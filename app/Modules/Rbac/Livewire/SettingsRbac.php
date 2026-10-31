@@ -110,6 +110,8 @@ class SettingsRbac extends Component
     ];
 
     // Export & Import Atribut (tab export_import)
+    public bool $showAtributImportModal = false;
+
     public $atributFile = null;
 
     public string $atributTarget = 'all';
@@ -238,7 +240,7 @@ class SettingsRbac extends Component
     {
         if (request()->has('tab')) {
             $tab = (string) request('tab');
-            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'export_import', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris'], true)) {
+            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'export_import', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit'], true)) {
                 $this->activeTab = $tab;
             }
         }
@@ -3514,7 +3516,7 @@ class SettingsRbac extends Component
 
     public function exportData(string $format = 'xlsx')
     {
-        $this->validate(['format' => 'in:xlsx,csv']);
+        $format = in_array(strtolower($format), ['xlsx', 'csv'], true) ? strtolower($format) : 'xlsx';
         $export = new AtributProdukExport(
             mode: 'template',
             cabangId: session('cabang_id')
@@ -3524,9 +3526,58 @@ class SettingsRbac extends Component
         return Excel::download($export, $fileName);
     }
 
+    public function exportAtributTarget(string $target, string $format = 'xlsx')
+    {
+        $target = $target === 'merk_hp' ? 'tipe_hp' : $target;
+        $validTargets = ['kategori', 'brand', 'kualitas', 'satuan', 'rak', 'tipe_hp'];
+        $spesifikTipe = in_array($target, $validTargets, true) ? $target : null;
+        $format = in_array(strtolower($format), ['xlsx', 'csv'], true) ? strtolower($format) : 'xlsx';
+
+        $export = new AtributProdukExport(
+            mode: 'data',
+            spesifikTipe: $spesifikTipe,
+            cabangId: session('cabang_id')
+        );
+        $fileName = 'data-atribut-'.($spesifikTipe ?: 'all').'-'.now()->format('Ymd-His').'.'.$format;
+
+        return Excel::download($export, $fileName);
+    }
+
+    public function downloadTemplateAtributTarget(string $target)
+    {
+        $target = $target === 'merk_hp' ? 'tipe_hp' : $target;
+        $validTargets = ['kategori', 'brand', 'kualitas', 'satuan', 'rak', 'tipe_hp'];
+        $spesifikTipe = in_array($target, $validTargets, true) ? $target : null;
+
+        $export = new AtributProdukExport(
+            mode: 'template',
+            spesifikTipe: $spesifikTipe,
+            cabangId: session('cabang_id')
+        );
+        $fileName = 'template-atribut-'.($spesifikTipe ?: 'all').'.xlsx';
+
+        return Excel::download($export, $fileName);
+    }
+
+    public function openImportModalFor(string $target): void
+    {
+        $this->atributTarget = $target === 'merk_hp' ? 'tipe_hp' : $target;
+        $this->atributFile = null;
+        $this->atributPreview = [];
+        $this->atributImportResult = [];
+        $this->atributStep = 'upload';
+        $this->showAtributImportModal = true;
+    }
+
+    public function closeAtributImportModal(): void
+    {
+        $this->showAtributImportModal = false;
+        $this->cancelImportAtribut();
+    }
+
     public function exportAtribut(string $format = 'xlsx')
     {
-        $this->validate(['format' => 'in:xlsx,csv']);
+        $format = in_array(strtolower($format), ['xlsx', 'csv'], true) ? strtolower($format) : 'xlsx';
         $export = new AtributProdukExport(
             mode: 'data',
             cabangId: session('cabang_id')

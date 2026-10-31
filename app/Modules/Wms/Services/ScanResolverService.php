@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Services;
 
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\ProdukBarcode;
 use App\Modules\Wms\Models\ProdukSatuanKonversi;
 use App\Modules\Wms\Models\SkuVariant;
 
@@ -148,6 +149,31 @@ class ScanResolverService
             ];
         }
 
+        // 2b. Cek multi barcode terindeks (barcode_1, barcode_2, barcode_3, ..., barcode_N)
+        $matchedBarcode = ProdukBarcode::where('barcode', $clean)
+            ->with(['produk' => fn ($p) => $p->with(['satuanKonversi', 'skuVariants'])])
+            ->first();
+
+        if ($matchedBarcode && $matchedBarcode->produk && $matchedBarcode->produk->is_active) {
+            $prod = $matchedBarcode->produk;
+            $variant = $prod->skuVariants->firstWhere('sku', $matchedBarcode->sku)
+                ?? $prod->skuVariants->first();
+
+            return [
+                'found' => true,
+                'type' => 'barcode_record',
+                'barcode_label' => $matchedBarcode->label,
+                'barcode_urutan' => $matchedBarcode->urutan,
+                'is_utama' => $matchedBarcode->is_utama,
+                'sku' => $matchedBarcode->sku ?: ($variant?->sku),
+                'produk' => $prod,
+                'variant' => $variant,
+                'satuan_konversi' => null,
+                'satuan_kode' => $prod->satuan ?: 'pcs',
+                'search_term' => $clean,
+            ];
+        }
+
         // 3. Cek format UTP-XXXXX (format cetak QR label stiker produk bawaan)
         if (preg_match('/^UTP-0*([1-9]\d*)$/i', $clean, $matches)) {
             $id = (int) $matches[1];
@@ -165,10 +191,12 @@ class ScanResolverService
             }
         }
 
-        // 4. Cek produk: barcode, slug, ID numerik, atau nama produk
+        // 4. Cek produk: barcode (utama & multi barcode / QR alt), slug, ID numerik, atau nama produk
         $produk = Produk::where('is_active', true)
             ->where(function ($query) use ($clean) {
                 $query->where('barcode', $clean)
+                    ->orWhereJsonContains('barcode_alt', $clean)
+                    ->orWhere('barcode_alt', 'like', '%"'.$clean.'"%')
                     ->orWhere('slug', $clean)
                     ->when(is_numeric($clean) && (float) $clean <= 2147483647, fn ($sub) => $sub->orWhere('id', (int) $clean))
                     ->orWhere('nama', $clean);

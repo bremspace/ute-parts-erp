@@ -180,7 +180,7 @@ class ReturPenjualanExchangeTest extends TestCase
             ->assertSee('BAR-LCD-02');
     }
 
-    public function test_validasi_kategori_produk_pengganti_beda_kategori_ditolak(): void
+    public function test_validasi_kategori_produk_pengganti_beda_kategori_diizinkan_jika_harga_memenuhi(): void
     {
         [$transaksi, $item] = $this->buatTransaksiAwal();
 
@@ -192,10 +192,8 @@ class ReturPenjualanExchangeTest extends TestCase
 
         $service = app(ReturnPenjualanService::class);
 
-        $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('kategori yang sama');
-
-        $service->buatRetur(
+        // Produk pengganti beda kategori (global) dengan harga 350.000 >= 250.000 berhasil
+        $retur = $service->buatRetur(
             $transaksi,
             [['transaksi_item_id' => $item->id, 'jumlah' => 1, 'kondisi_barang' => 'bagus']],
             'Ingin ganti ke baterai',
@@ -204,6 +202,9 @@ class ReturPenjualanExchangeTest extends TestCase
             'tukar_produk',
             [['produk_id' => $this->produkPenggantiBedaKategori->id, 'jumlah' => 1, 'harga_satuan' => 350000]]
         );
+
+        $this->assertNotNull($retur);
+        $this->assertEquals('tukar_produk', $retur->tipe_penyelesaian);
     }
 
     public function test_validasi_harga_unit_produk_pengganti_lebih_rendah_ditolak(): void

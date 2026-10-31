@@ -1850,6 +1850,31 @@
 
     @elseif($activeTab === 'atribut')
         <!-- TAB 4: ATRIBUT PRODUK WORKSPACE -->
+        <!-- Quick Integration Navigation Bar -->
+        <div class="p-4 rounded-2xl bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">🔗</span>
+                <div>
+                    <h4 class="text-xs font-bold text-ink-900 dark:text-white">Pusat Integrasi Master Atribut Produk</h4>
+                    <p class="text-[11px] text-ink-400">Kelola langsung master referensi (Kategori, Brand, Kualitas, Satuan, Rak, Tipe HP) yang terhubung ke WMS.</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="/app/pengaturan?tab=master" wire:navigate class="px-3 py-1.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-xs font-semibold text-ink-700 dark:text-ink-200 border border-black/10 dark:border-white/10 flex items-center gap-1.5 transition">
+                    <span>⚙️</span>
+                    <span>Kelola Master Atribut</span>
+                </a>
+                <a href="/app/pengaturan?tab=cabang" wire:navigate class="px-3 py-1.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-xs font-semibold text-ink-700 dark:text-ink-200 border border-black/10 dark:border-white/10 flex items-center gap-1.5 transition">
+                    <span>🏬</span>
+                    <span>Kelola Lokasi Rak</span>
+                </a>
+                <a href="/app/pengaturan?tab=export_import" wire:navigate class="px-3 py-1.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-xs font-bold text-up-primary border border-up-primary/20 flex items-center gap-1.5 transition">
+                    <span>📑</span>
+                    <span>Buka di Pengaturan</span>
+                </a>
+            </div>
+        </div>
+
         @if($atributStep === 'upload')
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Card 1: Export & Template Atribut -->

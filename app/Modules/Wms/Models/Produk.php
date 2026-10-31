@@ -18,7 +18,7 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
-    'nama', 'slug', 'barcode', 'deskripsi', 'kategori', 'kategori_id', 'brand_kompatibel',
+    'nama', 'slug', 'barcode', 'barcode_alt', 'deskripsi', 'kategori', 'kategori_id', 'brand_kompatibel',
     'model_kompatibel', 'kondisi', 'satuan', 'harga_beli',
     'metode_harga_beli', 'harga_jual_retail', 'margin_persen', 'gambar', 'foto', 'meta_title', 'meta_description',
     'kompatibilitas_hp', 'is_active',
@@ -66,6 +66,7 @@ class Produk extends Model
         'harga_jual_retail' => 'decimal:2',
         'margin_persen' => 'decimal:2',
         'foto' => 'array', // [T-11]
+        'barcode_alt' => 'array', // Multi Barcode / QR tambahan
         'kompatibilitas_hp' => 'array', // [T-11] terstruktur [{merk, model}]
         'is_ondemand' => 'boolean',
         'reorder_point' => 'integer',
@@ -78,12 +79,145 @@ class Produk extends Model
         return $this->hasMany(SkuVariant::class)->orderBy('is_active', 'desc');
     }
 
+    public function barcodes(): HasMany
+    {
+        return $this->hasMany(ProdukBarcode::class, 'produk_id')->orderBy('urutan');
+    }
+
+    /**
+     * Sinkronisasi daftar barcode ke format barcode_1, barcode_2, barcode_3, dst.
+     * barcode_1 adalah barcode utama; barcode_2 dst adalah alternatif.
+     * Otomatis memperbarui kolom 'barcode', 'barcode_alt', dan tabel 'produk_barcodes'.
+     *
+     * @param  array<int|string, string>  $barcodes
+     */
+    public function syncBarcodes(array $barcodes, ?string $sku = null): void
+    {
+        $cleanList = [];
+        foreach ($barcodes as $val) {
+            $valTrim = trim((string) $val);
+            if ($valTrim !== '' && ! in_array($valTrim, $cleanList, true)) {
+                $cleanList[] = $valTrim;
+            }
+        }
+
+        $targetSku = $sku ?: ($this->skuVariants->first()?->sku ?? $this->kode);
+
+        if (empty($cleanList)) {
+            $this->barcode = null;
+            $this->barcode_alt = null;
+            $this->saveQuietly();
+            $this->barcodes()->delete();
+
+            return;
+        }
+
+        $utama = $cleanList[0];
+        $altMap = [];
+        for ($i = 1; $i < count($cleanList); $i++) {
+            $idx = $i + 1;
+            $altMap["barcode_{$idx}"] = $cleanList[$i];
+        }
+
+        $this->barcode = $utama;
+        $this->barcode_alt = ! empty($altMap) ? $altMap : null;
+        $this->saveQuietly();
+
+        // Re-sync tabel produk_barcodes
+        $this->barcodes()->delete();
+
+        $now = now();
+        $inserts = [];
+        foreach ($cleanList as $index => $bc) {
+            $urutan = $index + 1;
+            $inserts[] = [
+                'produk_id' => $this->id,
+                'sku' => $targetSku,
+                'barcode' => $bc,
+                'label' => "barcode_{$urutan}",
+                'urutan' => $urutan,
+                'is_utama' => $urutan === 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        ProdukBarcode::insert($inserts);
+    }
+
+    /**
+     * Peta terstruktur barcode produk: ['barcode_1' => '...', 'barcode_2' => '...'].
+     *
+     * @return array<string, string>
+     */
+    public function getBarcodeFormatMapAttribute(): array
+    {
+        $all = $this->all_barcodes;
+        $map = [];
+        foreach ($all as $idx => $bc) {
+            $num = $idx + 1;
+            $map["barcode_{$num}"] = $bc;
+        }
+
+        return $map;
+    }
+
     /**
      * SKU Produk utama (diambil dari varian aktif pertama).
      */
     public function getSkuAttribute(): ?string
     {
         return $this->skuVariants->first()?->sku;
+    }
+
+    /**
+     * Seluruh barcode produk (barcode utama + barcode alternatif / QR tambahan).
+     *
+     * @return array<int, string>
+     */
+    public function getAllBarcodesAttribute(): array
+    {
+        if ($this->relationLoaded('barcodes') && $this->barcodes->isNotEmpty()) {
+            return $this->barcodes->pluck('barcode')->all();
+        }
+
+        $barcodes = [];
+        if (! empty($this->barcode)) {
+            $barcodes[] = trim((string) $this->barcode);
+        }
+        if (! empty($this->barcode_alt) && is_array($this->barcode_alt)) {
+            foreach ($this->barcode_alt as $alt) {
+                $trimmed = trim((string) $alt);
+                if ($trimmed !== '' && ! in_array($trimmed, $barcodes, true)) {
+                    $barcodes[] = $trimmed;
+                }
+            }
+        }
+
+        return $barcodes;
+    }
+
+    /**
+     * Cek apakah kode cocok dengan barcode utama atau salah satu barcode alternatif.
+     */
+    public function hasBarcode(string $code): bool
+    {
+        $clean = trim($code);
+        if ($clean === '') {
+            return false;
+        }
+
+        return in_array($clean, $this->all_barcodes, true);
+    }
+
+    /**
+     * Representasi string barcode alternatif (dipisahkan koma).
+     */
+    public function getBarcodeAltStringAttribute(): string
+    {
+        return ! empty($this->barcode_alt) && is_array($this->barcode_alt)
+            ? implode(', ', array_filter($this->barcode_alt))
+            : '';
     }
 
     public function brand(): BelongsTo

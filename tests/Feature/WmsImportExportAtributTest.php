@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Exports\AtributProdukExport;
+use App\Modules\Wms\Livewire\ImportExportPage;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
@@ -227,7 +228,9 @@ class WmsImportExportAtributTest extends TestCase
             ->assertSee('Export &amp; Import Master Data', false)
             ->assertSee('Template .xlsx')
             ->assertSee('Data .xlsx')
-            ->call('downloadTemplateAtribut');
+            ->call('downloadTemplateAtribut')
+            ->call('exportAtribut', 'xlsx')
+            ->call('exportAtribut', 'csv');
 
         Excel::assertDownloaded('template-atribut.xlsx');
     }
@@ -260,6 +263,48 @@ class WmsImportExportAtributTest extends TestCase
         ]);
         $this->assertDatabaseHas('kategori_produk', [
             'nama' => 'Sub Kategori Baris',
+        ]);
+    }
+
+    public function test_wms_import_export_page_tab_atribut_renders_without_error(): void
+    {
+        Excel::fake();
+
+        $this->actingAs($this->admin);
+        session(['cabang_id' => $this->cabang->id]);
+
+        $response = $this->get('/app/wms/import-export?tab=atribut');
+        $response->assertStatus(200);
+        $response->assertSee('Pusat Integrasi Master Atribut Produk');
+        $response->assertSee('Ekspor &amp; Unduh Template Atribut', false);
+
+        Livewire::test(ImportExportPage::class)
+            ->set('activeTab', 'atribut')
+            ->assertSet('atributStep', 'upload')
+            ->assertSee('Pusat Integrasi Master Atribut Produk')
+            ->call('downloadTemplateAtribut')
+            ->call('exportAtribut', 'xlsx')
+            ->call('exportAtribut', 'csv');
+
+        Excel::assertDownloaded('template-atribut.xlsx');
+
+        // Test preview dan commit atribut di WMS ImportExportPage
+        $csvContent = "kategori_utama,sub_kategori,kode_slug,urutan,is_active\n"
+                    ."Kategori WMS,Sub Kategori WMS,kategori-wms,1,ya\n";
+        $tempFile = UploadedFile::fake()->createWithContent('kategori_wms.csv', $csvContent);
+
+        Livewire::test(ImportExportPage::class)
+            ->set('activeTab', 'atribut')
+            ->set('atributTarget', 'kategori')
+            ->set('atributFile', $tempFile)
+            ->call('previewImportAtribut')
+            ->assertSet('atributStep', 'preview')
+            ->assertSee('Kategori WMS')
+            ->call('commitImportAtribut')
+            ->assertSet('atributStep', 'selesai');
+
+        $this->assertDatabaseHas('kategori_produk', [
+            'nama' => 'Kategori WMS',
         ]);
     }
 }

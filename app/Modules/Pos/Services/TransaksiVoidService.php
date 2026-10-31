@@ -11,6 +11,7 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Services\NomorSeriService;
@@ -197,6 +198,9 @@ class TransaksiVoidService
                 'void_alasan' => $alasan,
                 'catatan' => trim(($transaksi->catatan ?? '').' [VOID pada '.now()->format('d/m/Y H:i')." oleh {$authorizerUser->name}: {$alasan}]"),
             ]);
+
+            // [F1-4] Catat log aktivitas void berbasis Transaction-Centric + Dual-Indexing di metadata
+            app(TransactionActivityLogService::class)->catatVoid($transaksi, $authorizerUser, $alasan);
 
             return $transaksi;
         });

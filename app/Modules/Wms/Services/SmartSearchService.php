@@ -207,8 +207,15 @@ class SmartSearchService
             ->all() : [];
 
         return $query->where(function ($sub) use ($term, $tokenGroups, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds, $matchingSupplierIds) {
-            // 1. Exact match Barcode utama produk (B-Tree index)
+            // 1. Exact match Barcode utama produk & multi barcode terindeks (barcode_1 .. barcode_N)
             $sub->where('produk.barcode', $term)
+                ->orWhereExists(function ($ex) use ($term) {
+                    $ex->select(DB::raw(1))
+                        ->from('produk_barcodes')
+                        ->whereColumn('produk_barcodes.produk_id', 'produk.id')
+                        ->where('produk_barcodes.barcode', $term);
+                })
+                ->orWhere('produk.barcode_alt', 'like', "%\"{$term}\"%")
                 // 2. Barcode & SKU varian produk (subquery terindeks)
                 ->orWhereIn('produk.id', SkuVariant::query()
                     ->where('is_active', true)

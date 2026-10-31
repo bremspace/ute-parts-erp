@@ -102,8 +102,14 @@ class RiwayatAktivitas extends Component
     // ===== Filter =====
     public string $filterUser = '';
 
-    /** '' | created | updated | deleted */
+    /** '' | created | updated | deleted | penjualan | void | retur_penjualan | dll */
     public string $filterAksi = '';
+
+    /** Filter khusus kategori alur transaksi */
+    public string $filterKategoriTransaksi = '';
+
+    /** Filter pencarian produk / SKU di histori transaksi */
+    public string $filterProduk = '';
 
     public string $filterDari = '';
 
@@ -115,7 +121,7 @@ class RiwayatAktivitas extends Component
 
     public function updating(string $property): void
     {
-        if (str_starts_with($property, 'filter')) {
+        if (str_starts_with($property, 'filter') || $property === 'tipe') {
             $this->halaman = 1;
         }
     }
@@ -134,6 +140,8 @@ class RiwayatAktivitas extends Component
     {
         $this->filterUser = '';
         $this->filterAksi = '';
+        $this->filterKategoriTransaksi = '';
+        $this->filterProduk = '';
         $this->filterDari = '';
         $this->filterSampai = '';
         $this->halaman = 1;
@@ -248,21 +256,71 @@ class RiwayatAktivitas extends Component
 
         $query = AktivitasLog::query()->orderByDesc('id');
 
-        if ($this->tipe !== '') {
-            $modelClass = self::TIPE[$this->tipe] ?? null;
-            if ($modelClass) {
-                $query->where('subject_type', $modelClass);
+        // [Dual-Indexing] Jika melihat riwayat produk, sertakan transaksi yang menyangkut produk ini
+        if ($this->tipe === 'produk' && $this->entityId !== null) {
+            $produkId = (int) $this->entityId;
+            $modelClass = self::TIPE['produk'] ?? Produk::class;
+            $query->where(function ($q) use ($modelClass, $produkId) {
+                $q->where(function ($direct) use ($modelClass, $produkId) {
+                    $direct->where('subject_type', $modelClass)
+                        ->where('subject_id', $produkId);
+                })->orWhereJsonContains('properties->produk_ids', $produkId);
+            });
+        } else {
+            if ($this->tipe !== '') {
+                $modelClass = self::TIPE[$this->tipe] ?? null;
+                if ($modelClass) {
+                    $query->where('subject_type', $modelClass);
+                }
+            }
+
+            if ($this->entityId !== null) {
+                // Scope per entitas: cabang sudah diverifikasi di getAksesProperty()
+                $query->where('subject_id', $this->entityId);
+            } else {
+                $cabangId = (int) session('cabang_id');
+                if ($cabangId && ! $this->adalahSuperAdmin()) {
+                    $query->where(fn ($q) => $q->where('cabang_id', $cabangId)->orWhereNull('cabang_id'));
+                }
             }
         }
 
-        if ($this->entityId !== null) {
-            // Scope per entitas: cabang sudah diverifikasi di getAksesProperty()
-            $query->where('subject_id', $this->entityId);
-        } else {
-            $cabangId = (int) session('cabang_id');
-            if ($cabangId && ! $this->adalahSuperAdmin()) {
-                $query->where(fn ($q) => $q->where('cabang_id', $cabangId)->orWhereNull('cabang_id'));
+        // Filter Kategori Alur Transaksi
+        if ($this->filterKategoriTransaksi !== '') {
+            $kat = $this->filterKategoriTransaksi;
+            $query->where(function ($q) use ($kat) {
+                $q->where('event', $kat)
+                    ->orWhere('properties->tipe_transaksi', $kat);
+            });
+        }
+
+        // Filter Pencarian Produk / SKU pada transaksi
+        $filterProduk = trim($this->filterProduk);
+        if ($filterProduk !== '') {
+            $pIds = Produk::query()
+                ->where('nama', 'like', "%{$filterProduk}%")
+                ->orWhere('barcode', 'like', "%{$filterProduk}%")
+                ->orWhereHas('skuVariants', fn ($q) => $q->where('sku', 'like', "%{$filterProduk}%"))
+                ->pluck('id')
+                ->all();
+
+            if (ctype_digit($filterProduk)) {
+                $pIds[] = (int) $filterProduk;
             }
+            $pIds = array_values(array_unique($pIds));
+
+            $query->where(function ($q) use ($filterProduk, $pIds) {
+                if (! empty($pIds)) {
+                    $q->where(function ($p) use ($pIds) {
+                        $p->where('subject_type', Produk::class)->whereIn('subject_id', $pIds);
+                    });
+                    foreach ($pIds as $pId) {
+                        $q->orWhereJsonContains('properties->produk_ids', (int) $pId);
+                    }
+                }
+                $q->orWhere('description', 'like', "%{$filterProduk}%")
+                    ->orWhere('properties', 'like', "%{$filterProduk}%");
+            });
         }
 
         if ($this->filterAksi !== '') {
@@ -325,6 +383,27 @@ class RiwayatAktivitas extends Component
                 'created' => 'Dibuat',
                 'updated' => 'Diperbarui',
                 'deleted' => 'Dihapus',
+                'penjualan' => 'Penjualan Kasir',
+                'void' => 'Void / Dibatalkan',
+                'retur_penjualan' => 'Retur Penjualan',
+                'po_dibuat' => 'PO Dibuat',
+                'grn_diterima' => 'GRN Diterima',
+                'retur_pembelian' => 'Retur Supplier',
+                'transfer_stok' => 'Transfer Stok',
+                'stok_opname' => 'Stok Opname',
+                'servis' => 'Tiket Servis',
+            ],
+            'opsiKategoriTransaksi' => [
+                '' => 'Semua Jenis Alur Transaksi',
+                'penjualan' => 'Penjualan Kasir (POS)',
+                'void' => 'Void / Pembatalan Penjualan',
+                'retur_penjualan' => 'Retur Penjualan Konsumen',
+                'po' => 'Purchase Order (PO)',
+                'grn' => 'Penerimaan Barang (GRN)',
+                'retur_pembelian' => 'Retur Barang ke Supplier',
+                'transfer_stok' => 'Transfer Stok Antar Gudang',
+                'stok_opname' => 'Stok Opname & Penyesuaian',
+                'servis' => 'Tiket & Pengerjaan Servis',
             ],
             'opsiTipe' => [
                 '' => 'Semua Modul / Entitas',

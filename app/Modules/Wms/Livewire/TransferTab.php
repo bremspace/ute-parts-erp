@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
@@ -153,7 +154,8 @@ class TransferTab extends Component
             $cleanTerm = $result['search_term'] ?: $term;
             $produk = $query->where(function ($q) use ($cleanTerm) {
                 $q->where('barcode', $cleanTerm)
-                    ->orWhere('sku', $cleanTerm)
+                    ->orWhere('barcode_alt', $cleanTerm)
+                    ->orWhere('kode_lama', $cleanTerm)
                     ->orWhereHas('skuVariants', fn ($sv) => $sv->where('barcode', $cleanTerm)->orWhere('sku', $cleanTerm));
             })->first();
 
@@ -426,6 +428,9 @@ class TransferTab extends Component
                     'created_by' => auth()->id() ?? 1, // [T-41] audit trail
                 ]);
             }
+
+            // [F1-4] Catat log aktivitas transfer berbasis Transaction-Centric + Dual-Indexing di metadata
+            app(TransactionActivityLogService::class)->catatTransferStok($transfer, 'dibuat');
         });
 
         $this->showTransferModal = false;
@@ -494,6 +499,9 @@ class TransferTab extends Component
                     'approved_by' => auth()->id(), // [T-41] audit trail — yang menyetujui kirim
                     'approved_at' => now(),
                 ]);
+
+                // [F1-4] Catat log aktivitas transfer berbasis Transaction-Centric + Dual-Indexing di metadata
+                app(TransactionActivityLogService::class)->catatTransferStok($transfer, 'dikirim');
             });
 
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Transfer berhasil dikirim']);
@@ -560,6 +568,9 @@ class TransferTab extends Component
                     'tanggal_terima' => now(),
                     'user_penerima_id' => auth()->id(),
                 ]);
+
+                // [F1-4] Catat log aktivitas transfer berbasis Transaction-Centric + Dual-Indexing di metadata
+                app(TransactionActivityLogService::class)->catatTransferStok($transfer, 'diterima');
             });
 
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Transfer berhasil diterima dan stok ditambahkan']);

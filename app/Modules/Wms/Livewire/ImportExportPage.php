@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Modules\Wms\Exports\AtributProdukExport;
 use App\Modules\Wms\Exports\BulkFotoSkippedExport;
 use App\Modules\Wms\Exports\ImportProdukTemplateExport;
 use App\Modules\Wms\Jobs\ImportFotoMasalJob;
@@ -10,6 +11,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Services\BulkProductImageImportService;
 use App\Modules\Wms\Services\ExportMasterProdukService;
+use App\Modules\Wms\Services\ImportAtributService;
 use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\ImportSidRetailService;
 use Illuminate\Support\Facades\Storage;
@@ -103,10 +105,23 @@ class ImportExportPage extends Component
 
     public int $fotoErrorDisplayLimit = 50;
 
+    // --- TAB 4: ATRIBUT PRODUK WORKSPACE ---
+    public $atributFile = null;
+
+    public string $atributTarget = 'all';
+
+    public string $atributStep = 'upload'; // 'upload' | 'preview' | 'selesai'
+
+    public array $atributPreview = [];
+
+    public array $atributImportResult = [];
+
+    public string $atributActivePreviewTab = 'kategori';
+
     public function mount(): void
     {
         $reqTab = request('tab', 'import');
-        $this->activeTab = in_array($reqTab, ['import', 'export', 'foto'], true) ? $reqTab : 'import';
+        $this->activeTab = in_array($reqTab, ['import', 'export', 'foto', 'atribut'], true) ? $reqTab : 'import';
 
         $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
         $gudangPertama = Gudang::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->first();
@@ -1022,6 +1037,72 @@ class ImportExportPage extends Component
         $this->fotoSuccessCount = 0;
         $this->fotoErrorCount = 0;
         $this->fotoCompletedSummary = [];
+    }
+
+    // ===== TAB 4: EXPORT & IMPORT ATRIBUT PRODUK =====
+
+    public function exportAtribut(string $format = 'xlsx')
+    {
+        $format = in_array(strtolower($format), ['xlsx', 'csv'], true) ? strtolower($format) : 'xlsx';
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
+        $export = new AtributProdukExport(
+            mode: 'data',
+            cabangId: $cabangId
+        );
+        $fileName = 'data-atribut-'.now()->format('Ymd-His').'.'.$format;
+
+        return Excel::download($export, $fileName);
+    }
+
+    public function downloadTemplateAtribut()
+    {
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
+        $export = new AtributProdukExport(
+            mode: 'template',
+            cabangId: $cabangId
+        );
+        $fileName = 'template-atribut.xlsx';
+
+        return Excel::download($export, $fileName);
+    }
+
+    public function previewImportAtribut(): void
+    {
+        $this->validate(['atributFile' => 'required|file|mimes:xlsx,xls,csv|max:20480']);
+
+        $service = app(ImportAtributService::class);
+        $filePath = is_string($this->atributFile) ? $this->atributFile : $this->atributFile->getRealPath();
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
+        $preview = $service->preview($filePath, $this->atributTarget ?? 'all', $cabangId);
+
+        $this->atributPreview = $preview;
+        $this->atributStep = 'preview';
+    }
+
+    public function commitImportAtribut(): void
+    {
+        $service = app(ImportAtributService::class);
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
+        $result = $service->execute($this->atributPreview['items'] ?? [], $cabangId);
+
+        $this->atributImportResult = $result;
+        $this->atributStep = 'selesai';
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Import Atribut Produk Berhasil']);
+    }
+
+    public function cancelImportAtribut(): void
+    {
+        $this->reset('atributFile', 'atributStep', 'atributPreview', 'atributImportResult');
+    }
+
+    public function batalImportAtribut(): void
+    {
+        $this->cancelImportAtribut();
+    }
+
+    public function setAtributActivePreviewTab(string $tab): void
+    {
+        $this->atributActivePreviewTab = $tab;
     }
 
     public function render()

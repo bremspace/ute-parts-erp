@@ -36,42 +36,53 @@
         </div>
     </div>
 
-    <!-- Ringkasan Statistik Pengadaan (KPI Cards) -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <!-- Ringkasan Statistik Pengadaan & Retur (KPI Cards) -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <div class="p-4 rounded-2xl glass-card bg-white/70 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 shadow-sm">
             <div class="text-[11px] font-semibold text-ink-500 dark:text-ink-400 mb-1 flex items-center justify-between">
-                <span>Total Pemesanan (PO)</span>
+                <span>Total PO Masuk</span>
                 <span>📦</span>
             </div>
             <div class="text-xl sm:text-2xl font-black text-ink-900 dark:text-white tabular-nums">
                 {{ number_format($totalPo) }}
             </div>
-            <div class="text-[10px] text-ink-400 mt-0.5">Dokumen PO terfilter</div>
+            <div class="text-[10px] text-ink-400 mt-0.5">{{ number_format($totalQty) }} unit ({{ number_format($totalProdukUnik) }} SKU)</div>
         </div>
 
         <div class="p-4 rounded-2xl glass-card bg-white/70 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 shadow-sm">
             <div class="text-[11px] font-semibold text-ink-500 dark:text-ink-400 mb-1 flex items-center justify-between">
-                <span>Total Unit Dipesan</span>
-                <span>🔢</span>
-            </div>
-            <div class="text-xl sm:text-2xl font-black text-up-primary tabular-nums">
-                {{ number_format($totalQty) }} <span class="text-xs font-normal text-ink-400">unit</span>
-            </div>
-            <div class="text-[10px] text-ink-400 mt-0.5">Dari {{ number_format($totalProdukUnik) }} SKU produk berbeda</div>
-        </div>
-
-        <div class="p-4 rounded-2xl glass-card bg-white/70 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 shadow-sm">
-            <div class="text-[11px] font-semibold text-ink-500 dark:text-ink-400 mb-1 flex items-center justify-between">
-                <span>Total Belanja Pengadaan</span>
+                <span>Total Belanja Bruto</span>
                 <span>💰</span>
             </div>
             <div class="text-lg sm:text-xl font-black text-up-mint tabular-nums">
                 Rp {{ number_format($totalNilai, 0, ',', '.') }}
             </div>
-            <div class="text-[10px] text-ink-400 mt-0.5">Nilai subtotal transaksi</div>
+            <div class="text-[10px] text-ink-400 mt-0.5">Nilai subtotal PO bruto</div>
         </div>
 
         <div class="p-4 rounded-2xl glass-card bg-white/70 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 shadow-sm">
+            <div class="text-[11px] font-semibold text-up-red mb-1 flex items-center justify-between">
+                <span>Retur ke Supplier</span>
+                <span>↩️</span>
+            </div>
+            <div class="text-lg sm:text-xl font-black text-up-red tabular-nums">
+                -Rp {{ number_format($totalReturNilai, 0, ',', '.') }}
+            </div>
+            <div class="text-[10px] text-ink-400 mt-0.5">{{ number_format($totalReturDokumen) }} Retur ({{ number_format($totalReturQty) }} unit)</div>
+        </div>
+
+        <div class="p-4 rounded-2xl glass-card bg-white/70 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 shadow-sm">
+            <div class="text-[11px] font-semibold text-up-primary mb-1 flex items-center justify-between">
+                <span>Net Pengadaan Bersih</span>
+                <span>⚖️</span>
+            </div>
+            <div class="text-lg sm:text-xl font-black text-up-primary tabular-nums">
+                Rp {{ number_format($netPengadaanNilai, 0, ',', '.') }}
+            </div>
+            <div class="text-[10px] text-ink-400 mt-0.5">Net Qty: {{ number_format($netPengadaanQty) }} unit</div>
+        </div>
+
+        <div class="p-4 rounded-2xl glass-card bg-white/70 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 shadow-sm col-span-2 lg:col-span-1">
             <div class="text-[11px] font-semibold text-ink-500 dark:text-ink-400 mb-1 flex items-center justify-between">
                 <span>Rata-Rata per PO</span>
                 <span>📊</span>
@@ -389,8 +400,8 @@
                     </button>
                 </div>
 
-                <!-- Statistik Ringkasan Part -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4 shrink-0">
+                <!-- Statistik Ringkasan Part & Retur -->
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 my-4 shrink-0 text-xs">
                     <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
                         <span class="text-[11px] font-semibold text-ink-400 block">Harga Terakhir</span>
                         <span class="text-base sm:text-lg font-bold text-white tabular-nums">
@@ -400,19 +411,11 @@
                     </div>
 
                     <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
-                        <span class="text-[11px] font-semibold text-up-mint block">Rata-rata (Weighted Avg)</span>
+                        <span class="text-[11px] font-semibold text-up-mint block">Rata-rata (Weighted)</span>
                         <span class="text-base sm:text-lg font-bold text-up-mint tabular-nums">
                             Rp {{ number_format($historiStatistik['harga_rata_rata'] ?? 0, 0, ',', '.') }}
                         </span>
                         <span class="text-[9px] text-up-mint/80 block mt-0.5">Moving Average PO</span>
-                    </div>
-
-                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
-                        <span class="text-[11px] font-semibold text-ink-400 block">Harga Terendah</span>
-                        <span class="text-base sm:text-lg font-bold text-white tabular-nums">
-                            Rp {{ number_format($historiStatistik['harga_terendah'] ?? 0, 0, ',', '.') }}
-                        </span>
-                        <span class="text-[9px] text-ink-500 block mt-0.5">Best Deal</span>
                     </div>
 
                     <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
@@ -422,6 +425,26 @@
                         </span>
                         <span class="text-[9px] text-ink-500 block mt-0.5">
                             Dari {{ $historiStatistik['total_transaksi'] ?? 0 }} PO
+                        </span>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                        <span class="text-[11px] font-semibold text-up-red block">Total Retur Part</span>
+                        <span class="text-base sm:text-lg font-bold text-up-red tabular-nums">
+                            {{ number_format($historiStatistik['total_retur_qty'] ?? 0) }} unit
+                        </span>
+                        <span class="text-[9px] text-ink-400 block mt-0.5">
+                            Rp {{ number_format($historiStatistik['total_retur_nilai'] ?? 0, 0, ',', '.') }}
+                        </span>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 col-span-2 sm:col-span-1">
+                        <span class="text-[11px] font-semibold text-up-primary block">Net Pengadaan</span>
+                        <span class="text-base sm:text-lg font-bold text-up-primary tabular-nums">
+                            {{ number_format($historiStatistik['net_pengadaan_qty'] ?? 0) }} unit
+                        </span>
+                        <span class="text-[9px] text-ink-400 block mt-0.5">
+                            Bersih: Rp {{ number_format($historiStatistik['net_pengadaan_nilai'] ?? 0, 0, ',', '.') }}
                         </span>
                     </div>
                 </div>

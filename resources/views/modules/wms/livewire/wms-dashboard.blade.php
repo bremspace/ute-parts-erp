@@ -65,10 +65,10 @@
                         @endcanany
                         @can('wms.create')
                         <a
-                            href="/app/pengaturan?tab=export_import"
+                            href="/app/wms/import-export"
                             wire:navigate
                             class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                            title="Export & Import Master Produk & Atribut di Pengaturan"
+                            title="Export & Import Master Produk"
                         >
                             <span>📥</span>
                             <span>Import Excel</span>
@@ -77,7 +77,7 @@
                             href="/app/wms/import-foto"
                             wire:navigate
                             class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                            title="Import Foto Bulk"
+                            title="Upload Massal Foto Produk"
                         >
                             <span>📸</span>
                             <span>Import Foto</span>

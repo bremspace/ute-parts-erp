@@ -134,9 +134,17 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     @forelse($suppliers as $sp)
                         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 flex items-start justify-between gap-2">
-                            <div class="space-y-0.5">
+                            <div class="space-y-1">
                                 <div class="flex items-center gap-1.5">
-                                    <p class="text-xs font-bold text-white">{{ $sp->nama }}</p>
+                                    <button
+                                        type="button"
+                                        wire:click="bukaProfilSupplier({{ $sp->id }})"
+                                        class="text-xs font-bold text-white hover:text-up-mint hover:underline text-left cursor-pointer flex items-center gap-1"
+                                        title="Buka Profil & Riwayat Lengkap"
+                                    >
+                                        <span>{{ $sp->nama }}</span>
+                                        <span class="text-[9px] text-ink-400">↗</span>
+                                    </button>
                                     @if(! $sp->is_active)
                                         <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-red/10 text-up-red font-semibold">Nonaktif</span>
                                     @endif
@@ -145,8 +153,20 @@
                                 @if($sp->kontak)
                                     <p class="text-[10px] text-ink-500">PIC: {{ $sp->kontak }}</p>
                                 @endif
+                                <div class="text-[10px] text-ink-400 flex items-center gap-1">
+                                    <span>Saldo Deposit Retur:</span>
+                                    <span class="font-bold text-up-mint tabular-nums">Rp {{ number_format($sp->saldo_deposit ?? 0, 0, ',', '.') }}</span>
+                                </div>
                             </div>
                             <div class="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    wire:click="bukaProfilSupplier({{ $sp->id }})"
+                                    class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition text-xs cursor-pointer"
+                                    title="Profil & Riwayat Lengkap Supplier"
+                                >
+                                    👤
+                                </button>
                                 @can('wms.create')
                                     <button
                                         wire:click="bukaEditSupplier({{ $sp->id }})"
@@ -447,23 +467,82 @@
 
     <!-- MODAL: TAMBAH SUPPLIER [T-10] -->
     @if($showSupplierModal)
-        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Tambah Supplier</h3>
-                    <button wire:click="$set('showSupplierModal', false)" class="text-ink-400 hover:text-white">✕</button>
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+            <div class="w-full max-w-lg glass-panel p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+                <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10">
+                    <div>
+                        <h3 class="text-base font-bold text-white">Tambah Supplier Baru</h3>
+                        <p class="text-[10px] text-ink-400">Database lengkap supplier: profil, termin, dan rekening bank</p>
+                    </div>
+                    <button wire:click="$set('showSupplierModal', false)" class="text-ink-400 hover:text-white cursor-pointer font-bold text-base">✕</button>
                 </div>
-                <div class="space-y-3">
-                    <div><label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama *</label><input type="text" wire:model="supplierForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" /></div>
-                    <div><label class="block text-xs font-semibold text-ink-300 mb-1.5">Kontak / PIC</label><input type="text" wire:model="supplierForm.kontak" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" /></div>
-                    <div><label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon</label><input type="text" wire:model="supplierForm.telepon" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" /></div>
-                    <div><label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label><textarea wire:model="supplierForm.alamat" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea></div>
-                    <div><label class="block text-xs font-semibold text-ink-300 mb-1.5">Termin (hari)</label><input type="number" wire:model="supplierForm.termin_hari" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" /></div>
+                <div class="space-y-3 flex-1 overflow-y-auto pr-1 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Nama Supplier / PT / Toko *</label>
+                            <input type="text" wire:model="supplierForm.nama" placeholder="Contoh: PT. Bintang Parts Indonesia" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium" />
+                            @error('supplierForm.nama') <span class="text-up-red text-[10px]">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Kontak / PIC</label>
+                            <input type="text" wire:model="supplierForm.kontak" placeholder="Nama sales / PIC" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Nomor Telepon / WA</label>
+                            <input type="text" wire:model="supplierForm.telepon" placeholder="08xxxxxxxxxx" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Email Resmi</label>
+                            <input type="email" wire:model="supplierForm.email" placeholder="sales@supplier.com" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                            @error('supplierForm.email') <span class="text-up-red text-[10px]">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Termin Pembayaran (Hari)</label>
+                            <input type="number" wire:model="supplierForm.termin_hari" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Alamat Kantor / Gudang</label>
+                            <textarea wire:model="supplierForm.alamat" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs" placeholder="Alamat pengiriman / workshop supplier"></textarea>
+                        </div>
+                    </div>
+
+                    {{-- Data Rekening Bank --}}
+                    <div class="pt-2 border-t border-white/5 space-y-2">
+                        <span class="text-[10px] font-bold text-up-mint uppercase tracking-wider block">Rekening Bank untuk Pembayaran PO / Refund</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div>
+                                <label class="block text-[11px] text-ink-400 mb-1">Nama Bank</label>
+                                <input type="text" wire:model="supplierForm.bank_nama" placeholder="BCA / Mandiri / BRI" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-400 mb-1">Nomor Rekening</label>
+                                <input type="text" wire:model="supplierForm.nomor_rekening" placeholder="1234567890" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" />
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-400 mb-1">Atas Nama</label>
+                                <input type="text" wire:model="supplierForm.nama_rekening" placeholder="PT Bintang Parts" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] text-ink-400 mb-1">Kebijakan Acuan Retur Garansi</label>
+                        <select wire:model="supplierForm.kebijakan_retur" class="w-full px-3 py-2 rounded-xl glass-input text-xs bg-ink-900 text-white border border-white/10">
+                            <option value="faktur_asli">Sesuai Faktur Asli PO / Invoice Awal (Rekomendasi)</option>
+                            <option value="harga_pasar">Sesuai Harga Pasar / Pricelist Terkini</option>
+                            <option value="tukar_unit">Tukar Unit Fisik Baru (1-to-1 Replacement)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] text-ink-400 mb-1">Catatan Tambahan (Opsional)</label>
+                        <input type="text" wire:model="supplierForm.catatan" placeholder="Ketentuan retur, diskon khusus, dsb." class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                    </div>
                 </div>
-                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                <div class="flex gap-3 pt-3 border-t border-white/5 mt-3">
                     <button type="button" wire:click="$set('showSupplierModal', false)" wire:loading.attr="disabled" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-95 text-center">Batal</button>
-                    <button type="button" wire:click="simpanSupplier" wire:loading.attr="disabled" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer min-h-[44px] transition active:scale-95 text-center flex items-center justify-center gap-1.5">
-                        <span wire:loading.remove wire:target="simpanSupplier">Simpan</span>
+                    <button type="button" wire:click="simpanSupplier" wire:loading.attr="disabled" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer min-h-[44px] transition active:scale-95 text-center flex items-center justify-center gap-1.5 shadow-lg shadow-up-primary/25">
+                        <span wire:loading.remove wire:target="simpanSupplier">Simpan Supplier</span>
                         <span wire:loading wire:target="simpanSupplier">Menyimpan…</span>
                     </button>
                 </div>
@@ -512,48 +591,336 @@
 
     <!-- MODAL: EDIT SUPPLIER -->
     @if($editSupplierId)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-base font-bold text-white">Edit Supplier</h3>
-                    <button wire:click="$set('editSupplierId', null)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+            <div class="w-full max-w-lg glass-panel p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+                <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-white/10">
+                    <div>
+                        <h3 class="text-base font-bold text-white">Edit Profil Supplier</h3>
+                        <p class="text-[10px] text-ink-400">Perbarui data kontak, termin, dan rekening bank vendor</p>
+                    </div>
+                    <button wire:click="$set('editSupplierId', null)" class="text-ink-400 hover:text-white cursor-pointer font-bold text-base">✕</button>
                 </div>
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama *</label>
-                        <input type="text" wire:model="editSupplierForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                <div class="space-y-3 flex-1 overflow-y-auto pr-1 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Nama Supplier / PT / Toko *</label>
+                            <input type="text" wire:model="editSupplierForm.nama" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium" />
+                            @error('editSupplierForm.nama') <span class="text-up-red text-[10px]">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Kontak / PIC</label>
+                            <input type="text" wire:model="editSupplierForm.kontak" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Telepon</label>
+                            <input type="text" wire:model="editSupplierForm.telepon" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Email Resmi</label>
+                            <input type="email" wire:model="editSupplierForm.email" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                            @error('editSupplierForm.email') <span class="text-up-red text-[10px]">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Termin (hari)</label>
+                            <input type="number" wire:model="editSupplierForm.termin_hari" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Alamat</label>
+                            <textarea wire:model="editSupplierForm.alamat" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs"></textarea>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kontak / PIC</label>
-                        <input type="text" wire:model="editSupplierForm.kontak" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+
+                    {{-- Data Rekening Bank --}}
+                    <div class="pt-2 border-t border-white/5 space-y-2">
+                        <span class="text-[10px] font-bold text-up-mint uppercase tracking-wider block">Rekening Bank untuk Pembayaran PO / Refund</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div>
+                                <label class="block text-[11px] text-ink-400 mb-1">Nama Bank</label>
+                                <input type="text" wire:model="editSupplierForm.bank_nama" placeholder="BCA / Mandiri / BRI" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-400 mb-1">Nomor Rekening</label>
+                                <input type="text" wire:model="editSupplierForm.nomor_rekening" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" />
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-400 mb-1">Atas Nama</label>
+                                <input type="text" wire:model="editSupplierForm.nama_rekening" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                            </div>
+                        </div>
                     </div>
+
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon</label>
-                        <input type="text" wire:model="editSupplierForm.telepon" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+                        <label class="block text-[11px] text-ink-400 mb-1">Kebijakan Acuan Retur Garansi</label>
+                        <select wire:model="editSupplierForm.kebijakan_retur" class="w-full px-3 py-2 rounded-xl glass-input text-xs bg-ink-900 text-white border border-white/10">
+                            <option value="faktur_asli">Sesuai Faktur Asli PO / Invoice Awal (Rekomendasi)</option>
+                            <option value="harga_pasar">Sesuai Harga Pasar / Pricelist Terkini</option>
+                            <option value="tukar_unit">Tukar Unit Fisik Baru (1-to-1 Replacement)</option>
+                        </select>
                     </div>
+
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>
-                        <textarea wire:model="editSupplierForm.alamat" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea>
+                        <label class="block text-[11px] text-ink-400 mb-1">Catatan Tambahan (Opsional)</label>
+                        <input type="text" wire:model="editSupplierForm.catatan" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Termin (hari)</label>
-                        <input type="number" wire:model="editSupplierForm.termin_hari" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
-                    </div>
+
                     <div class="flex items-center gap-2 pt-1">
-                        <input type="checkbox" id="supplierActive" wire:model="editSupplierForm.is_active" class="rounded border-white/20 text-up-primary focus:ring-up-primary" />
-                        <label for="supplierActive" class="text-xs text-ink-200">Supplier Aktif</label>
+                        <input type="checkbox" id="supplierActive" wire:model="editSupplierForm.is_active" class="rounded border-white/20 text-up-primary focus:ring-up-primary cursor-pointer" />
+                        <label for="supplierActive" class="text-xs text-ink-200 cursor-pointer">Status Supplier Aktif</label>
                     </div>
                 </div>
-                <div class="flex items-center justify-between gap-3 pt-4 border-t border-white/5 mt-5">
+                <div class="flex items-center justify-between gap-3 pt-3 border-t border-white/5 mt-3">
                     @if(isSuperAdminOrOwner() || auth()->user()?->hasRole('finance'))
-                        <button type="button" wire:click="hapusSupplier({{ $editSupplierId }})" wire:confirm="Yakin ingin menghapus supplier ini? Jika memiliki riwayat PO, status akan dinonaktifkan." class="px-3 py-3 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs cursor-pointer min-h-[44px]">
+                        <button type="button" wire:click="hapusSupplier({{ $editSupplierId }})" wire:confirm="Yakin ingin menghapus supplier ini? Jika memiliki riwayat PO, status akan dinonaktifkan." class="px-3 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs cursor-pointer min-h-[42px]">
                             🗑️ Hapus
                         </button>
                     @endif
                     <div class="flex-1 flex gap-2 justify-end">
-                        <button wire:click="$set('editSupplierId', null)" class="px-4 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                        <button wire:click="perbaruiSupplier" class="px-5 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px] active:scale-[0.97]">Simpan Perubahan</button>
+                        <button wire:click="$set('editSupplierId', null)" class="px-4 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[42px]">Batal</button>
+                        <button wire:click="perbaruiSupplier" class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer min-h-[42px] active:scale-[0.97] shadow-lg shadow-up-primary/25">Simpan Perubahan</button>
                     </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: PROFIL & RIWAYAT LENGKAP SUPPLIER -->
+    @if($showSupplierProfileModal && $supplierProfil)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+            <div class="w-full max-w-3xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-6 rounded-3xl relative my-auto max-h-[92vh] flex flex-col border border-black/10 dark:border-white/10 shadow-2xl">
+                {{-- Header Supplier Profile --}}
+                <div class="flex items-start justify-between pb-4 mb-4 border-b border-black/10 dark:border-white/10">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-lg font-bold text-ink-900 dark:text-white">{{ $supplierProfil->nama }}</h3>
+                            @if($supplierProfil->is_active)
+                                <span class="px-2 py-0.5 rounded-full bg-up-mint/20 text-up-mint font-bold text-[10px]">Aktif</span>
+                            @else
+                                <span class="px-2 py-0.5 rounded-full bg-up-red/20 text-up-red font-bold text-[10px]">Nonaktif</span>
+                            @endif
+                        </div>
+                        <p class="text-xs text-ink-500 dark:text-ink-400 mt-1">
+                            PIC: <strong class="text-white">{{ $supplierProfil->kontak ?: '-' }}</strong> · Telp: <strong class="text-white">{{ $supplierProfil->telepon ?: '-' }}</strong> · Termin: <strong class="text-white">{{ $supplierProfil->termin_hari }} hari</strong>
+                        </p>
+                    </div>
+                    <button wire:click="tutupProfilSupplier" class="text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer font-bold text-base">✕</button>
+                </div>
+
+                {{-- Stat Cards --}}
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4 text-xs">
+                    <div class="p-3 rounded-2xl bg-white/5 border border-white/10">
+                        <span class="text-ink-400 block text-[10px]">Saldo Deposit Retur:</span>
+                        <span class="font-bold text-sm text-up-mint tabular-nums">Rp {{ number_format($supplierProfil->saldo_deposit, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-white/5 border border-white/10">
+                        <span class="text-ink-400 block text-[10px]">Total Transaksi PO:</span>
+                        <span class="font-bold text-sm text-white tabular-nums">{{ $supplierProfil->purchaseOrders->count() }} Dokumen</span>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-white/5 border border-white/10">
+                        <span class="text-ink-400 block text-[10px]">Total Retur Barang:</span>
+                        <span class="font-bold text-sm text-up-red tabular-nums">{{ $supplierProfil->returnPembelians->count() }} Retur</span>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-white/5 border border-white/10">
+                        <span class="text-ink-400 block text-[10px]">Katalog Produk:</span>
+                        <span class="font-bold text-sm text-ink-200 tabular-nums">{{ $supplierProfil->produks->count() }} Produk</span>
+                    </div>
+                </div>
+
+                {{-- Tabs Nav --}}
+                <div class="flex items-center gap-1.5 border-b border-white/10 pb-2 mb-3 overflow-x-auto">
+                    <button
+                        type="button"
+                        wire:click="$set('supplierProfileTab', 'profil')"
+                        class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer {{ $supplierProfileTab === 'profil' ? 'bg-up-primary text-white' : 'text-ink-400 hover:text-white' }}"
+                    >
+                        Profil &amp; Rekening
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="$set('supplierProfileTab', 'saldo')"
+                        class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer {{ $supplierProfileTab === 'saldo' ? 'bg-up-primary text-white' : 'text-ink-400 hover:text-white' }}"
+                    >
+                        Riwayat Saldo Deposit Retur ({{ $supplierProfil->saldoMutasi->count() }})
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="$set('supplierProfileTab', 'retur')"
+                        class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer {{ $supplierProfileTab === 'retur' ? 'bg-up-primary text-white' : 'text-ink-400 hover:text-white' }}"
+                    >
+                        Riwayat Retur Pembelian ({{ $supplierProfil->returnPembelians->count() }})
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="$set('supplierProfileTab', 'po')"
+                        class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer {{ $supplierProfileTab === 'po' ? 'bg-up-primary text-white' : 'text-ink-400 hover:text-white' }}"
+                    >
+                        Riwayat Pembelian PO ({{ $supplierProfil->purchaseOrders->count() }})
+                    </button>
+                </div>
+
+                {{-- Tab Content --}}
+                <div class="flex-1 overflow-y-auto pr-1 space-y-3 text-xs">
+                    {{-- TAB PROFIL --}}
+                    @if($supplierProfileTab === 'profil')
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                                <h4 class="font-bold text-xs uppercase text-ink-300">Informasi Kontak &amp; Operasional</h4>
+                                <div class="space-y-1.5 text-xs">
+                                    <div>
+                                        <span class="text-ink-400 text-[11px] block">Alamat Kantor / Gudang:</span>
+                                        <span class="text-white">{{ $supplierProfil->alamat ?: '-' }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-ink-400 text-[11px] block">Email Resmi:</span>\n                                        <span class="text-white">{{ $supplierProfil->email ?: '-' }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-ink-400 text-[11px] block">Nomor Telepon:</span>
+                                        <span class="text-white">{{ $supplierProfil->telepon ?: '-' }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-ink-400 text-[11px] block">Termin Pembayaran:</span>
+                                        <span class="text-white font-bold">{{ $supplierProfil->termin_hari }} Hari</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-ink-400 text-[11px] block">Kebijakan Acuan Retur Garansi:</span>
+                                        <span class="text-up-mint font-semibold">
+                                            @if($supplierProfil->kebijakan_retur === 'harga_pasar')
+                                                Harga Pasar / Pricelist Terkini
+                                            @elseif($supplierProfil->kebijakan_retur === 'tukar_unit')
+                                                Tukar Unit Fisik Baru
+                                            @else
+                                                Sesuai Faktur Asli PO (Rekomendasi)
+                                            @endif
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                                <h4 class="font-bold text-xs uppercase text-ink-300">Rekening Bank untuk Pembayaran / Refund</h4>
+                                <div class="space-y-1.5 text-xs">
+                                    <div>
+                                        <span class="text-ink-400 text-[11px] block">Nama Bank:</span>
+                                        <span class="text-white font-bold">{{ $supplierProfil->bank_nama ?: 'Belum diatur' }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-ink-400 text-[11px] block">Nomor Rekening:</span>
+                                        <span class="font-mono text-up-mint font-bold text-sm">{{ $supplierProfil->nomor_rekening ?: '-' }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-ink-400 text-[11px] block">Atas Nama Rekening:</span>
+                                        <span class="text-white">{{ $supplierProfil->nama_rekening ?: '-' }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-ink-400 text-[11px] block">Catatan Tambahan:</span>
+                                        <span class="text-ink-300 italic">{{ $supplierProfil->catatan ?: '-' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- TAB SALDO DEPOSIT RETUR --}}
+                    @if($supplierProfileTab === 'saldo')
+                        <div class="space-y-2">
+                            <div class="p-3 rounded-2xl bg-up-mint/10 border border-up-mint/20 flex items-center justify-between text-xs">
+                                <div>
+                                    <span class="text-ink-300 block text-[10px]">Saldo Deposit Aktif Saat Ini:</span>
+                                    <span class="font-bold text-base text-up-mint tabular-nums">Rp {{ number_format($supplierProfil->saldo_deposit, 0, ',', '.') }}</span>
+                                </div>
+                                <span class="text-[10px] text-ink-400 max-w-xs text-right">
+                                    Dapat digunakan untuk memotong total tagihan PO berikutnya atau dicairkan via kas/bank.
+                                </span>
+                            </div>
+
+                            <div class="rounded-2xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+                                @forelse($supplierProfil->saldoMutasi as $m)
+                                    <div class="p-3 flex items-center justify-between gap-3 bg-white/[0.01]">
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase {{ $m->jenis === 'masuk' ? 'bg-up-mint/20 text-up-mint' : 'bg-up-red/20 text-up-red' }}">
+                                                    {{ $m->jenis === 'masuk' ? '+ Masuk' : '- Keluar' }}
+                                                </span>
+                                                <span class="font-bold text-white text-xs">{{ $m->keterangan }}</span>
+                                            </div>
+                                            <div class="text-[10px] text-ink-400 mt-1">
+                                                Tgl: {{ $m->created_at?->format('d/m/Y H:i') }} · Oleh: {{ $m->user?->name ?? 'Sistem' }}
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="font-bold text-xs tabular-nums {{ $m->jenis === 'masuk' ? 'text-up-mint' : 'text-up-red' }}">
+                                                {{ $m->jenis === 'masuk' ? '+' : '-' }} Rp {{ number_format($m->jumlah, 0, ',', '.') }}
+                                            </div>
+                                            <div class="text-[10px] text-ink-400 tabular-nums">
+                                                Saldo Akhir: Rp {{ number_format($m->saldo_setelah, 0, ',', '.') }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div class="p-6 text-center text-ink-400 text-xs">
+                                        Belum ada riwayat mutasi saldo deposit untuk supplier ini.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- TAB RETUR PEMBELIAN --}}
+                    @if($supplierProfileTab === 'retur')
+                        <div class="rounded-2xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+                            @forelse($supplierProfil->returnPembelians as $r)
+                                <div class="p-3 flex items-center justify-between gap-3 bg-white/[0.01]">
+                                    <div>
+                                        <div class="font-mono font-bold text-white text-xs">{{ $r->no_return }}</div>
+                                        <div class="text-[10px] text-ink-400">
+                                            Tgl: {{ $r->tanggal?->format('d/m/Y') }} · Metode: <strong class="text-white uppercase">{{ $r->metode_pengembalian }}</strong>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="font-bold text-xs text-up-red tabular-nums">Rp {{ number_format($r->jumlah, 0, ',', '.') }}</div>
+                                        <x-prism.status-pill :status="str_replace('_','-',$r->status)" size="sm" />
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="p-6 text-center text-ink-400 text-xs">
+                                    Belum ada transaksi retur barang ke supplier ini.
+                                </div>
+                            @endforelse
+                        </div>
+                    @endif
+
+                    {{-- TAB TRANSAKSI PO --}}
+                    @if($supplierProfileTab === 'po')
+                        <div class="rounded-2xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+                            @forelse($supplierProfil->purchaseOrders as $p)
+                                <div class="p-3 flex items-center justify-between gap-3 bg-white/[0.01]">
+                                    <div>
+                                        <div class="font-mono font-bold text-white text-xs">{{ $p->no_po }}</div>
+                                        <div class="text-[10px] text-ink-400">
+                                            Tgl: {{ $p->created_at?->format('d/m/Y') }} · Status: <span class="uppercase text-white font-bold">{{ $p->status }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="font-bold text-xs text-white tabular-nums">Rp {{ number_format($p->total, 0, ',', '.') }}</div>
+                                        <div class="text-[10px] text-ink-400">Dibayar: Rp {{ number_format($p->total_dibayar, 0, ',', '.') }}</div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="p-6 text-center text-ink-400 text-xs">
+                                    Belum ada riwayat transaksi Purchase Order (PO).
+                                </div>
+                            @endforelse
+                        </div>
+                    @endif
+                </div>
+
+                <div class="pt-4 border-t border-black/10 dark:border-white/10 mt-4 flex justify-end">
+                    <button
+                        type="button"
+                        wire:click="tutupProfilSupplier"
+                        class="px-5 py-2.5 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-700 dark:text-white font-bold text-xs cursor-pointer"
+                    >
+                        Tutup
+                    </button>
                 </div>
             </div>
         </div>

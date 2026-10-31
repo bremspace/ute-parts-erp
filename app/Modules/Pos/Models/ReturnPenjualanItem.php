@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'return_penjualan_id', 'produk_id', 'sku_variant_id', 'jumlah',
     'harga_satuan', 'subtotal', 'hpp', 'kondisi_barang', 'nomor_seri',
     'supplier_id', 'status_karantina', 'return_pembelian_id',
+    'alasan', 'tipe_penyelesaian', 'metode_pengembalian',
+    'tukar_items_payload', 'selisih_nominal', 'foto_bukti',
 ])]
 class ReturnPenjualanItem extends Model
 {
@@ -24,7 +26,10 @@ class ReturnPenjualanItem extends Model
         'harga_satuan' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'hpp' => 'decimal:2',
+        'selisih_nominal' => 'decimal:2',
         'nomor_seri' => 'array',
+        'tukar_items_payload' => 'array',
+        'foto_bukti' => 'array',
     ];
 
     public function returnPenjualan(): BelongsTo

@@ -254,6 +254,14 @@
                                 <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms/cycle-count*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
                                 <span>Cycle Count & Opname</span>
                             </a>
+                            <a href="/app/wms/import-export" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms/import-export*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms/import-export*') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                                <span>Import &amp; Export Produk</span>
+                            </a>
+                            <a href="/app/wms/import-foto" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms/import-foto*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms/import-foto*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
+                                <span>Import Foto Massal</span>
+                            </a>
                         @endcan
                         @can('laporan.cabang')
                             <a href="/app/laporan/nomor-seri" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/laporan/nomor-seri*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">

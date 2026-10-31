@@ -13,6 +13,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Servis\Models\Garansi;
 use App\Modules\Servis\Models\JenisServis;
@@ -331,6 +332,9 @@ class ServisService
                 app(NomorSeriService::class)->lepasServis((int) $tiket->id);
             }
         }, 3);
+
+        // [F1-4] Catat log aktivitas servis berbasis Transaction-Centric + Dual-Indexing di metadata
+        app(TransactionActivityLogService::class)->catatServis($tiket, $statusBaru);
 
         // Notifikasi ke pelanggan — SETELAH commit (jangan kirim bila rollback)
         $labelMap = [

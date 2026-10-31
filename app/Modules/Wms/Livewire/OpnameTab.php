@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
@@ -289,8 +290,8 @@ class OpnameTab extends Component
             $prod = Produk::where('is_active', true)
                 ->where(function ($q) use ($clean) {
                     $q->where('barcode', $clean)
-                        ->orWhere('sku', $clean)
-                        ->orWhere('kode', $clean)
+                        ->orWhere('barcode_alt', $clean)
+                        ->orWhere('kode_lama', $clean)
                         ->orWhereHas('skuVariants', fn ($sv) => $sv->where('barcode', $clean)->orWhere('sku', $clean));
                 })
                 ->first();
@@ -305,7 +306,7 @@ class OpnameTab extends Component
                 $this->opnameRows[] = [
                     'produk_id' => $prod->id,
                     'nama' => $prod->nama,
-                    'sku' => $prod->skuVariants->first()?->sku ?: $prod->kode,
+                    'sku' => $prod->skuVariants->first()?->sku ?: ($prod->barcode ?: $prod->kode_lama),
                     'barcode' => $prod->barcode,
                     'brand' => $prod->brand?->nama,
                     'kategori' => $prod->kategoriRelasi?->nama,
@@ -494,6 +495,9 @@ class OpnameTab extends Component
                 'approver_id' => auth()->id() ?? 1,
                 'tanggal_approval' => now(),
             ]);
+
+            // [F1-4] Catat log aktivitas opname berbasis Transaction-Centric + Dual-Indexing di metadata
+            app(TransactionActivityLogService::class)->catatStokOpname($opname);
         });
 
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Stock opname disetujui & stok sistem berhasil diselaraskan']);

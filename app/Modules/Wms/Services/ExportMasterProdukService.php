@@ -103,86 +103,86 @@ class ExportMasterProdukService
                                     AfterSheet::class => function (AfterSheet $event) {
                                         $sheet = $event->sheet->getDelegate();
 
-                                        // Dropdown Satuan (Kolom D) -> Referensi Sheet 2 (kolom D)
-                                        $valSatuan = $sheet->getCell('D2')->getDataValidation();
+                                        // Dropdown Satuan (Kolom G) -> Referensi Sheet 2 (kolom D)
+                                        $valSatuan = $sheet->getCell('G2')->getDataValidation();
                                         $valSatuan->setType(DataValidation::TYPE_LIST);
                                         $valSatuan->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valSatuan->setAllowBlank(true);
                                         $valSatuan->setShowDropDown(true);
                                         $valSatuan->setFormula1("'Referensi Sistem'!\$D\$2:\$D\$100");
-                                        $valSatuan->setSqref('D2:D5000');
+                                        $valSatuan->setSqref('G2:G5000');
 
-                                        // Dropdown Kategori (Kolom F) -> Referensi Sheet 2 (kolom B)
-                                        $valKat = $sheet->getCell('F2')->getDataValidation();
+                                        // Dropdown Kategori (Kolom I) -> Referensi Sheet 2 (kolom B)
+                                        $valKat = $sheet->getCell('I2')->getDataValidation();
                                         $valKat->setType(DataValidation::TYPE_LIST);
                                         $valKat->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valKat->setAllowBlank(true);
                                         $valKat->setShowDropDown(true);
                                         $valKat->setFormula1("'Referensi Sistem'!\$B\$2:\$B\$100");
-                                        $valKat->setSqref('F2:F5000');
+                                        $valKat->setSqref('I2:I5000');
 
-                                        // Dropdown Sub Kategori (Kolom G) -> Referensi Sheet 2 (kolom H)
-                                        $valSubKat = $sheet->getCell('G2')->getDataValidation();
+                                        // Dropdown Sub Kategori (Kolom J) -> Referensi Sheet 2 (kolom H)
+                                        $valSubKat = $sheet->getCell('J2')->getDataValidation();
                                         $valSubKat->setType(DataValidation::TYPE_LIST);
                                         $valSubKat->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valSubKat->setAllowBlank(true);
                                         $valSubKat->setShowDropDown(true);
                                         $valSubKat->setFormula1("'Referensi Sistem'!\$H\$2:\$H\$100");
-                                        $valSubKat->setSqref('G2:G5000');
+                                        $valSubKat->setSqref('J2:J5000');
 
-                                        // Dropdown Brand (Kolom H) -> Referensi Sheet 2 (kolom C)
-                                        $valBrand = $sheet->getCell('H2')->getDataValidation();
+                                        // Dropdown Brand (Kolom K) -> Referensi Sheet 2 (kolom C)
+                                        $valBrand = $sheet->getCell('K2')->getDataValidation();
                                         $valBrand->setType(DataValidation::TYPE_LIST);
                                         $valBrand->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valBrand->setAllowBlank(true);
                                         $valBrand->setShowDropDown(true);
                                         $valBrand->setFormula1("'Referensi Sistem'!\$C\$2:\$C\$100");
-                                        $valBrand->setSqref('H2:H5000');
+                                        $valBrand->setSqref('K2:K5000');
 
-                                        // Dropdown Kualitas (Kolom I) -> Referensi Sheet 2 (kolom E)
-                                        $valKualitas = $sheet->getCell('I2')->getDataValidation();
+                                        // Dropdown Kualitas (Kolom L) -> Referensi Sheet 2 (kolom E)
+                                        $valKualitas = $sheet->getCell('L2')->getDataValidation();
                                         $valKualitas->setType(DataValidation::TYPE_LIST);
                                         $valKualitas->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valKualitas->setAllowBlank(true);
                                         $valKualitas->setShowDropDown(true);
                                         $valKualitas->setFormula1("'Referensi Sistem'!\$E\$2:\$E\$50");
-                                        $valKualitas->setSqref('I2:I5000');
+                                        $valKualitas->setSqref('L2:L5000');
 
-                                        // Dropdown Kondisi (Kolom J)
-                                        $valKondisi = $sheet->getCell('J2')->getDataValidation();
+                                        // Dropdown Kondisi (Kolom M)
+                                        $valKondisi = $sheet->getCell('M2')->getDataValidation();
                                         $valKondisi->setType(DataValidation::TYPE_LIST);
                                         $valKondisi->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valKondisi->setAllowBlank(true);
                                         $valKondisi->setShowDropDown(true);
                                         $valKondisi->setFormula1('"baru,oem,bekas,refurbished"');
-                                        $valKondisi->setSqref('J2:J5000');
+                                        $valKondisi->setSqref('M2:M5000');
 
-                                        // Dropdown Supplier (Kolom K) -> Referensi Sheet 2 (kolom F)
-                                        $valSupplier = $sheet->getCell('K2')->getDataValidation();
+                                        // Dropdown Supplier (Kolom N) -> Referensi Sheet 2 (kolom F)
+                                        $valSupplier = $sheet->getCell('N2')->getDataValidation();
                                         $valSupplier->setType(DataValidation::TYPE_LIST);
                                         $valSupplier->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valSupplier->setAllowBlank(true);
                                         $valSupplier->setShowDropDown(true);
                                         $valSupplier->setFormula1("'Referensi Sistem'!\$F\$2:\$F\$100");
-                                        $valSupplier->setSqref('K2:K5000');
+                                        $valSupplier->setSqref('N2:N5000');
 
-                                        // Dropdown Merk HP (Kolom L) -> Referensi Sheet 2 (kolom A)
-                                        $valMerkHp = $sheet->getCell('L2')->getDataValidation();
+                                        // Dropdown Merk HP (Kolom O) -> Referensi Sheet 2 (kolom A)
+                                        $valMerkHp = $sheet->getCell('O2')->getDataValidation();
                                         $valMerkHp->setType(DataValidation::TYPE_LIST);
                                         $valMerkHp->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valMerkHp->setAllowBlank(true);
                                         $valMerkHp->setShowDropDown(true);
                                         $valMerkHp->setFormula1("'Referensi Sistem'!\$A\$2:\$A\$100");
-                                        $valMerkHp->setSqref('L2:L5000');
+                                        $valMerkHp->setSqref('O2:O5000');
 
-                                        // Dropdown SN (Kolom T)
-                                        $valSn = $sheet->getCell('T2')->getDataValidation();
+                                        // Dropdown SN (Kolom W)
+                                        $valSn = $sheet->getCell('W2')->getDataValidation();
                                         $valSn->setType(DataValidation::TYPE_LIST);
                                         $valSn->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valSn->setAllowBlank(true);
                                         $valSn->setShowDropDown(true);
                                         $valSn->setFormula1('"ya,tidak"');
-                                        $valSn->setSqref('T2:T5000');
+                                        $valSn->setSqref('W2:W5000');
                                     },
                                 ];
                             }
@@ -267,6 +267,7 @@ class ExportMasterProdukService
             'kategoriRelasi.parent',
             'hargaTier',
             'skuVariants',
+            'barcodes',
             'tipeHps',
             'satuanKonversi',
             'stokItems',
@@ -379,10 +380,22 @@ class ExportMasterProdukService
             $hargaAgen = $p->hargaTier->firstWhere('tipe_konsumen', 'agen')?->harga
                 ?? $p->harga_jual_retail;
 
+            $allBcList = $p->barcodes && $p->barcodes->isNotEmpty()
+                ? $p->barcodes->sortBy('urutan')->pluck('barcode')->all()
+                : $p->all_barcodes;
+
+            $b1 = $allBcList[0] ?? ($p->barcode ?: '');
+            $b2 = $allBcList[1] ?? '';
+            $b3 = $allBcList[2] ?? '';
+            $multiBc = count($allBcList) > 3 ? implode(', ', array_slice($allBcList, 3)) : '';
+
             $rows[] = [
                 'sku' => $p->kode ?: ($p->skuVariants->first()?->sku ?? ''),
                 'nama' => $p->nama,
-                'barcode' => $p->barcode ?: '',
+                'barcode_1' => $b1,
+                'barcode_2' => $b2,
+                'barcode_3' => $b3,
+                'multi_barcode' => $multiBc,
                 'satuan' => $p->satuan ?: 'pcs',
                 'konversi_satuan' => $konversiSatuan,
                 'kategori' => $kategoriImport,
@@ -522,14 +535,15 @@ class ExportMasterProdukService
             ['PETUNJUK IMPORT MASTER PRODUK UTE PARTS ERP'],
             [''],
             ['1. Kolom Wajib Diisi: sku, nama, harga_jual'],
-            ['2. Kolom Opsional: barcode, satuan, konversi_satuan, kategori, sub_kategori, brand, kualitas, kondisi, supplier, merk_hp, tipe_hp, harga_beli, harga_reseller, harga_agen, min_stock, reorder_point, sn, stok_awal, gudang, rak, produk_kompatibel_sku, kompatibilitas_hp, deskripsi, foto_url, cabang'],
+            ['2. Kolom Opsional: barcode_1 (utama), barcode_2, barcode_3, multi_barcode (alternatif/tambahan dipisah koma), satuan, konversi_satuan, kategori, sub_kategori, brand, kualitas, kondisi, supplier, merk_hp, tipe_hp, harga_beli, harga_reseller, harga_agen, min_stock, reorder_point, sn, stok_awal, gudang, rak, produk_kompatibel_sku, kompatibilitas_hp, deskripsi, foto_url, cabang'],
             ['3. Kolom satuan: gunakan kode satuan dari Sheet Referensi Sistem (cth: pcs, set, pack, box)'],
             ['4. Kolom konversi_satuan: format satuan:pengali:harga_jual dipisah titik koma (cth: box:10:120000;pack:5:62000)'],
             ['5. Kolom kondisi: hanya menerima: baru, oem, bekas, refurbished (default: baru)'],
             ['6. Kolom sn: ya / tidak (default: tidak)'],
             ['7. Kolom gudang & rak: isi nama gudang dan rak sesuai cabang aktif (lihat Sheet Referensi Sistem). Jika dikosongkan, otomatis dialokasikan ke Gudang Utama dan Rak default cabang aktif.'],
             ['8. Kolom cabang (opsional): jika diisi, sistem memvalidasi data untuk cabang tersebut. Jika tidak diisi, otomatis menggunakan cabang aktif saat sesi impor.'],
-            ['9. Round-trip: File hasil ekspor master produk memiliki struktur yang identik dan dapat langsung diimpor kembali ke sistem.'],
+            ['9. Multi Barcode: barcode_1 adalah barcode/QR utama produk. barcode_2, barcode_3, dst. serta multi_barcode adalah barcode alternatif/supplier. Seluruh barcode otomatis diindeks agar pemindaian langsung merujuk ke SKU produk.'],
+            ['10. Round-trip: File hasil ekspor master produk memiliki struktur yang identik dan dapat langsung diimpor kembali ke sistem.'],
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
@@ -42,7 +43,10 @@ class PoTab extends Component
 
     public bool $showSupplierModal = false;
 
-    public array $supplierForm = ['nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30];
+    public array $supplierForm = [
+        'nama' => '', 'kontak' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'termin_hari' => 30,
+        'bank_nama' => '', 'nomor_rekening' => '', 'nama_rekening' => '', 'catatan' => '', 'kebijakan_retur' => 'faktur_asli',
+    ];
 
     public ?int $bayarPoId = null;
 
@@ -57,8 +61,16 @@ class PoTab extends Component
     public ?int $editSupplierId = null;
 
     public array $editSupplierForm = [
-        'nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30, 'is_active' => true,
+        'nama' => '', 'kontak' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'termin_hari' => 30,
+        'bank_nama' => '', 'nomor_rekening' => '', 'nama_rekening' => '', 'catatan' => '', 'kebijakan_retur' => 'faktur_asli', 'is_active' => true,
     ];
+
+    // Detail & Profil Lengkap Supplier
+    public ?int $detailSupplierId = null;
+
+    public bool $showSupplierProfileModal = false;
+
+    public string $supplierProfileTab = 'profil'; // profil | saldo | po | retur
 
     // [PROCUREMENT MODAL: ABC, ROP, Min-Max, JIT]
     public bool $showProcurementModal = false;
@@ -267,6 +279,9 @@ class PoTab extends Component
                     $pid['purchase_order_id'] = $po->id;
                     PurchaseOrderItem::create($pid);
                 }
+
+                // [F1-4] Catat log aktivitas PO berbasis Transaction-Centric + Dual-Indexing di metadata
+                app(TransactionActivityLogService::class)->catatPurchaseOrder($po, 'po_dibuat');
 
                 $createdPoCount++;
             }
@@ -645,6 +660,9 @@ class PoTab extends Component
             ]);
         }
 
+        // [F1-4] Catat log aktivitas PO berbasis Transaction-Centric + Dual-Indexing di metadata
+        app(TransactionActivityLogService::class)->catatPurchaseOrder($po, 'po_dibuat');
+
         $this->showPoModal = false;
         $this->dispatch('alert', ['type' => 'success', 'message' => "PO {$noPo} dibuat (draft)"]);
     }
@@ -844,8 +862,14 @@ class PoTab extends Component
             'nama' => $supplier->nama,
             'kontak' => $supplier->kontak ?? '',
             'telepon' => $supplier->telepon ?? '',
+            'email' => $supplier->email ?? '',
             'alamat' => $supplier->alamat ?? '',
             'termin_hari' => (int) $supplier->termin_hari,
+            'bank_nama' => $supplier->bank_nama ?? '',
+            'nomor_rekening' => $supplier->nomor_rekening ?? '',
+            'nama_rekening' => $supplier->nama_rekening ?? '',
+            'catatan' => $supplier->catatan ?? '',
+            'kebijakan_retur' => $supplier->kebijakan_retur ?? 'faktur_asli',
             'is_active' => (bool) $supplier->is_active,
         ];
     }
@@ -858,13 +882,18 @@ class PoTab extends Component
 
         $this->validate([
             'editSupplierForm.nama' => 'required|string|max:255',
+            'editSupplierForm.email' => 'nullable|email|max:191',
             'editSupplierForm.termin_hari' => 'nullable|integer|min:0',
+            'editSupplierForm.bank_nama' => 'nullable|string|max:100',
+            'editSupplierForm.nomor_rekening' => 'nullable|string|max:100',
+            'editSupplierForm.nama_rekening' => 'nullable|string|max:191',
+            'editSupplierForm.kebijakan_retur' => 'nullable|string|max:50',
         ]);
 
         $supplier = Supplier::findOrFail($this->editSupplierId);
         $supplier->update($this->editSupplierForm);
         $this->editSupplierId = null;
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Supplier berhasil diperbarui']);
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Profil supplier berhasil diperbarui']);
     }
 
     public function simpanSupplier()
@@ -877,8 +906,13 @@ class PoTab extends Component
             'supplierForm.nama' => 'required|string|max:255',
             'supplierForm.kontak' => 'nullable|string|max:255',
             'supplierForm.telepon' => 'nullable|string|max:20',
+            'supplierForm.email' => 'nullable|email|max:191',
             'supplierForm.alamat' => 'nullable|string',
             'supplierForm.termin_hari' => 'nullable|integer|min:0',
+            'supplierForm.bank_nama' => 'nullable|string|max:100',
+            'supplierForm.nomor_rekening' => 'nullable|string|max:100',
+            'supplierForm.nama_rekening' => 'nullable|string|max:191',
+            'supplierForm.kebijakan_retur' => 'nullable|string|max:50',
         ]);
 
         $data = $this->supplierForm;
@@ -899,8 +933,24 @@ class PoTab extends Component
             $this->poForm['supplier_id'] = $supplier->id;
         }
         $this->showSupplierModal = false;
-        $this->supplierForm = ['nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30];
+        $this->supplierForm = [
+            'nama' => '', 'kontak' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'termin_hari' => 30,
+            'bank_nama' => '', 'nomor_rekening' => '', 'nama_rekening' => '', 'catatan' => '', 'kebijakan_retur' => 'faktur_asli',
+        ];
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Supplier '.$supplier->nama.' berhasil ditambahkan dan dipilih']);
+    }
+
+    public function bukaProfilSupplier(int $supplierId): void
+    {
+        $this->detailSupplierId = $supplierId;
+        $this->supplierProfileTab = 'profil';
+        $this->showSupplierProfileModal = true;
+    }
+
+    public function tutupProfilSupplier(): void
+    {
+        $this->showSupplierProfileModal = false;
+        $this->detailSupplierId = null;
     }
 
     public function hapusSupplier(int $id): void
@@ -1002,6 +1052,16 @@ class PoTab extends Component
             $totalEstimasiPo += ($h * $qty);
         }
 
+        $supplierProfil = null;
+        if ($this->detailSupplierId) {
+            $supplierProfil = Supplier::with([
+                'purchaseOrders.items.produk',
+                'returnPembelians.items.produk',
+                'saldoMutasi.user',
+                'produks',
+            ])->find($this->detailSupplierId);
+        }
+
         return view('modules.wms.livewire.po-tab', [
             'gudangs' => $gudangs,
             'allProducts' => $allProducts,
@@ -1018,6 +1078,7 @@ class PoTab extends Component
             'procurementSummary' => $procurementSummary,
             'akunKasBankList' => AkunCOA::whereIn('kelompok', ['kas', 'bank'])->where('is_active', true)->orderBy('kode')->get(),
             'totalEstimasiPo' => $totalEstimasiPo,
+            'supplierProfil' => $supplierProfil,
         ]);
     }
 }

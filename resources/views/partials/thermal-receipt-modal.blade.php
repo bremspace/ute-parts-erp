@@ -73,6 +73,11 @@
                                 @endif
                             </div>
                         @endif
+                        @if(!empty($receiptData['is_retur']))
+                            <div class="p-1.5 mb-1.5 text-center bg-rose-50 border-2 border-rose-600 rounded text-rose-900 font-black uppercase text-[11px] tracking-wider print:border-black print:text-black">
+                                {{ $receiptData['label_struk'] ?? '*** STRUK BUKTI RETUR TRANSAKSI ***' }}
+                            </div>
+                        @endif
                         @if(!empty($receiptData['is_piutang']))
                             <div class="p-1.5 mb-1.5 text-center bg-amber-50 border-2 border-dashed border-amber-600 rounded text-amber-900 font-black uppercase text-[11px] tracking-wider print:border-black print:text-black">
                                 *** TAGIHAN PIUTANG / BELUM LUNAS ***
@@ -84,9 +89,15 @@
                             </div>
                         @endif
                         <div class="receipt-row flex justify-between">
-                            <span class="text-gray-600">No. TRX:</span>
+                            <span class="text-gray-600">{{ !empty($receiptData['is_retur']) ? 'No. Retur:' : 'No. TRX:' }}</span>
                             <span class="font-bold text-gray-900">{{ $receiptData['no_transaksi'] }}</span>
                         </div>
+                        @if(!empty($receiptData['no_transaksi_asal']))
+                            <div class="receipt-row flex justify-between">
+                                <span class="text-gray-600">Faktur Asal:</span>
+                                <span class="font-bold text-gray-800">{{ $receiptData['no_transaksi_asal'] }}</span>
+                            </div>
+                        @endif
                         @if(!empty($receiptData['sumber']) && !in_array(strtolower($receiptData['sumber']), ['pos', 'offline'], true))
                             <div class="receipt-row flex justify-between">
                                 <span class="text-gray-600">Pesanan:</span>
@@ -259,8 +270,25 @@
                             </div>
                         @endif
 
+                        @if(!empty($receiptData['is_retur']))
+                            <div class="receipt-row flex justify-between text-gray-700 font-normal text-[10px] border-t border-dashed border-gray-300 pt-1">
+                                <span>Nilai Retur Barang:</span>
+                                <span>Rp {{ number_format($receiptData['total_retur'] ?? 0, 0, ',', '.') }}</span>
+                            </div>
+                            @if(!empty($receiptData['total_pengganti']))
+                                <div class="receipt-row flex justify-between text-gray-700 font-normal text-[10px]">
+                                    <span>Nilai Barang Pengganti:</span>
+                                    <span>Rp {{ number_format($receiptData['total_pengganti'], 0, ',', '.') }}</span>
+                                </div>
+                                <div class="receipt-row flex justify-between text-gray-950 font-black text-[10px]">
+                                    <span>SELISIH DIBAYAR:</span>
+                                    <span>Rp {{ number_format($receiptData['selisih'] ?? 0, 0, ',', '.') }}</span>
+                                </div>
+                            @endif
+                        @endif
+
                         <div class="receipt-row flex justify-between text-xs text-gray-950 border-t border-dashed border-gray-300 pt-1">
-                            <span class="tracking-wide">TOTAL:</span>
+                            <span class="tracking-wide">{{ !empty($receiptData['is_retur']) && !empty($receiptData['total_pengganti']) ? 'TOTAL SELISIH:' : 'TOTAL:' }}</span>
                             <span class="font-black">Rp {{ number_format($receiptData['total'], 0, ',', '.') }}</span>
                         </div>
                         @if(!empty($receiptData['is_piutang']))

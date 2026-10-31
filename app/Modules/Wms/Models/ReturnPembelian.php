@@ -18,7 +18,9 @@ use Spatie\Activitylog\Support\LogOptions;
  */
 #[Fillable([
     'no_return', 'purchase_order_id', 'supplier_id', 'cabang_id', 'gudang_id', 'user_id',
-    'tanggal', 'jumlah', 'status', 'metode_pengembalian', 'alasan', 'is_migrasi_sid',
+    'tanggal', 'jumlah', 'nilai_realisasi', 'selisih_klaim', 'status', 'metode_pengembalian',
+    'kebijakan_retur', 'alasan', 'tanggal_kirim', 'ekspedisi', 'no_resi', 'penerima_vendor',
+    'tanggal_terima_vendor', 'tanggal_selesai', 'catatan_penyelesaian', 'unit_pengganti_detail', 'is_migrasi_sid',
 ])]
 class ReturnPembelian extends Model
 {
@@ -34,7 +36,13 @@ class ReturnPembelian extends Model
 
     protected $casts = [
         'tanggal' => 'date',
+        'tanggal_kirim' => 'datetime',
+        'tanggal_terima_vendor' => 'datetime',
+        'tanggal_selesai' => 'datetime',
         'jumlah' => 'decimal:2',
+        'nilai_realisasi' => 'decimal:2',
+        'selisih_klaim' => 'decimal:2',
+        'unit_pengganti_detail' => 'array',
         'is_migrasi_sid' => 'boolean',
     ];
 

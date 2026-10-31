@@ -359,9 +359,37 @@ class ProcurementService
 
         $rows = $query->limit(50)->get();
 
-        if ($rows->isEmpty()) {
+        // Ambil data retur pembelian untuk produk ini agar menyatu secara analitik
+        $returRows = DB::table('return_pembelian_item')
+            ->join('return_pembelian', 'return_pembelian.id', '=', 'return_pembelian_item.return_pembelian_id')
+            ->leftJoin('supplier', 'supplier.id', '=', 'return_pembelian.supplier_id')
+            ->where('return_pembelian_item.produk_id', $produkId)
+            ->when($supplierId, fn ($q) => $q->where('return_pembelian.supplier_id', $supplierId))
+            ->select([
+                'return_pembelian.id as retur_id',
+                'return_pembelian.no_return',
+                'return_pembelian.created_at',
+                'return_pembelian.status',
+                'return_pembelian.metode_pengembalian',
+                'supplier.id as supplier_id',
+                'supplier.nama as supplier_nama',
+                'supplier.telepon as supplier_telepon',
+                'return_pembelian_item.harga_beli',
+                'return_pembelian_item.jumlah',
+                'return_pembelian_item.subtotal',
+            ])
+            ->orderByDesc('return_pembelian.created_at')
+            ->orderByDesc('return_pembelian.id')
+            ->limit(50)
+            ->get();
+
+        $totalReturQty = (int) $returRows->sum('jumlah');
+        $totalReturNilai = (float) $returRows->sum('subtotal');
+
+        if ($rows->isEmpty() && $returRows->isEmpty()) {
             return [
                 'items' => [],
+                'retur_items' => [],
                 'statistik' => [
                     'total_transaksi' => 0,
                     'total_qty' => 0,
@@ -370,16 +398,39 @@ class ProcurementService
                     'harga_tertinggi' => 0,
                     'harga_rata_rata' => 0,
                     'supplier_terakhir' => null,
+                    'total_retur_transaksi' => 0,
+                    'total_retur_qty' => 0,
+                    'total_retur_nilai' => 0,
+                    'net_pengadaan_qty' => 0,
+                    'net_pengadaan_nilai' => 0,
                 ],
             ];
         }
 
         $totalQty = (int) $rows->sum('jumlah');
         $totalNilai = (float) $rows->sum('subtotal');
-        $hargaTerakhir = (float) $rows->first()->harga_beli;
-        $hargaTerendah = (float) $rows->min('harga_beli');
-        $hargaTertinggi = (float) $rows->max('harga_beli');
+        $hargaTerakhir = (float) ($rows->first()?->harga_beli ?? 0);
+        $hargaTerendah = (float) ($rows->min('harga_beli') ?? 0);
+        $hargaTertinggi = (float) ($rows->max('harga_beli') ?? 0);
         $weightedAvg = $totalQty > 0 ? round($totalNilai / $totalQty, 2) : $hargaTerakhir;
+
+        $returItemsFormatted = $returRows->values()->map(function ($r) {
+            return [
+                'tipe' => 'retur',
+                'id' => $r->retur_id,
+                'nomor' => $r->no_return,
+                'tanggal' => $r->created_at ? date('d/m/Y H:i', strtotime($r->created_at)) : '-',
+                'created_at' => $r->created_at,
+                'status' => $r->status,
+                'metode' => $r->metode_pengembalian,
+                'supplier_id' => $r->supplier_id,
+                'supplier_nama' => $r->supplier_nama ?: 'Umum / Tanpa Nama',
+                'supplier_telepon' => $r->supplier_telepon ?: '-',
+                'harga_beli' => (float) $r->harga_beli,
+                'jumlah' => (int) $r->jumlah,
+                'subtotal' => (float) $r->subtotal,
+            ];
+        })->all();
 
         return [
             'items' => $rows->values()->map(function ($r, $idx) use ($rows) {
@@ -396,6 +447,7 @@ class ProcurementService
                 }
 
                 return [
+                    'tipe' => 'beli',
                     'po_id' => $r->po_id,
                     'no_po' => $r->no_po,
                     'tanggal' => $r->created_at ? date('d/m/Y H:i', strtotime($r->created_at)) : '-',
@@ -413,14 +465,21 @@ class ProcurementService
                     'trend' => $trend,
                 ];
             })->all(),
+            'retur_items' => $returItemsFormatted,
             'statistik' => [
                 'total_transaksi' => $rows->count(),
                 'total_qty' => $totalQty,
+                'total_nilai' => $totalNilai,
                 'harga_terakhir' => $hargaTerakhir,
                 'harga_terendah' => $hargaTerendah,
                 'harga_tertinggi' => $hargaTertinggi,
                 'harga_rata_rata' => $weightedAvg,
-                'supplier_terakhir' => $rows->first()->supplier_nama,
+                'supplier_terakhir' => $rows->first()?->supplier_nama,
+                'total_retur_transaksi' => $returRows->count(),
+                'total_retur_qty' => $totalReturQty,
+                'total_retur_nilai' => $totalReturNilai,
+                'net_pengadaan_qty' => $totalQty - $totalReturQty,
+                'net_pengadaan_nilai' => $totalNilai - $totalReturNilai,
             ],
         ];
     }

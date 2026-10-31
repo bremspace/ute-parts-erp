@@ -5,6 +5,7 @@ namespace App\Modules\Wms\Livewire;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
+use App\Modules\Wms\Models\ReturnPembelianItem;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Services\ProcurementService;
 use Livewire\Component;
@@ -20,6 +21,8 @@ class HistoriPengadaanTab extends Component
     public ?int $supplierId = null;
 
     public string $statusPo = 'all';
+
+    public string $jenisTransaksi = 'all'; // all, beli, retur
 
     public string $trenHarga = 'all'; // all, naik, turun, tetap
 
@@ -95,6 +98,7 @@ class HistoriPengadaanTab extends Component
             'search',
             'supplierId',
             'statusPo',
+            'jenisTransaksi',
             'trenHarga',
             'tanggalMulai',
             'tanggalSelesai',
@@ -206,7 +210,7 @@ class HistoriPengadaanTab extends Component
                 'purchaseOrder' => function ($q) {
                     $q->with(['supplier', 'gudangTujuan', 'grn']);
                 },
-                'produk',
+                'produk.skuVariants',
                 'skuVariant',
             ])
             ->whereHas('purchaseOrder', function ($q) use ($cabangId) {
@@ -237,8 +241,10 @@ class HistoriPengadaanTab extends Component
                 $q->where(function ($sub) use ($term) {
                     $sub->whereHas('produk', function ($p) use ($term) {
                         $p->where('nama', 'like', $term)
-                            ->orWhere('sku', 'like', $term)
-                            ->orWhere('barcode', 'like', $term);
+                            ->orWhere('barcode', 'like', $term)
+                            ->orWhere('barcode_alt', 'like', $term)
+                            ->orWhere('kode_lama', 'like', $term)
+                            ->orWhereHas('skuVariants', fn ($sv) => $sv->where('sku', 'like', $term)->orWhere('barcode', 'like', $term));
                     })
                         ->orWhereHas('purchaseOrder', function ($po) use ($term) {
                             $po->where('no_po', 'like', $term)
@@ -259,6 +265,29 @@ class HistoriPengadaanTab extends Component
         $totalQty = (int) (clone $baseQuery)->sum('jumlah');
         $totalNilai = (float) (clone $baseQuery)->sum('subtotal');
         $totalProdukUnik = (clone $baseQuery)->distinct('produk_id')->count('produk_id');
+
+        // Metrik Ringkasan Retur Pembelian
+        $returQuery = ReturnPembelianItem::query()
+            ->with(['returnPembelian.supplier', 'produk'])
+            ->whereHas('returnPembelian', function ($rq) use ($cabangId) {
+                $rq->when($cabangId, fn ($q2) => $q2->where('cabang_id', $cabangId));
+                if ($this->supplierId) {
+                    $rq->where('supplier_id', $this->supplierId);
+                }
+                if ($this->tanggalMulai) {
+                    $rq->whereDate('created_at', '>=', $this->tanggalMulai);
+                }
+                if ($this->tanggalSelesai) {
+                    $rq->whereDate('created_at', '<=', $this->tanggalSelesai);
+                }
+            });
+
+        $totalReturDokumen = (clone $returQuery)->distinct('return_pembelian_id')->count('return_pembelian_id');
+        $totalReturQty = (int) (clone $returQuery)->sum('jumlah');
+        $totalReturNilai = (float) (clone $returQuery)->sum('subtotal');
+
+        $netPengadaanQty = $totalQty - $totalReturQty;
+        $netPengadaanNilai = $totalNilai - $totalReturNilai;
 
         // Sorting
         $query = clone $baseQuery;
@@ -348,6 +377,11 @@ class HistoriPengadaanTab extends Component
             'totalQty' => $totalQty,
             'totalNilai' => $totalNilai,
             'totalProdukUnik' => $totalProdukUnik,
+            'totalReturDokumen' => $totalReturDokumen,
+            'totalReturQty' => $totalReturQty,
+            'totalReturNilai' => $totalReturNilai,
+            'netPengadaanQty' => $netPengadaanQty,
+            'netPengadaanNilai' => $netPengadaanNilai,
             'poDetail' => $poDetail,
         ]);
     }

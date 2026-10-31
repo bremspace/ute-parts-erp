@@ -22,6 +22,7 @@ use App\Modules\Pos\Services\PricingService;
 use App\Modules\Pos\Services\QrisService;
 use App\Modules\Pos\Services\TransaksiVoidService;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Services\KomisiService;
@@ -2817,6 +2818,8 @@ class PosKasir extends Component
                 ];
 
                 $this->completedTransactionId = $transaksi->id;
+                // [F1-4] Catat log aktivitas transaksi berbasis Transaction-Centric + Dual-Indexing di metadata
+                app(TransactionActivityLogService::class)->catatPenjualan($transaksi);
             });
 
             $this->showPaymentModal = false;

@@ -74,9 +74,11 @@ class ProdukService
         ?float $marginPersen = null,
         ?int $rakId = null,
         array $multiSatuan = [],
-        ?int $supplierId = null
+        ?int $supplierId = null,
+        array $barcodeAlt = [],
+        string $opsiSku = 'otomatis'
     ): Produk {
-        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $rakId, $multiSatuan, $supplierId) {
+        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $rakId, $multiSatuan, $supplierId, $barcodeAlt, $opsiSku) {
             $satuan = $satuanKode ?: 'pcs';
             $satuanRef = $satuanKode ? SatuanUnit::where('kode', $satuanKode)->first() : null;
             if ($satuanKode && ! $satuanRef) {
@@ -141,11 +143,19 @@ class ProdukService
             }
 
             $cleanBarcode = $barcode ? trim($barcode) : null;
+            $cleanBarcodeAlt = [];
+            foreach ($barcodeAlt as $bAlt) {
+                $bTrim = trim((string) $bAlt);
+                if ($bTrim !== '' && $bTrim !== $cleanBarcode && ! in_array($bTrim, $cleanBarcodeAlt, true)) {
+                    $cleanBarcodeAlt[] = $bTrim;
+                }
+            }
 
             $produk = Produk::create([
                 'nama' => $nama,
                 'slug' => (Str::limit(Str::slug($nama), 180, '') ?: 'produk').'-'.Str::lower(Str::random(4)),
                 'barcode' => $cleanBarcode,
+                'barcode_alt' => ! empty($cleanBarcodeAlt) ? $cleanBarcodeAlt : null,
                 'deskripsi' => $deskripsi,
                 'kategori' => $finalKategoriStr,
                 'kategori_id' => $finalKategoriId,
@@ -173,8 +183,16 @@ class ProdukService
                 'is_ondemand' => $isOndemand,
             ]);
 
-            $barcodeFallback = $cleanBarcode ?: null;
-            $finalSku = $sku ? trim($sku) : ($barcodeFallback ?: 'SKU-'.strtoupper(Str::random(6)));
+            if ($opsiSku === 'barcode' && ! empty($cleanBarcode)) {
+                $finalSku = $cleanBarcode;
+            } elseif ($opsiSku === 'manual' && ! empty($sku)) {
+                $finalSku = trim($sku);
+            } elseif ($opsiSku === 'otomatis') {
+                $finalSku = ! empty($sku) ? trim($sku) : 'SKU-'.strtoupper(Str::random(6));
+            } else {
+                $barcodeFallback = $cleanBarcode ?: null;
+                $finalSku = $sku ? trim($sku) : ($barcodeFallback ?: 'SKU-'.strtoupper(Str::random(6)));
+            }
 
             $variant = SkuVariant::create([
                 'produk_id' => $produk->id,
@@ -186,6 +204,12 @@ class ProdukService
                 'harga_jual_retail' => $hargaJual,
                 'is_active' => true,
             ]);
+
+            // Sinkronisasi multi barcode ke format barcode_1, barcode_2, ... di tabel terindeks
+            $allInputBarcodes = array_merge($cleanBarcode ? [$cleanBarcode] : [], $cleanBarcodeAlt);
+            if (! empty($allInputBarcodes)) {
+                $produk->syncBarcodes($allInputBarcodes, $finalSku);
+            }
 
             if ($finalTipeHpIds) {
                 $produk->tipeHps()->sync($finalTipeHpIds);
@@ -256,9 +280,11 @@ class ProdukService
         ?float $marginPersen = null,
         ?array $multiSatuan = null,
         ?int $supplierId = null,
-        ?string $sku = null
+        ?string $sku = null,
+        ?array $barcodeAlt = null,
+        ?string $opsiSku = null
     ): Produk {
-        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $multiSatuan, $supplierId, $sku) {
+        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $multiSatuan, $supplierId, $sku, $barcodeAlt, $opsiSku) {
             $produk = Produk::findOrFail($produkId);
 
             $satuan = $satuanKode ?: ($produk->satuan ?: 'pcs');
@@ -315,7 +341,7 @@ class ProdukService
 
             $cleanBarcode = $barcode !== null ? (trim($barcode) ?: null) : $produk->barcode;
 
-            $produk->update([
+            $updatePayload = [
                 'nama' => $nama,
                 'barcode' => $cleanBarcode,
                 'deskripsi' => $deskripsi ?? $produk->deskripsi,
@@ -342,7 +368,20 @@ class ProdukService
                 'min_stock' => $minStock !== null ? $minStock : $produk->min_stock,
                 'max_stock' => $maxStock !== null ? $maxStock : $produk->max_stock,
                 'is_ondemand' => $isOndemand !== null ? $isOndemand : $produk->is_ondemand,
-            ]);
+            ];
+
+            if ($barcodeAlt !== null) {
+                $cleanBarcodeAlt = [];
+                foreach ($barcodeAlt as $bAlt) {
+                    $bTrim = trim((string) $bAlt);
+                    if ($bTrim !== '' && $bTrim !== $cleanBarcode && ! in_array($bTrim, $cleanBarcodeAlt, true)) {
+                        $cleanBarcodeAlt[] = $bTrim;
+                    }
+                }
+                $updatePayload['barcode_alt'] = ! empty($cleanBarcodeAlt) ? $cleanBarcodeAlt : null;
+            }
+
+            $produk->update($updatePayload);
 
             // Sync tipe HP kompatibel
             $produk->tipeHps()->sync($finalTipeHpIds);
@@ -356,7 +395,9 @@ class ProdukService
 
             if ($variant) {
                 $skuToUpdate = $variant->sku;
-                if ($cleanSku !== null && $cleanSku !== '') {
+                if ($opsiSku === 'barcode' && ! empty($cleanBarcode)) {
+                    $skuToUpdate = $cleanBarcode;
+                } elseif ($cleanSku !== null && $cleanSku !== '') {
                     $skuExists = SkuVariant::where('sku', $cleanSku)
                         ->where('id', '!=', $variant->id)
                         ->exists();
@@ -364,6 +405,8 @@ class ProdukService
                         throw new \InvalidArgumentException("Kode SKU '{$cleanSku}' sudah digunakan oleh produk lain.");
                     }
                     $skuToUpdate = $cleanSku;
+                } elseif ($opsiSku === 'otomatis') {
+                    $skuToUpdate = 'SKU-'.strtoupper(Str::random(6));
                 } elseif (empty($skuToUpdate) && ! empty($cleanBarcode)) {
                     $skuToUpdate = $cleanBarcode;
                 }
@@ -394,6 +437,15 @@ class ProdukService
                 if (! empty($hargaTier)) {
                     $this->simpanHargaTier($produk->id, $variant->id, $hargaTier, $hargaJual);
                 }
+            }
+
+            // Sync barcode ke format barcode_1, barcode_2, ... di tabel terindeks
+            if ($barcode !== null || $barcodeAlt !== null) {
+                $curBarcode = $cleanBarcode !== null ? $cleanBarcode : ($produk->barcode ?? null);
+                $curAlt = $barcodeAlt !== null ? $cleanBarcodeAlt : ($produk->barcode_alt ?? []);
+                $allToSync = array_merge($curBarcode ? [$curBarcode] : [], is_array($curAlt) ? array_values($curAlt) : []);
+                $targetSku = $variant?->sku ?? $cleanSku;
+                $produk->syncBarcodes($allToSync, $targetSku);
             }
 
             if ($multiSatuan !== null) {

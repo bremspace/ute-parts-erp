@@ -9,6 +9,7 @@ use App\Modules\Pos\Models\ReturnPenjualanItem;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Models\Produk;
@@ -19,6 +20,7 @@ use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Modules\Workflow\Services\ApprovalService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -77,14 +79,17 @@ class ReturnPenjualanService
     public function buatRetur(
         Transaksi $transaksi,
         array $items,
-        string $alasan,
+        string $alasan = '',
         string $metodePengembalian = 'kas',
         ?int $userId = null,
         string $tipePenyelesaian = 'refund',
         array $tukarItems = [],
         string $channel = 'pos',
         array $fotoBukti = [],
-        ?string $catatanQc = null
+        ?string $catatanQc = null,
+        string $metodeBayarSelisih = 'tunai',
+        float $jumlahBayarSelisih = 0,
+        float $kembalianSelisih = 0
     ): ReturnPenjualan {
         $cabangId = (int) ($transaksi->cabang_id ?: (session('cabang_id') ?: Cabang::value('id') ?: 1));
         $gudangId = $this->resolveGudangId($transaksi->gudang_id ? (int) $transaksi->gudang_id : null, $cabangId);
@@ -96,9 +101,26 @@ class ReturnPenjualanService
         return DB::transaction(function () use (
             $transaksi, $items, $alasan, $metodePengembalian, $cabangId,
             $gudangId, $userId, $tipePenyelesaian, $tukarItems, $channel,
-            $fotoBukti, $catatanQc
+            $fotoBukti, $catatanQc, $metodeBayarSelisih, $jumlahBayarSelisih, $kembalianSelisih
         ) {
             $transaksiLocked = Transaksi::whereKey($transaksi->id)->lockForUpdate()->firstOrFail();
+
+            // [ANTI-FRAUD] Deteksi Cerdas Masa Garansi
+            $tglTransaksi = $transaksiLocked->created_at ?: now();
+            $durasiGaransi = (int) ($transaksiLocked->durasi_garansi_hari ?? 3);
+            if ($durasiGaransi <= 0) {
+                $durasiGaransi = 3;
+            }
+            $garansiBerakhir = $transaksiLocked->garansi_berakhir_pada
+                ? Carbon::parse($transaksiLocked->garansi_berakhir_pada)->endOfDay()
+                : $tglTransaksi->copy()->addDays($durasiGaransi)->endOfDay();
+
+            if (now()->greaterThan($garansiBerakhir)) {
+                $lewatHari = max(1, (int) now()->diffInDays($garansiBerakhir));
+                throw ValidationException::withMessages([
+                    'garansi' => "Retur ditolak otomatis oleh sistem: Masa garansi transaksi telah habis sejak {$garansiBerakhir->format('d/m/Y')} ({$lewatHari} hari yang lalu). Garansi resmi toko berlaku {$durasiGaransi} hari sejak transaksi tanggal {$tglTransaksi->format('d/m/Y')}.",
+                ]);
+            }
 
             if (! $transaksiLocked->gudang_id || ! Gudang::where('id', $transaksiLocked->gudang_id)->exists() || ! $transaksiLocked->cabang_id) {
                 $transaksiLocked->update([
@@ -110,6 +132,8 @@ class ReturnPenjualanService
             $totalRetur = 0;
             $totalHpp = 0;
             $preparedItems = [];
+            $allTukarItems = [];
+            $tipeCount = ['refund' => 0, 'tukar_produk' => 0];
 
             foreach ($items as $itemData) {
                 $trxItem = TransaksiItem::with('produk')->where('transaksi_id', $transaksiLocked->id)
@@ -179,6 +203,23 @@ class ReturnPenjualanService
                 }
 
                 $kondisi = ($itemData['kondisi_barang'] ?? 'bagus') === 'rusak' ? 'rusak' : 'bagus';
+                $itemTipe = in_array($itemData['tipe_penyelesaian'] ?? $tipePenyelesaian, ['refund', 'tukar_produk'], true)
+                    ? ($itemData['tipe_penyelesaian'] ?? $tipePenyelesaian)
+                    : $tipePenyelesaian;
+                $itemMetodePengembalian = in_array($itemData['metode_pengembalian'] ?? $metodePengembalian, ['kas', 'piutang', 'saldo'], true)
+                    ? ($itemData['metode_pengembalian'] ?? $metodePengembalian)
+                    : $metodePengembalian;
+                $itemAlasan = ! empty($itemData['alasan']) ? (string) $itemData['alasan'] : $alasan;
+                $itemFoto = ! empty($itemData['foto_bukti']) && is_array($itemData['foto_bukti']) ? $itemData['foto_bukti'] : [];
+                $itemTukar = ! empty($itemData['tukar_items']) && is_array($itemData['tukar_items']) ? $itemData['tukar_items'] : [];
+
+                if ($itemTipe === 'tukar_produk' && ! empty($itemTukar)) {
+                    foreach ($itemTukar as $it) {
+                        $allTukarItems[] = $it;
+                    }
+                }
+
+                $tipeCount[$itemTipe] = ($tipeCount[$itemTipe] ?? 0) + 1;
 
                 $preparedItems[] = [
                     'trx_item' => $trxItem,
@@ -189,6 +230,11 @@ class ReturnPenjualanService
                     'sn' => $snList,
                     'kondisi_barang' => $kondisi,
                     'supplier_id' => $supplierId,
+                    'alasan' => $itemAlasan,
+                    'tipe_penyelesaian' => $itemTipe,
+                    'metode_pengembalian' => $itemMetodePengembalian,
+                    'foto_bukti' => $itemFoto,
+                    'tukar_items' => $itemTukar,
                 ];
 
                 $totalRetur += $subtotal;
@@ -197,6 +243,57 @@ class ReturnPenjualanService
 
             if (empty($preparedItems)) {
                 throw ValidationException::withMessages(['items' => 'Minimal satu item harus diretur dengan jumlah > 0']);
+            }
+
+            // Tentukan status tipe penyelesaian agregat (refund, tukar_produk, atau campur)
+            $finalTipePenyelesaian = 'refund';
+            if ($tipeCount['refund'] > 0 && $tipeCount['tukar_produk'] > 0) {
+                $finalTipePenyelesaian = 'campur';
+            } elseif ($tipeCount['tukar_produk'] > 0) {
+                $finalTipePenyelesaian = 'tukar_produk';
+            }
+
+            // Validasi tukar barang jika ada item exchange
+            if (empty($allTukarItems) && ! empty($tukarItems)) {
+                $allTukarItems = $tukarItems;
+            }
+
+            if (! empty($allTukarItems)) {
+                $returProdukIds = array_unique(array_map(fn ($p) => (int) $p['trx_item']->produk_id, $preparedItems));
+                $returProduks = Produk::whereIn('id', $returProdukIds)->get()->keyBy('id');
+
+                $tukarProdukIds = array_unique(array_map(fn ($t) => (int) $t['produk_id'], $allTukarItems));
+                $tukarProduks = Produk::whereIn('id', $tukarProdukIds)->get()->keyBy('id');
+
+                $minHargaUnit = 0;
+                foreach ($preparedItems as $prep) {
+                    if ($prep['tipe_penyelesaian'] === 'tukar_produk' && $prep['harga_satuan'] > $minHargaUnit) {
+                        $minHargaUnit = (float) $prep['harga_satuan'];
+                    }
+                }
+                if ($minHargaUnit <= 0) {
+                    $minHargaUnit = (float) max(array_column($preparedItems, 'harga_satuan'));
+                }
+
+                foreach ($allTukarItems as $tItem) {
+                    $tProduk = $tukarProduks->get($tItem['produk_id']);
+                    if (! $tProduk) {
+                        throw ValidationException::withMessages([
+                            'tukar_items' => "Produk pengganti #{$tItem['produk_id']} tidak ditemukan.",
+                        ]);
+                    }
+
+                    // Validasi harga: harga unit produk pengganti >= harga unit barang yang diretur (barang lebih murah DITOLAK)
+                    $hargaUnitPengganti = isset($tItem['harga_satuan'])
+                        ? (float) $tItem['harga_satuan']
+                        : (float) ($tProduk->harga_jual_retail ?? $tProduk->harga_jual ?? 0);
+
+                    if ($hargaUnitPengganti < $minHargaUnit - 0.01) {
+                        throw ValidationException::withMessages([
+                            'tukar_items' => "Harga satuan produk pengganti [{$tProduk->nama}] (Rp ".number_format($hargaUnitPengganti, 0, ',', '.').') tidak boleh lebih rendah dari harga barang yang diretur (Rp '.number_format($minHargaUnit, 0, ',', '.').').',
+                        ]);
+                    }
+                }
             }
 
             $today = now()->format('Ymd');
@@ -214,11 +311,14 @@ class ReturnPenjualanService
                 'jumlah' => $totalRetur,
                 'status' => 'draft',
                 'metode_pengembalian' => in_array($metodePengembalian, ['kas', 'piutang', 'saldo'], true) ? $metodePengembalian : 'kas',
-                'tipe_penyelesaian' => in_array($tipePenyelesaian, ['refund', 'tukar_produk'], true) ? $tipePenyelesaian : 'refund',
+                'tipe_penyelesaian' => $finalTipePenyelesaian,
                 'alasan' => $alasan,
                 'foto_bukti' => $fotoBukti,
                 'catatan_qc' => $catatanQc,
                 'channel' => $channel,
+                'metode_bayar_selisih' => $metodeBayarSelisih,
+                'jumlah_bayar_selisih' => $jumlahBayarSelisih,
+                'kembalian_selisih' => $kembalianSelisih,
             ]);
 
             foreach ($preparedItems as $prep) {
@@ -234,6 +334,11 @@ class ReturnPenjualanService
                     'nomor_seri' => $prep['sn'],
                     'supplier_id' => $prep['supplier_id'],
                     'status_karantina' => $prep['kondisi_barang'] === 'bagus' ? 'siap_jual' : 'karantina',
+                    'alasan' => $prep['alasan'],
+                    'tipe_penyelesaian' => $prep['tipe_penyelesaian'],
+                    'metode_pengembalian' => $prep['metode_pengembalian'],
+                    'tukar_items_payload' => ! empty($prep['tukar_items']) ? $prep['tukar_items'] : null,
+                    'foto_bukti' => ! empty($prep['foto_bukti']) ? $prep['foto_bukti'] : null,
                 ]);
 
                 // Update status nomor seri
@@ -248,75 +353,16 @@ class ReturnPenjualanService
                 }
             }
 
-            if ($tipePenyelesaian === 'tukar_produk' && ! empty($tukarItems)) {
-                // Validasi tukar barang: kategori harus sama dengan produk yang diretur dan harga unit pengganti >= harga unit item diretur
-                $returProdukIds = array_unique(array_map(fn ($p) => (int) $p['trx_item']->produk_id, $preparedItems));
-                $returProduks = Produk::whereIn('id', $returProdukIds)->get()->keyBy('id');
-
-                $tukarProdukIds = array_unique(array_map(fn ($t) => (int) $t['produk_id'], $tukarItems));
-                $tukarProduks = Produk::whereIn('id', $tukarProdukIds)->get()->keyBy('id');
-
-                // Kategori produk yang diretur
-                $allowedKategoriIds = [];
-                $allowedKategoriStrings = [];
-                $minHargaUnit = 0;
-                foreach ($preparedItems as $prep) {
-                    $pModel = $returProduks->get($prep['trx_item']->produk_id);
-                    if ($pModel?->kategori_id) {
-                        $allowedKategoriIds[] = (int) $pModel->kategori_id;
-                    }
-                    if ($pModel?->kategori) {
-                        $allowedKategoriStrings[] = trim(strtolower($pModel->kategori));
-                    }
-                    if ($prep['harga_satuan'] > $minHargaUnit) {
-                        $minHargaUnit = (float) $prep['harga_satuan'];
-                    }
-                }
-                $allowedKategoriIds = array_unique($allowedKategoriIds);
-                $allowedKategoriStrings = array_unique($allowedKategoriStrings);
-
-                foreach ($tukarItems as $tItem) {
-                    $tProduk = $tukarProduks->get($tItem['produk_id']);
-                    if (! $tProduk) {
-                        throw ValidationException::withMessages([
-                            'tukar_items' => "Produk pengganti #{$tItem['produk_id']} tidak ditemukan.",
-                        ]);
-                    }
-
-                    // Validasi kategori: jika produk yang diretur memiliki kategori, produk pengganti wajib berkategori sama
-                    if (! empty($allowedKategoriIds) || ! empty($allowedKategoriStrings)) {
-                        $matchId = $tProduk->kategori_id && in_array((int) $tProduk->kategori_id, $allowedKategoriIds, true);
-                        $matchString = $tProduk->kategori && in_array(trim(strtolower($tProduk->kategori)), $allowedKategoriStrings, true);
-                        if (! $matchId && ! $matchString) {
-                            throw ValidationException::withMessages([
-                                'tukar_items' => "Produk pengganti [{$tProduk->nama}] harus berada dalam kategori yang sama dengan produk yang diretur.",
-                            ]);
-                        }
-                    }
-
-                    // Validasi harga: harga unit produk pengganti >= harga unit barang yang diretur (harga lebih rendah dilarang)
-                    $hargaUnitPengganti = isset($tItem['harga_satuan'])
-                        ? (float) $tItem['harga_satuan']
-                        : (float) ($tProduk->harga_jual_retail ?? $tProduk->harga_jual ?? 0);
-
-                    if ($hargaUnitPengganti < $minHargaUnit) {
-                        throw ValidationException::withMessages([
-                            'tukar_items' => "Harga satuan produk pengganti [{$tProduk->nama}] (Rp ".number_format($hargaUnitPengganti, 0, ',', '.').') tidak boleh lebih rendah dari harga barang yang diretur (Rp '.number_format($minHargaUnit, 0, ',', '.').').',
-                        ]);
-                    }
-                }
-            }
-
             // Cek apakah memerlukan persetujuan workflow (misal rule > threshold)
             $needsApproval = $this->approvalService->butuhApproval('retur', $cabangId, (float) $totalRetur);
 
             // Simpan payload produk pengganti pada retur
-            if ($tipePenyelesaian === 'tukar_produk' && ! empty($tukarItems)) {
-                $retur->update(['tukar_items_payload' => $tukarItems]);
+            if (! empty($allTukarItems)) {
+                $retur->update(['tukar_items_payload' => $allTukarItems]);
 
                 // Eksekusi pemotongan stok & pembuatan transaksi tukar sekarang HANYA jika tidak butuh approval
                 if (! $needsApproval) {
-                    $this->prosesTukarProduk($retur, $tukarItems, $userId);
+                    $this->prosesTukarProduk($retur, $allTukarItems, $userId);
                 }
             }
 
@@ -325,7 +371,12 @@ class ReturnPenjualanService
                 $this->eksekusiRetur($retur, $totalHpp, $userId);
             }
 
-            return $retur->fresh(['items.produk', 'transaksi', 'pelanggan', 'tukarTransaksi']);
+            $returResult = $retur->fresh(['items.produk', 'transaksi', 'pelanggan', 'tukarTransaksi.items.produk']);
+
+            // [F1-4] Catat log aktivitas retur berbasis Transaction-Centric + Dual-Indexing di metadata
+            app(TransactionActivityLogService::class)->catatReturPenjualan($returResult);
+
+            return $returResult;
         });
     }
 
@@ -382,12 +433,24 @@ class ReturnPenjualanService
             $totalTukar += $subtotal;
         }
 
-        $selisih = round($totalTukar - (float) $retur->jumlah, 2);
+        $returNilaiTukar = (float) $retur->items()
+            ->where('tipe_penyelesaian', 'tukar_produk')
+            ->sum('subtotal');
+        if ($returNilaiTukar <= 0) {
+            $returNilaiTukar = (float) $retur->jumlah;
+        }
+
+        $selisih = max(0, round($totalTukar - $returNilaiTukar, 2));
 
         // Buat transaksi POS pengganti
         $today = now()->format('Ymd');
         $count = Transaksi::whereDate('created_at', now()->toDateString())->count() + 1;
         $noTransaksiTukar = sprintf('TRX-TUKAR-%s-%04d', $today, $count);
+
+        $metodeBayarSelisih = $retur->metode_bayar_selisih ?? 'tunai';
+        $catatanBayar = $selisih > 0
+            ? ' (Selisih Rp '.number_format($selisih, 0, ',', '.').' via '.strtoupper($metodeBayarSelisih).')'
+            : ' (Tukar Impas Rp 0)';
 
         $transaksiTukar = Transaksi::create([
             'no_transaksi' => $noTransaksiTukar,
@@ -402,7 +465,7 @@ class ReturnPenjualanService
             'jumlah_bayar' => $totalTukar,
             'kembalian' => 0,
             'status' => 'selesai',
-            'catatan' => "Tukar Produk dari Retur {$retur->no_return} (Selisih: Rp ".number_format($selisih, 0, ',', '.').')',
+            'catatan' => "Tukar Produk dari Retur {$retur->no_return}{$catatanBayar}",
         ]);
 
         foreach ($preparedTukar as $p) {

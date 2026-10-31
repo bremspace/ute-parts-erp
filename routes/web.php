@@ -49,12 +49,14 @@ use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Controllers\BulkFotoUploadController;
 use App\Modules\Wms\Livewire\CycleCountPage;
+use App\Modules\Wms\Livewire\ImportExportPage;
 use App\Modules\Wms\Livewire\ImportFotoPage;
 use App\Modules\Wms\Livewire\LaporanNomorSeri;
 use App\Modules\Wms\Livewire\WmsDashboard;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\ReturnPembelian;
 use App\Modules\Workflow\Livewire\ApprovalInbox;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -601,8 +603,8 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
         ->middleware('permission:wms.view');
     // WMS Chunked Bulk Foto Upload
 
-    // WMS Export & Import Master (redirect to Pengaturan)
-    Route::get('/wms/import-export', fn () => redirect()->route('pengaturan', ['tab' => 'export_import']))
+    // WMS Export & Import Master Produk & Foto
+    Route::get('/wms/import-export', ImportExportPage::class)
         ->name('wms.import-export')
         ->middleware('permission:wms.view');
 
@@ -641,6 +643,13 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
 
         return view('wms.grn-print', ['grn' => $grn]);
     })->name('wms.grn.print')->middleware('permission:wms.view');
+
+    // Cetak Dokumen Surat Pengantar Retur Pembelian / Retur ke Supplier (A5/A4 Standar)
+    Route::get('/wms/retur-pembelian/{id}/print', function ($id) {
+        $retur = ReturnPembelian::with(['supplier', 'items.produk', 'gudang.cabang', 'user'])->findOrFail($id);
+
+        return view('wms.retur-pembelian-print', ['retur' => $retur]);
+    })->name('wms.retur-pembelian.print')->middleware('permission:wms.view');
 
     // Cetak Label Pengiriman Ekspedisi Pesanan Online (SOT Printer)
     Route::get('/pos/pesanan-online/{id}/print-label', function ($id) {

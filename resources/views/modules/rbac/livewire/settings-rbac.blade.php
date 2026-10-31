@@ -419,6 +419,14 @@
                         💾 Basis Data & Backup
                     </button>
                     @endif
+                    @can('lihat-audit-log')
+                    <button
+                        wire:click="$set('activeTab', 'audit')"
+                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'audit' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        📜 Audit Trail & Log
+                    </button>
+                    @endcan
                 </div>
             </div>
 
@@ -429,25 +437,52 @@
                 @elseif($activeTab === 'role')
                     <button wire:click="openRoleModal" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Role Baru</button>
                 @elseif($activeTab === 'cabang')
-                    <button wire:click="openCabangModal()" class="flex-1 sm:flex-initial min-w-[90px] px-3.5 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Cabang</button>
-                    <button wire:click="openGudangModal()" class="flex-1 sm:flex-initial min-w-[90px] px-3.5 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs shadow-md shadow-up-primary/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Gudang</button>
-                    <button wire:click="openRakModal()" class="flex-1 sm:flex-initial min-w-[80px] px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/10 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Rak</button>
+                    <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <div class="inline-flex rounded-xl bg-white/5 border border-white/10 p-0.5">
+                            <button type="button" wire:click="exportAtributTarget('rak', 'xlsx')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-ink-300 hover:text-white hover:bg-white/10 transition cursor-pointer flex items-center gap-1" title="Export data Rak ke Excel">
+                                <span>📊 Export Rak</span>
+                            </button>
+                            <button type="button" wire:click="downloadTemplateAtributTarget('rak')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-ink-300 hover:text-white hover:bg-white/10 transition cursor-pointer flex items-center gap-1" title="Unduh template Excel Rak">
+                                <span>📥 Template Rak</span>
+                            </button>
+                            <button type="button" wire:click="openImportModalFor('rak')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-up-mint hover:bg-up-mint/15 transition cursor-pointer flex items-center gap-1" title="Import Rak dari Excel/CSV">
+                                <span>📤 Import Rak</span>
+                            </button>
+                        </div>
+                        <button wire:click="openCabangModal()" class="flex-1 sm:flex-initial min-w-[90px] px-3.5 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Cabang</button>
+                        <button wire:click="openGudangModal()" class="flex-1 sm:flex-initial min-w-[90px] px-3.5 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs shadow-md shadow-up-primary/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Gudang</button>
+                        <button wire:click="openRakModal()" class="flex-1 sm:flex-initial min-w-[80px] px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/10 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Rak</button>
+                    </div>
                 @elseif($activeTab === 'master_produk')
-                    @if($masterProdukSubTab === 'kategori')
-                        <button wire:click="openKategoriModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kategori Baru</button>
-                    @elseif($masterProdukSubTab === 'brand')
-                        <button wire:click="openBrandModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Brand Part Baru</button>
-                    @elseif($masterProdukSubTab === 'kualitas')
-                        <button wire:click="openKualitasModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kualitas Baru</button>
-                    @elseif($masterProdukSubTab === 'satuan')
-                        <button wire:click="openSatuanModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Satuan Baru</button>
-                    @elseif($masterProdukSubTab === 'kondisi')
-                        <button wire:click="openKondisiModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kondisi Baru</button>
-                    @elseif($masterProdukSubTab === 'merk_hp')
-                        <button wire:click="openMerkHpModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Merk HP Baru</button>
-                    @elseif($masterProdukSubTab === 'tipe_hp')
-                        <button wire:click="openTipeHpModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Tipe HP Baru</button>
-                    @endif
+                    <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <div class="inline-flex rounded-xl bg-white/5 border border-white/10 p-0.5">
+                            <button type="button" wire:click="exportAtributTarget('{{ $masterProdukSubTab }}', 'xlsx')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-ink-300 hover:text-white hover:bg-white/10 transition cursor-pointer flex items-center gap-1" title="Export data atribut ini ke Excel">
+                                <span>📊 Export</span>
+                            </button>
+                            <button type="button" wire:click="downloadTemplateAtributTarget('{{ $masterProdukSubTab }}')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-ink-300 hover:text-white hover:bg-white/10 transition cursor-pointer flex items-center gap-1" title="Unduh template Excel atribut ini">
+                                <span>📥 Template</span>
+                            </button>
+                            <button type="button" wire:click="openImportModalFor('{{ $masterProdukSubTab }}')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-up-mint hover:bg-up-mint/15 transition cursor-pointer flex items-center gap-1" title="Import atribut ini dari Excel/CSV">
+                                <span>📤 Import</span>
+                            </button>
+                        </div>
+
+                        @if($masterProdukSubTab === 'kategori')
+                            <button wire:click="openKategoriModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kategori Baru</button>
+                        @elseif($masterProdukSubTab === 'brand')
+                            <button wire:click="openBrandModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Brand Part Baru</button>
+                        @elseif($masterProdukSubTab === 'kualitas')
+                            <button wire:click="openKualitasModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kualitas Baru</button>
+                        @elseif($masterProdukSubTab === 'satuan')
+                            <button wire:click="openSatuanModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Satuan Baru</button>
+                        @elseif($masterProdukSubTab === 'kondisi')
+                            <button wire:click="openKondisiModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kondisi Baru</button>
+                        @elseif($masterProdukSubTab === 'merk_hp')
+                            <button wire:click="openMerkHpModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Merk HP Baru</button>
+                        @elseif($masterProdukSubTab === 'tipe_hp')
+                            <button wire:click="openTipeHpModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Tipe HP Baru</button>
+                        @endif
+                    </div>
                 @elseif($activeTab === 'export_import')
                     <button wire:click="downloadTemplateAtribut" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer">
                         <span>📥</span>
@@ -4100,6 +4135,18 @@
         @livewire(\App\Modules\Rbac\Livewire\DatabaseManagement::class)
     @endif
 
+    @if($activeTab === 'audit')
+        @can('lihat-audit-log')
+            <div class="glass-panel p-4 sm:p-6 rounded-3xl">
+                @livewire(\App\Modules\Rbac\Livewire\RiwayatAktivitas::class, key('settings-riwayat-aktivitas'))
+            </div>
+        @else
+            <div class="glass-panel p-6 rounded-3xl text-center text-xs text-up-amber font-semibold">
+                Anda tidak memiliki hak akses melihat audit log aktivitas sistem.
+            </div>
+        @endcan
+    @endif
+
     <!-- MODAL: USER -->
     @if($showUserModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -4892,6 +4939,159 @@
                 <div class="flex gap-2.5 sm:gap-3 pt-3 sm:pt-4 border-t border-white/5 mt-4 sm:mt-5 flex-shrink-0">
                     <button wire:click="$set('showBatchEditModal', false)" class="flex-1 py-2.5 sm:py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer transition active:scale-95">Batal</button>
                     <button wire:click="simpanBatchEdit" class="flex-1 py-2.5 sm:py-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs cursor-pointer transition active:scale-95 shadow-md shadow-up-primary/20">Terapkan Perubahan</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL POPUP: IMPORT ATRIBUT PER TARGET SUB-TAB -->
+    @if($showAtributImportModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative max-h-[92vh] flex flex-col my-auto border border-white/10 shadow-2xl">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10 flex-shrink-0">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <span>📥</span>
+                            <span>Import Master Atribut: <span class="text-up-mint uppercase">{{ $atributTarget }}</span></span>
+                        </h3>
+                        <p class="text-[11px] text-ink-400">Unggah berkas Excel (.xlsx) atau CSV untuk sub-tab {{ $atributTarget }}.</p>
+                    </div>
+                    <button type="button" wire:click="closeAtributImportModal" class="p-1.5 rounded-xl hover:bg-white/10 text-ink-400 hover:text-white transition cursor-pointer">✕</button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="space-y-4 overflow-y-auto flex-1 pr-1">
+                    @if($atributStep === 'upload')
+                        <div class="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/10">
+                            <div>
+                                <span class="text-xs font-semibold text-white block">Gunakan Template Standar</span>
+                                <span class="text-[10px] text-ink-400">Gunakan kolom header yang sesuai agar data tervalidasi otomatis.</span>
+                            </div>
+                            <button type="button" wire:click="downloadTemplateAtributTarget('{{ $atributTarget }}')" class="px-3 py-1.5 rounded-xl bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold text-xs border border-up-primary/30 flex items-center gap-1.5 cursor-pointer transition active:scale-95">
+                                <span>📥</span>
+                                <span>Unduh Template .xlsx</span>
+                            </button>
+                        </div>
+
+                        <!-- Dropzone File Upload -->
+                        <div class="relative overflow-hidden p-6 rounded-2xl border-2 border-dashed {{ $atributFile ? 'border-up-mint bg-up-mint/[0.03]' : 'border-white/15 bg-white/[0.01]' }} hover:border-up-primary transition text-center space-y-2 cursor-pointer group">
+                            <input type="file" wire:model="atributFile" accept=".xlsx,.xls,.csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+
+                            @if($atributFile)
+                                <div class="text-3xl text-up-mint">✓</div>
+                                <div class="font-bold text-xs text-white">{{ $atributFile->getClientOriginalName() }}</div>
+                                <div class="text-[11px] text-ink-400">{{ number_format($atributFile->getSize() / 1024, 1) }} KB — Siap dipratinjau</div>
+                                <span class="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-up-mint/20 text-up-mint">Klik untuk ganti file</span>
+                            @else
+                                <div class="text-3xl group-hover:scale-110 transition-transform">📂</div>
+                                <div class="font-bold text-xs text-white">Pilih atau Seret Berkas ke Sini</div>
+                                <p class="text-[11px] text-ink-400">Mendukung file .xlsx dan .csv (maks 5 MB)</p>
+                                <span class="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-up-primary/10 text-up-primary">Pilih Berkas...</span>
+                            @endif
+                        </div>
+
+                        @error('atributFile')
+                            <p class="text-xs text-up-red font-semibold">{{ $message }}</p>
+                        @enderror
+
+                        <button type="button" wire:click="previewImportAtribut" wire:loading.attr="disabled" class="w-full py-3 px-4 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20 disabled:opacity-50">
+                            <span wire:loading.remove wire:target="previewImportAtribut">Pratinjau Data {{ ucfirst($atributTarget) }} →</span>
+                            <span wire:loading wire:target="previewImportAtribut" class="flex items-center gap-2">
+                                <span class="animate-spin">⏳</span>
+                                <span>Membaca &amp; Memvalidasi...</span>
+                            </span>
+                        </button>
+                    @elseif($atributStep === 'preview')
+                        <!-- Metrics -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-0.5">
+                                <div class="text-[10px] uppercase font-bold text-ink-400">Total Baris</div>
+                                <div class="text-xl font-black text-white tabular-nums">{{ $atributPreview['total_baris'] ?? 0 }}</div>
+                            </div>
+                            <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30 space-y-0.5">
+                                <div class="text-[10px] uppercase font-bold text-up-mint">Data Baru</div>
+                                <div class="text-xl font-black text-up-mint tabular-nums">{{ collect($atributPreview['summary'] ?? [])->sum('baru') }}</div>
+                            </div>
+                            <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/30 space-y-0.5">
+                                <div class="text-[10px] uppercase font-bold text-up-primary">Update</div>
+                                <div class="text-xl font-black text-up-primary tabular-nums">{{ collect($atributPreview['summary'] ?? [])->sum('update') }}</div>
+                            </div>
+                            <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/30 space-y-0.5">
+                                <div class="text-[10px] uppercase font-bold text-up-red">Error</div>
+                                <div class="text-xl font-black text-up-red tabular-nums">{{ $atributPreview['total_error'] ?? 0 }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Preview Table -->
+                        <div class="rounded-2xl border border-white/10 overflow-hidden max-h-60 overflow-y-auto">
+                            <table class="w-full text-left text-xs text-ink-200 whitespace-nowrap">
+                                <thead class="text-ink-400 bg-white/5 uppercase text-[10px] sticky top-0 backdrop-blur-sm">
+                                    <tr>
+                                        <th class="py-2 px-3">Status</th>
+                                        <th class="py-2 px-3">Nama / Kode</th>
+                                        <th class="py-2 px-3">Keterangan</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @php
+                                        $items = [];
+                                        if (!empty($atributTarget) && isset($atributPreview['items'][$atributTarget])) {
+                                            $items = $atributPreview['items'][$atributTarget];
+                                        } else {
+                                            foreach ($atributPreview['items'] ?? [] as $tItems) {
+                                                if (!empty($tItems)) { $items = array_merge($items, $tItems); }
+                                            }
+                                        }
+                                    @endphp
+                                    @forelse($items as $row)
+                                        <tr class="hover:bg-white/[0.02]">
+                                            <td class="py-2 px-3">
+                                                @if(($row['status'] ?? '') === 'baru')
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/20 text-up-mint">Baru</span>
+                                                @elseif(($row['status'] ?? '') === 'update')
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary">Update</span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-red/20 text-up-red">Error</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2 px-3 font-semibold text-white">
+                                                {{ $row['nama'] ?? $row['kode'] ?? $row['sub_kategori'] ?? $row['kategori_utama'] ?? '-' }}
+                                            </td>
+                                            <td class="py-2 px-3 text-[11px] text-ink-400">
+                                                {{ $row['pesan'] ?? ($row['keterangan'] ?? '-') }}
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="3" class="py-6 text-center text-ink-500 text-xs">Tidak ada data untuk dipratinjau.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="flex items-center gap-3 pt-3 border-t border-white/10">
+                            <button type="button" wire:click="cancelImportAtribut" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer transition">
+                                ← Pilih File Lain
+                            </button>
+                            <button type="button" wire:click="commitImportAtribut" class="flex-1 py-2.5 rounded-xl bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-mint/20 transition active:scale-95">
+                                Simpan &amp; Terapkan Data ({{ $atributPreview['total_valid'] ?? 0 }})
+                            </button>
+                        </div>
+                    @elseif($atributStep === 'selesai')
+                        <div class="py-8 text-center space-y-3">
+                            <div class="text-4xl text-up-mint">🎉</div>
+                            <h4 class="text-base font-bold text-white">Import Berhasil Diselesaikan!</h4>
+                            <p class="text-xs text-ink-400 max-w-md mx-auto">
+                                Seluruh data master atribut {{ $atributTarget }} telah disimpan dan disinkronkan ke database sistem.
+                            </p>
+                            <button type="button" wire:click="closeAtributImportModal" class="px-6 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer transition hover:bg-up-primary/90">
+                                Tutup
+                            </button>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

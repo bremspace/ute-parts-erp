@@ -8,6 +8,7 @@ use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
@@ -556,6 +557,9 @@ class GrnService
         }
 
         $grn->update(['status' => 'terima']);
+
+        // [F1-4] Catat log aktivitas penerimaan GRN berbasis Transaction-Centric + Dual-Indexing di metadata
+        app(TransactionActivityLogService::class)->catatGrn($grn);
 
         // [F2-2] PO → 'diterima' saat finalisasi — cegah penerimaan ganda
         // via jalur legacy (PoTab::terimaPo / API updatePoStatus).

@@ -235,6 +235,9 @@ class ProdukTab extends Component
         'margin_persen' => null,
         'hitung_dari_margin' => false,
         'multi_satuan' => [],
+        // [MULTI BARCODE & OPSI SKU]
+        'barcode_alt_input' => '',
+        'opsi_sku' => 'otomatis', // 'otomatis' | 'barcode' | 'manual'
         // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
         'abc_class' => 'B',
         'reorder_point' => null,
@@ -941,6 +944,38 @@ class ProdukTab extends Component
         return app(MarginGuardService::class)->evaluasiHarga($beli, $jual, $kategori);
     }
 
+    public function updatedProdukFormOpsiSku($val): void
+    {
+        if ($val === 'barcode') {
+            $this->produkForm['sku'] = $this->produkForm['barcode'] ?? '';
+        } elseif ($val === 'otomatis') {
+            $this->produkForm['sku'] = '';
+        }
+    }
+
+    public function updatedProdukFormBarcode($val): void
+    {
+        if (($this->produkForm['opsi_sku'] ?? '') === 'barcode') {
+            $this->produkForm['sku'] = trim((string) $val);
+        }
+    }
+
+    public function updatedEditProdukFormOpsiSku($val): void
+    {
+        if ($val === 'barcode') {
+            $this->editProdukForm['sku'] = $this->editProdukForm['barcode'] ?? '';
+        } elseif ($val === 'otomatis') {
+            $this->editProdukForm['sku'] = '';
+        }
+    }
+
+    public function updatedEditProdukFormBarcode($val): void
+    {
+        if (($this->editProdukForm['opsi_sku'] ?? '') === 'barcode') {
+            $this->editProdukForm['sku'] = trim((string) $val);
+        }
+    }
+
     public function terapkanRekomendasiMargin(string $mode = 'create'): void
     {
         if (! isSuperAdminOrOwner() && ! $this->boleh('wms.create', 'Anda tidak memiliki izin mengubah harga produk.')) {
@@ -1091,6 +1126,10 @@ class ProdukTab extends Component
             }
         }
 
+        $altList = ! empty($this->produkForm['barcode_alt_input'])
+            ? array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', (string) $this->produkForm['barcode_alt_input']))))
+            : [];
+
         try {
             app(ProdukService::class)->buatProduk(
                 nama: $this->produkForm['nama'],
@@ -1126,7 +1165,9 @@ class ProdukTab extends Component
                 marginPersen: ! empty($this->produkForm['margin_persen']) ? (float) $this->produkForm['margin_persen'] : null,
                 rakId: ! empty($this->produkForm['rak_id']) ? (int) $this->produkForm['rak_id'] : null,
                 multiSatuan: $this->produkForm['multi_satuan'] ?? [],
-                supplierId: ! empty($this->produkForm['supplier_id']) ? (int) $this->produkForm['supplier_id'] : null
+                supplierId: ! empty($this->produkForm['supplier_id']) ? (int) $this->produkForm['supplier_id'] : null,
+                barcodeAlt: $altList,
+                opsiSku: $this->produkForm['opsi_sku'] ?? 'otomatis'
             );
 
             $this->showProdukModal = false;
@@ -1287,6 +1328,9 @@ class ProdukTab extends Component
                 ];
             })->toArray(),
             'deskripsi' => $p->deskripsi ?? '',
+            // [MULTI BARCODE & OPSI SKU]
+            'barcode_alt_input' => $p->barcode_alt_string,
+            'opsi_sku' => (! empty($p->barcode) && ($p->skuVariants->first()?->sku === $p->barcode)) ? 'barcode' : 'manual',
             // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
             'abc_class' => $p->abc_class ?: 'B',
             'reorder_point' => $p->reorder_point,
@@ -1554,6 +1598,10 @@ class ProdukTab extends Component
             }
         }
 
+        $altList = isset($this->editProdukForm['barcode_alt_input'])
+            ? array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', (string) $this->editProdukForm['barcode_alt_input']))))
+            : [];
+
         try {
             app(ProdukService::class)->updateProduk(
                 produkId: $this->editProdukId,
@@ -1585,7 +1633,9 @@ class ProdukTab extends Component
                 marginPersen: ! empty($this->editProdukForm['margin_persen']) ? (float) $this->editProdukForm['margin_persen'] : null,
                 multiSatuan: $this->editProdukForm['multi_satuan'] ?? [],
                 supplierId: ! empty($this->editProdukForm['supplier_id']) ? (int) $this->editProdukForm['supplier_id'] : null,
-                sku: isset($this->editProdukForm['sku']) ? trim((string) $this->editProdukForm['sku']) : null
+                sku: isset($this->editProdukForm['sku']) ? trim((string) $this->editProdukForm['sku']) : null,
+                barcodeAlt: $altList,
+                opsiSku: $this->editProdukForm['opsi_sku'] ?? 'manual'
             );
 
             // Simpan perubahan lokasi rak stok per gudang

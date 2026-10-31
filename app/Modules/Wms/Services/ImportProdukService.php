@@ -164,10 +164,16 @@ class ImportProdukService
         $cleaned = preg_replace('/[^a-z0-9\s_-]/', '', $heading) ?? $heading;
         $normalized = preg_replace('/[\s_-]+/', '_', trim($cleaned)) ?? '';
 
+        if (preg_match('/^barcode_(\d+)$/', $normalized)) {
+            return $normalized;
+        }
+
         return match ($normalized) {
             'sku', 'kode_sku', 'kode', 'kode_barang', 'kode_item', 'part_number', 'part_no', 'item_code' => 'sku',
             'nama', 'nama_produk', 'nama_barang', 'nama_item', 'product_name', 'item_name', 'deskripsi_barang', 'nama_sparepart' => 'nama',
-            'barcode', 'bar_code', 'kode_barcode', 'upc', 'ean' => 'barcode',
+            'barcode', 'bar_code', 'kode_barcode', 'upc', 'ean', 'barcode_utama' => 'barcode_1',
+            'barcode_alt', 'barcodealt', 'multi_barcode', 'barcode_tambahan', 'barcode_suplier', 'barcode_supplier', 'barcode_lain', 'qr_alt' => 'multi_barcode',
+            'opsi_sku', 'format_sku', 'sku_mode' => 'opsi_sku',
             'satuan', 'satuan_unit', 'unit', 'uom', 'satuan_dasar' => 'satuan',
             'multi_satuan', 'konversi_satuan', 'satuan_konversi', 'multi_uom', 'konversi' => 'konversi_satuan',
             'kategori', 'kategori_utama', 'kategori_produk', 'kategori_barang', 'category', 'main_category' => 'kategori',
@@ -195,6 +201,67 @@ class ImportProdukService
             'foto_url', 'foto', 'gambar', 'gambar_url', 'image', 'image_url' => 'foto_url',
             default => $normalized,
         };
+    }
+
+    /**
+     * Ekstraksi seluruh barcode dari baris data import.
+     * Menggabungkan barcode_1 (atau barcode), barcode_2, barcode_3, dst., serta kolom multi_barcode / barcode_alt.
+     * Menghasilkan array terurut unik: ['barcode_1' => '...', 'barcode_2' => '...'].
+     *
+     * @return array<string, string>
+     */
+    public function extractAllBarcodesFromRow(array $row): array
+    {
+        $ordered = [];
+
+        // 1. barcode_1 atau barcode
+        $b1 = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
+        if ($b1 !== '') {
+            $ordered[] = $b1;
+        }
+
+        // 2. Scan dynamic keys barcode_2, barcode_3, ..., barcode_N
+        $numbered = [];
+        foreach ($row as $k => $v) {
+            if (preg_match('/^barcode_(\d+)$/', (string) $k, $m)) {
+                $idx = (int) $m[1];
+                if ($idx > 1) {
+                    $val = $this->normalizeBarcode($v);
+                    if ($val !== '') {
+                        $numbered[$idx] = $val;
+                    }
+                }
+            }
+        }
+        ksort($numbered);
+        foreach ($numbered as $nb) {
+            if (! in_array($nb, $ordered, true)) {
+                $ordered[] = $nb;
+            }
+        }
+
+        // 3. Scan multi_barcode / barcode_alt
+        $rawAlt = $row['multi_barcode'] ?? $row['barcode_alt'] ?? null;
+        if (! empty($rawAlt)) {
+            $parts = is_array($rawAlt) ? $rawAlt : preg_split('/[,;\n]+/', (string) $rawAlt);
+            foreach ($parts as $p) {
+                $trimmed = trim((string) $p);
+                $cleaned = preg_replace('/^barcode_\d+[\s:=]+/i', '', $trimmed);
+                $val = $this->normalizeBarcode($cleaned);
+                if ($val !== '' && ! in_array($val, $ordered, true)) {
+                    $ordered[] = $val;
+                }
+            }
+        }
+
+        // Format mapping: barcode_1, barcode_2, barcode_3, ...
+        $result = [];
+        foreach ($ordered as $i => $bc) {
+            $num = $i + 1;
+            $result["barcode_{$num}"] = $bc;
+        }
+
+        return $result;
     }
 
     /**
@@ -919,7 +986,7 @@ class ImportProdukService
     public function templateColumns(): array
     {
         return [
-            'sku', 'nama', 'barcode', 'satuan', 'konversi_satuan', 'kategori', 'sub_kategori', 'brand', 'kualitas', 'kondisi', 'supplier',
+            'sku', 'nama', 'barcode_1', 'barcode_2', 'barcode_3', 'multi_barcode', 'satuan', 'konversi_satuan', 'kategori', 'sub_kategori', 'brand', 'kualitas', 'kondisi', 'supplier',
             'merk_hp', 'tipe_hp',
             'harga_beli', 'harga_jual', 'harga_reseller', 'harga_agen',
             'min_stock', 'reorder_point', 'sn',
@@ -933,7 +1000,11 @@ class ImportProdukService
     {
         return [
             [
-                'sku' => 'LCD-IP13-ORI', 'nama' => 'LCD iPhone 13 Original', 'barcode' => '8991234500001',
+                'sku' => 'LCD-IP13-ORI', 'nama' => 'LCD iPhone 13 Original',
+                'barcode_1' => '8991234500001',
+                'barcode_2' => 'SPL-88291',
+                'barcode_3' => 'SUP-99012',
+                'multi_barcode' => 'ALT-QR-1301, ALT-QR-1302',
                 'satuan' => 'pcs', 'konversi_satuan' => 'box:10:12000000;pack:5:6200000', 'kategori' => 'LCD & Touchscreen', 'sub_kategori' => 'Fullset Assembly', 'brand' => 'Crown',
                 'kualitas' => 'Original', 'kondisi' => 'baru', 'supplier' => 'PT Supplier Jaya',
                 'merk_hp' => 'Apple', 'tipe_hp' => 'iPhone 13',
@@ -945,7 +1016,11 @@ class ImportProdukService
                 'deskripsi' => 'LCD assembly original untuk iPhone 13 warna hitam', 'foto_url' => '',
             ],
             [
-                'sku' => 'BAT-SA54-ODM', 'nama' => 'Baterai Samsung A54 Grade A', 'barcode' => '8991234500002',
+                'sku' => 'BAT-SA54-ODM', 'nama' => 'Baterai Samsung A54 Grade A',
+                'barcode_1' => '8991234500002',
+                'barcode_2' => 'BAT-SAMS-A54-ALT',
+                'barcode_3' => '',
+                'multi_barcode' => '',
                 'satuan' => 'pcs', 'konversi_satuan' => 'box:20:3200000', 'kategori' => 'Baterai', 'sub_kategori' => 'Baterai Tanam', 'brand' => 'OG',
                 'kualitas' => 'Grade A', 'kondisi' => 'oem', 'supplier' => 'Supplier Umum',
                 'merk_hp' => 'Samsung', 'tipe_hp' => 'Galaxy A54, Galaxy A34',
@@ -1392,7 +1467,7 @@ class ImportProdukService
     public function detectDuplikatRow(array $row, int $nomorBaris, array $konteks): ?array
     {
         $sku = trim((string) ($row['sku'] ?? ''));
-        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
+        $barcode = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
         $nama = trim((string) ($row['nama'] ?? ''));
 
         $isSkuFile = $sku !== '' && isset($konteks['skuDalamFile'][$sku]);
@@ -1516,7 +1591,7 @@ class ImportProdukService
     {
         $errors = [];
         $sku = trim((string) ($row['sku'] ?? ''));
-        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
+        $barcode = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
         $nama = trim((string) ($row['nama'] ?? ''));
 
         if (! $sku) {
@@ -1715,7 +1790,7 @@ class ImportProdukService
         foreach ($rows as $i => $row) {
             $nomorBaris = $i + 2; // +1 heading
             $skuRaw = trim((string) ($row['sku'] ?? ''));
-            $barcodeRaw = $this->normalizeBarcode($row['barcode'] ?? null);
+            $barcodeRaw = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
 
             $resErr = $resolusiErrorBaris[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiErrorBaris[$skuRaw] ?? null) : null);
             $isErrorSkipped = $resErr === 'skip';
@@ -2082,7 +2157,7 @@ class ImportProdukService
                     $nomorBaris = $indexChunk * $chunkSize + $i + 2;
                     $skuRaw = trim((string) ($row['sku'] ?? ''));
                     $namaRaw = trim((string) ($row['nama'] ?? ''));
-                    $barcodeRaw = $this->normalizeBarcode($row['barcode'] ?? null);
+                    $barcodeRaw = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
 
                     $lastItemChunk = [
                         'sku' => $skuRaw,
@@ -2422,10 +2497,10 @@ class ImportProdukService
             $konteks['skuDalamFile'][$s] = true;
             $konteks['skuBarisMap'][$s] = ['baris' => $nomorBaris, 'nama' => $n];
         }
-        $b = $this->normalizeBarcode($row['barcode'] ?? null);
-        if ($b !== '') {
-            $konteks['barcodeDalamFile'][$b] = true;
-            $konteks['barcodeBarisMap'][$b] = ['baris' => $nomorBaris, 'nama' => $n, 'sku' => $s];
+        $allBarcodes = $this->extractAllBarcodesFromRow($row);
+        foreach ($allBarcodes as $bcVal) {
+            $konteks['barcodeDalamFile'][$bcVal] = true;
+            $konteks['barcodeBarisMap'][$bcVal] = ['baris' => $nomorBaris, 'nama' => $n, 'sku' => $s];
         }
         $n = trim((string) ($row['nama'] ?? ''));
         if ($n !== '') {
@@ -2446,7 +2521,7 @@ class ImportProdukService
     {
         $nama = trim((string) ($row['nama'] ?? ''));
         $sku = trim((string) ($row['sku'] ?? ''));
-        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
+        $barcode = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
         $hargaBeli = round((float) ($row['harga_beli'] ?? 0), 2);
         $hargaJual = round((float) ($row['harga_jual'] ?? 0), 2);
         $stokAwal = (int) ($row['stok_awal'] ?? 0);
@@ -2617,7 +2692,7 @@ class ImportProdukService
     protected function prosesTimpaUpdateBaris(array $row, int $importLogId, ?int $userId, int $nomorBaris, ?int $cabangId = null): array
     {
         $sku = trim((string) ($row['sku'] ?? ''));
-        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
+        $barcode = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
         $hargaBeli = round((float) ($row['harga_beli'] ?? 0), 2);
         $hargaJual = round((float) ($row['harga_jual'] ?? 0), 2);
         $stokAwal = (int) ($row['stok_awal'] ?? 0);
@@ -2692,6 +2767,15 @@ class ImportProdukService
             $produkUpdate['sn'] = $this->normalizeSn($row['sn']);
         }
 
+        $extractedBarcodes = $this->extractAllBarcodesFromRow($row);
+        if (! empty($extractedBarcodes)) {
+            $barcodeList = array_values($extractedBarcodes);
+            $barcode = $barcodeList[0];
+            $barcodeAltMap = array_slice($extractedBarcodes, 1);
+            $produkUpdate['barcode'] = $barcode;
+            $produkUpdate['barcode_alt'] = ! empty($barcodeAltMap) ? $barcodeAltMap : null;
+        }
+
         if (isset($row['deskripsi']) && trim((string) $row['deskripsi']) !== '') {
             $produkUpdate['deskripsi'] = trim((string) $row['deskripsi']);
         }
@@ -2764,6 +2848,10 @@ class ImportProdukService
         }
         if (! empty($variantUpdate)) {
             $variant->update($variantUpdate);
+        }
+
+        if (! empty($extractedBarcodes)) {
+            $produk->syncBarcodes(array_values($extractedBarcodes), $sku ?: $variant->sku);
         }
 
         // Multi satuan / konversi satuan
@@ -2864,15 +2952,29 @@ class ImportProdukService
     protected function prosesSatuBaris(array $row, int $importLogId, ?int $userId, ?int $cabangId = null): array
     {
         $nama = trim((string) ($row['nama'] ?? ''));
+        $extractedBarcodes = $this->extractAllBarcodesFromRow($row);
+        $barcodeList = array_values($extractedBarcodes);
+        $barcode = $extractedBarcodes['barcode_1'] ?? null;
+        $barcodeAltList = array_slice($extractedBarcodes, 1);
+        $opsiSku = strtolower(trim((string) ($row['opsi_sku'] ?? '')));
         $sku = trim((string) ($row['sku'] ?? ''));
-        if ($sku === '') {
-            $dummyKonteks = [];
-            $sku = $this->generateFallbackSku($nama, $dummyKonteks);
+
+        if ($opsiSku === 'barcode' && ! empty($barcode)) {
+            $sku = $barcode;
+        } elseif ($sku === '') {
+            if ($opsiSku === 'otomatis') {
+                $dummyKonteks = [];
+                $sku = $this->generateFallbackSku($nama, $dummyKonteks);
+            } elseif (! empty($barcode)) {
+                $sku = $barcode;
+            } else {
+                $dummyKonteks = [];
+                $sku = $this->generateFallbackSku($nama, $dummyKonteks);
+            }
         }
         if ($nama === '') {
             $nama = 'Produk '.$sku;
         }
-        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
 
         $satuan = $this->resolveOrCreateSatuan($row['satuan'] ?? 'pcs');
 
@@ -2942,6 +3044,7 @@ class ImportProdukService
             'kualitas_id' => $kualitasId,
             'supplier_id' => $supplierId,
             'barcode' => $barcode ?: null,
+            'barcode_alt' => ! empty($barcodeAltList) ? $barcodeAltList : null,
             'brand_kompatibel' => $primaryMerk,
             'model_kompatibel' => $primaryModel,
             'kompatibilitas_hp' => ! empty($daftarTipe) ? $daftarTipe : null,
@@ -2967,6 +3070,10 @@ class ImportProdukService
             'harga_jual_retail' => $hargaJual,
             'is_active' => true,
         ]);
+
+        if (! empty($barcodeList)) {
+            $produk->syncBarcodes($barcodeList, $sku);
+        }
 
         if ($daftarTipe) {
             $ids = [];

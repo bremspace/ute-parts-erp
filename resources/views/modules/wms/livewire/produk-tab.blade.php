@@ -1618,13 +1618,19 @@
                         @if($visibleColumns['sku'] ?? true)
                             <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
                                 <span class="text-ink-300 block font-semibold">{{ $skuPertama ?? '-' }}</span>
-                                @if($p->barcode)
-                                    <div class="flex items-center gap-1 mt-0.5">
-                                        <span class="text-[10px] text-up-primary font-mono block px-1.5 py-0.2 rounded bg-up-primary/10 border border-up-primary/20">{{ $p->barcode }}</span>
-                                    </div>
-                                @else
-                                    <span class="text-[11px] text-ink-500 font-mono block mt-0.5">-</span>
-                                @endif
+                                <div class="flex items-center gap-1 mt-0.5 flex-wrap">
+                                    @if($p->barcode)
+                                        <span class="text-[10px] text-up-primary font-mono block px-1.5 py-0.2 rounded bg-up-primary/10 border border-up-primary/20" title="Barcode Utama">{{ $p->barcode }}</span>
+                                    @endif
+                                    @if(! empty($p->barcode_alt) && is_array($p->barcode_alt) && count($p->barcode_alt) > 0)
+                                        <span class="text-[9px] text-up-amber font-mono px-1 py-0.2 rounded bg-up-amber/10 border border-up-amber/20 cursor-help" title="Barcode Tambahan: {{ implode(', ', $p->barcode_alt) }}">
+                                            +{{ count($p->barcode_alt) }} alt
+                                        </span>
+                                    @endif
+                                    @if(! $p->barcode && empty($p->barcode_alt))
+                                        <span class="text-[11px] text-ink-500 font-mono block mt-0.5">-</span>
+                                    @endif
+                                </div>
                             </td>
                         @endif
 
@@ -2207,7 +2213,7 @@
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
-                                <label class="text-xs font-semibold text-ink-300">Kode Barcode (Fisik / Scan)</label>
+                                <label class="text-xs font-semibold text-ink-300">Kode Barcode / QR Utama (Fisik / Scan)</label>
                                 <button type="button" wire:click="generateBarcodeForm('create')" class="text-[10px] text-up-amber hover:underline font-semibold cursor-pointer" title="Buat kode barcode otomatis">⚡ Auto</button>
                             </div>
                             <div class="relative flex items-center">
@@ -2220,10 +2226,20 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                     </svg>
                                 </button>
-                                <input type="text" wire:model="produkForm.barcode" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
+                                <input type="text" wire:model.live="produkForm.barcode" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
                             </div>
                             @error('produkForm.barcode') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
+                    </div>
+
+                    <!-- Multi Barcode / QR Tambahan (Supplier / Alternatif) -->
+                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[11px] font-semibold text-ink-300">Multi Barcode / QR Tambahan (Barcode Supplier / Alt)</label>
+                            <span class="text-[10px] text-ink-500">Mendukung multi barcode suplier & internal</span>
+                        </div>
+                        <input type="text" wire:model="produkForm.barcode_alt_input" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" placeholder="Pisahkan dengan koma jika lebih dari satu. Cth: SPL-88291, SUP-99012" />
+                        <p class="text-[10px] text-ink-500">Kamera scanner & kasir akan otomatis mengenali barcode utama maupun semua barcode tambahan di atas.</p>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
@@ -2329,9 +2345,36 @@
                             <p class="text-[9px] text-ink-500 mt-1">Satuan terkecil inventori (cth: pcs, meter)</p>
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode SKU (opsional)</label>
-                        <input type="text" wire:model="produkForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono" placeholder="Otomatis ikuti Barcode jika kosong" />
+                    <!-- Opsi Penamaan SKU -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2.5">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <label class="block text-xs font-semibold text-white">Opsi Penamaan SKU</label>
+                                <p class="text-[10px] text-ink-400">Tentukan format penamaan kode identifikasi unik produk.</p>
+                            </div>
+                            <div class="flex items-center gap-1.5 p-1 rounded-xl bg-ink-900/60 border border-white/10 text-[11px]">
+                                <button type="button" wire:click="$set('produkForm.opsi_sku', 'otomatis')" class="px-2.5 py-1 rounded-lg font-medium transition cursor-pointer {{ ($produkForm['opsi_sku'] ?? 'otomatis') === 'otomatis' ? 'bg-up-primary text-white shadow' : 'text-ink-400 hover:text-white' }}">
+                                    ⚡ Otomatis
+                                </button>
+                                <button type="button" wire:click="$set('produkForm.opsi_sku', 'barcode')" class="px-2.5 py-1 rounded-lg font-medium transition cursor-pointer {{ ($produkForm['opsi_sku'] ?? '') === 'barcode' ? 'bg-up-primary text-white shadow' : 'text-ink-400 hover:text-white' }}">
+                                    🏷️ Ikuti Barcode
+                                </button>
+                                <button type="button" wire:click="$set('produkForm.opsi_sku', 'manual')" class="px-2.5 py-1 rounded-lg font-medium transition cursor-pointer {{ ($produkForm['opsi_sku'] ?? '') === 'manual' ? 'bg-up-primary text-white shadow' : 'text-ink-400 hover:text-white' }}">
+                                    ✏️ Manual
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            @if(($produkForm['opsi_sku'] ?? 'otomatis') === 'otomatis')
+                                <input type="text" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono opacity-70 bg-black/20" value="SKU otomatis dibuat saat simpan (Format: SKU-XXXXXX)" disabled />
+                            @elseif(($produkForm['opsi_sku'] ?? '') === 'barcode')
+                                <input type="text" wire:model="produkForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono font-bold text-up-mint" placeholder="Mengikuti kode barcode produk" readonly />
+                            @else
+                                <input type="text" wire:model="produkForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Masukkan kode SKU manual (Cth: LCD-IP13-ORI)" />
+                            @endif
+                            @error('produkForm.sku') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        </div>
                     </div>
 
                     <!-- Kecocokan Smartphone (Multi-Kompatibilitas Tipe HP — Merek & Model Terpisah) -->
@@ -3136,20 +3179,15 @@
                 <div class="space-y-4">
                     <!-- TAB 1: INFO POKOK & HARGA -->
                     <div x-show="tab === 'utama'" class="space-y-3.5">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="sm:col-span-1">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Produk *</label>
                             <input type="text" wire:model="editProdukForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                             @error('editProdukForm.nama') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode SKU (Internal)</label>
-                            <input type="text" wire:model="editProdukForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: LCD-IP11-ORI" />
-                            @error('editProdukForm.sku') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
-                        </div>
-                        <div>
                             <div class="flex items-center justify-between mb-1.5">
-                                <label class="text-xs font-semibold text-ink-300">Kode Barcode (Fisik / Scan)</label>
+                                <label class="text-xs font-semibold text-ink-300">Kode Barcode / QR Utama (Fisik / Scan)</label>
                                 <button type="button" wire:click="generateBarcodeForm('edit')" class="text-[10px] text-up-amber hover:underline font-semibold cursor-pointer" title="Buat kode barcode otomatis">⚡ Auto</button>
                             </div>
                             <div class="relative flex items-center">
@@ -3162,9 +3200,51 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                     </svg>
                                 </button>
-                                <input type="text" wire:model="editProdukForm.barcode" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
+                                <input type="text" wire:model.live="editProdukForm.barcode" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
                             </div>
                             @error('editProdukForm.barcode') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+
+                    <!-- Multi Barcode / QR Tambahan (Supplier / Alternatif) Edit Form -->
+                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[11px] font-semibold text-ink-300">Multi Barcode / QR Tambahan (Barcode Supplier / Alt)</label>
+                            <span class="text-[10px] text-ink-500">Mendukung multi barcode suplier & internal</span>
+                        </div>
+                        <input type="text" wire:model="editProdukForm.barcode_alt_input" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" placeholder="Pisahkan dengan koma jika lebih dari satu. Cth: SPL-88291, SUP-99012" />
+                        <p class="text-[10px] text-ink-500">Kamera scanner & kasir akan otomatis mengenali barcode utama maupun semua barcode tambahan di atas.</p>
+                    </div>
+
+                    <!-- Opsi Penamaan SKU Edit Form -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2.5">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <label class="block text-xs font-semibold text-white">Kode SKU & Opsi Penamaan</label>
+                                <p class="text-[10px] text-ink-400">Pilih opsi apakah SKU mengikuti barcode, auto generate baru, atau edit manual.</p>
+                            </div>
+                            <div class="flex items-center gap-1.5 p-1 rounded-xl bg-ink-900/60 border border-white/10 text-[11px]">
+                                <button type="button" wire:click="$set('editProdukForm.opsi_sku', 'manual')" class="px-2.5 py-1 rounded-lg font-medium transition cursor-pointer {{ ($editProdukForm['opsi_sku'] ?? 'manual') === 'manual' ? 'bg-up-primary text-white shadow' : 'text-ink-400 hover:text-white' }}">
+                                    ✏️ Manual
+                                </button>
+                                <button type="button" wire:click="$set('editProdukForm.opsi_sku', 'barcode')" class="px-2.5 py-1 rounded-lg font-medium transition cursor-pointer {{ ($editProdukForm['opsi_sku'] ?? '') === 'barcode' ? 'bg-up-primary text-white shadow' : 'text-ink-400 hover:text-white' }}">
+                                    🏷️ Ikuti Barcode
+                                </button>
+                                <button type="button" wire:click="$set('editProdukForm.opsi_sku', 'otomatis')" class="px-2.5 py-1 rounded-lg font-medium transition cursor-pointer {{ ($editProdukForm['opsi_sku'] ?? '') === 'otomatis' ? 'bg-up-primary text-white shadow' : 'text-ink-400 hover:text-white' }}">
+                                    ⚡ Buat SKU Baru
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            @if(($editProdukForm['opsi_sku'] ?? 'manual') === 'manual')
+                                <input type="text" wire:model="editProdukForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: LCD-IP11-ORI" />
+                            @elseif(($editProdukForm['opsi_sku'] ?? '') === 'barcode')
+                                <input type="text" wire:model="editProdukForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono font-bold text-up-mint" placeholder="Mengikuti kode barcode produk" readonly />
+                            @else
+                                <input type="text" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono opacity-70 bg-black/20" value="SKU baru akan dibuat otomatis saat simpan (Format: SKU-XXXXXX)" disabled />
+                            @endif
+                            @error('editProdukForm.sku') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
                     </div>
 
