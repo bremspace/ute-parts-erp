@@ -62,10 +62,111 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                <!-- Upload Logo Brand -->
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Logo Toko / Brand (Opsional)</label>
+                    <div class="flex items-center gap-4 p-3.5 rounded-xl border border-dashed border-ink-300 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02]">
+                        <div class="w-16 h-16 rounded-xl border border-ink-200 dark:border-white/10 flex items-center justify-center overflow-hidden bg-white dark:bg-[#0B1120] flex-shrink-0 shadow-sm">
+                            @if ($logoFile)
+                                <img src="{{ $logoFile->temporaryUrl() }}" alt="Preview Logo" class="w-full h-full object-contain p-1">
+                            @elseif ($existingLogoUrl)
+                                <img src="{{ $existingLogoUrl }}" alt="Logo Toko" class="w-full h-full object-contain p-1">
+                            @else
+                                <x-prism.logo size="sm" :with-text="false" />
+                            @endif
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <input type="file" wire:model="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="text-xs text-ink-600 dark:text-ink-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-up-primary/10 file:text-up-primary hover:file:bg-up-primary/20 cursor-pointer">
+                            <p class="text-[11px] text-ink-500 mt-1">PNG, JPG, WebP, atau SVG (Maks. 2MB). Ditampilkan di header POS, struk kasir, dan toko online.</p>
+                            @error('logoFile') <span class="text-xs text-up-red block mt-1">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Nama Toko Fisik <span class="text-up-red">*</span></label>
-                    <input type="text" wire:model="namaToko" class="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm focus:border-up-primary focus:ring-1 focus:ring-up-primary text-ink-900 dark:text-white" placeholder="Contoh: Ute Parts Sentral">
+                    <input type="text" wire:model="namaToko" class="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm focus:border-up-primary focus:ring-1 focus:ring-up-primary text-ink-900 dark:text-white" placeholder="Contoh: Bremspace Sentral">
                     @error('namaToko') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Domain Toko / Bisnis <span class="text-up-red">*</span></label>
+                    <input type="text" wire:model.live.debounce.500ms="domainToko" class="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm font-mono focus:border-up-primary focus:ring-1 focus:ring-up-primary text-ink-900 dark:text-white" placeholder="misal: bremspace.id atau pos.toko.com">
+                    @error('domainToko') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
+                    <span class="text-[11px] text-ink-500 mt-1 block">Email staf dan URL aplikasi diseragamkan dengan domain ini.</span>
+                </div>
+
+                <!-- Bantuan Pointing DNS -->
+                <div class="md:col-span-2 p-3.5 sm:p-4 rounded-xl border border-ink-200/80 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            <span class="text-xs font-bold text-ink-900 dark:text-white">Panduan Pointing Domain {{ $isLocalhost ? '(Mode Lokal / Dev)' : '' }}</span>
+                        </div>
+                        <button type="button" wire:click="checkDns" wire:loading.attr="disabled" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/20 transition-colors">
+                            <span wire:loading.remove wire:target="checkDns">Cek Status DNS</span>
+                            <span wire:loading wire:target="checkDns" class="flex items-center gap-1">
+                                <svg class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                Memeriksa...
+                            </span>
+                        </button>
+                    </div>
+
+                    @if ($isLocalhost)
+                        <div class="p-2.5 rounded-lg bg-up-primary/10 border border-up-primary/20 text-xs text-ink-700 dark:text-ink-300 space-y-1.5">
+                            <div class="font-semibold text-up-primary flex items-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                Terdeteksi Lingkungan Komputer Lokal (Localhost / Dev)
+                            </div>
+                            <p class="text-[11px] text-ink-500 dark:text-ink-400">
+                                Pada lingkungan lokal, domain tidak diarahkan ke IP publik VPS. Tambahkan baris berikut di file <code class="font-mono text-ink-900 dark:text-white">hosts</code> komputer Anda (<code class="font-mono text-[10px]">/etc/hosts</code> atau <code class="font-mono text-[10px]">C:\Windows\System32\drivers\etc\hosts</code>):
+                            </p>
+                            <div class="p-2 rounded bg-black/5 dark:bg-black/30 font-mono text-[11px] text-ink-900 dark:text-white select-all border border-ink-200 dark:border-white/5">
+                                127.0.0.1 {{ $domainToko }}
+                            </div>
+                            <p class="text-[11px] text-ink-500 dark:text-ink-400">
+                                Atau gunakan tunnel seperti Cloudflare Tunnel / Ngrok jika ingin domain publik mengarah ke localhost.
+                            </p>
+                        </div>
+                    @else
+                        <p class="text-xs text-ink-500 dark:text-ink-400">
+                            Arahkan DNS domain Anda di penyedia domain (Niagahoster, Domainesia, Cloudflare, Namecheap, dsb) dengan data berikut:
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <div class="p-2.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-[#0B1120]">
+                                <span class="text-[10px] text-ink-400 uppercase tracking-wider block">Tipe Record</span>
+                                <span class="font-bold font-mono text-ink-900 dark:text-white">A Record</span>
+                                <span class="text-[11px] text-ink-500 block mt-0.5">Host: <code class="text-up-primary font-mono">@</code> atau domain utama</span>
+                            </div>
+                            <div class="p-2.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-[#0B1120]">
+                                <span class="text-[10px] text-ink-400 uppercase tracking-wider block">Target IP Publik Server</span>
+                                <span class="font-bold font-mono text-ink-900 dark:text-white">{{ $serverPublicIp }}</span>
+                                <span class="text-[11px] text-ink-500 block mt-0.5">Point A Record ke IP server ini</span>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if ($dnsStatus === 'matched')
+                        <div class="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span>DNS terhubung sempurna! Domain <strong>{{ $domainToko }}</strong> sudah mengarah ke server ini ({{ $dnsResolvedIp }}).</span>
+                        </div>
+                    @elseif ($dnsStatus === 'different_ip')
+                        <div class="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-2">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            <span>Domain terdeteksi mengarah ke IP <strong>{{ $dnsResolvedIp }}</strong> (bukan {{ $serverPublicIp }}). Ubah A record di DNS registrar Anda.</span>
+                        </div>
+                    @elseif ($dnsStatus === 'unresolved')
+                        <div class="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <span>DNS belum terdeteksi aktif untuk {{ $domainToko }}. Propagasi DNS biasanya memerlukan waktu 5–30 menit.</span>
+                        </div>
+                    @elseif ($dnsStatus === 'empty')
+                        <div class="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs">
+                            Masukkan nama domain terlebih dahulu untuk memeriksa status pointing DNS.
+                        </div>
+                    @endif
                 </div>
 
                 <div>
@@ -82,7 +183,7 @@
 
                 <div>
                     <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Header Struk Kasir <span class="text-up-red">*</span></label>
-                    <input type="text" wire:model="strukHeader" class="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm focus:border-up-primary focus:ring-1 focus:ring-up-primary text-ink-900 dark:text-white" placeholder="Contoh: UTE PARTS">
+                    <input type="text" wire:model="strukHeader" class="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm focus:border-up-primary focus:ring-1 focus:ring-up-primary text-ink-900 dark:text-white" placeholder="Contoh: BREMSPACE">
                     @error('strukHeader') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
                 </div>
 
@@ -94,7 +195,7 @@
 
                 <div>
                     <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Slogan / Subtitle Struk</label>
-                    <input type="text" wire:model="strukSlogan" class="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm focus:border-up-primary focus:ring-1 focus:ring-up-primary text-ink-900 dark:text-white" placeholder="Pusat Sparepart & Servis HP">
+                    <input type="text" wire:model="strukSlogan" class="w-full px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm focus:border-up-primary focus:ring-1 focus:ring-up-primary text-ink-900 dark:text-white" placeholder="Pusat Sparepart & Servis Gadget">
                 </div>
 
                 <div>
@@ -263,7 +364,7 @@
                 <div class="text-xs sm:text-sm font-medium text-ink-800 dark:text-ink-200">
                     Pilih file migrasi produk (.xlsx, .xls, .csv)
                 </div>
-                <p class="text-[11px] sm:text-xs text-ink-500">Maksimal 25MB. Sistem otomatis membaca format Standar Ute Parts & SidRetail.</p>
+                <p class="text-[11px] sm:text-xs text-ink-500">Maksimal 25MB. Sistem otomatis membaca format Standar Excel & SidRetail.</p>
                 <div class="pt-1 sm:pt-2 overflow-hidden">
                     <input type="file" wire:model="fileMigrasi" accept=".xlsx,.xls,.csv" class="max-w-full text-xs text-ink-500 file:mr-2 sm:file:mr-4 file:py-1.5 sm:file:py-2 file:px-3 sm:file:px-4 file:rounded-xl file:border-0 file:text-[11px] sm:file:text-xs file:font-semibold file:bg-up-primary file:text-white hover:file:opacity-90 cursor-pointer">
                 </div>
@@ -356,7 +457,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 pt-2">
                         <div>
                             <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Nama Merchant QRIS <span class="text-up-red">*</span></label>
-                            <input type="text" wire:model="qrisMerchantName" class="w-full px-3 py-2 rounded-lg border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm text-ink-900 dark:text-white" placeholder="Contoh: UTE PARTS OFFICIAL">
+                            <input type="text" wire:model="qrisMerchantName" class="w-full px-3 py-2 rounded-lg border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm text-ink-900 dark:text-white" placeholder="Contoh: BREMSPACE OFFICIAL">
                             @error('qrisMerchantName') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
                         </div>
                         <div>

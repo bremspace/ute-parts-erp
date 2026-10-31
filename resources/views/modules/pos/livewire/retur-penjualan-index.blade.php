@@ -1123,7 +1123,7 @@
         </div>
     @endif
 
-    {{-- Modal Struk Thermal Reusable (Format Global Ute Parts) --}}
+    {{-- Modal Struk Thermal Reusable (Format Global ERP) --}}
     @include('partials.thermal-receipt-modal')
 
     {{-- Modal Riwayat Aktivitas Audit Trail --}}

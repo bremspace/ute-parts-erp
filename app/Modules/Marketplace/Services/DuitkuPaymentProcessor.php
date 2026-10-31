@@ -194,7 +194,7 @@ class DuitkuPaymentProcessor
                     'inapp',
                     $transaksi->pelanggan?->email,
                     'Pembayaran Diterima',
-                    "Pembayaran pesanan {$merchantOrderId} berhasil. Tim Ute Parts sedang mempersiapkan paket Anda.",
+                    "Pembayaran pesanan {$merchantOrderId} berhasil. Tim toko sedang mempersiapkan paket Anda.",
                     [
                         'transaksi_id' => $transaksi->id,
                         'pelanggan_id' => $transaksi->pelanggan_id,

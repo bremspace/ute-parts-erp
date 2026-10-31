@@ -76,7 +76,7 @@ class WebKonsumenSettings extends Component
     public array $contactForm = [
         'wa_floating_active' => true,
         'wa_number' => '6281234567890',
-        'wa_default_msg' => 'Halo Admin Ute Parts, saya ingin tanya sparepart...',
+        'wa_default_msg' => 'Halo Admin, saya ingin tanya sparepart / produk...',
         'operating_hours' => 'Senin - Sabtu: 08:30 - 20:30 WIB',
         'social_links' => [
             'instagram' => '',

@@ -3,7 +3,7 @@
     <div class="text-center space-y-3">
         <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-up-primary/10 text-up-primary text-[11px] font-bold uppercase tracking-wider">
             <span class="w-1.5 h-1.5 rounded-full bg-up-primary animate-pulse"></span>
-            <span>Ute Parts Service Lab</span>
+            <span>{{ config('app.name', 'Bremspace') }} Service Lab</span>
         </div>
         <h1 class="text-2xl sm:text-4xl font-black tracking-tight text-ink-900 dark:text-white leading-tight">
             Booking Servis Gadget Presisi
@@ -25,7 +25,7 @@
 
                 <div class="pl-0 sm:pl-9 space-y-1.5">
                     <label for="cabang_id" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">
-                        Pusat Layanan Ute Parts <span class="text-up-red">*</span>
+                        Pusat Layanan Toko <span class="text-up-red">*</span>
                     </label>
                     <div class="relative w-full min-w-0">
                         <select id="cabang_id" wire:model="cabang_id"

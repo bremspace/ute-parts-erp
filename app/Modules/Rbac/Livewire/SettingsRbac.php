@@ -160,7 +160,7 @@ class SettingsRbac extends Component
         'show_komisi_detail' => true,
         'show_potongan' => true,
         'show_ttd' => true,
-        'catatan_kaki' => 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP Ute Parts.',
+        'catatan_kaki' => 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP.',
     ];
 
     public array $laporanDocForm = [
@@ -187,11 +187,11 @@ class SettingsRbac extends Component
     ];
 
     public array $strukForm = [
-        'nama_toko' => 'UTE PARTS',
+        'nama_toko' => 'BREMSPACE',
         'slogan' => 'Pusat Sparepart & Servis HP',
         'alamat' => 'Jl. Veteran No. 12',
         'telepon' => '0812-3456-7890',
-        'website_medsos' => 'www.uteparts.id',
+        'website_medsos' => 'www.bremspace.com',
         'show_cabang' => true,
         'show_kasir' => true,
         'show_pelanggan' => true,
@@ -1095,7 +1095,7 @@ class SettingsRbac extends Component
             $target = '62'.substr($target, 1);
         }
 
-        $pesan = "🔔 *Uji Coba WhatsApp Gateway Ute Parts ERP*\n\nKoneksi WhatsApp Gateway berhasil terhubung dengan sistem Ute Parts.\n\n📅 Waktu: ".now()->format('d M Y H:i:s')."\n👤 Diuji oleh: ".auth()->user()->name."\n\n_Pesan ini dikirim otomatis oleh sistem._";
+        $pesan = '🔔 *Uji Coba WhatsApp Gateway '.config('app.name', 'Bremspace')." ERP*\n\nKoneksi WhatsApp Gateway berhasil terhubung dengan sistem.\n\n📅 Waktu: ".now()->format('d M Y H:i:s')."\n👤 Diuji oleh: ".auth()->user()->name."\n\n_Pesan ini dikirim otomatis oleh sistem._";
 
         try {
             $response = Http::timeout(12)->withHeaders([

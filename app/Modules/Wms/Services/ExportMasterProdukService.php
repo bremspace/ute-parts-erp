@@ -532,7 +532,7 @@ class ExportMasterProdukService
     public function buatPetunjukImport(): array
     {
         return [
-            ['PETUNJUK IMPORT MASTER PRODUK UTE PARTS ERP'],
+            ['PETUNJUK IMPORT MASTER PRODUK ERP'],
             [''],
             ['1. Kolom Wajib Diisi: sku, nama, harga_jual'],
             ['2. Kolom Opsional: barcode_1 (utama), barcode_2, barcode_3, multi_barcode (alternatif/tambahan dipisah koma), satuan, konversi_satuan, kategori, sub_kategori, brand, kualitas, kondisi, supplier, merk_hp, tipe_hp, harga_beli, harga_reseller, harga_agen, min_stock, reorder_point, sn, stok_awal, gudang, rak, produk_kompatibel_sku, kompatibilitas_hp, deskripsi, foto_url, cabang'],

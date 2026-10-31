@@ -77,7 +77,7 @@ class KirimNotifikasiJob implements ShouldQueue
         // Menggunakan mail driver dari config (log di local, SMTP di production)
         Mail::raw($log->konten, function ($message) use ($log) {
             $message->to($log->tujuan)
-                ->subject($log->judul ?? 'Notifikasi Ute Parts');
+                ->subject($log->judul ?? ('Notifikasi '.config('app.name', 'Bremspace')));
         });
 
         return true;

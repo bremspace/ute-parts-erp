@@ -1,5 +1,5 @@
 /**
- * Ute Parts ERP - Precision Notification Audio Synthesizer (Web Audio API)
+ * Notification Audio Synthesizer (Web Audio API)
  * Identik dengan nuansa otomotif / spare parts presisi (clean metallic diagnostic chime).
  * Zero network latency, zero MP3 404, reliable PWA/offline & mobile support.
  */
@@ -44,7 +44,7 @@ export function toggleUteNotificationSound() {
 }
 
 /**
- * Main sound synthesizer for Ute Parts
+ * Main sound synthesizer
  * @param {'default'|'urgent'|'warning'|'error'|'success'|'info'|'approval'} type
  */
 export function playUteNotificationSound(type = 'default') {
@@ -65,7 +65,7 @@ export function playUteNotificationSound(type = 'default') {
         const now = ctx.currentTime;
 
         if (type === 'urgent' || type === 'error' || type === 'warning' || type === 'approval') {
-            // Ute Parts Urgent Alert: Triple high-vis diagnostic pulse (740Hz -> 880Hz -> 1046.5Hz)
+            // Urgent Alert: Triple high-vis diagnostic pulse (740Hz -> 880Hz -> 1046.5Hz)
             const notes = [
                 { freq: 740, start: 0, dur: 0.09 },
                 { freq: 880, start: 0.10, dur: 0.09 },
@@ -90,7 +90,7 @@ export function playUteNotificationSound(type = 'default') {
                 osc.stop(now + n.start + n.dur);
             });
         } else if (type === 'success') {
-            // Ute Parts Precision Success Chime (Bright rising triad: C5 -> E5 -> C6)
+            // Success Chime (Bright rising triad: C5 -> E5 -> C6)
             const notes = [
                 { freq: 523.25, start: 0, dur: 0.09 },
                 { freq: 659.25, start: 0.08, dur: 0.10 },
@@ -115,7 +115,7 @@ export function playUteNotificationSound(type = 'default') {
                 osc.stop(now + n.start + n.dur);
             });
         } else {
-            // Default: Ute Parts Precision Dual-Harmonic Chime (D5 587.33Hz -> A5 880Hz)
+            // Default: Precision Dual-Harmonic Chime (D5 587.33Hz -> A5 880Hz)
             const osc1 = ctx.createOscillator();
             const osc2 = ctx.createOscillator();
             const gain = ctx.createGain();

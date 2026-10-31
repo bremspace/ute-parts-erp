@@ -34,12 +34,12 @@
     <meta name="theme-color" content="#070A14">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Ute ERP">
+    <meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'Bremspace') }} ERP">
     <link rel="apple-touch-icon" href="{{ asset('icons/icon-192x192.png') }}">
     <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon-erp.svg') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
 
-    <title>{{ $title ?? 'Backoffice ERP/POS' }} — Ute Parts</title>
+    <title>{{ $title ?? 'Backoffice ERP/POS' }} — {{ config('app.name', 'Bremspace') }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -593,7 +593,7 @@
                     </button>
                     @php
                         $resolvedHeader = $header ?? null;
-                        if (! $resolvedHeader || $resolvedHeader === 'Ute Parts ERP') {
+                        if (! $resolvedHeader || $resolvedHeader === 'ERP') {
                             $resolvedHeader = match (true) {
                                 request()->is('app/dashboard*') => 'Dashboard',
                                 request()->is('app/pos/riwayat*') => 'Riwayat Transaksi',
@@ -622,7 +622,7 @@
                                 request()->is('app/keamanan/sesi*') => 'Sesi Perangkat',
                                 request()->is('app/audit-log*') => 'Audit Trail & Log',
                                 request()->is('app/pengaturan*') => 'Pengaturan & Sistem',
-                                default => 'Ute Parts ERP',
+                                default => config('app.name', 'Bremspace').' ERP',
                             };
                         }
                     @endphp

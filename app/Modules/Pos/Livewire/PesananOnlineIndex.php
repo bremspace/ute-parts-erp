@@ -391,7 +391,7 @@ class PesananOnlineIndex extends Component
             'inapp',
             $transaksi->pelanggan?->email,
             'Pesanan Sedang Dikemas',
-            "Pesanan {$transaksi->no_transaksi} saat ini sedang dikemas dan dipersiapkan oleh tim gudang Ute Parts.",
+            "Pesanan {$transaksi->no_transaksi} saat ini sedang dikemas dan dipersiapkan oleh tim gudang.",
             [
                 'transaksi_id' => $transaksi->id,
                 'pelanggan_id' => $transaksi->pelanggan_id,
@@ -486,7 +486,7 @@ class PesananOnlineIndex extends Component
                     'wa',
                     $transaksi->pelanggan->telepon,
                     $judul,
-                    "Halo {$transaksi->pelanggan->nama}, {$pesan} Terima kasih telah berbelanja di Ute Parts!",
+                    "Halo {$transaksi->pelanggan->nama}, {$pesan} Terima kasih telah berbelanja di toko kami!",
                     [
                         'transaksi_id' => $transaksi->id,
                         'pelanggan_id' => $transaksi->pelanggan_id,
@@ -524,7 +524,7 @@ class PesananOnlineIndex extends Component
             'inapp',
             $transaksi->pelanggan?->email,
             'Pesanan Selesai',
-            "Pesanan {$transaksi->no_transaksi} telah diselesaikan. Terima kasih telah mempercayakan kebutuhan suku cadang Anda kepada Ute Parts!",
+            "Pesanan {$transaksi->no_transaksi} telah diselesaikan. Terima kasih telah mempercayakan kebutuhan Anda kepada kami!",
             [
                 'transaksi_id' => $transaksi->id,
                 'pelanggan_id' => $transaksi->pelanggan_id,
@@ -653,7 +653,7 @@ class PesananOnlineIndex extends Component
             'no_transaksi' => $transaksi->no_transaksi,
             'tanggal' => $transaksi->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
             'waktu' => $transaksi->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
-            'cabang' => $transaksi->cabang?->nama ?? 'Ute Parts Store',
+            'cabang' => $transaksi->cabang?->nama ?? config('app.name', 'Bremspace'),
             'kasir' => $transaksi->kasir?->name ?? 'Web Store',
             'pelanggan' => $transaksi->pelanggan?->nama ?? 'Pelanggan Umum',
             'telepon' => $transaksi->pengiriman?->telepon_tujuan ?? $transaksi->pelanggan?->telepon ?? '-',

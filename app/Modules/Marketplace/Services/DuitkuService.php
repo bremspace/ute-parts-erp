@@ -108,9 +108,9 @@ class DuitkuService
             'paymentAmount' => $paymentAmount,
             'paymentMethod' => $paymentMethod ?: 'VA',
             'merchantOrderId' => $merchantOrderId,
-            'productDetails' => mb_substr('Order Ute Parts '.$merchantOrderId, 0, 255),
+            'productDetails' => mb_substr('Order '.config('app.name', 'Bremspace').' '.$merchantOrderId, 0, 255),
             // email field wajib di docs — placeholder bila pelanggan tanpa email
-            'email' => $customerEmail ?: 'customer@uteparts.id',
+            'email' => $customerEmail ?: 'customer@bremspace.id',
             'customerVaName' => mb_substr($customerName !== '' ? $customerName : 'Customer', 0, 20),
             'phoneNumber' => $phoneNumber ?: '081234567890',
             'callbackUrl' => $targetCallbackUrl,

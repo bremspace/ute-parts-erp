@@ -117,7 +117,7 @@ function pair(l, r, w = 32) {
 function layoutStruk58(data) {
     const E = [];
     const W = 32;
-    const namaToko = data.nama_toko || 'UTE PARTS';
+    const namaToko = data.nama_toko || window.APP_NAME || 'BREMSPACE';
     const slogan = data.slogan || 'Pusat Sparepart & Servis HP';
     E.push({ t: 'line', s: namaToko, c: 1, b: 1, h: 1 });
     if (slogan) E.push({ t: 'line', s: slogan, c: 1 });
@@ -249,7 +249,7 @@ function layoutStruk58(data) {
 function layoutFaktur80(data) {
     const E = [];
     const W = 42;
-    const namaToko = data.nama_toko || 'UTE PARTS';
+    const namaToko = data.nama_toko || window.APP_NAME || 'BREMSPACE';
     const slogan = data.slogan || 'Pusat Sparepart & Servis HP';
     E.push({ t: 'line', s: namaToko, c: 1, b: 1, h: 1 });
     if (slogan) E.push({ t: 'line', s: slogan, c: 1 });

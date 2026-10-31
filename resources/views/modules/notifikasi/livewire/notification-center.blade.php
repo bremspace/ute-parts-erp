@@ -81,7 +81,7 @@
                     <button
                         type="button"
                         onclick="window.playUteNotificationSound('urgent')"
-                        title="Uji Suara Otomotif Ute Parts"
+                        title="Uji Suara Notifikasi"
                         class="p-1.5 rounded-lg text-ink-400 hover:text-up-primary hover:bg-up-primary/10 transition-colors cursor-pointer text-[10px] font-mono font-bold tracking-tight"
                     >
                         TEST

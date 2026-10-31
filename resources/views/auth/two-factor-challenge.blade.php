@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verifikasi 2FA — Ute Parts</title>
+    <title>Verifikasi 2FA — {{ config('app.name', 'Bremspace') }}</title>
 
     <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
@@ -71,7 +71,7 @@
         </div>
 
         <p class="text-center text-xs text-ink-500 mt-6">
-            Ute Parts ERP &copy; 2026. Hak Cipta Dilindungi.
+            {{ config('app.name', 'Bremspace') }} ERP &copy; {{ date('Y') }}. Hak Cipta Dilindungi.
         </p>
     </div>
 </body>

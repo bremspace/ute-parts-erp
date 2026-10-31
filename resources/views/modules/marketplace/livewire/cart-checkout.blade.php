@@ -29,7 +29,7 @@
                         Sistem kasir & cabang telah menerima daftar suku cadang Anda.
                         Bayar online sekarang lewat menu <strong class="text-ink-700 dark:text-amber-100">Akun Saya → Pesanan</strong>
                         (transfer bank, QRIS, atau e-wallet) agar pesanan segera disiapkan —
-                        atau selesaikan pembayaran saat ambil barang / lewat instruksi resmi WhatsApp Ute Parts.
+                        atau selesaikan pembayaran saat ambil barang / lewat instruksi resmi WhatsApp toko.
                     </p>
                 </div>
             </div>

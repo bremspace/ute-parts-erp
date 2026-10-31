@@ -332,7 +332,7 @@ class PembayaranPesananOnlineService
                 'wa',
                 $transaksi->pelanggan->telepon,
                 'Pesanan Selesai Diambil',
-                "Halo {$transaksi->pelanggan->nama}, pesanan {$transaksi->no_transaksi} telah selesai diambil di toko. Terima kasih telah mempercayai Ute Parts!",
+                "Halo {$transaksi->pelanggan->nama}, pesanan {$transaksi->no_transaksi} telah selesai diambil di toko. Terima kasih telah mempercayai kami!",
                 [
                     'transaksi_id' => $transaksi->id,
                     'pelanggan_id' => $transaksi->pelanggan_id,

@@ -849,7 +849,7 @@ class ReturPenjualanIndex extends Component
     }
 
     /**
-     * Siapkan payload struk khusus transaksi retur (format standar Ute Parts global).
+     * Siapkan payload struk khusus transaksi retur (format standar global).
      */
     public function siapkanStrukRetur(ReturnPenjualan $retur): void
     {
@@ -888,7 +888,7 @@ class ReturPenjualanIndex extends Component
         $selisih = (float) $retur->selisih_nominal;
 
         $this->receiptData = [
-            'nama_toko' => $strukConfig['nama_toko'] ?? 'UTE PARTS',
+            'nama_toko' => $strukConfig['nama_toko'] ?? config('app.name', 'BREMSPACE'),
             'slogan' => $strukConfig['slogan'] ?? null,
             'alamat' => $strukConfig['alamat'] ?? null,
             'telepon' => $strukConfig['telepon'] ?? null,

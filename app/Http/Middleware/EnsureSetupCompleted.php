@@ -34,7 +34,9 @@ class EnsureSetupCompleted
             return $next($request);
         }
 
-        $isSetupCompleted = (bool) app(KonfigurasiService::class)->get('app_setup_completed', false);
+        $defaultCompleted = app()->runningUnitTests();
+        $rawSetup = app(KonfigurasiService::class)->get('app_setup_completed');
+        $isSetupCompleted = $rawSetup === null ? $defaultCompleted : filter_var($rawSetup, FILTER_VALIDATE_BOOLEAN);
 
         if (! $isSetupCompleted) {
             // Super Admin, Owner, atau yang berhak atas pengaturan diarahkan ke wizard

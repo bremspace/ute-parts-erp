@@ -171,7 +171,7 @@ class ReturnPenjualanService
 
                         if (! $snRow) {
                             throw ValidationException::withMessages([
-                                'items' => "Nomor seri [{$sn}] tidak ditemukan dalam sistem Ute Parts untuk produk ini.",
+                                'items' => "Nomor seri [{$sn}] tidak ditemukan dalam sistem untuk produk ini.",
                             ]);
                         }
 

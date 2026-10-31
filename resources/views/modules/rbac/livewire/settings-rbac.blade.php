@@ -1079,7 +1079,7 @@
                                         type="text"
                                         wire:model="qrisForm.merchant_name"
                                         class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-bold"
-                                        placeholder="Contoh: UTE PARTS STORE"
+                                        placeholder="Contoh: BREMSPACE STORE"
                                     />
                                     @error('qrisForm.merchant_name') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
                                 </div>
@@ -1335,7 +1335,7 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <div>
                                             <label class="block text-xs font-semibold text-ink-300 mb-1">Nama Toko / Brand *</label>
-                                            <input type="text" wire:model.live.debounce.300ms="strukForm.nama_toko" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold text-white" placeholder="Contoh: UTE PARTS">
+                                            <input type="text" wire:model.live.debounce.300ms="strukForm.nama_toko" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold text-white" placeholder="Contoh: BREMSPACE">
                                             @error('strukForm.nama_toko') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
                                         </div>
 
@@ -1358,7 +1358,7 @@
 
                                         <div>
                                             <label class="block text-xs font-semibold text-ink-300 mb-1">Website / Media Sosial</label>
-                                            <input type="text" wire:model.live.debounce.300ms="strukForm.website_medsos" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: www.uteparts.id / @uteparts">
+                                            <input type="text" wire:model.live.debounce.300ms="strukForm.website_medsos" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: www.bremspace.com / @bremspace">
                                         </div>
                                     </div>
                                 </div>
@@ -1503,7 +1503,7 @@
                                 >
                                     <!-- Header Toko -->
                                     <div class="text-center pb-2 border-b border-dashed border-gray-400 space-y-0.5">
-                                        <h3 class="text-sm font-black tracking-wider text-gray-900 uppercase">{{ $strukForm['nama_toko'] ?: 'UTE PARTS' }}</h3>
+                                        <h3 class="text-sm font-black tracking-wider text-gray-900 uppercase">{{ $strukForm['nama_toko'] ?: 'BREMSPACE' }}</h3>
                                         @if(!empty($strukForm['slogan']))
                                             <p class="text-[10px] text-gray-600 font-medium">{{ $strukForm['slogan'] }}</p>
                                         @endif
@@ -1728,7 +1728,7 @@
                                     <!-- Sisi Kanan: Detail Produk -->
                                     <div class="ml-2.5 min-w-0 flex-1 flex flex-col justify-center font-sans leading-tight">
                                         @if($printerForm['label_show_brand'])
-                                            <span class="text-[9px] font-black uppercase tracking-wider text-indigo-700 truncate">UTE PARTS</span>
+                                            <span class="text-[9px] font-black uppercase tracking-wider text-indigo-700 truncate">{{ $strukForm['nama_toko'] ?: 'BREMSPACE' }}</span>
                                         @endif
                                         <span class="text-[10px] font-bold text-gray-900 line-clamp-2 mt-0.5">LCD Touchscreen iPhone 13 Pro Max</span>
                                         @if($printerForm['label_show_sku'])
@@ -1841,7 +1841,7 @@
                                 @if(!empty($wmsDocForm['show_kop']))
                                     <div class="flex justify-between items-start border-b border-ink-200 pb-2">
                                         <div>
-                                            <div class="font-black text-xs text-up-primary">{{ $strukForm['nama_toko'] ?? 'UTE PARTS' }}</div>
+                                            <div class="font-black text-xs text-up-primary">{{ $strukForm['nama_toko'] ?? 'BREMSPACE' }}</div>
                                             <div class="text-[8.5px] text-ink-500">{{ $strukForm['slogan'] ?? 'Pusat Sparepart & Servis HP' }}</div>
                                             <div class="text-[8px] text-ink-400 mt-0.5">{{ $strukForm['alamat'] ?? 'Kantor Pusat & Gudang Utama' }} · Telp: {{ $strukForm['telepon'] ?? '-' }}</div>
                                         </div>
@@ -2033,7 +2033,7 @@
                                 @if(!empty($hrSlipForm['show_kop']))
                                     <div class="flex justify-between items-start border-b border-ink-200 pb-2">
                                         <div>
-                                            <div class="font-black text-xs text-up-primary">{{ $strukForm['nama_toko'] ?? 'UTE PARTS' }}</div>
+                                            <div class="font-black text-xs text-up-primary">{{ $strukForm['nama_toko'] ?? 'BREMSPACE' }}</div>
                                             <div class="text-[9px] text-ink-500">{{ $strukForm['slogan'] ?? 'Pusat Sparepart & Servis HP' }}</div>
                                         </div>
                                         <div class="text-right">
@@ -2074,7 +2074,7 @@
                                         </div>
                                         <div>
                                             <div>Bagian Keuangan,</div>
-                                            <div class="mt-6 pt-1 border-t border-ink-300 font-semibold">{{ $strukForm['nama_toko'] ?? 'UTE PARTS' }}</div>
+                                            <div class="mt-6 pt-1 border-t border-ink-300 font-semibold">{{ $strukForm['nama_toko'] ?? 'BREMSPACE' }}</div>
                                         </div>
                                     </div>
                                 @endif
@@ -2183,7 +2183,7 @@
                                 @if(!empty($laporanDocForm['show_kop']))
                                     <div class="flex justify-between items-start border-b-2 border-ink-900 pb-2">
                                         <div>
-                                            <div class="font-black text-xs text-ink-900">{{ $strukForm['nama_toko'] ?? 'UTE PARTS' }}</div>
+                                            <div class="font-black text-xs text-ink-900">{{ $strukForm['nama_toko'] ?? 'BREMSPACE' }}</div>
                                             <div class="text-[9px] text-ink-500">{{ $strukForm['alamat'] ?? 'Kantor Pusat' }}</div>
                                         </div>
                                         <div class="text-right">
@@ -2239,7 +2239,7 @@
                                 @if(!empty($laporanDocForm['show_audit_footer']))
                                     <div class="text-[7px] text-ink-400 flex justify-between border-t border-dashed border-ink-200 pt-1">
                                         <span>Dicetak: {{ auth()->user()?->name ?? 'User' }}</span>
-                                        <span>Dokumen ERP Ute Parts</span>
+                                        <span>Dokumen Resmi ERP</span>
                                     </div>
                                 @endif
                             </div>
@@ -2332,7 +2332,7 @@
                                 @if(!empty($labelPengirimanForm['show_sender']))
                                     <div class="border-b border-black pb-1.5 space-y-0.5 text-[8.5px]">
                                         <div class="text-[7.5px] font-bold uppercase text-ink-600">Pengirim:</div>
-                                        <div class="font-bold">{{ $strukForm['nama_toko'] ?? 'UTE PARTS STORE' }}</div>
+                                        <div class="font-bold">{{ $strukForm['nama_toko'] ?? 'BREMSPACE STORE' }}</div>
                                         <div>Telp: {{ $strukForm['telepon'] ?? '0812-3456-7890' }}</div>
                                     </div>
                                 @endif

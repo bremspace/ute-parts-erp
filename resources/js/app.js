@@ -1,4 +1,4 @@
-// Ute Parts - Main Application Entry Point
+// Main Application Entry Point
 // PWA Service Worker Registration
 
 import '../css/app.css';
@@ -242,7 +242,7 @@ window.pwaInstaller = function () {
         canInstall: false,
         installed: false,
         dismissed: false,
-        appName: window.UTE_ZONE === 'backoffice' ? 'Ute ERP' : 'Ute Parts',
+        appName: window.APP_NAME || (window.UTE_ZONE === 'backoffice' ? 'ERP Backoffice' : 'Bremspace'),
         init() {
             if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
                 this.installed = true;
@@ -326,4 +326,4 @@ window.screenWakeLock = function () {
 };
 
 // Alpine.js components will be registered in their respective blade files
-console.log('[Ute Parts] App initialized');
+console.log('[App] Initialized');

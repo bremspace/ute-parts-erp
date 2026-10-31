@@ -2115,7 +2115,7 @@ class PosKasir extends Component
             $dynamicPayload = $qrisService->generateDynamic($qris->payload_static, $nominal, $inv);
             $this->qrisKasirSvg = $qrisService->renderSvg($dynamicPayload, 200);
 
-            $storeName = $qris->merchant_name ?: config('app.name', 'Ute Parts');
+            $storeName = $qris->merchant_name ?: config('app.name', 'Bremspace');
             $msg = $qrisService->formatWhatsAppMessage(
                 $storeName,
                 $inv,
@@ -2152,7 +2152,7 @@ class PosKasir extends Component
         $cabangId = session('cabang_id');
         $qrisService = app(QrisService::class);
         $qris = $qrisService->getActiveQris($cabangId);
-        $storeName = $qris?->merchant_name ?: config('app.name', 'Ute Parts');
+        $storeName = $qris?->merchant_name ?: config('app.name', 'Bremspace');
         $inv = $this->qrisInvoice ?: ('INV-'.date('YmdHis'));
 
         $msg = $qrisService->formatWhatsAppMessage(
@@ -2306,7 +2306,7 @@ class PosKasir extends Component
         $cabangId = session('cabang_id');
         $qrisService = app(QrisService::class);
         $qris = $qrisService->getActiveQris($cabangId);
-        $storeName = $qris?->merchant_name ?: config('app.name', 'Ute Parts');
+        $storeName = $qris?->merchant_name ?: config('app.name', 'Bremspace');
         $inv = $this->qrisInvoice ?: ('INV-'.date('YmdHis'));
 
         $pesan = $qrisService->formatWhatsAppMessage(

@@ -200,7 +200,7 @@
     @if($showSender)
         <div class="address-box">
             <div class="address-title">Pengirim:</div>
-            <div class="address-name" style="font-size:8.5pt;">{{ $transaksi->cabang?->nama ?? ($printHeader['nama_toko'] ?? 'UTE PARTS') }}</div>
+            <div class="address-name" style="font-size:8.5pt;">{{ $transaksi->cabang?->nama ?? ($printHeader['nama_toko'] ?? config('app.name', 'BREMSPACE')) }}</div>
             <div>Telp: {{ $transaksi->cabang?->telepon ?? ($printHeader['telepon'] ?? '-') }}</div>
             <div>{{ $transaksi->cabang?->alamat ?? ($printHeader['alamat'] ?? 'Kantor Pusat') }}</div>
         </div>

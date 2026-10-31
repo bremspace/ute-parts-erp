@@ -270,7 +270,7 @@
 
                 <div class="space-y-4 text-xs">
                     <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/20 text-ink-300">
-                        Gunakan fitur ini jika pembeli mengirimkan <strong>bukan barang toko Ute Parts</strong>, segel toko rusak dibongkar, atau paket kosong/unit ditukar.
+                        Gunakan fitur ini jika pembeli mengirimkan <strong>bukan barang resmi toko</strong>, segel toko rusak dibongkar, atau paket kosong/unit ditukar.
                     </div>
 
                     <div>
@@ -313,7 +313,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Channel</label>
-                        <input type="text" wire:model="connectForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Ute Parts Official — Shopee" />
+                        <input type="text" wire:model="connectForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Bremspace Official — Shopee" />
                     </div>
 
                     @if($connectForm['platform'] === 'shopee')

@@ -755,7 +755,7 @@
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                                 <div>
                                     <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1 text-[11px]">Email Login *</label>
-                                    <input type="email" wire:model="inputEmailLogin" placeholder="email@uteparts.id"
+                                    <input type="email" wire:model="inputEmailLogin" placeholder="email@bremspace.id"
                                         class="block w-full text-base sm:text-sm min-h-[40px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                                     @error('inputEmailLogin') <span class="text-red-500 text-[11px] mt-0.5 block">{{ $message }}</span> @enderror
                                 </div>

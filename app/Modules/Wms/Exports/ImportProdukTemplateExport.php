@@ -291,7 +291,7 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                 public function collection(): Enumerable
                 {
                     return collect([
-                        ['PETUNJUK IMPORT MASTER PRODUK DINAMIS — UTE PARTS'],
+                        ['PETUNJUK IMPORT MASTER PRODUK DINAMIS'],
                         [''],
                         ['1. METODE PENGISIAN TINGGAL PILIH (DROPDOWN):'],
                         ['   - Kolom satuan, kategori, brand part, merk_hp, kualitas, kondisi, dan sn memiliki DROPDOWN pilihan.'],

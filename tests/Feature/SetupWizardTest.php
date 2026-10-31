@@ -11,7 +11,9 @@ use App\Modules\Rbac\Services\DatabaseManagementService;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -119,11 +121,15 @@ class SetupWizardTest extends TestCase
             ->test(SetupWizard::class)
             // Step 1: Profil Toko
             ->assertSet('currentStep', 1)
-            ->set('namaToko', 'Ute Parts Galaxy')
+            ->set('namaToko', 'Bremspace Sentral')
+            ->set('domainToko', 'bremspace.com')
+            ->assertSet('superAdminEmail', 'superadmin@bremspace.com')
+            ->assertSet('kasirEmail', 'kasir@bremspace.com')
+            ->assertSet('teknisiEmail', 'teknisi@bremspace.com')
             ->set('namaCabang', 'Cabang Sentral')
             ->set('alamatToko', 'Jl. Komputer Raya No. 99')
             ->set('teleponToko', '081299998888')
-            ->set('strukHeader', 'UTE PARTS GALAXY')
+            ->set('strukHeader', 'BREMSPACE SENTRAL')
             ->call('nextStep')
             ->assertSet('currentStep', 2)
             // Step 2: Modal Kas & Bank
@@ -165,11 +171,19 @@ class SetupWizardTest extends TestCase
         // User terupdate
         $admin->refresh();
         $this->assertEquals('Budi Santoso', $admin->name);
+        $this->assertEquals('superadmin@bremspace.com', $admin->email);
         $this->assertTrue(Hash::check('SandiKuat999!', $admin->password));
 
         $kasir->refresh();
         $this->assertEquals('Siti Kasir', $kasir->name);
+        $this->assertEquals('kasir@bremspace.com', $kasir->email);
         $this->assertTrue(Hash::check('SandiKasir123!', $kasir->password));
+
+        $teknisi->refresh();
+        $this->assertEquals('teknisi@bremspace.com', $teknisi->email);
+
+        // Domain config tersimpan
+        $this->assertEquals('bremspace.com', app(KonfigurasiService::class)->get('app_domain'));
 
         // Jurnal modal awal terbentuk
         $jurnal = JurnalHeader::where('sumber', 'manual')
@@ -200,5 +214,42 @@ class SetupWizardTest extends TestCase
 
         // Flag setup awal harus false kembali
         $this->assertFalse((bool) $config->get('app_setup_completed'));
+    }
+
+    public function test_setup_wizard_saves_custom_brand_name_and_logo(): void
+    {
+        Storage::fake('public');
+
+        $cabang = Cabang::create([
+            'kode' => 'CBG-01',
+            'nama' => 'Cabang Pusat',
+            'is_active' => true,
+        ]);
+
+        $admin = User::create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@bremspace.id',
+            'password' => Hash::make('password'),
+        ]);
+        $admin->assignRole('super-admin');
+
+        $logoFile = UploadedFile::fake()->image('logo.png', 100, 100);
+
+        session(['cabang_id' => $cabang->id, 'cabang_nama' => $cabang->nama]);
+
+        Livewire::actingAs($admin)
+            ->test(SetupWizard::class)
+            ->set('namaToko', 'Bremspace Mega Store')
+            ->set('logoFile', $logoFile)
+            ->call('nextStep')
+            ->assertHasNoErrors()
+            ->set('currentStep', 6)
+            ->call('selesaikanSetup')
+            ->assertRedirect(route('pos'));
+
+        $config = app(KonfigurasiService::class);
+        $this->assertEquals('Bremspace Mega Store', $config->get('app_brand_name'));
+        $this->assertNotNull($config->get('app_logo'));
+        $this->assertStringContainsString('logo/brand-logo-', $config->get('app_logo'));
     }
 }

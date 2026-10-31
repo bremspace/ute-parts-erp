@@ -81,7 +81,7 @@ class PurchaseOrder extends Model
             $phone = '62'.substr($phone, 1);
         }
 
-        $cabangNama = $this->gudangTujuan?->cabang?->nama ?? 'Ute Parts';
+        $cabangNama = $this->gudangTujuan?->cabang?->nama ?? config('app.name', 'Bremspace');
         $gudangNama = $this->gudangTujuan?->nama ?? '-';
         $tanggal = $this->created_at ? $this->created_at->format('d/m/Y') : date('d/m/Y');
 
@@ -125,7 +125,7 @@ class PurchaseOrder extends Model
             $phone = '62'.substr($phone, 1);
         }
 
-        $cabangNama = $this->gudangTujuan?->cabang?->nama ?? 'Ute Parts';
+        $cabangNama = $this->gudangTujuan?->cabang?->nama ?? config('app.name', 'Bremspace');
         $gudangNama = $this->gudangTujuan?->nama ?? '-';
         $tanggal = now()->format('d/m/Y H:i');
         $alasanFinal = $alasan ?: ($this->catatan ?: 'Ketidaksesuaian barang saat pemeriksaan fisik gudang');

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Backoffice — Ute Parts</title>
+    <title>Login Backoffice — {{ config('app.name', 'Bremspace') }}</title>
 
     <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
@@ -18,7 +18,7 @@
     <div class="w-full max-w-md relative z-10">
         <!-- Logo & Title -->
         <div class="text-center mb-8 flex justify-center">
-            <x-prism.logo size="lg" layout="vertical" mode="dark" title="UTE PARTS" subtitle="Sistem ERP, Kasir POS & Manajemen Multi-Gudang" />
+            <x-prism.logo size="lg" layout="vertical" mode="dark" subtitle="Sistem ERP, Kasir POS & Manajemen Multi-Gudang" />
         </div>
 
         <!-- Glass Card -->
@@ -89,7 +89,7 @@
                         required
                         autofocus
                         autocomplete="username"
-                        placeholder="nama@uteparts.id atau nama pengguna"
+                        placeholder="nama@bremspace.id atau nama pengguna"
                         class="w-full px-4 py-3 rounded-xl glass-input text-sm"
                         value="{{ old('email') }}"
                     />
@@ -136,7 +136,7 @@
 
         <!-- Footer Notice -->
         <p class="text-center text-xs text-ink-500 mt-6">
-            Ute Parts ERP &copy; 2026. Hak Cipta Dilindungi.
+            {{ config('app.name', 'Bremspace') }} ERP &copy; {{ date('Y') }}. Hak Cipta Dilindungi.
         </p>
     </div>
 </body>

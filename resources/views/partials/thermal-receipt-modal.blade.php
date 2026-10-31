@@ -42,7 +42,7 @@
                 <div class="thermal-receipt-container thermal-receipt-preview bg-white text-black p-4 rounded-2xl font-mono text-xs shadow-inner space-y-2 select-text transition-all duration-200" id="thermalReceipt" :style="paperSize === '58' ? 'max-width: 280px; margin: 0 auto;' : 'max-width: 340px; margin: 0 auto;'">
                     <!-- Brand Header -->
                     <div class="receipt-center pb-2 border-b border-dashed border-gray-400">
-                        <h3 class="receipt-title text-sm font-black tracking-wider text-gray-900">{{ $strukConfig['nama_toko'] ?? 'UTE PARTS' }}</h3>
+                        <h3 class="receipt-title text-sm font-black tracking-wider text-gray-900">{{ $strukConfig['nama_toko'] ?? config('app.name', 'BREMSPACE') }}</h3>
                         @if(!empty($strukConfig['slogan']))
                             <p class="text-[10px] text-gray-600 font-medium">{{ $strukConfig['slogan'] }}</p>
                         @endif

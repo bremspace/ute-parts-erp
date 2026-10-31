@@ -13,7 +13,7 @@
                 Manajemen Basis Data & Keselamatan Sistem
             </h1>
             <p class="text-xs text-ink-400 mt-0.5">
-                Pusat kontrol pencadangan (backup), pemulihan (restore), sinkronisasi cloud, serta pembersihan data aman Ute Parts.
+                Pusat kontrol pencadangan (backup), pemulihan (restore), sinkronisasi cloud, serta pembersihan data aman.
             </p>
         </div>
 

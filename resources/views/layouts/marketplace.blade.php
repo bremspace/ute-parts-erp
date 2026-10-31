@@ -34,12 +34,12 @@
     <meta name="theme-color" content="#4F46E5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Ute Parts">
+    <meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'Bremspace') }}">
     <link rel="apple-touch-icon" href="{{ asset('icons/icon-192x192.png') }}">
     <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
 
-    <title>{{ $title ?? 'Ute Parts' }} — Toko Sparepart & Servis HP</title>
+    <title>{{ $title ?? config('app.name', 'Bremspace') }} — {{ $webConfig['hero_headline'] ?? 'Toko Sparepart & Servis' }}</title>
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
@@ -509,7 +509,7 @@
                 <a href="{{ route('customer.account') }}" class="hover:text-up-primary transition-colors">Akun & Membership</a>
             </div>
             <div class="space-y-1">
-                <p class="text-xs text-ink-400 dark:text-ink-500">© {{ date('Y') }} Ute Parts Ecosystem. All rights reserved.</p>
+                <p class="text-xs text-ink-400 dark:text-ink-500">© {{ date('Y') }} {{ config('app.name', 'Bremspace') }}. All rights reserved.</p>
                 @if (!empty($webConfig['operating_hours']))
                     <p class="text-[11px] text-ink-400 dark:text-ink-500">Jam Buka: {{ $webConfig['operating_hours'] }}</p>
                 @endif
@@ -537,7 +537,7 @@
     @if ($webConfig['wa_floating_active'] ?? true)
         @php
             $waNum = preg_replace('/[^0-9]/', '', $webConfig['wa_number'] ?? '6281234567890');
-            $waMsg = urlencode($webConfig['wa_default_msg'] ?? 'Halo Admin Ute Parts, saya ingin tanya sparepart...');
+            $waMsg = urlencode($webConfig['wa_default_msg'] ?? ('Halo Admin ' . config('app.name', 'Bremspace') . ', saya ingin tanya produk...'));
             $waUrl = "https://wa.me/{$waNum}?text={$waMsg}";
         @endphp
         <div class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-40 group"

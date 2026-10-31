@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cetak Label QR & Barcode Produk — Ute Parts</title>
+    <title>Cetak Label QR & Barcode Produk — {{ config('app.name', 'Bremspace') }}</title>
     @php
         $cfg = $labelConfig ?? [
             'preset' => '33x15',
@@ -278,7 +278,7 @@
                     $kode = $p->barcode ?: ($p->skuVariants->first()?->sku ?: ('UTP-' . str_pad((string)$p->id, 5, '0', STR_PAD_LEFT)));
                     $qrSvg = $qrService->generateSvg($kode, 100, 0);
                     $hargaJual = $p->harga_jual_retail ?: ($p->harga_jual ?: 0);
-                    $brandNama = $p->brand?->nama ?: (app(\App\Modules\Crm\Services\KonfigurasiService::class)->getPrintHeader()['nama_toko'] ?? 'UTE PARTS');
+                    $brandNama = $p->brand?->nama ?: (app(\App\Modules\Crm\Services\KonfigurasiService::class)->getPrintHeader()['nama_toko'] ?? config('app.name', 'BREMSPACE'));
                     $copies = (int) ($cfg['copies'] ?? 1);
                 @endphp
 

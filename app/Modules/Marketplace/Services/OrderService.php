@@ -206,7 +206,7 @@ class OrderService
                 $this->notifService->kirim(
                     'wa',
                     $pelanggan->telepon,
-                    'Invoice Pesanan Ute Parts',
+                    'Invoice Pesanan '.config('app.name', 'Bremspace'),
                     "Halo {$pelanggan->nama}, pesanan {$noTransaksi} telah kami terima dengan total Rp ".number_format($transaksi->total_akhir, 0, ',', '.').'. Silakan selesaikan pembayaran untuk diproses toko.',
                     [
                         'transaksi_id' => $transaksi->id,

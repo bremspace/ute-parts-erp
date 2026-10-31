@@ -3,14 +3,27 @@
     'withText' => true,
     'mode' => 'auto', // dark, light, auto
     'layout' => 'horizontal', // horizontal, vertical
-    'title' => 'UTE PARTS',
+    'title' => null,
     'subtitle' => null,
     'href' => null,
     'textClass' => '',
+    'image' => null,
 ])
 
 @php
-$id = uniqid('up-logo-');
+$id = uniqid('prism-logo-');
+
+$resolvedTitle = $title ?: config('app.name', 'BREMSPACE');
+
+// Lazy-resolve logo image jika belum diberikan
+$logoImage = $image;
+if ($logoImage === null) {
+    try {
+        $logoImage = app(\App\Modules\Crm\Services\KonfigurasiService::class)->getAppLogo();
+    } catch (\Throwable) {
+        $logoImage = null;
+    }
+}
 
 $sizes = [
     'sm' => [
@@ -68,67 +81,48 @@ $wrapperTag = $href ? 'a' : 'div';
     @if($href) href="{{ $href }}" @endif
     {{ $attributes->merge(['class' => "{$directionClass} {$conf['gap']} select-none group transition-opacity duration-150"]) }}
 >
-    <!-- Precision Hardware Prism Emblem Badge -->
-    <div class="{{ $conf['box'] }} bg-gradient-to-tr from-up-primary via-indigo-600 to-up-accent flex items-center justify-center shadow-lg shadow-up-primary/25 border border-white/20 flex-shrink-0 group-hover:shadow-up-primary/40 transition-shadow">
-        <svg class="{{ $conf['icon'] }}" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <defs>
-                <linearGradient id="u-{{ $id }}" x1="0%" y1="0%" x2="80%" y2="100%">
-                    <stop offset="0%" stop-color="#FFFFFF" />
-                    <stop offset="100%" stop-color="#DCD6FE" />
-                </linearGradient>
-                <linearGradient id="p-{{ $id }}" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#FFF3E8" />
-                    <stop offset="100%" stop-color="#FFBE88" />
-                </linearGradient>
-                <linearGradient id="mint-{{ $id }}" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#34D399" />
-                    <stop offset="100%" stop-color="#1FBF8F" />
-                </linearGradient>
-            </defs>
+    <!-- Brand / Prism Emblem Badge -->
+    <div class="{{ $conf['box'] }} bg-gradient-to-tr from-up-primary via-indigo-600 to-up-accent flex items-center justify-center shadow-lg shadow-up-primary/25 border border-white/20 flex-shrink-0 group-hover:shadow-up-primary/40 transition-shadow overflow-hidden">
+        @if(!empty($logoImage))
+            <img src="{{ $logoImage }}" alt="{{ $resolvedTitle }}" class="w-full h-full object-contain p-1 rounded-inherit">
+        @else
+            <svg class="{{ $conf['icon'] }}" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                    <linearGradient id="facet-top-{{ $id }}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95" />
+                        <stop offset="100%" stop-color="#DCD6FE" stop-opacity="0.8" />
+                    </linearGradient>
+                    <linearGradient id="facet-left-{{ $id }}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#818CF8" />
+                        <stop offset="100%" stop-color="#4F46E5" />
+                    </linearGradient>
+                    <linearGradient id="facet-right-{{ $id }}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#FFBE88" />
+                        <stop offset="100%" stop-color="#E8873B" />
+                    </linearGradient>
+                    <linearGradient id="facet-center-{{ $id }}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#34D399" />
+                        <stop offset="100%" stop-color="#1FBF8F" />
+                    </linearGradient>
+                </defs>
 
-            <!-- 'U' Track -->
-            <path d="M 18 18
-                     L 29 18
-                     L 29 58
-                     C 29 67 35 73 44 73
-                     C 50 73 54 70 54 65
-                     L 54 48
-                     L 65 48
-                     L 65 65
-                     C 65 77 56 84 44 84
-                     C 28 84 18 74 18 58
-                     Z"
-                  fill="url(#u-{{ $id }})" />
-
-            <!-- 'P' Loop & Stem -->
-            <path d="M 36 18
-                     L 66 18
-                     C 77 18 84 25 84 35
-                     C 84 45 77 52 66 52
-                     L 47 52
-                     L 47 74
-                     L 36 74
-                     Z
-                     M 47 28.5
-                     L 64 28.5
-                     C 68.5 28.5 72.5 31 72.5 35
-                     C 72.5 39 68.5 41.5 64 41.5
-                     L 47 41.5
-                     Z"
-                  fill="url(#p-{{ $id }})" />
-
-            <!-- Interlocking Facet Bridge -->
-            <path d="M 47 48 L 54 48 L 54 52 L 47 52 Z" fill="#FFFFFF" opacity="0.85" />
-
-            <!-- Optical Refraction Mint Diamond -->
-            <polygon points="41.5,30 45.5,34.5 41.5,39 37.5,34.5" fill="url(#mint-{{ $id }})" />
-            <circle cx="41.5" cy="34.5" r="1.3" fill="#FFFFFF" />
-        </svg>
+                <!-- Modern Geometric Diamond Prism Facets -->
+                <!-- Top Cap Facet -->
+                <polygon points="50,14 82,32 50,48 18,32" fill="url(#facet-top-{{ $id }})" />
+                <!-- Left Lower Facet -->
+                <polygon points="18,32 50,48 50,86 18,66" fill="url(#facet-left-{{ $id }})" />
+                <!-- Right Lower Facet -->
+                <polygon points="50,48 82,32 82,66 50,86" fill="url(#facet-right-{{ $id }})" />
+                <!-- Center Core Spark -->
+                <polygon points="50,38 60,48 50,58 40,48" fill="url(#facet-center-{{ $id }})" opacity="0.95" />
+                <circle cx="50" cy="48" r="2" fill="#FFFFFF" />
+            </svg>
+        @endif
     </div>
 
     @if($withText)
         <div class="min-w-0 {{ $textClass }}">
-            <span class="{{ $conf['title'] }} {{ $titleColor }} block truncate tracking-wider font-bold">{{ $title }}</span>
+            <span class="{{ $conf['title'] }} {{ $titleColor }} block truncate tracking-wider font-bold">{{ $resolvedTitle }}</span>
             @if($subtitle)
                 <span class="{{ $conf['subtitle'] }} {{ $subtitleColor }} block truncate">{{ $subtitle }}</span>
             @endif

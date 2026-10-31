@@ -49,7 +49,7 @@ class WhatsAppHelper
      */
     public static function draftStrukPos(array $receiptData): string
     {
-        $tokoRaw = $receiptData['cabang'] ?? config('app.name', 'Ute Parts');
+        $tokoRaw = $receiptData['cabang'] ?? config('app.name', 'Bremspace');
         $toko = strip_tags(html_entity_decode((string) $tokoRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
 
         $noTrx = trim((string) ($receiptData['no_transaksi'] ?? '-'));
@@ -111,7 +111,7 @@ class WhatsAppHelper
      */
     public static function draftTerimaServis(string $pelanggan, string $noTiket, string $jenisHp, string $token): string
     {
-        $toko = strip_tags(html_entity_decode(config('app.name', 'Ute Parts'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $toko = strip_tags(html_entity_decode(config('app.name', 'Bremspace'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         $pelangganClean = trim(strip_tags(html_entity_decode($pelanggan, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $jenisHpClean = trim(strip_tags(html_entity_decode($jenisHp, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $trackingUrl = url("/tracking/{$token}");
@@ -132,7 +132,7 @@ class WhatsAppHelper
      */
     public static function draftEstimasiServis(string $pelanggan, string $noTiket, string $jenisHp, float $biaya, string $alasan, string $token): string
     {
-        $toko = strip_tags(html_entity_decode(config('app.name', 'Ute Parts'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $toko = strip_tags(html_entity_decode(config('app.name', 'Bremspace'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         $pelangganClean = trim(strip_tags(html_entity_decode($pelanggan, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $jenisHpClean = trim(strip_tags(html_entity_decode($jenisHp, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $alasanClean = trim(strip_tags(html_entity_decode($alasan, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
@@ -153,7 +153,7 @@ class WhatsAppHelper
      */
     public static function draftServisSelesai(string $pelanggan, string $noTiket, string $jenisHp, float $total, ?string $token): string
     {
-        $toko = strip_tags(html_entity_decode(config('app.name', 'Ute Parts'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $toko = strip_tags(html_entity_decode(config('app.name', 'Bremspace'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         $pelangganClean = trim(strip_tags(html_entity_decode($pelanggan, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $jenisHpClean = trim(strip_tags(html_entity_decode($jenisHp, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $nominal = number_format($total, 0, ',', '.');

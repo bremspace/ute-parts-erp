@@ -203,10 +203,10 @@
     @if($showKop)
         <div class="header">
             <div>
-                <div class="brand-title">{{ $printHeader['nama_toko'] ?? 'UTE PARTS' }}</div>
+                <div class="brand-title">{{ $printHeader['nama_toko'] ?? config('app.name', 'BREMSPACE') }}</div>
                 <p class="brand-subtitle">
-                    {{ $printHeader['slogan'] ?? 'Pusat Sparepart & Servis HP' }} · {{ $printHeader['alamat'] ?? 'Kantor Pusat' }}<br>
-                    Telp/WA: {{ $printHeader['telepon'] ?? '-' }} · Website: {{ $printHeader['website_medsos'] ?? 'www.uteparts.id' }}
+                    {{ $printHeader['slogan'] ?? 'Pusat Sparepart & Servis' }} · {{ $printHeader['alamat'] ?? 'Kantor Pusat' }}<br>
+                    Telp/WA: {{ $printHeader['telepon'] ?? '-' }} · Website: {{ $printHeader['website_medsos'] ?? 'www.bremspace.com' }}
                 </p>
             </div>
             <div class="doc-title-box">
@@ -312,7 +312,7 @@
         <div class="footer-audit">
             <span>Dicetak oleh: <strong>{{ auth()->user()?->name ?? 'System' }}</strong> ({{ auth()->user()?->email ?? '-' }})</span>
             <span>Tanggal Cetak: {{ now()->format('d/m/Y H:i:s') }}</span>
-            <span>Dokumen Resmi ERP Ute Parts</span>
+            <span>Dokumen Resmi ERP</span>
         </div>
     @endif
 </div>

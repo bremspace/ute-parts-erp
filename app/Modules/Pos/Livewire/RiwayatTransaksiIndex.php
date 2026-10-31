@@ -972,7 +972,7 @@ class RiwayatTransaksiIndex extends Component
                 'is_piutang' => $isPiutang,
                 'jatuh_tempo' => $jatuhTempoTgl,
                 'sisa_piutang' => $sisaPiutang,
-                'cabang' => $trx->cabang?->nama ?? 'Ute Parts Store',
+                'cabang' => $trx->cabang?->nama ?? config('app.name', 'Bremspace'),
                 'garansi' => $trx->garansi_teks ?: null,
             ];
 
@@ -1009,7 +1009,7 @@ class RiwayatTransaksiIndex extends Component
                 'bayar' => (float) ($tiket->transaksi?->jumlah_bayar ?? $rincian['total']),
                 'kembalian' => (float) ($tiket->transaksi?->kembalian ?? 0),
                 'metode' => strtoupper($tiket->metode_pembayaran ?? $tiket->transaksi?->metode_bayar ?? 'TUNAI'),
-                'cabang' => $tiket->cabang?->nama ?? 'Ute Parts Servis',
+                'cabang' => $tiket->cabang?->nama ?? (config('app.name', 'Bremspace').' Servis'),
             ];
 
         } elseif ($tipe === 'retur' || $tipe === 'retur_penjualan') {
@@ -1043,7 +1043,7 @@ class RiwayatTransaksiIndex extends Component
                 'bayar' => (float) $retur->jumlah,
                 'kembalian' => 0.0,
                 'metode' => 'RETUR ('.strtoupper($retur->metode_pengembalian ?? 'KAS').')',
-                'cabang' => $retur->cabang?->nama ?? 'Ute Parts Store',
+                'cabang' => $retur->cabang?->nama ?? config('app.name', 'Bremspace'),
             ];
 
             $this->showReceiptModal = true;
@@ -1078,7 +1078,7 @@ class RiwayatTransaksiIndex extends Component
                 'bayar' => (float) $retur->jumlah,
                 'kembalian' => 0.0,
                 'metode' => 'RETUR BELI ('.strtoupper($retur->metode_pengembalian ?? 'UTANG').')',
-                'cabang' => $retur->cabang?->nama ?? 'Ute Parts Store',
+                'cabang' => $retur->cabang?->nama ?? config('app.name', 'Bremspace'),
             ];
 
             $this->showReceiptModal = true;

@@ -86,7 +86,7 @@ class SendWebhookJob implements ShouldQueue
                 'X-Ute-Timestamp' => $timestamp,
                 'X-Ute-Event' => $delivery->event,
                 'X-Ute-Delivery-Id' => (string) $delivery->id,
-                'User-Agent' => 'UteParts-Webhook/1.0',
+                'User-Agent' => 'Bremspace-Webhook/1.0',
             ])->withBody($raw, 'application/json')->timeout(10)->post($endpoint->url);
         } catch (ConnectionException $e) {
             $delivery->update([
@@ -165,7 +165,7 @@ class SendWebhookJob implements ShouldQueue
             // Payload contoh dari tombol "Test Fire" admin UI
             return [
                 'test_fire' => true,
-                'pesan' => 'Payload contoh dari Ute Parts — endpoint terhubung dan siap menerima event.',
+                'pesan' => 'Payload contoh dari '.config('app.name', 'Bremspace').' — endpoint terhubung dan siap menerima event.',
                 'event' => $delivery->event,
                 'cabang_id' => null,
             ];

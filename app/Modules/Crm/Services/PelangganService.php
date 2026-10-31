@@ -153,8 +153,8 @@ class PelangganService
         $pemohon = $requestedBy ?? auth()->id() ?? ApprovalService::pemohon();
         if (! $pemohon) {
             $systemUser = User::first() ?? User::factory()->create([
-                'email' => 'system@uteparts.id',
-                'name' => 'System Ute Parts',
+                'email' => 'system@bremspace.id',
+                'name' => 'System Automated',
             ]);
             $pemohon = $systemUser->id;
         }

@@ -909,25 +909,25 @@
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Instagram URL</label>
                         <input type="text" wire:model.live="contactForm.social_links.instagram"
-                               placeholder="https://instagram.com/uteparts"
+                               placeholder="https://instagram.com/bremspace"
                                class="w-full px-3.5 py-2 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">TikTok URL</label>
                         <input type="text" wire:model.live="contactForm.social_links.tiktok"
-                               placeholder="https://tiktok.com/@uteparts"
+                               placeholder="https://tiktok.com/@bremspace"
                                class="w-full px-3.5 py-2 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Shopee Store URL</label>
                         <input type="text" wire:model.live="contactForm.social_links.shopee"
-                               placeholder="https://shopee.co.id/uteparts"
+                               placeholder="https://shopee.co.id/bremspace"
                                class="w-full px-3.5 py-2 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Tokopedia Store URL</label>
                         <input type="text" wire:model.live="contactForm.social_links.tokopedia"
-                               placeholder="https://tokopedia.com/uteparts"
+                               placeholder="https://tokopedia.com/bremspace"
                                class="w-full px-3.5 py-2 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
                     </div>
                 </div>
@@ -1157,7 +1157,7 @@
                 <div class="bg-white/90 dark:bg-[#0F172A]/90 backdrop-blur border-b border-slate-200 dark:border-white/10 px-4 py-3 flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <img src="{{ $brandingForm['store_logo_url'] }}" alt="Logo" class="w-6 h-6 object-contain">
-                        <span class="font-bold text-xs text-ink-900 dark:text-white">Ute Parts</span>
+                        <span class="font-bold text-xs text-ink-900 dark:text-white">{{ config('app.name', 'Bremspace') }}</span>
                     </div>
                     <div class="text-[10px] text-up-mint font-semibold px-2 py-0.5 rounded-full bg-up-mint/10">
                         Official Store

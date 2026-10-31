@@ -545,7 +545,7 @@
                         @elseif($o->status === 'selesai')
                             <div class="p-3 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-xs text-ink-700 dark:text-emerald-200 flex items-center gap-2">
                                 <span class="text-up-mint font-bold">✓</span>
-                                <span>Pesanan Selesai. Terima kasih telah berbelanja di Ute Parts!</span>
+                                <span>Pesanan Selesai. Terima kasih telah berbelanja di toko kami!</span>
                             </div>
                         @elseif($o->status === 'batal')
                             <div class="p-3 rounded-2xl bg-up-red/10 border border-up-red/20 text-xs text-up-red flex items-center gap-2">
@@ -635,7 +635,7 @@
                             <p class="text-sm font-bold text-ink-900 dark:text-white">Pembayaran Online Belum Tersedia</p>
                             <p class="text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
                                 Layanan pembayaran online sedang tidak aktif. Pesanan Anda tetap tersimpan —
-                                selesaikan pembayaran saat ambil barang atau lewat instruksi resmi WhatsApp Ute Parts.
+                                selesaikan pembayaran saat ambil barang atau lewat instruksi resmi WhatsApp toko.
                             </p>
                             <button
                                 type="button"

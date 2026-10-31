@@ -83,7 +83,7 @@
                         <input
                             type="text"
                             wire:model="voidSupervisorAuth"
-                            placeholder="admin@uteparts.id"
+                            placeholder="admin@bremspace.id"
                             class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white border border-ink-200/80 dark:border-white/10"
                         />
                         @error('voidSupervisorAuth') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror

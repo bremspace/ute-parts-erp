@@ -252,7 +252,7 @@
         <!-- Header -->
         <div class="header">
             <div>
-                <div class="brand-title">{{ $grn->gudang?->cabang?->nama ?? $po?->gudangTujuan?->cabang?->nama ?? ($printHeader['nama_toko'] ?? 'UTE PARTS') }}</div>
+                <div class="brand-title">{{ $grn->gudang?->cabang?->nama ?? $po?->gudangTujuan?->cabang?->nama ?? ($printHeader['nama_toko'] ?? config('app.name', 'BREMSPACE')) }}</div>
                 <p class="brand-subtitle">
                     {{ $printHeader['slogan'] ?? 'Gudang Logistik & Penerimaan Barang' }}<br>
                     {{ $grn->gudang?->cabang?->alamat ?? ($printHeader['alamat'] ?? 'Kantor Cabang & Gudang Logistik') }}<br>

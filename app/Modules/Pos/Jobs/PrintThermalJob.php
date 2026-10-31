@@ -58,7 +58,7 @@ class PrintThermalJob implements ShouldQueue
 
         $strukConfig = app(KonfigurasiService::class)->getStrukConfig();
         $headerLines = array_values(array_filter([
-            $strukConfig['nama_toko'] ?? ($transaksi->cabang?->nama ?? 'UTE PARTS'),
+            $strukConfig['nama_toko'] ?? ($transaksi->cabang?->nama ?? config('app.name', 'BREMSPACE')),
             $strukConfig['slogan'] ?? null,
             $strukConfig['alamat'] ?? null,
             ! empty($strukConfig['telepon']) ? 'Telp: '.$strukConfig['telepon'] : null,
@@ -70,7 +70,7 @@ class PrintThermalJob implements ShouldQueue
         ]));
 
         $data = [
-            'headerLines' => ! empty($headerLines) ? $headerLines : [$transaksi->cabang?->nama ?? 'UTE PARTS'],
+            'headerLines' => ! empty($headerLines) ? $headerLines : [$transaksi->cabang?->nama ?? config('app.name', 'BREMSPACE')],
             'items' => $items,
             'total' => (float) $transaksi->total_akhir,
             'bayar' => (float) $transaksi->jumlah_bayar,

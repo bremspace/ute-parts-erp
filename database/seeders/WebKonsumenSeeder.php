@@ -215,7 +215,7 @@ class WebKonsumenSeeder extends Seeder
             [
                 'group_key' => 'contact',
                 'setting_key' => 'wa_default_msg',
-                'setting_value' => 'Halo Admin Ute Parts, saya ingin tanya sparepart...',
+                'setting_value' => 'Halo Admin Bremspace, saya ingin tanya sparepart...',
                 'value_type' => 'string',
                 'deskripsi' => 'Template pesan awal saat klik WhatsApp',
             ],
@@ -230,10 +230,10 @@ class WebKonsumenSeeder extends Seeder
                 'group_key' => 'contact',
                 'setting_key' => 'social_links',
                 'setting_value' => json_encode([
-                    'instagram' => 'https://instagram.com/uteparts',
-                    'tiktok' => 'https://tiktok.com/@uteparts',
-                    'shopee' => 'https://shopee.co.id/uteparts',
-                    'tokopedia' => 'https://tokopedia.com/uteparts',
+                    'instagram' => 'https://instagram.com/bremspace',
+                    'tiktok' => 'https://tiktok.com/@bremspace',
+                    'shopee' => 'https://shopee.co.id/bremspace',
+                    'tokopedia' => 'https://tokopedia.com/bremspace',
                 ]),
                 'value_type' => 'json',
                 'deskripsi' => 'Tautan akun media sosial resmi',
@@ -273,7 +273,7 @@ class WebKonsumenSeeder extends Seeder
         // Contoh default banner promo
         if (WebBanner::count() === 0) {
             WebBanner::create([
-                'judul' => 'Promo Spesial Teknisi & Mitra Ute Parts',
+                'judul' => 'Promo Spesial Teknisi & Mitra Toko',
                 'badge_label' => 'PROMO SPESIAL',
                 'gambar_desktop' => '/images/banner-hero-sample.jpg',
                 'target_url' => '/shop',

@@ -148,7 +148,7 @@
                 <!-- Dropdown Sumber Platform -->
                 <select wire:model.live="sumberFilter" class="w-full sm:w-auto px-3 py-1.5 rounded-xl bg-ink-50 dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-bold text-ink-900 dark:text-white outline-none cursor-pointer">
                     <option value="semua">Semua Platform (Web &amp; Omni)</option>
-                    <option value="marketplace">🌐 Web Ute Parts Store</option>
+                    <option value="marketplace">🌐 Web Store</option>
                     <option value="shopee">🧡 Shopee</option>
                     <option value="tokopedia">💚 Tokopedia</option>
                     <option value="omni_lain">📦 Omnichannel Lainnya</option>

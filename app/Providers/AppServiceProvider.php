@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
@@ -33,6 +34,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Dynamic Brand / App Name dari Konfigurasi Toko (White-Label)
+        try {
+            $brandName = app(KonfigurasiService::class)->get('app_brand_name');
+            if ($brandName) {
+                config(['app.name' => $brandName]);
+            }
+        } catch (\Throwable) {
+            // Abaikan jika DB belum dimigrasi
+        }
+
         // Super-admin & Owner implicitly grant all permissions (Spatie recommended practice)
         Gate::before(function ($user, $ability) {
             return method_exists($user, 'hasRole') && ($user->hasRole('super-admin') || $user->hasRole('owner')) ? true : null;

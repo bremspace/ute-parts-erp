@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masuk Pelanggan — Ute Parts</title>
+    <title>Masuk Pelanggan — {{ config('app.name', 'Bremspace') }}</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -15,7 +15,7 @@
     $overlayMode = $webConfig['customer_login_bg_overlay'] ?? 'scrim_dark';
     $waNumber = $webConfig['wa_number'] ?? '6281234567890';
     $waNumberClean = preg_replace('/[^0-9]/', '', $waNumber);
-    $waMsg = urlencode("Halo Admin Ute Parts, saya lupa kata sandi akun pelanggan saya. Mohon bantuan reset kata sandi.");
+    $waMsg = urlencode("Halo Admin " . config('app.name', 'Bremspace') . ", saya lupa kata sandi akun pelanggan saya. Mohon bantuan reset kata sandi.");
 @endphp
 <body class="bg-[#0B0F19] text-ink-900 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
     <!-- Dynamic Custom Background Foto & Scrim Overlay -->

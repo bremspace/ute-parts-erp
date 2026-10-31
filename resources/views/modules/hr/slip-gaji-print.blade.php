@@ -10,7 +10,7 @@
     $showKomisiDetail = (bool) ($slipConfig['show_komisi_detail'] ?? true);
     $showPotongan = (bool) ($slipConfig['show_potongan'] ?? true);
     $showTtd = (bool) ($slipConfig['show_ttd'] ?? true);
-    $catatanKaki = $slipConfig['catatan_kaki'] ?? 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP Ute Parts.';
+    $catatanKaki = $slipConfig['catatan_kaki'] ?? 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP.';
 
     $isThermal = $paperSize === '80mm';
     $rincian = is_string($slip->rincian ?? null) ? json_decode($slip->rincian, true) : ($slip->rincian ?? []);
@@ -246,7 +246,7 @@
     @if($showKop)
         <div class="header">
             <div>
-                <div class="brand-title">{{ $slip->karyawan?->cabang?->nama ?? ($printHeader['nama_toko'] ?? 'UTE PARTS') }}</div>
+                <div class="brand-title">{{ $slip->karyawan?->cabang?->nama ?? ($printHeader['nama_toko'] ?? config('app.name', 'BREMSPACE')) }}</div>
                 <p class="brand-subtitle">
                     {{ $printHeader['slogan'] ?? 'Pusat Sparepart & Servis Handphone' }}<br>
                     {{ $slip->karyawan?->cabang?->alamat ?? ($printHeader['alamat'] ?? 'Kantor Pusat') }}<br>
@@ -360,7 +360,7 @@
             </div>
             <div class="ttd-box">
                 <div>Bagian Keuangan / HRD</div>
-                <div class="ttd-line">{{ $printHeader['nama_toko'] ?? 'Manajemen UTE PARTS' }}</div>
+                <div class="ttd-line">{{ $printHeader['nama_toko'] ?? ('Manajemen ' . config('app.name', 'BREMSPACE')) }}</div>
             </div>
         </div>
     @endif

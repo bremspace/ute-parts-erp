@@ -75,7 +75,7 @@ class PaymentController extends Controller
                     'va_number' => null,
                     'qr_string' => $dynamicPayload,
                     'qr_image' => $qrDataUri,
-                    'merchant_name' => $qris->merchant_name ?: config('app.name', 'Ute Parts'),
+                    'merchant_name' => $qris->merchant_name ?: config('app.name', 'Bremspace'),
                     'expiry' => now()->addMinutes(60)->format('Y-m-d H:i:s'),
                     'sandbox' => false,
                     'is_qris_toko' => true,

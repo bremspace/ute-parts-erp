@@ -423,6 +423,16 @@ class DatabaseManagementService
 
                 // Bersihkan user tambahan selain akun resmi bawaan & reset 2FA
                 $defaultEmails = [
+                    'superadmin@bremspace.id',
+                    'super-admin@bremspace.id',
+                    'owner@bremspace.id',
+                    'admintoko@bremspace.id',
+                    'kasir@bremspace.id',
+                    'teknisi@bremspace.id',
+                    'gudang@bremspace.id',
+                    'finance@bremspace.id',
+                    'marketing@bremspace.id',
+                    'hr@bremspace.id',
                     'superadmin@uteparts.id',
                     'super-admin@uteparts.id',
                     'owner@uteparts.id',
@@ -472,7 +482,8 @@ class DatabaseManagementService
                     \Illuminate\Support\Facades\Log::error('Gagal set app_setup_completed di factory_reset: '.$e->getMessage());
                 }
 
-                $activeSuper = User::where('email', 'superadmin@uteparts.id')->first();
+                $activeSuper = User::where('email', 'superadmin@bremspace.id')->first()
+                    ?? User::where('email', 'superadmin@uteparts.id')->first();
                 if ($activeSuper) {
                     auth()->login($activeSuper);
                 }
@@ -482,7 +493,7 @@ class DatabaseManagementService
                 $label = 'Full Wipe (Pembersihan Total Database)';
                 $currentUser = auth()->user();
                 $savedId = $currentUser?->id;
-                $savedEmail = $currentUser?->email ?? 'superadmin@uteparts.id';
+                $savedEmail = $currentUser?->email ?? 'superadmin@bremspace.id';
                 $savedName = $currentUser?->name ?? 'Super Administrator';
                 $defaultPassword = 'Password123!';
 

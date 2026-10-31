@@ -166,7 +166,7 @@ class KonfigurasiService
 
     /**
      * [SSOT] Single Source of Truth ringkasan seluruh komponen potongan, komisi,
-     * dan beban biaya pengurang nilai harga produk di seluruh sistem Ute Parts.
+     * dan beban biaya pengurang nilai harga produk di seluruh sistem.
      */
     public function getRingkasanPotonganSistem(?string $kategori = null): array
     {
@@ -470,6 +470,16 @@ class KonfigurasiService
         return is_array($cfg) ? array_merge($default, $cfg) : $default;
     }
 
+    public function getBrandName(): string
+    {
+        return (string) ($this->get('app_brand_name') ?? $this->getStrukConfig()['nama_toko'] ?? config('app.name', 'BREMSPACE'));
+    }
+
+    public function getAppLogo(): ?string
+    {
+        return $this->get('app_logo');
+    }
+
     /**
      * Konfigurasi struk kasir / POS thermal print.
      * Default lebar 80mm, lengkap dengan header toko, QR code retur, dan garansi.
@@ -478,11 +488,12 @@ class KonfigurasiService
     {
         $default = [
             // Header Toko
-            'nama_toko' => 'UTE PARTS',
-            'slogan' => 'Pusat Sparepart & Servis HP',
+            'nama_toko' => 'BREMSPACE',
+            'slogan' => 'Pusat Sparepart & Servis Gadget',
             'alamat' => 'Jl. Veteran No. 12',
             'telepon' => '0812-3456-7890',
-            'website_medsos' => 'www.uteparts.id',
+            'website_medsos' => 'www.bremspace.com',
+            'logo_url' => $this->get('app_logo'),
 
             // Komponen Informasi
             'show_cabang' => true,
@@ -541,11 +552,11 @@ class KonfigurasiService
         $struk = $this->getStrukConfig();
 
         return [
-            'nama_toko' => $struk['nama_toko'] ?? 'UTE PARTS',
-            'slogan' => $struk['slogan'] ?? 'Pusat Sparepart & Servis HP',
+            'nama_toko' => $struk['nama_toko'] ?? 'BREMSPACE',
+            'slogan' => $struk['slogan'] ?? 'Pusat Sparepart & Servis Gadget',
             'alamat' => $struk['alamat'] ?? 'Jl. Veteran No. 12',
             'telepon' => $struk['telepon'] ?? '0812-3456-7890',
-            'website_medsos' => $struk['website_medsos'] ?? 'www.uteparts.id',
+            'website_medsos' => $struk['website_medsos'] ?? 'www.bremspace.com',
         ];
     }
 
@@ -563,7 +574,7 @@ class KonfigurasiService
             'show_komisi_detail' => true,
             'show_potongan' => true,
             'show_ttd' => true,
-            'catatan_kaki' => 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP Ute Parts.',
+            'catatan_kaki' => 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP.',
         ];
 
         $cfg = $this->get('slip_gaji_config');

@@ -283,7 +283,7 @@
                                             type="text"
                                             wire:model="diskonSupervisorAuth"
                                             autocomplete="username"
-                                            placeholder="superadmin@uteparts.id"
+                                            placeholder="superadmin@bremspace.id"
                                             class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs text-ink-900 dark:text-white border-ink-200/80 dark:border-white/15"
                                         />
                                     </div>

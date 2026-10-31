@@ -162,7 +162,7 @@ class ImportExportPage extends Component
     {
         return Excel::download(
             new ImportProdukTemplateExport,
-            'template_import_produk_uteparts_'.date('Ymd_His').'.xlsx'
+            'template_import_produk_'.date('Ymd_His').'.xlsx'
         );
     }
 

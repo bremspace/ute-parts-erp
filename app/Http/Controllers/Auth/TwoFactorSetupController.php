@@ -37,7 +37,7 @@ class TwoFactorSetupController extends Controller
         }
 
         $secret = $user->two_factor_secret;
-        $otpauthUrl = $google2fa->getQRCodeUrl('Ute Parts', $user->email, $secret);
+        $otpauthUrl = $google2fa->getQRCodeUrl(config('app.name', 'Bremspace'), $user->email, $secret);
 
         // Plaintext backup codes hanya sekali (pull = get + forget)
         $backupCodes = $request->session()->pull('two_factor_backup_codes');

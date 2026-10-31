@@ -1,7 +1,7 @@
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 /**
- * Ute Parts - Barcode Scanner Engine
+ * Barcode Scanner Engine
  * Mendukung:
  * 1. Hardware Barcode Scanner (USB, Bluetooth, Wireless Dongle via Keyboard Wedge)
  * 2. Web Mobile / Kamera HP Live Stream Scanner via Html5Qrcode

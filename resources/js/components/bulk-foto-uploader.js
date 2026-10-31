@@ -1,4 +1,4 @@
-// Ute Parts - Bulk Product Image Import Alpine Component
+// Bulk Product Image Import Alpine Component
 // Handles client-side pre-flight sorting, mobile-friendly multi-file pickers, fflate selective extraction, and chunk upload.
 
 export function getBulkFotoUploader(wire) {

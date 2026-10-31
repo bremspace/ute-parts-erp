@@ -34,7 +34,7 @@ class OmnichannelCommandCenter extends Component
 
     public string $qcCatatan = '';
 
-    public string $bandingAlasan = 'Barang yang dikembalikan bukan produk dari toko Ute Parts / Segel rusak / Unit ditukar pembeli';
+    public string $bandingAlasan = 'Barang yang dikembalikan bukan produk resmi toko / Segel rusak / Unit ditukar pembeli';
 
     public array $connectForm = [
         'nama' => '', 'platform' => 'shopee',
@@ -369,7 +369,7 @@ class OmnichannelCommandCenter extends Component
     public function bukaBandingModal(int $channelOrderId): void
     {
         $this->selectedChannelOrderId = $channelOrderId;
-        $this->bandingAlasan = 'Barang yang dikembalikan bukan produk dari toko Ute Parts / Segel rusak / Unit ditukar pembeli';
+        $this->bandingAlasan = 'Barang yang dikembalikan bukan produk resmi toko / Segel rusak / Unit ditukar pembeli';
         $this->showBandingModal = true;
     }
 

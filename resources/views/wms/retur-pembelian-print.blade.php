@@ -275,7 +275,7 @@
         @if($showKop)
             <div class="header">
                 <div>
-                    <h1 class="brand-title">{{ $printHeader['nama_toko'] ?? config('app.name', 'UTE PARTS') }}</h1>
+                    <h1 class="brand-title">{{ $printHeader['nama_toko'] ?? config('app.name', 'BREMSPACE') }}</h1>
                     <p class="brand-subtitle">
                         {{ $printHeader['alamat'] ?? 'Pusat Sparepart & Layanan Gadget Terpercaya' }}<br>
                         Telp: {{ $printHeader['telepon'] ?? '-' }}

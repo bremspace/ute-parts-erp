@@ -81,7 +81,7 @@
                             <label class="p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $importFormat === 'standar' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
                                 <input type="radio" wire:model.live="importFormat" value="standar" class="mt-0.5 text-up-primary">
                                 <div class="space-y-0.5">
-                                    <div class="font-bold text-xs text-ink-900 dark:text-white">Format Standar Ute Parts</div>
+                                    <div class="font-bold text-xs text-ink-900 dark:text-white">Format Standar Excel</div>
                                     <div class="text-[10px] text-ink-400 leading-relaxed">Template resmi dengan multi-tier harga, tipe HP, multi-satuan, lokasi rak &amp; gudang.</div>
                                 </div>
                             </label>
@@ -1833,7 +1833,7 @@
                         <span>Struktur Kolom Wajib Template</span>
                     </h3>
                     <p class="text-xs text-ink-400">
-                        Format kolom yang diterima oleh sistem parser WMS Ute Parts:
+                        Format kolom yang diterima oleh sistem parser WMS:
                     </p>
                 </div>
 
