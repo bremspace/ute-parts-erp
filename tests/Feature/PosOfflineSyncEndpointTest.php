@@ -8,6 +8,7 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StokItem;
+use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -30,6 +31,7 @@ class PosOfflineSyncEndpointTest extends TestCase
         parent::setUp();
 
         $this->seed(RolesAndPermissionsSeeder::class);
+        $this->seed(AkunCoaSeeder::class);
 
         $this->cabang = Cabang::create([
             'nama' => 'Cabang Sync Test',

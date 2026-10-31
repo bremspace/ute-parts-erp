@@ -303,14 +303,14 @@ class PosOfflineSyncService
             // 9. Posting Jurnal Double-Entry di Server (PRD §4.6 & PRD-OFFLINE §6.1)
             $barisJurnal = [
                 [
-                    'kode_akun' => '1-10001', // Kas Kasir
-                    'nama_akun' => 'Kas Kasir',
+                    'akun_kode' => '110-01', // Kas
+                    'nama_akun' => 'Kas',
                     'debit' => (float) $clientTotalNominal,
                     'kredit' => 0.0,
                     'keterangan' => "Penerimaan Kas POS Offline {$transaksi->no_transaksi}",
                 ],
                 [
-                    'kode_akun' => '4-10001', // Pendapatan Penjualan
+                    'akun_kode' => '410-01', // Pendapatan Penjualan
                     'nama_akun' => 'Pendapatan Penjualan',
                     'debit' => 0.0,
                     'kredit' => (float) $clientTotalNominal,
@@ -320,14 +320,14 @@ class PosOfflineSyncService
 
             if ($totalHpp > 0) {
                 $barisJurnal[] = [
-                    'kode_akun' => '5-10001', // HPP
+                    'akun_kode' => '510-02', // HPP
                     'nama_akun' => 'Harga Pokok Penjualan',
                     'debit' => (float) $totalHpp,
                     'kredit' => 0.0,
                     'keterangan' => "HPP POS Offline {$transaksi->no_transaksi}",
                 ];
                 $barisJurnal[] = [
-                    'kode_akun' => '1-10301', // Persediaan
+                    'akun_kode' => '130-01', // Persediaan
                     'nama_akun' => 'Persediaan Barang Dagang',
                     'debit' => 0.0,
                     'kredit' => (float) $totalHpp,
@@ -341,11 +341,15 @@ class PosOfflineSyncService
             }
 
             try {
+                $noJurnal = $this->jurnalService->generateNoJurnal('pos', $cabangId);
                 $this->jurnalService->post(
-                    cabangId: $cabangId,
+                    noJurnal: $noJurnal,
                     tanggal: $clientCreatedAt->toDateString(),
-                    keterangan: "Jurnal Transaksi POS Offline {$transaksi->no_transaksi}",
-                    baris: $barisJurnal,
+                    sumber: 'pos',
+                    lines: $barisJurnal,
+                    deskripsi: "Jurnal Transaksi POS Offline {$transaksi->no_transaksi}",
+                    cabangId: $cabangId,
+                    userId: $transaksi->kasir_id,
                     referensiTipe: Transaksi::class,
                     referensiId: $transaksi->id
                 );

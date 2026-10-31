@@ -191,6 +191,17 @@
                                 Detail 360°
                             </button>
 
+                            @can('lihat-audit-log')
+                            <button
+                                type="button"
+                                wire:click="bukaRiwayat('pelanggan', {{ $c->id }})"
+                                class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-95"
+                                title="Lihat Audit Trail Pelanggan"
+                            >
+                                Riwayat
+                            </button>
+                            @endcan
+
                             @can('crm.edit')
                             <button
                                 type="button"
@@ -286,6 +297,16 @@
                                 <span>🔍</span>
                                 <span>Detail 360°</span>
                             </button>
+                            @can('lihat-audit-log')
+                            <button
+                                type="button"
+                                wire:click="bukaRiwayat('pelanggan', {{ $c->id }})"
+                                class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-xs cursor-pointer active:scale-95 min-h-[40px] flex items-center justify-center"
+                                title="Lihat Audit Trail Pelanggan"
+                            >
+                                Riwayat
+                            </button>
+                            @endcan
                             @can('crm.edit')
                             <button
                                 type="button"
@@ -1559,4 +1580,7 @@
             </div>
         </div>
     @endif
+
+    {{-- [F1-4] Modal riwayat audit trail per pelanggan --}}
+    @include('partials.riwayat-modal')
 </div>

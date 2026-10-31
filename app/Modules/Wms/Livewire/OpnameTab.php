@@ -4,6 +4,7 @@ namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
+use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
@@ -24,6 +25,8 @@ use Livewire\Component;
  */
 class OpnameTab extends Component
 {
+    use PunyaRiwayatAktivitas;
+
     public ?int $filterGudangId = null;
 
     // New Opname Modal state

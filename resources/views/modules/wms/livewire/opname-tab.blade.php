@@ -29,6 +29,15 @@
                                 >
                                     Detail
                                 </button>
+                                @can('lihat-audit-log')
+                                    <button
+                                        type="button"
+                                        wire:click="bukaRiwayat('opname', {{ $opn->id }})"
+                                        class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer"
+                                    >
+                                        Riwayat
+                                    </button>
+                                @endcan
                                 @if($opn->status === 'menunggu_approval')
                                     @can('wms.approve-opname')
                                         @if($opn->user_id !== auth()->id() || isSuperAdminOrOwner())
@@ -708,4 +717,7 @@
             </div>
         </div>
     @endif
+
+    {{-- [F1-4] Modal riwayat audit trail per opname --}}
+    @include('partials.riwayat-modal')
 </div>

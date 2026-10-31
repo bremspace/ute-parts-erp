@@ -69,7 +69,9 @@ class RiwayatAktivitas extends Component
         'opname' => StokOpname::class,
         'transfer' => StokTransfer::class,
         'retur_penjualan' => ReturnPenjualan::class,
+        'return_penjualan' => ReturnPenjualan::class,
         'retur_pembelian' => ReturnPembelian::class,
+        'return_pembelian' => ReturnPembelian::class,
         'user' => User::class,
         'cabang' => Cabang::class,
         // Master data katalog — CRUD-nya sudah dilog `CatatAktivitas`, tapi tanpa
@@ -218,8 +220,8 @@ class RiwayatAktivitas extends Component
             'supplier' => $model->nama,
             'opname' => $model->no_opname,
             'transfer' => $model->no_transfer,
-            'retur_penjualan' => $model->no_return ?? '#'.$model->id,
-            'retur_pembelian' => $model->no_return ?? '#'.$model->id,
+            'retur_penjualan', 'return_penjualan' => $model->no_return ?? '#'.$model->id,
+            'retur_pembelian', 'return_pembelian' => $model->no_return ?? '#'.$model->id,
             'user' => $model->name.' ('.$model->email.')',
             'cabang' => $model->nama.' ('.$model->kode.')',
             'kategori' => $model->nama,
@@ -636,7 +638,67 @@ class RiwayatAktivitas extends Component
         }
 
         if (is_array($value)) {
-            return implode(', ', array_map(fn ($k, $v) => is_numeric($k) ? (string) $v : self::labelKolom((string) $k).': '.$v, array_keys($value), array_values($value)));
+            if (empty($value)) {
+                return '—';
+            }
+
+            // Cek apakah seluruh elemen adalah skalar
+            $isAssoc = ! array_is_list($value);
+            $allScalar = true;
+            foreach ($value as $v) {
+                if (is_array($v) || is_object($v)) {
+                    $allScalar = false;
+                    break;
+                }
+            }
+
+            if ($allScalar) {
+                if ($isAssoc) {
+                    return implode(', ', array_map(
+                        fn ($k, $v) => self::labelKolom((string) $k).': '.(is_bool($v) ? ($v ? 'Ya' : 'Tidak') : (string) $v),
+                        array_keys($value),
+                        array_values($value)
+                    ));
+                }
+
+                return implode(', ', array_map(fn ($v) => is_bool($v) ? ($v ? 'Ya' : 'Tidak') : (string) $v, $value));
+            }
+
+            // Jika array of arrays / multi-dimensi (seperti item retur, tukar_items_payload, dll)
+            if (array_is_list($value)) {
+                $count = count($value);
+                $samples = [];
+                foreach (array_slice($value, 0, 3) as $item) {
+                    if (is_array($item)) {
+                        $label = $item['nama_produk'] ?? $item['nama'] ?? $item['sku'] ?? $item['keterangan'] ?? null;
+                        $qty = $item['qty'] ?? $item['jumlah'] ?? null;
+                        if ($label) {
+                            $samples[] = $qty ? "{$label} (x{$qty})" : (string) $label;
+                        }
+                    }
+                }
+                if (! empty($samples)) {
+                    $suffix = $count > count($samples) ? ' (+'.($count - count($samples)).' lainnya)' : '';
+
+                    return implode(', ', $samples).$suffix;
+                }
+
+                return "{$count} data tercatat";
+            }
+
+            // Objek / asosiatif bertingkat
+            return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
+        if (is_object($value)) {
+            if ($value instanceof \DateTimeInterface) {
+                return $value->format('d/m/Y H:i');
+            }
+            if (method_exists($value, '__toString')) {
+                return (string) $value;
+            }
+
+            return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
         return (string) $value;

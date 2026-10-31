@@ -10,6 +10,7 @@ use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ParsesNominal;
@@ -24,6 +25,7 @@ use Livewire\WithPagination;
 class CrmDashboard extends Component
 {
     use ParsesNominal;
+    use PunyaRiwayatAktivitas;
     use WithPagination;
 
     public string $search = '';

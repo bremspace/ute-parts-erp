@@ -9,6 +9,7 @@ use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Models\ReturnPembelian;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -118,5 +119,83 @@ class AuditFase3FixTest extends TestCase
         // Cek bahwa view me-render partial riwayat-modal
         $bladeContent = file_get_contents(resource_path('views/modules/pos/livewire/retur-penjualan-index.blade.php'));
         $this->assertStringContainsString("@include('partials.riwayat-modal')", $bladeContent);
+    }
+
+    public function test_t13_audit_trail_retur_dengan_nested_array_tidak_error_array_to_string(): void
+    {
+        session(['cabang_id' => $this->cabang->id]);
+
+        $retur = ReturnPenjualan::create([
+            'no_return' => 'RET-NESTED-001',
+            'cabang_id' => $this->cabang->id,
+            'user_id' => $this->user->id,
+            'tanggal' => now()->toDateString(),
+            'status' => 'selesai',
+            'jumlah' => 150000,
+            'tipe_penyelesaian' => 'tukar_produk',
+            'metode_pengembalian' => 'tunai',
+            'alasan' => 'Tukar warna',
+            'tukar_items_payload' => [
+                ['produk_id' => 1, 'nama_produk' => 'LCD iPhone 14', 'qty' => 1, 'harga_satuan' => 150000],
+            ],
+            'foto_bukti' => [
+                'bukti_1.jpg',
+                'bukti_2.jpg',
+            ],
+        ]);
+
+        // Simulasikan rendering audit trail
+        $component = Livewire::actingAs($this->user)
+            ->test(RiwayatAktivitas::class, [
+                'tipe' => 'retur_penjualan',
+                'entityId' => $retur->id,
+            ]);
+
+        $component->assertStatus(200);
+        $this->assertStringContainsString('RET-NESTED-001', $component->html());
+
+        // Verifikasi formatNilai aman untuk berbagai bentuk array
+        $formatted = RiwayatAktivitas::formatNilai($retur->tukar_items_payload, 'tukar_items_payload');
+        $this->assertStringContainsString('LCD iPhone 14', $formatted);
+
+        $formattedFotos = RiwayatAktivitas::formatNilai($retur->foto_bukti, 'foto_bukti');
+        $this->assertEquals('bukti_1.jpg, bukti_2.jpg', $formattedFotos);
+    }
+
+    public function test_t14_audit_trail_retur_pembelian_supplier_dapat_diakses(): void
+    {
+        session(['cabang_id' => $this->cabang->id]);
+
+        $returPembelian = ReturnPembelian::create([
+            'no_return' => 'RET-SUPP-001',
+            'cabang_id' => $this->cabang->id,
+            'user_id' => $this->user->id,
+            'tanggal' => now()->toDateString(),
+            'status' => 'selesai',
+            'jumlah' => 200000,
+            'alasan' => 'Part cacat pabrik',
+            'unit_pengganti_detail' => [
+                ['nama_part' => 'Baterai Original', 'qty' => 2],
+            ],
+        ]);
+
+        $component = Livewire::actingAs($this->user)
+            ->test(RiwayatAktivitas::class, [
+                'tipe' => 'retur_pembelian',
+                'entityId' => $returPembelian->id,
+            ]);
+
+        $component->assertStatus(200);
+        $this->assertStringContainsString('RET-SUPP-001', $component->html());
+
+        // Tes alias return_pembelian
+        $componentAlias = Livewire::actingAs($this->user)
+            ->test(RiwayatAktivitas::class, [
+                'tipe' => 'return_pembelian',
+                'entityId' => $returPembelian->id,
+            ]);
+
+        $componentAlias->assertStatus(200);
+        $this->assertStringContainsString('RET-SUPP-001', $componentAlias->html());
     }
 }

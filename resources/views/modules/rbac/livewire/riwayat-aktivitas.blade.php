@@ -84,10 +84,13 @@
                 @php
                     $isTrx = $baris->is_transaksi;
                     $itemsList = $baris->items_list;
-                    $changes = $baris->attribute_changes ?? collect();
+                    $rawChanges = $baris->attribute_changes;
+                    $changes = is_object($rawChanges) && method_exists($rawChanges, 'get')
+                        ? $rawChanges
+                        : collect(is_array($rawChanges) ? $rawChanges : (is_string($rawChanges) ? (json_decode($rawChanges, true) ?: []) : []));
                     $sesudah = $changes->get('attributes') ?? [];
                     $sebelum = $changes->get('old') ?? [];
-                    $lewati = ['id', 'created_at', 'updated_at'];
+                    $lewati = ['id', 'created_at', 'updated_at', 'password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
 
                     $kunciSemua = array_values(array_unique(array_merge(array_keys($sesudah), array_keys($sebelum))));
                     $kunciSemua = array_values(array_filter($kunciSemua, fn ($k) => ! in_array($k, $lewati, true)));
@@ -115,7 +118,7 @@
                             $badgeColor = match($baris->event) {
                                 'penjualan' => 'bg-up-mint/15 text-up-mint border border-up-mint/30',
                                 'void' => 'bg-up-red/15 text-up-red border border-up-red/30',
-                                'retur_penjualan', 'retur_pembelian' => 'bg-up-accent/15 text-up-accent border border-up-accent/30',
+                                'retur_penjualan', 'return_penjualan', 'retur_pembelian', 'return_pembelian' => 'bg-up-accent/15 text-up-accent border border-up-accent/30',
                                 'po', 'po_dibuat' => 'bg-blue-500/15 text-blue-400 border border-blue-500/30',
                                 'grn', 'grn_diterima' => 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30',
                                 'transfer_stok' => 'bg-purple-500/15 text-purple-400 border border-purple-500/30',

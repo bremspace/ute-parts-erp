@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Rbac\Services\TransactionActivityLogService;
+use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
@@ -21,6 +22,8 @@ use Livewire\Component;
  */
 class TransferTab extends Component
 {
+    use PunyaRiwayatAktivitas;
+
     /** [B-15c] Pengaman jumlah gudang per cabang (normally < 10). */
     public const GUDANG_DROPDOWN_LIMIT = 100;
 

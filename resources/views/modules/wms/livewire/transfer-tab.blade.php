@@ -34,6 +34,15 @@
                                 >
                                     Detail
                                 </button>
+                                @can('lihat-audit-log')
+                                    <button
+                                        type="button"
+                                        wire:click="bukaRiwayat('transfer', {{ $trf->id }})"
+                                        class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer"
+                                    >
+                                        Riwayat
+                                    </button>
+                                @endcan
                                 @if($trf->status === 'draft')
                                     <button
                                         wire:click="kirimTransfer({{ $trf->id }})"
@@ -479,4 +488,7 @@
             </div>
         </div>
     @endif
+
+    {{-- [F1-4] Modal riwayat audit trail per transfer --}}
+    @include('partials.riwayat-modal')
 </div>

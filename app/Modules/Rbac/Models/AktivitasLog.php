@@ -29,10 +29,10 @@ class AktivitasLog extends Activity
             'restored' => 'Dipulihkan',
             'penjualan' => 'Penjualan Kasir',
             'void' => 'Void / Batal',
-            'retur_penjualan' => 'Retur Konsumen',
+            'retur_penjualan', 'return_penjualan' => 'Retur Konsumen',
             'po', 'po_dibuat' => 'Pesanan PO',
             'grn', 'grn_diterima' => 'Penerimaan GRN',
-            'retur_pembelian' => 'Retur Supplier',
+            'retur_pembelian', 'return_pembelian' => 'Retur Supplier',
             'transfer_stok' => 'Transfer Stok',
             'stok_opname' => 'Stok Opname',
             'servis' => 'Tiket Servis',
@@ -67,7 +67,7 @@ class AktivitasLog extends Activity
             return true;
         }
 
-        return in_array($this->event, ['penjualan', 'void', 'retur_penjualan', 'po', 'grn', 'retur_pembelian', 'transfer_stok', 'stok_opname', 'servis'], true);
+        return in_array($this->event, ['penjualan', 'void', 'retur_penjualan', 'return_penjualan', 'po', 'grn', 'retur_pembelian', 'return_pembelian', 'transfer_stok', 'stok_opname', 'servis'], true);
     }
 
     /** Label tipe transaksi yang ramah awam */
@@ -79,10 +79,10 @@ class AktivitasLog extends Activity
         return match ($tipe) {
             'penjualan' => 'Penjualan Kasir POS',
             'void' => 'Void Transaksi (Batal)',
-            'retur_penjualan' => 'Retur Penjualan Konsumen',
+            'retur_penjualan', 'return_penjualan' => 'Retur Penjualan Konsumen',
             'po', 'po_dibuat' => 'Purchase Order (PO)',
             'grn', 'grn_diterima' => 'Penerimaan Barang (GRN)',
-            'retur_pembelian' => 'Retur Barang ke Supplier',
+            'retur_pembelian', 'return_pembelian' => 'Retur Barang ke Supplier',
             'transfer_stok' => 'Transfer Stok Antar Gudang',
             'stok_opname' => 'Penyesuaian Stok Opname',
             'servis' => 'Aktivitas Tiket Servis',

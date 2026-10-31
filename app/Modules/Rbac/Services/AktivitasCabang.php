@@ -5,6 +5,7 @@ namespace App\Modules\Rbac\Services;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 /**
  * [F1-4] Resolver cabang_id utk audit trail (activity_log).
@@ -22,15 +23,24 @@ class AktivitasCabang
 
         $attributes = $model->getAttributes();
 
-        if (array_key_exists('cabang_id', $attributes)) {
-            return $attributes['cabang_id'] === null ? null : (int) $attributes['cabang_id'];
+        if (! empty($attributes['cabang_id'])) {
+            return (int) $attributes['cabang_id'];
         }
 
         foreach (['gudang_id', 'gudang_tujuan_id', 'gudang_asal_id'] as $kolom) {
             if (! empty($attributes[$kolom])) {
                 $cabangId = Gudang::query()->whereKey($attributes[$kolom])->value('cabang_id');
 
-                return $cabangId === null ? null : (int) $cabangId;
+                if ($cabangId !== null) {
+                    return (int) $cabangId;
+                }
+            }
+        }
+
+        if (! empty($attributes['transaksi_id'])) {
+            $cabangId = DB::table('transaksi')->where('id', $attributes['transaksi_id'])->value('cabang_id');
+            if ($cabangId !== null) {
+                return (int) $cabangId;
             }
         }
 
