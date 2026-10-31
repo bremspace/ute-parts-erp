@@ -5,13 +5,8 @@ namespace App\Modules\Rbac\Services;
 use App\Models\User;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Rbac\Models\Cabang;
-use Database\Seeders\AdminUserSeeder;
-use Database\Seeders\AkunCoaSeeder;
-use Database\Seeders\CabangSeeder;
-use Database\Seeders\JenisServisSeeder;
+use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\KategoriProdukSeeder;
-use Database\Seeders\KomisiSkemaSeeder;
-use Database\Seeders\MasterDataSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\RoleUserSeeder;
 use Database\Seeders\TierMembershipSeeder;
@@ -339,6 +334,8 @@ class DatabaseManagementService
             'notifications',
             'approval_requests',
             'webhook_delivery',
+            'supplier_saldo_mutasi',
+            'pelanggan_poin_log',
             'activity_log',
             'audit_logs',
         ];
@@ -347,6 +344,7 @@ class DatabaseManagementService
             'stok_items',
             'stok_item',
             'sku_variants',
+            'produk_barcodes',
             'produk',
             'produk_satuan_konversi',
             'kompatibilitas_antar_produk',
@@ -382,6 +380,7 @@ class DatabaseManagementService
             'rak',
             'gudang',
             'user_cabang',
+            'qris_cabang',
             'cabang',
             'user_preferences',
             'device_sessions',
@@ -442,18 +441,9 @@ class DatabaseManagementService
                     'two_factor_backup_codes' => null,
                 ]);
 
-                // Jalankan seeder default pabrik
+                // Jalankan seeder default pabrik (DatabaseSeeder standar zero dummy)
                 $seeders = [
-                    RolesAndPermissionsSeeder::class,
-                    CabangSeeder::class,
-                    MasterDataSeeder::class,
-                    TierMembershipSeeder::class,
-                    KategoriProdukSeeder::class,
-                    AdminUserSeeder::class,
-                    RoleUserSeeder::class,
-                    AkunCoaSeeder::class,
-                    JenisServisSeeder::class,
-                    KomisiSkemaSeeder::class,
+                    DatabaseSeeder::class,
                 ];
                 foreach ($seeders as $seederClass) {
                     try {
@@ -584,6 +574,7 @@ class DatabaseManagementService
         return [
             'success' => true,
             'mode' => $mode,
+            'label' => $label,
             'mode_label' => $label,
             'cleared_tables' => $clearedCount,
             'pre_reset_backup' => $preBackup['filename'],
