@@ -57,11 +57,25 @@ trait CatatAktivitas
     {
         $cabangId = AktivitasCabang::untuk($this);
 
-        if ($cabangId === null) {
-            return;
+        $props = collect($activity->properties);
+
+        if ($cabangId !== null) {
+            $props->put('cabang_id', $cabangId);
+            $activity->cabang_id = $cabangId;
         }
 
-        $activity->properties = collect($activity->properties)->put('cabang_id', $cabangId);
-        $activity->cabang_id = $cabangId;
+        if (app()->bound('request')) {
+            $req = request();
+            if ($req) {
+                if (! $props->has('ip')) {
+                    $props->put('ip', $req->ip());
+                }
+                if (! $props->has('user_agent')) {
+                    $props->put('user_agent', substr((string) $req->userAgent(), 0, 255));
+                }
+            }
+        }
+
+        $activity->properties = $props;
     }
 }

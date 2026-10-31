@@ -671,7 +671,7 @@ class RiwayatAktivitas extends Component
             'status_pembayaran' => 'Status Pembayaran',
             'status_garansi' => 'Status Garansi',
             'kondisi_barang' => 'Kondisi Barang',
-            'pelanggan_id' => 'Pelanggan',
+            'pelanggan_id' => 'ID Pelanggan',
             'cabang_id' => 'Cabang Toko',
             'user_id' => 'Pengguna (User)',
             'kasir_id' => 'Kasir',

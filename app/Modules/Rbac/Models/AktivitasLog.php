@@ -16,6 +16,40 @@ use Spatie\Activitylog\Models\Activity;
  */
 class AktivitasLog extends Activity
 {
+    public static bool $allowDelete = false;
+
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        static::creating(function (AktivitasLog $log) {
+            if (app()->bound('request')) {
+                $req = request();
+                if ($req) {
+                    $props = $log->properties;
+                    $arr = $props instanceof Enumerable ? $props->all() : (is_array($props) ? $props : []);
+                    if (empty($arr['ip'])) {
+                        $arr['ip'] = $req->ip();
+                    }
+                    if (empty($arr['user_agent'])) {
+                        $arr['user_agent'] = substr((string) $req->userAgent(), 0, 255);
+                    }
+                    $log->properties = collect($arr);
+                }
+            }
+        });
+
+        static::updating(function () {
+            throw new \DomainException('Audit log bersifat immutable dan tidak boleh dimodifikasi (ISO 27001 / ISO 9001).');
+        });
+
+        static::deleting(function () {
+            if (! static::$allowDelete && ! app()->runningInConsole()) {
+                throw new \DomainException('Audit log bersifat immutable dan tidak boleh dihapus dari aplikasi (ISO 27001 / ISO 9001).');
+            }
+        });
+    }
+
     /** Relasi ke Cabang */
     public function cabang(): BelongsTo
     {
@@ -33,6 +67,20 @@ class AktivitasLog extends Activity
         return $this->causer?->name ?? 'sistem';
     }
 
+    public function getIpAttribute(): ?string
+    {
+        $props = $this->normalized_properties;
+
+        return $props['ip'] ?? null;
+    }
+
+    public function getUserAgentAttribute(): ?string
+    {
+        $props = $this->normalized_properties;
+
+        return $props['user_agent'] ?? null;
+    }
+
     /** Label aksi Bahasa Indonesia (created → Dibuat, dst). */
     public function getAksiLabelAttribute(): string
     {
@@ -41,6 +89,10 @@ class AktivitasLog extends Activity
             'updated' => 'Diperbarui',
             'deleted' => 'Dihapus',
             'restored' => 'Dipulihkan',
+            'login' => 'Login Berhasil',
+            'login_failed' => 'Login Gagal',
+            'logout' => 'Logout',
+            'lockout' => 'Akun Terkunci',
             'penjualan' => 'Penjualan Kasir',
             'void' => 'Void / Batal',
             'retur_penjualan', 'return_penjualan' => 'Retur Konsumen',

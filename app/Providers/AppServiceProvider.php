@@ -12,7 +12,12 @@ use App\Modules\Workflow\Observers\PurchaseOrderObserver;
 use App\Modules\Workflow\Observers\ReturnPembelianObserver;
 use App\Modules\Workflow\Observers\ReturnPenjualanObserver;
 use App\Modules\Workflow\Observers\TransaksiObserver;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Lockout;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
@@ -111,5 +116,73 @@ class AppServiceProvider extends ServiceProvider
         } catch (\Throwable $e) {
             // Abaikan saat booting tanpa database/migrasi (mis. composer install/package:discover di CI)
         }
+
+        // [ISO-27001 / A.8.15] Security Event Audit Logging (Authentication & Session)
+        Event::listen(Login::class, function (Login $event) {
+            try {
+                activity('auth')
+                    ->performedOn($event->user)
+                    ->causedBy($event->user)
+                    ->event('login')
+                    ->withProperties([
+                        'guard' => $event->guard,
+                        'ip' => request()?->ip(),
+                        'user_agent' => substr((string) request()?->userAgent(), 0, 255),
+                    ])
+                    ->log('Login berhasil ke sistem (Guard: '.$event->guard.')');
+            } catch (\Throwable) {
+            }
+        });
+
+        Event::listen(Failed::class, function (Failed $event) {
+            try {
+                $target = $event->credentials['email']
+                    ?? $event->credentials['telepon']
+                    ?? $event->credentials['username']
+                    ?? 'unknown';
+
+                activity('auth')
+                    ->event('login_failed')
+                    ->withProperties([
+                        'target_kredensial' => $target,
+                        'guard' => $event->guard,
+                        'ip' => request()?->ip(),
+                        'user_agent' => substr((string) request()?->userAgent(), 0, 255),
+                    ])
+                    ->log("Percobaan login gagal untuk kredensial: {$target}");
+            } catch (\Throwable) {
+            }
+        });
+
+        Event::listen(Logout::class, function (Logout $event) {
+            try {
+                if ($event->user) {
+                    activity('auth')
+                        ->performedOn($event->user)
+                        ->causedBy($event->user)
+                        ->event('logout')
+                        ->withProperties([
+                            'guard' => $event->guard,
+                            'ip' => request()?->ip(),
+                            'user_agent' => substr((string) request()?->userAgent(), 0, 255),
+                        ])
+                        ->log('Logout dari sistem');
+                }
+            } catch (\Throwable) {
+            }
+        });
+
+        Event::listen(Lockout::class, function () {
+            try {
+                activity('auth')
+                    ->event('lockout')
+                    ->withProperties([
+                        'ip' => request()?->ip(),
+                        'user_agent' => substr((string) request()?->userAgent(), 0, 255),
+                    ])
+                    ->log('Aktivitas mencurigakan terdeteksi: Akun/IP terkunci sementara akibat melampaui limit login');
+            } catch (\Throwable) {
+            }
+        });
     }
 }

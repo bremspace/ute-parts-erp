@@ -29,7 +29,7 @@ class AuditLogExport implements FromCollection, ShouldAutoSize, WithHeadings, Wi
 
     public function title(): string
     {
-        return 'Audit & Aktivitas Log';
+        return 'Audit Trail ISO 27001';
     }
 
     public function collection(): Collection
@@ -42,14 +42,16 @@ class AuditLogExport implements FromCollection, ShouldAutoSize, WithHeadings, Wi
         return [
             'No',
             'Waktu Kejadian (WIB)',
-            'Cabang',
+            'IP Address & Perangkat',
+            'Cabang Toko',
             'Modul / Entitas',
             'No. Dokumen / ID',
-            'Aksi',
+            'Aksi / Event',
             'Pelaku (User)',
-            'Ringkasan Aktivitas',
+            'Ringkasan Aktivitas (Deskripsi)',
             'Rincian Perubahan Nilai (Semula ➔ Menjadi)',
-            'Rincian Barang / Produk Terlibat',
+            'Rincian Barang & Mutasi Produk',
+            'Metadata Keamanan & Parameter Alur',
         ];
     }
 
@@ -60,7 +62,12 @@ class AuditLogExport implements FromCollection, ShouldAutoSize, WithHeadings, Wi
     {
         $this->nomorUrut++;
 
-        // Format rincian perubahan data
+        // 1. Format IP & Perangkat (ISO 27001 requirement)
+        $ip = $log->ip ?: '—';
+        $ua = $log->user_agent ? substr($log->user_agent, 0, 75) : '';
+        $perangkatText = $ua ? "{$ip}\n({$ua})" : $ip;
+
+        // 2. Format rincian perubahan data
         $mutasiText = [];
         foreach ($log->daftar_mutasi as $m) {
             if ($m['tipe'] === 'tambah') {
@@ -72,7 +79,7 @@ class AuditLogExport implements FromCollection, ShouldAutoSize, WithHeadings, Wi
             }
         }
 
-        // Format rincian item produk
+        // 3. Format rincian item produk
         $barangText = [];
         foreach ($log->items_list as $it) {
             $nama = $it['nama_produk'] ?? 'Produk';
@@ -95,32 +102,65 @@ class AuditLogExport implements FromCollection, ShouldAutoSize, WithHeadings, Wi
             }
         }
 
+        // 4. Metadata Keamanan & Parameter Alur
+        $metadataText = [];
+        $props = $log->normalized_properties;
+        if (! empty($props['guard'])) {
+            $metadataText[] = "• Auth Guard: {$props['guard']}";
+        }
+        if (! empty($props['target_kredensial'])) {
+            $metadataText[] = "• Target: {$props['target_kredensial']}";
+        }
+        if (! empty($props['metode_bayar'])) {
+            $metadataText[] = '• Metode Bayar: '.strtoupper(str_replace('_', ' ', (string) $props['metode_bayar']));
+        }
+        if (! empty($props['tipe_penyelesaian'])) {
+            $metadataText[] = '• Penyelesaian: '.($props['tipe_penyelesaian'] === 'tukar_produk' ? 'Tukar Produk' : 'Refund Dana');
+        }
+        if (! empty($props['gudang_asal']) && ! empty($props['gudang_tujuan'])) {
+            $metadataText[] = "• Alur Gudang: {$props['gudang_asal']} ➔ {$props['gudang_tujuan']}";
+        }
+        if (! empty($props['alasan'])) {
+            $metadataText[] = "• Alasan: {$props['alasan']}";
+        }
+        if (! empty($props['selisih_nominal']) && (float) $props['selisih_nominal'] > 0) {
+            $metadataText[] = '• Selisih Bayar: Rp '.number_format((float) $props['selisih_nominal'], 0, ',', '.');
+        }
+
+        // Pelaku format
+        $pelaku = $log->causer_nama;
+        if ($log->causer && ! empty($log->causer->email)) {
+            $pelaku .= "\n(".$log->causer->email.')';
+        }
+
         return [
             $this->nomorUrut,
             $log->created_at ? $log->created_at->format('d/m/Y H:i:s') : '—',
+            $perangkatText,
             $log->cabang_nama ?: ($log->cabang_id ? 'Cabang #'.$log->cabang_id : 'Semua Cabang / Sistem'),
             RiwayatAktivitas::labelEntitas($log->subject_type),
             $log->no_referensi ?: ($log->subject_id ? '#'.$log->subject_id : '—'),
             $log->aksi_label,
-            $log->causer_nama,
+            $pelaku,
             $log->ringkasan,
             ! empty($mutasiText) ? implode("\n", $mutasiText) : '—',
             ! empty($barangText) ? implode("\n", $barangText) : '—',
+            ! empty($metadataText) ? implode("\n", $metadataText) : '—',
         ];
     }
 
     public function styles(Worksheet $sheet): array
     {
-        // Header styling
-        $sheet->getStyle('A1:J1')->applyFromArray([
+        // Header styling (ISO 27001 Audit Header: Navy/Indigo gradient)
+        $sheet->getStyle('A1:L1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
-                'size' => 11,
+                'size' => 10,
             ],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '4F46E5'], // Indigo / Primary Ute
+                'startColor' => ['rgb' => '1E1B4B'], // Deep Navy
             ],
             'alignment' => [
                 'vertical' => Alignment::VERTICAL_CENTER,
@@ -129,20 +169,36 @@ class AuditLogExport implements FromCollection, ShouldAutoSize, WithHeadings, Wi
             ],
         ]);
 
-        $sheet->getRowDimension(1)->setRowHeight(30);
+        $sheet->getRowDimension(1)->setRowHeight(32);
+        $sheet->freezePane('A2');
 
-        // Body alignment & text wrapping
+        // Body formatting
         $highestRow = $sheet->getHighestRow();
         if ($highestRow > 1) {
+            $sheet->setAutoFilter("A1:L{$highestRow}");
+
             $sheet->getStyle("A2:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("B2:B{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("E2:F{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("I2:J{$highestRow}")->getAlignment()->setWrapText(true);
-            $sheet->getStyle("A1:J{$highestRow}")->applyFromArray([
+            $sheet->getStyle("C2:C{$highestRow}")->getAlignment()->setWrapText(true);
+            $sheet->getStyle("F2:G{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("H2:H{$highestRow}")->getAlignment()->setWrapText(true);
+            $sheet->getStyle("I2:L{$highestRow}")->getAlignment()->setWrapText(true);
+
+            // Zebra striping on data rows for readable audit reading
+            for ($row = 2; $row <= $highestRow; $row++) {
+                if ($row % 2 === 0) {
+                    $sheet->getStyle("A{$row}:L{$row}")->getFill()->applyFromArray([
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'F8FAFC'],
+                    ]);
+                }
+            }
+
+            $sheet->getStyle("A1:L{$highestRow}")->applyFromArray([
                 'borders' => [
                     'allBorders' => [
                         'borderStyle' => Border::BORDER_THIN,
-                        'color' => ['rgb' => 'D1D5DB'],
+                        'color' => ['rgb' => 'E2E8F0'],
                     ],
                 ],
             ]);

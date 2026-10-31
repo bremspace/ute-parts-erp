@@ -237,6 +237,12 @@
                             <span class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
                             <span class="font-semibold">{{ $baris->causer_nama }}</span>
                         </div>
+                        @if($baris->ip)
+                            <div class="mt-1 flex items-center gap-1 text-[10px] text-ink-400 font-mono" title="{{ $baris->user_agent }}">
+                                <span class="text-[9px] text-ink-500">IP:</span>
+                                <span>{{ $baris->ip }}</span>
+                            </div>
+                        @endif
                     </td>
 
                     {{-- 5. Ringkasan & Rincian Mutasi (Expand / Collapse) --}}

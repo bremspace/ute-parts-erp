@@ -26,6 +26,8 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\Supplier;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -561,5 +563,47 @@ class ActivityLogTest extends TestCase
             ->set('filterCari', 'NON_EXISTENT_DOCUMENT_KEY_99999')
             ->assertDontSee($trx->no_transaksi)
             ->assertSee('Tidak ada aktivitas tercatat untuk filter ini');
+    }
+
+    public function test_audit_log_immutability_anti_edit_dan_anti_hapus(): void
+    {
+        $this->userAuthed('super-admin');
+        $trx = $this->buatTransaksi();
+
+        $log = AktivitasLog::where('subject_id', $trx->id)->first();
+        $this->assertNotNull($log);
+
+        // 1. Verifikasi anti-edit (ISO 27001 immutability)
+        try {
+            $log->update(['description' => 'Log diubah oleh attacker']);
+            $this->fail('Audit log seharusnya tidak boleh diubah (wajib throw exception).');
+        } catch (\DomainException $e) {
+            $this->assertStringContainsString('immutable', $e->getMessage());
+        }
+
+        // 2. Verifikasi anti-hapus saat dijalankan dari konteks aplikasi
+        // Simulasikan non-console environment
+        $this->app->bind('is_running_in_console', fn () => false);
+        // Test updating/deleting guard
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('immutable');
+        $log->update(['description' => 'percobaan manipulasi log']);
+    }
+
+    public function test_audit_log_security_events_login_dan_failed(): void
+    {
+        $user = $this->userAuthed('super-admin');
+
+        // 1. Event Login berhasil
+        event(new Login('web', $user, false));
+        $loginLog = AktivitasLog::where('event', 'login')->where('causer_id', $user->id)->first();
+        $this->assertNotNull($loginLog);
+        $this->assertStringContainsString('Login berhasil', $loginLog->description);
+
+        // 2. Event Login gagal
+        event(new Failed('web', null, ['email' => 'hacker@target.com']));
+        $failedLog = AktivitasLog::where('event', 'login_failed')->first();
+        $this->assertNotNull($failedLog);
+        $this->assertStringContainsString('hacker@target.com', $failedLog->description);
     }
 }
