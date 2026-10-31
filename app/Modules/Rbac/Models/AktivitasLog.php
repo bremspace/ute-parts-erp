@@ -2,6 +2,8 @@
 
 namespace App\Modules\Rbac\Models;
 
+use App\Modules\Rbac\Livewire\RiwayatAktivitas;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Enumerable;
 use Spatie\Activitylog\Models\Activity;
 
@@ -14,6 +16,18 @@ use Spatie\Activitylog\Models\Activity;
  */
 class AktivitasLog extends Activity
 {
+    /** Relasi ke Cabang */
+    public function cabang(): BelongsTo
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id');
+    }
+
+    /** Nama Cabang asal aktivitas */
+    public function getCabangNamaAttribute(): ?string
+    {
+        return $this->cabang?->nama;
+    }
+
     public function getCauserNamaAttribute(): string
     {
         return $this->causer?->name ?? 'sistem';
@@ -127,6 +141,79 @@ class AktivitasLog extends Activity
         }
 
         return [];
+    }
+
+    /** Daftar barang pengganti (tukar produk) dalam retur */
+    public function getItemsTukarListAttribute(): array
+    {
+        $props = $this->normalized_properties;
+        if (! empty($props['items_tukar']) && is_array($props['items_tukar'])) {
+            return $props['items_tukar'];
+        }
+
+        return [];
+    }
+
+    /**
+     * Parsing mutasi kolom (diff) lengkap tanpa pemotongan,
+     * diformat dalam Bahasa Indonesia yang ramah pengguna awam.
+     *
+     * @return array<int, array{kunci: string, label: string, sebelum: string, sesudah: string, tipe: string}>
+     */
+    public function getDaftarMutasiAttribute(): array
+    {
+        $rawChanges = $this->attribute_changes;
+        $changes = is_object($rawChanges) && method_exists($rawChanges, 'get')
+            ? $rawChanges
+            : collect(is_array($rawChanges) ? $rawChanges : (is_string($rawChanges) ? (json_decode($rawChanges, true) ?: []) : []));
+
+        $sesudah = $changes->get('attributes') ?? [];
+        $sebelum = $changes->get('old') ?? [];
+
+        $lewati = [
+            'id', 'created_at', 'updated_at', 'password', 'remember_token',
+            'two_factor_secret', 'two_factor_recovery_codes',
+        ];
+
+        $kunciSemua = array_values(array_unique(array_merge(array_keys($sesudah), array_keys($sebelum))));
+        $kunciSemua = array_values(array_filter($kunciSemua, fn ($k) => ! in_array($k, $lewati, true)));
+
+        $hasil = [];
+        foreach ($kunciSemua as $key) {
+            $valSebelum = $sebelum[$key] ?? null;
+            $valSesudah = $sesudah[$key] ?? null;
+
+            // Lewati jika update tapi nilai sebelum dan sesudah identik
+            if ($this->event === 'updated' && $valSebelum === $valSesudah) {
+                continue;
+            }
+
+            // Pada event created, lewati field yang memang tidak diisi (null / '') agar ringkas dan relevan
+            if ($this->event === 'created' && ($valSesudah === null || $valSesudah === '')) {
+                continue;
+            }
+
+            // Pada event deleted, lewati field yang null saat sebelum dihapus
+            if ($this->event === 'deleted' && ($valSebelum === null || $valSebelum === '')) {
+                continue;
+            }
+
+            $tipeMutasi = match ($this->event) {
+                'created' => 'tambah',
+                'deleted' => 'hapus',
+                default => 'ubah',
+            };
+
+            $hasil[] = [
+                'kunci' => $key,
+                'label' => RiwayatAktivitas::labelKolom($key),
+                'sebelum' => RiwayatAktivitas::formatNilai($valSebelum, $key),
+                'sesudah' => RiwayatAktivitas::formatNilai($valSesudah, $key),
+                'tipe' => $tipeMutasi,
+            ];
+        }
+
+        return $hasil;
     }
 
     /**

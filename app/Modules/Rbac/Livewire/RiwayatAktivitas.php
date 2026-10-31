@@ -571,6 +571,53 @@ class RiwayatAktivitas extends Component
             'tunjangan' => 'Tunjangan',
             'potongan' => 'Potongan',
             'total_gaji' => 'Total Gaji',
+            'stok_sistem' => 'Stok Sistem',
+            'stok_fisik' => 'Stok Fisik',
+            'selisih' => 'Selisih Stok',
+            'gudang_asal_id' => 'Gudang Asal',
+            'gudang_tujuan_id' => 'Gudang Tujuan',
+            'rak_id' => 'Lokasi Rak',
+            'kode' => 'Kode',
+            'sku' => 'SKU / Barcode',
+            'barcode' => 'Barcode',
+            'brand_id' => 'Merk / Brand',
+            'kategori_id' => 'Kategori Produk',
+            'kualitas_id' => 'Kualitas Produk',
+            'satuan_id' => 'Satuan Produk',
+            'tipe_hp_id' => 'Kompatibilitas Tipe HP',
+            'tier_membership_id' => 'Tier Membership',
+            'tipe_konsumen' => 'Tipe Konsumen',
+            'limit_kredit' => 'Batas Limit Kredit',
+            'total_belanja_12bulan' => 'Total Belanja 12 Bulan',
+            'tanggal_lahir' => 'Tanggal Lahir',
+            'debit' => 'Nominal Debit',
+            'kredit' => 'Nominal Kredit',
+            'saldo' => 'Saldo',
+            'persen_diskon' => 'Persen Diskon',
+            'nominal_diskon' => 'Nominal Diskon',
+            'total_nominal' => 'Total Nominal',
+            'nilai_realisasi' => 'Nilai Realisasi',
+            'selisih_nominal' => 'Selisih Nominal',
+            'tukar_items_payload' => 'Rincian Barang Pengganti (Tukar)',
+            'foto_bukti' => 'Bukti Foto',
+            'unit_pengganti_detail' => 'Rincian Unit Pengganti',
+            'ekspedisi' => 'Ekspedisi Pengiriman',
+            'no_resi' => 'Nomor Resi',
+            'penerima_vendor' => 'Penerima Vendor',
+            'tanggal_kirim' => 'Tanggal Kirim',
+            'tanggal_terima_vendor' => 'Tanggal Terima Vendor',
+            'catatan_penyelesaian' => 'Catatan Penyelesaian',
+            'kebijakan_retur' => 'Kebijakan Retur',
+            'channel' => 'Channel Penjualan',
+            'jabatan' => 'Jabatan',
+            'departemen' => 'Departemen',
+            'tanggal_bergabung' => 'Tanggal Bergabung',
+            'shift_id' => 'Shift Kerja',
+            'jam_masuk' => 'Jam Masuk',
+            'jam_pulang' => 'Jam Pulang',
+            'pajak_persen' => 'Persen Pajak',
+            'tipe' => 'Tipe / Jenis',
+            'token_approval' => 'Token Persetujuan',
         ];
 
         if (isset($dictionary[$key])) {
@@ -593,6 +640,8 @@ class RiwayatAktivitas extends Component
         }
 
         $statusMap = [
+            'aktif' => 'Aktif',
+            'nonaktif' => 'Nonaktif',
             'lunas' => 'Lunas',
             'belum_lunas' => 'Belum Lunas',
             'selesai' => 'Selesai',
@@ -619,17 +668,17 @@ class RiwayatAktivitas extends Component
             return $statusMap[strtolower($value)];
         }
 
-        if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/', $value)) {
+        if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?Z?)?$/', $value)) {
             try {
                 $c = Carbon::parse($value);
 
-                return str_contains($value, ':') ? $c->format('d/m/Y H:i') : $c->format('d/m/Y');
+                return (str_contains($value, ':') || str_contains($value, 'T')) ? $c->format('d/m/Y H:i') : $c->format('d/m/Y');
             } catch (\Exception) {
                 return $value;
             }
         }
 
-        if (is_numeric($value) && ! str_ends_with($key, '_id') && ! str_ends_with($key, '_persen') && ! in_array($key, ['qty', 'jumlah', 'garansi_hari', 'poin_loyalty', 'konversi'], true)) {
+        if (is_numeric($value) && ! str_ends_with($key, '_id') && ! str_ends_with($key, '_persen') && ! in_array($key, ['qty', 'jumlah', 'garansi_hari', 'poin_loyalty', 'konversi'], true) && ! preg_match('/(telepon|phone|hp|wa|barcode|sku|token|kode|nik|pos)/i', $key)) {
             if (preg_match('/(total|harga|subtotal|bayar|kembali|nominal|ongkir|gaji|biaya|jumlah)/i', $key)) {
                 return 'Rp '.number_format((float) $value, 0, ',', '.');
             }
@@ -668,9 +717,9 @@ class RiwayatAktivitas extends Component
             if (array_is_list($value)) {
                 $count = count($value);
                 $samples = [];
-                foreach (array_slice($value, 0, 3) as $item) {
+                foreach ($value as $item) {
                     if (is_array($item)) {
-                        $label = $item['nama_produk'] ?? $item['nama'] ?? $item['sku'] ?? $item['keterangan'] ?? null;
+                        $label = $item['nama_produk'] ?? $item['nama'] ?? $item['sku'] ?? $item['nama_part'] ?? $item['keterangan'] ?? null;
                         $qty = $item['qty'] ?? $item['jumlah'] ?? null;
                         if ($label) {
                             $samples[] = $qty ? "{$label} (x{$qty})" : (string) $label;
@@ -678,9 +727,7 @@ class RiwayatAktivitas extends Component
                     }
                 }
                 if (! empty($samples)) {
-                    $suffix = $count > count($samples) ? ' (+'.($count - count($samples)).' lainnya)' : '';
-
-                    return implode(', ', $samples).$suffix;
+                    return implode(', ', $samples);
                 }
 
                 return "{$count} data tercatat";

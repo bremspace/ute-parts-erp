@@ -75,7 +75,7 @@ class TransactionActivityLogService
                 $kasirNama,
                 $pelangganNama,
                 $totalQty,
-                implode(', ', array_slice($itemSummaries, 0, 3)).(count($itemSummaries) > 3 ? ' dkk.' : ''),
+                implode(', ', $itemSummaries),
                 number_format($totalNominal, 0, ',', '.'),
                 $metodeBayar
             );
