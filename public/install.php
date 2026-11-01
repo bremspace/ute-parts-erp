@@ -1015,10 +1015,14 @@ EOF;
                     break;
 
                 case 'optimize_cache':
-                    runCommand("{$phpBin} artisan config:cache");
-                    runCommand("{$phpBin} artisan route:cache");
+                    runCommand("{$phpBin} artisan optimize:clear");
+                    if (! file_exists($baseDir.'/public/build/manifest.json')) {
+                        if (runCommand('which npm')['status'] === 0) {
+                            runCommand('npm run build');
+                        }
+                    }
                     runCommand("{$phpBin} artisan view:cache");
-                    echo json_encode(['success' => true, 'message' => 'Cache aplikasi berhasil dioptimasi untuk produksi.']);
+                    echo json_encode(['success' => true, 'message' => 'Cache aplikasi berhasil dibersihkan & template Blade siap produksi.']);
                     break;
 
                 case 'setup_ai_dev':

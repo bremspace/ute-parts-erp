@@ -256,19 +256,23 @@ elif command -v open >/dev/null 2>&1; then
     open "$LOCAL_URL" >/dev/null 2>&1 &
 fi
 
-# 11. Jalankan Built-in Web Server (0.0.0.0 untuk akses Localhost & Multi-Device LAN)
+# 11. Jalankan Built-in Web Server di Background (Tetap aktif walau terminal ditutup)
+echo "ℹ [INFO] Menyalakan server di background pada port $PORT..."
+mkdir -p storage/framework storage/logs
+nohup "$PHP_BIN" -S 0.0.0.0:"$PORT" -t public > storage/logs/server.log 2>&1 &
+SERVER_PID=$!
+echo "$SERVER_PID" > storage/framework/server.pid
+sleep 1
+
 echo "======================================================================"
-echo "   Server Siap & Berjalan:"
+echo "   Server ERP & POS Berhasil Berjalan di Background!"
 echo "   - Dari Komputer Ini       : $LOCAL_URL"
 if [ -n "$NETWORK_URL" ]; then
 echo "   - Dari HP/iPhone/iPad/LAN : $NETWORK_URL"
 fi
+echo "   - PID Proses Server       : $SERVER_PID"
 echo "----------------------------------------------------------------------"
-echo "   Petunjuk Multi-Client Satu Database:"
-echo "   - Komputer Pusat / Server : Pilih 'Mode Server' di Web Installer."
-echo "   - Komputer Kasir / Client : Pilih 'Mode Client' -> 'Auto-Scan Server'."
-echo "======================================================================"
-echo "   Tekan Ctrl+C untuk menghentikan server."
+echo "   [INFO] Server tetap aktif melayani meskipun terminal ini ditutup."
+echo "   [INFO] Untuk menghentikan server, jalankan: ./stop-server.sh"
 echo "======================================================================"
 echo ""
-exec "$PHP_BIN" -S 0.0.0.0:"$PORT" -t public

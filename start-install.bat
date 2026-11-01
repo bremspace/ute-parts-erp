@@ -212,9 +212,23 @@ echo ======================================================================
 echo    Tutup jendela ini jika ingin mematikan server.
 echo.
 
-:: 8. Buka Browser Otomatis
+:: 8. Jalankan Built-in Web Server di Background (Tetap aktif walau CMD ditutup)
+echo [INFO] Menyalakan server di background pada port %PORT%...
+wscript.exe "%~dp0scripts\run-server-background.vbs" "%PHP_BIN%" "%PORT%" "%~dp0public"
+timeout /t 1 /nobreak >nul 2>nul
+
+:: 9. Buka Browser Otomatis
 start "" "%LOCAL_URL%"
 
-:: 9. Jalankan Built-in Web Server (0.0.0.0 agar bisa diakses dari LAN)
-"%PHP_BIN%" -S 0.0.0.0:%PORT% -t public
+echo ======================================================================
+echo    Server ERP ^& POS Berhasil Aktif di Background!
+echo    - Dari Komputer Ini       : %LOCAL_URL%
+if not "%NETWORK_URL%"=="" (
+echo    - Dari HP / iPhone / iPad : %NETWORK_URL%
+)
+echo ----------------------------------------------------------------------
+echo    [INFO] Server tetap aktif di background meskipun terminal ini ditutup!
+echo    [INFO] Untuk menghentikan server, jalankan: stop-server.bat
+echo ======================================================================
+echo.
 pause
