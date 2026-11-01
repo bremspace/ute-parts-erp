@@ -169,6 +169,11 @@ fi
 
 # 7b. Otomatisasi Hak Akses MySQL & Bind-Address LAN (Untuk Komputer Server Induk)
 if command -v mysql >/dev/null 2>&1; then
+    # Nyalakan service MySQL jika belum aktif
+    if ! netstat -tuln 2>/dev/null | grep -q ":3306 " && ! ss -tuln 2>/dev/null | grep -q ":3306 "; then
+        sudo systemctl start mysql 2>/dev/null || sudo systemctl start mariadb 2>/dev/null || sudo service mysql start 2>/dev/null || true
+    fi
+
     for mycnf in /etc/mysql/mysql.conf.d/mysqld.cnf /etc/mysql/mariadb.conf.d/50-server.cnf /etc/mysql/my.cnf; do
         if [ -f "$mycnf" ] && grep -q "127.0.0.1" "$mycnf" 2>/dev/null; then
             echo "ℹ [AUTO-FIX] Menyesuaikan MySQL bind-address ke 0.0.0.0 agar dapat diakses komputer kasir LAN..."

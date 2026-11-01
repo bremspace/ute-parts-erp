@@ -165,6 +165,26 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address" /c:"Al
 :: Cek & sesuaikan bind-address MySQL di Laragon / XAMPP agar bisa diakses LAN secara otomatis
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path 'C:\laragon\bin\mysql\*\my.ini', 'C:\xampp\mysql\bin\my.ini' -ErrorAction SilentlyContinue | ForEach-Object { (Get-Content $_.FullName) -replace 'bind-address\s*=\s*127\.0\.0\.1', 'bind-address = 0.0.0.0' | Set-Content $_.FullName }" >nul 2>nul
 
+:: Cek & Otomatis Nyalakan Service MySQL lokal jika port 3306 belum aktif
+netstat -ano | findstr /r /c:":3306 " >nul 2>nul
+if errorlevel 1 (
+    net start MySQL >nul 2>nul
+    net start MySQL80 >nul 2>nul
+    net start MariaDB >nul 2>nul
+    if exist "C:\laragon\bin\mysql" (
+        for /d %%D in ("C:\laragon\bin\mysql\*") do (
+            if exist "%%~D\bin\mysqld.exe" (
+                echo [INFO] Menyalakan service MySQL lokal Laragon di background...
+                start "" /b "%%~D\bin\mysqld.exe" --defaults-file="%%~D\my.ini" --standalone >nul 2>nul
+            )
+        )
+    )
+    if exist "C:\xampp\mysql\bin\mysqld.exe" (
+        echo [INFO] Menyalakan service MySQL lokal XAMPP di background...
+        start "" /b "C:\xampp\mysql\bin\mysqld.exe" --defaults-file="C:\xampp\mysql\bin\my.ini" --standalone >nul 2>nul
+    )
+)
+
 :: Buka port di Windows Defender Firewall (Port 1741 & 3306)
 netsh advfirewall firewall add rule name="Ute Parts ERP (Port %PORT%)" dir=in action=allow protocol=TCP localport=%PORT% >nul 2>nul
 netsh advfirewall firewall add rule name="Ute Parts MySQL LAN (Port 3306)" dir=in action=allow protocol=TCP localport=3306 >nul 2>nul

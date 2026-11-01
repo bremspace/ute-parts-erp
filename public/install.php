@@ -773,6 +773,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         if (($dbHost === '127.0.0.1' || $dbHost === 'localhost') && ! empty($dbUser)) {
                             try {
                                 $pdo = new PDO("mysql:host={$dbHost};port={$dbPort}", $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 3]);
+                                $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
                                 $pdo->exec("CREATE USER IF NOT EXISTS '{$dbUser}'@'%' IDENTIFIED BY '{$dbPass}'");
                                 if (! empty($dbPass)) {
                                     $pdo->exec("ALTER USER '{$dbUser}'@'%' IDENTIFIED BY '{$dbPass}'");
@@ -1882,6 +1883,11 @@ function toggleDbDriver(driver) {
     document.getElementById('mysql-fields').classList.toggle('hidden', !isMysql);
     document.getElementById('sqlite-fields').classList.toggle('hidden', isMysql);
 
+    const radioMysql = document.querySelector('input[name="db_driver_choice"][value="mysql"]');
+    const radioSqlite = document.querySelector('input[name="db_driver_choice"][value="sqlite"]');
+    if (radioMysql) radioMysql.checked = isMysql;
+    if (radioSqlite) radioSqlite.checked = !isMysql;
+
     const lblMysql = document.getElementById('label-driver-mysql');
     const lblSqlite = document.getElementById('label-driver-sqlite');
     if (isMysql) {
@@ -1925,7 +1931,17 @@ async function testDatabaseConnection() {
             resBox.textContent = '✓ ' + data.message;
         } else {
             resBox.className = 'p-3 rounded-xl text-xs font-mono bg-rose-500/10 border border-rose-500/30 text-rose-300';
-            resBox.textContent = '✕ ' + data.message;
+            let extraAction = '';
+            if (driver === 'mysql') {
+                extraAction = `
+                    <div class="mt-2.5 pt-2 border-t border-rose-500/20 flex flex-wrap gap-2 items-center">
+                        <button type="button" onclick="toggleDbDriver('sqlite'); testDatabaseConnection();" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-sans font-bold text-[11px] transition cursor-pointer">
+                            ⚡ Beralih ke SQLite Otomatis (1-Klik Tanpa Perlu Setup MySQL)
+                        </button>
+                    </div>
+                `;
+            }
+            resBox.innerHTML = `<div>✕ ${data.message}</div>${extraAction}`;
         }
     } catch (e) {
         resBox.className = 'p-3 rounded-xl text-xs font-mono bg-rose-500/10 border border-rose-500/30 text-rose-300';
