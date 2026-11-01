@@ -261,7 +261,7 @@ class OmnichannelCommandCenter extends Component
                 }
 
                 $variant = SkuVariant::with('produk')->where('sku', $sku)->first();
-                $produk = $variant?->produk ?: Produk::where('kode_produk', $sku)->first();
+                $produk = $variant?->produk ?: Produk::where('barcode', $sku)->orWhere('kode_lama', $sku)->first();
 
                 if ($produk) {
                     ChannelProductMapping::updateOrCreate(

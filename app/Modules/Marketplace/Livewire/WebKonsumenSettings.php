@@ -898,7 +898,7 @@ class WebKonsumenSettings extends Component
         // Autocomplete Options menggunakan SmartSearchService engine terpusat
         $smartSearch = app(SmartSearchService::class);
 
-        $produkQuery = Produk::where('is_active', true)->select('id', 'nama', 'kode_produk', 'harga_jual_retail', 'foto_utama');
+        $produkQuery = Produk::where('is_active', true)->select('id', 'nama', 'barcode', 'kode_lama', 'harga_jual_retail', 'foto', 'gambar');
         if (trim($this->partSearchQuery) !== '') {
             $smartSearch->applySmartSearch($produkQuery, $this->partSearchQuery);
         }
@@ -907,7 +907,7 @@ class WebKonsumenSettings extends Component
         // Ambil produk terpilih jika belum masuk di list
         $selectedIds = (array) ($this->articleForm['produk_terkait_ids'] ?? []);
         if (! empty($selectedIds)) {
-            $selectedProduks = Produk::whereIn('id', $selectedIds)->select('id', 'nama', 'kode_produk', 'harga_jual_retail', 'foto_utama')->get();
+            $selectedProduks = Produk::whereIn('id', $selectedIds)->select('id', 'nama', 'barcode', 'kode_lama', 'harga_jual_retail', 'foto', 'gambar')->get();
             $produkList = $selectedProduks->merge($produkList)->unique('id')->values();
         }
 

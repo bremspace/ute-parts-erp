@@ -172,6 +172,14 @@ class Produk extends Model
     }
 
     /**
+     * Alias kode produk (SKU varian utama, barcode, atau kode lama).
+     */
+    public function getKodeProdukAttribute(): ?string
+    {
+        return $this->sku ?: ($this->barcode ?: $this->kode_lama);
+    }
+
+    /**
      * Seluruh barcode produk (barcode utama + barcode alternatif / QR tambahan).
      *
      * @return array<int, string>

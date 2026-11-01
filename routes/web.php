@@ -817,7 +817,7 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
     Route::get('/pengaturan/web-konsumen', WebKonsumenSettings::class)->name('pengaturan.web-konsumen')->middleware('permission:pengaturan.manage');
     Route::get('/pengaturan/web-konsumen/{tab}', WebKonsumenSettings::class)
         ->name('pengaturan.web-konsumen.tab')
-        ->whereIn('tab', ['hero', 'branding', 'banner', 'stok', 'kontak', 'pembayaran', 'preview'])
+        ->whereIn('tab', ['hero', 'branding', 'banner', 'stok', 'panduan', 'review', 'faq', 'kontak', 'pembayaran', 'preview'])
         ->middleware('permission:pengaturan.manage');
 
     Route::get('/pengaturan/{tab}', SettingsRbac::class)
