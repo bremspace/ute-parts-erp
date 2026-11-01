@@ -13,6 +13,10 @@
 
 declare(strict_types=1);
 
+@set_time_limit(0);
+@ini_set('max_execution_time', '0');
+@ini_set('memory_limit', '512M');
+
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
@@ -131,11 +135,21 @@ function downloadComposerPhar(): bool
 
 function runCommand(string $command): array
 {
+    $baseDir = dirname(__DIR__);
+
+    // Hilangkan cd {$baseDir} && jika ada karena cwd proc_open sudah diarahkan ke $baseDir
+    $command = preg_replace('/^cd\s+[\'"]?'.preg_quote($baseDir, '/').'[\'"]?\s*&&\s*/i', '', $command);
+
+    if (! str_contains($command, '2>&1')) {
+        $command .= ' 2>&1';
+    }
+
     $descriptors = [
+        0 => ['file', (PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null'), 'r'],
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
-    $process = proc_open($command, $descriptors, $pipes, __DIR__.'/..');
+    $process = proc_open($command, $descriptors, $pipes, $baseDir);
     if (! is_resource($process)) {
         return ['status' => 1, 'output' => 'Gagal menjalankan proses'];
     }
@@ -738,6 +752,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($action === 'execute_step') {
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '512M');
+        header('Content-Type: application/json; charset=utf-8');
+
         $step = $_POST['step'] ?? '';
         $baseDir = dirname(__DIR__);
         $phpBin = getPhpBinary();
@@ -864,7 +883,7 @@ EOF;
                     break;
 
                 case 'key_generate':
-                    $res = runCommand("cd {$baseDir} && {$phpBin} artisan key:generate --force");
+                    $res = runCommand("{$phpBin} artisan key:generate --force");
                     if ($res['status'] !== 0) {
                         $envPath = $baseDir.'/.env';
                         if (file_exists($envPath)) {
@@ -882,11 +901,12 @@ EOF;
                     echo json_encode(['success' => true, 'message' => 'Application key berhasil di-generate.']);
                     break;
 
+                case 'migrate':
                 case 'migrate_seed':
                     if (($_POST['app_role'] ?? 'server') === 'client') {
                         echo json_encode([
                             'success' => true,
-                            'message' => 'Mode Client: Skema database & data master menggunakan database Server Induk (migrasi dilewati).',
+                            'message' => 'Mode Client: Skema database menggunakan database Server Induk (migrasi dilewati).',
                         ]);
                         break;
                     }
@@ -901,26 +921,47 @@ EOF;
                             }
                         }
                     }
-                    $resMigrate = runCommand("cd {$baseDir} && {$phpBin} -d memory_limit=512M artisan migrate --force");
+                    $resMigrate = runCommand("{$phpBin} -d memory_limit=512M artisan migrate --force");
                     if ($resMigrate['status'] !== 0) {
                         throw new RuntimeException('Migrasi skema database gagal: '.$resMigrate['output']);
                     }
-                    $resSeed = runCommand("cd {$baseDir} && {$phpBin} -d memory_limit=512M artisan db:seed --force");
+
+                    if ($step === 'migrate_seed') {
+                        $resSeed = runCommand("{$phpBin} -d memory_limit=512M artisan db:seed --force");
+                        if ($resSeed['status'] !== 0) {
+                            throw new RuntimeException('Seeder data master gagal: '.$resSeed['output']);
+                        }
+                        echo json_encode(['success' => true, 'message' => 'Struktur database & data bawaan berhasil di-seed.']);
+                    } else {
+                        echo json_encode(['success' => true, 'message' => 'Struktur tabel database berhasil dimigrasi (100+ tabel).']);
+                    }
+                    break;
+
+                case 'seed':
+                    if (($_POST['app_role'] ?? 'server') === 'client') {
+                        echo json_encode([
+                            'success' => true,
+                            'message' => 'Mode Client: Data master menggunakan database Server Induk (seeding dilewati).',
+                        ]);
+                        break;
+                    }
+
+                    $resSeed = runCommand("{$phpBin} -d memory_limit=512M artisan db:seed --force");
                     if ($resSeed['status'] !== 0) {
                         throw new RuntimeException('Seeder data master gagal: '.$resSeed['output']);
                     }
-                    echo json_encode(['success' => true, 'message' => 'Struktur database & data bawaan berhasil di-seed.']);
+                    echo json_encode(['success' => true, 'message' => 'Data master, hak akses & akun bawaan berhasil di-seed.']);
                     break;
 
                 case 'storage_link':
-                    runCommand("cd {$baseDir} && {$phpBin} artisan storage:link 2>&1");
+                    runCommand("{$phpBin} artisan storage:link 2>&1");
                     echo json_encode(['success' => true, 'message' => 'Symlink storage media berhasil disiapkan.']);
                     break;
 
                 case 'optimize_cache':
-                    runCommand("cd {$baseDir} && {$phpBin} artisan config:cache");
-                    runCommand("cd {$baseDir} && {$phpBin} artisan route:cache");
-                    runCommand("cd {$baseDir} && {$phpBin} artisan view:cache");
+                    runCommand("{$phpBin} artisan config:cache");
+                    runCommand("{$phpBin} artisan route:cache");
+                    runCommand("{$phpBin} artisan view:cache");
                     echo json_encode(['success' => true, 'message' => 'Cache aplikasi berhasil dioptimasi untuk produksi.']);
                     break;
 
@@ -939,6 +980,9 @@ EOF;
                     break;
             }
         } catch (Throwable $e) {
+            if (ob_get_length()) {
+                ob_clean();
+            }
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         exit;
@@ -1956,17 +2000,18 @@ async function startExecution() {
 
     const appRole = document.getElementById('app_role').value;
     let steps = [
-        { id: 'write_env', label: '1/7 Menyimpan konfigurasi .env' },
-        { id: 'check_vendor', label: '2/7 Memeriksa & instal dependensi Composer' },
-        { id: 'key_generate', label: '3/7 Generate kunci aplikasi (APP_KEY)' },
-        { id: 'migrate_seed', label: '4/7 Migrasi skema database & seeding akun default' },
-        { id: 'storage_link', label: '5/7 Menghubungkan symlink direktori media' },
-        { id: 'optimize_cache', label: '6/7 Mengoptimasi cache konfigurasi & rute produksi' },
-        { id: 'setup_ai_dev', label: '7/7 Menyiapkan AI Stack (OpenCode + 9router + MCP)' }
+        { id: 'write_env', label: '1/8 Menyimpan konfigurasi .env' },
+        { id: 'check_vendor', label: '2/8 Memeriksa & instal dependensi Composer' },
+        { id: 'key_generate', label: '3/8 Generate kunci aplikasi (APP_KEY)' },
+        { id: 'migrate', label: '4/8 Migrasi skema database (100+ tabel)' },
+        { id: 'seed', label: '5/8 Seeding data master & akun default' },
+        { id: 'storage_link', label: '6/8 Menghubungkan symlink direktori media' },
+        { id: 'optimize_cache', label: '7/8 Mengoptimasi cache konfigurasi & rute produksi' },
+        { id: 'setup_ai_dev', label: '8/8 Menyiapkan AI Stack (OpenCode + 9router + MCP)' }
     ];
 
     if (appRole === 'client') {
-        steps = steps.filter(s => s.id !== 'migrate_seed');
+        steps = steps.filter(s => s.id !== 'migrate' && s.id !== 'seed');
     }
 
     const logBox = document.getElementById('execution-log');
@@ -2011,7 +2056,17 @@ async function startExecution() {
 
         try {
             const res = await fetch('install.php', { method: 'POST', body: formData });
-            const data = await res.json();
+            const rawText = await res.text();
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch (jsonErr) {
+                logEntry.textContent = '✕ Server error (' + res.status + '): ' + (rawText.trim().substring(0, 300) || 'Koneksi terputus / Timeout script PHP');
+                logEntry.className = 'text-rose-400 font-bold';
+                statusText.textContent = 'Instalasi terhenti karena error server.';
+                return;
+            }
+
             if (!data.success) {
                 logEntry.textContent = '✕ Gagal di ' + step.label + ': ' + data.message;
                 logEntry.className = 'text-rose-400 font-bold';
