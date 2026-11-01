@@ -17,10 +17,12 @@ use App\Modules\Servis\Console\Commands\CekBatasWaktuServisCommand;
 use App\Modules\Wms\Jobs\CycleCountJob;
 use App\Modules\Wms\Jobs\ReorderOtomatisJob;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
@@ -160,4 +162,43 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        $exceptions->render(function (QueryException|PDOException $e, Request $request) {
+            $msg = $e->getMessage();
+            $isConnectionFailure = str_contains($msg, 'Connection refused')
+                || str_contains($msg, '[2002]')
+                || str_contains($msg, 'No such file or directory')
+                || str_contains($msg, 'Access denied for user');
+
+            if ($isConnectionFailure) {
+                if ($request->is('api/*') || $request->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Layanan database tidak dapat dihubungi (Connection refused). Pastikan service MySQL sedang aktif atau gunakan SQLite.',
+                    ], 503);
+                }
+
+                $dbHost = env('DB_HOST', '127.0.0.1');
+                $dbPort = env('DB_PORT', '3306');
+                $dbName = env('DB_DATABASE', 'erp_pos_db');
+                if (app()->bound('config')) {
+                    $dbHost = config('database.connections.mysql.host', $dbHost);
+                    $dbPort = config('database.connections.mysql.port', $dbPort);
+                    $dbName = config('database.connections.mysql.database', $dbName);
+                }
+
+                if (app()->bound('view')) {
+                    $html = view('errors.database-connect', [
+                        'errorMessage' => $msg,
+                        'dbHost' => $dbHost,
+                        'dbPort' => $dbPort,
+                        'dbName' => $dbName,
+                    ])->render();
+
+                    return new Response($html, 503, ['Content-Type' => 'text/html; charset=UTF-8']);
+                }
+            }
+
+            return null;
+        });
     })->create();

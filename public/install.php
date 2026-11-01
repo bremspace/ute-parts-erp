@@ -33,12 +33,6 @@ if (! $isInstalled && file_exists($envFile)) {
     }
 }
 
-// Jika sistem sudah terinstall dan halaman install.php dibuka via browser (GET tanpa ?reconfigure=1), langsung alihkan ke login
-if ($isInstalled && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && empty($_GET['reconfigure'])) {
-    header('Location: /app/login');
-    exit;
-}
-
 // =============================================================================
 // HELPER FUNCTIONS & DIAGNOSTICS
 // =============================================================================
@@ -902,7 +896,7 @@ LOG_LEVEL=error
 
 {$dbConfig}
 
-SESSION_DRIVER=database
+SESSION_DRIVER=file
 SESSION_LIFETIME=120
 SESSION_ENCRYPT=false
 SESSION_PATH=/

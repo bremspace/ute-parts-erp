@@ -172,17 +172,21 @@ if errorlevel 1 (
     net start MySQL >nul 2>nul
     net start MySQL80 >nul 2>nul
     net start MariaDB >nul 2>nul
-    if exist "C:\laragon\bin\mysql" (
-        for /d %%D in ("C:\laragon\bin\mysql\*") do (
-            if exist "%%~D\bin\mysqld.exe" (
-                echo [INFO] Menyalakan service MySQL lokal Laragon di background...
-                start "" /b "%%~D\bin\mysqld.exe" --defaults-file="%%~D\my.ini" --standalone >nul 2>nul
+    for %%P in ("C:\laragon\bin\mysql" "D:\laragon\bin\mysql" "E:\laragon\bin\mysql") do (
+        if exist "%%~P" (
+            for /d %%D in ("%%~P\*") do (
+                if exist "%%~D\bin\mysqld.exe" (
+                    echo [INFO] Menyalakan service MySQL lokal Laragon di background...
+                    start "" /b "%%~D\bin\mysqld.exe" --defaults-file="%%~D\my.ini" --standalone >nul 2>nul
+                )
             )
         )
     )
-    if exist "C:\xampp\mysql\bin\mysqld.exe" (
-        echo [INFO] Menyalakan service MySQL lokal XAMPP di background...
-        start "" /b "C:\xampp\mysql\bin\mysqld.exe" --defaults-file="C:\xampp\mysql\bin\my.ini" --standalone >nul 2>nul
+    for %%X in ("C:\xampp\mysql\bin\mysqld.exe" "D:\xampp\mysql\bin\mysqld.exe" "E:\xampp\mysql\bin\mysqld.exe") do (
+        if exist "%%~X" (
+            echo [INFO] Menyalakan service MySQL lokal XAMPP di background...
+            start "" /b "%%~X" --standalone >nul 2>nul
+        )
     )
 )
 
@@ -190,14 +194,28 @@ if errorlevel 1 (
 netsh advfirewall firewall add rule name="ERP POS System (Port %PORT%)" dir=in action=allow protocol=TCP localport=%PORT% >nul 2>nul
 netsh advfirewall firewall add rule name="ERP MySQL LAN (Port 3306)" dir=in action=allow protocol=TCP localport=3306 >nul 2>nul
 
+:: Periksa apakah MySQL port 3306 aktif
+set "MYSQL_ACTIVE=0"
+netstat -ano | findstr /r /c:":3306 " >nul 2>nul
+if not errorlevel 1 (
+    set "MYSQL_ACTIVE=1"
+)
+
 set "TARGET_PATH=/install.php"
 if exist "%~dp0storage\installed.lock" (
-    set "TARGET_PATH=/app/login"
-) else if exist "%~dp0.env" (
-    findstr /m /c:"APP_KEY=base64:" "%~dp0.env" >nul 2>nul
-    if not errorlevel 1 (
+    if "%MYSQL_ACTIVE%"=="1" (
         set "TARGET_PATH=/app/login"
+    ) else if exist "%~dp0.env" (
+        findstr /m /c:"DB_CONNECTION=sqlite" "%~dp0.env" >nul 2>nul
+        if not errorlevel 1 (
+            set "TARGET_PATH=/app/login"
+        )
     )
+)
+
+if "%MYSQL_ACTIVE%"=="0" (
+    echo [PERHATIAN] Service MySQL di port 3306 belum aktif.
+    echo [INFO] Jika tidak ingin menginstal MySQL, Anda dapat memilih mode SQLite di installer.
 )
 
 set "LOCAL_URL=http://localhost:%PORT%!TARGET_PATH!"

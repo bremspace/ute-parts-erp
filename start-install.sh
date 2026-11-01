@@ -243,11 +243,21 @@ if command -v ufw >/dev/null 2>&1; then
     fi
 fi
 
+MYSQL_ACTIVE=0
+if netstat -tuln 2>/dev/null | grep -q ":3306 " || ss -tuln 2>/dev/null | grep -q ":3306 " || lsof -i :3306 >/dev/null 2>&1; then
+    MYSQL_ACTIVE=1
+fi
+
 TARGET_PATH="/install.php"
 if [ -f "storage/installed.lock" ]; then
-    TARGET_PATH="/app/login"
-elif [ -f ".env" ] && grep -q "APP_KEY=base64:" ".env" 2>/dev/null; then
-    TARGET_PATH="/app/login"
+    if [ "$MYSQL_ACTIVE" = "1" ] || grep -q "DB_CONNECTION=sqlite" ".env" 2>/dev/null; then
+        TARGET_PATH="/app/login"
+    fi
+fi
+
+if [ "$MYSQL_ACTIVE" = "0" ]; then
+    echo "⚠️  [PERHATIAN] Service MySQL port 3306 belum aktif."
+    echo "ℹ  [TIPS] Anda dapat memilih database 'SQLite' di installer jika ingin tanpa MySQL."
 fi
 
 LOCAL_URL="http://localhost:${PORT}${TARGET_PATH}"

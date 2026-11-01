@@ -16,7 +16,7 @@ class LoginFlowTest extends TestCase
 
     public function test_login_page_renders(): void
     {
-        $this->get('/app/login')->assertStatus(200)->assertSee('UTE PARTS');
+        $this->get('/app/login')->assertStatus(200)->assertSee('Masuk ke Backoffice');
     }
 
     public function test_guest_is_redirected_from_app_to_login(): void

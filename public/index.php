@@ -5,7 +5,7 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-// Auto-redirect ke installer HANYA jika instalasi belum pernah dijalankan
+// Auto-redirect ke installer jika instalasi belum selesai atau database tidak aktif
 $envFile = __DIR__.'/../.env';
 $lockFile = __DIR__.'/../storage/installed.lock';
 
@@ -17,8 +17,29 @@ if (! $isInstalled) {
         $envContent = (string) @file_get_contents($envFile);
         $hasKey = preg_match('/^APP_KEY=.+/m', $envContent) && ! preg_match('/^APP_KEY=\s*$/m', $envContent);
         $hasDb = preg_match('/^DB_DATABASE=.+/m', $envContent) || preg_match('/^DB_CONNECTION=sqlite/m', $envContent);
+
         if ($hasKey && $hasDb) {
-            $isInstalled = true;
+            $isDbReachable = true;
+            if (preg_match('/^DB_CONNECTION=(.*)$/m', $envContent, $mConn) && trim($mConn[1] ?? '') === 'mysql') {
+                $host = '127.0.0.1';
+                $port = 3306;
+                if (preg_match('/^DB_HOST=(.*)$/m', $envContent, $mH) && ! empty(trim($mH[1]))) {
+                    $host = trim($mH[1]);
+                }
+                if (preg_match('/^DB_PORT=(.*)$/m', $envContent, $mP) && ! empty(trim($mP[1]))) {
+                    $port = (int) trim($mP[1]);
+                }
+                $socket = @fsockopen($host, $port, $errno, $errstr, 0.2);
+                if ($socket) {
+                    fclose($socket);
+                } else {
+                    $isDbReachable = false;
+                }
+            }
+
+            if ($isDbReachable) {
+                $isInstalled = true;
+            }
         }
     }
 }
