@@ -22,19 +22,19 @@ echo "ℹ [INFO] Sistem Operasi terdeteksi: $OS_TYPE ($(uname -m))"
 # 2. Deteksi PHP Binary
 PHP_BIN=""
 CANDIDATES=(
-    "$(which php 2>/dev/null || true)"
+    "/usr/bin/php8.5"
+    "/usr/local/lsws/lsphp85/bin/php"
     "/usr/bin/php8.4"
-    "/usr/bin/php8.3"
+    "/usr/local/lsws/lsphp84/bin/php"
+    "$(which php 2>/dev/null || true)"
     "/usr/local/bin/php"
     "/opt/homebrew/bin/php"
-    "/usr/local/lsws/lsphp85/bin/php"
-    "/usr/local/lsws/lsphp84/bin/php"
 )
 
 for bin in "${CANDIDATES[@]}"; do
     if [ -n "$bin" ] && [ -x "$bin" ]; then
-        # Cek versi PHP minimal 8.3
-        VER_OK="$("$bin" -r 'echo version_compare(PHP_VERSION, "8.3.0", ">=") ? "1" : "0";' 2>/dev/null || echo "0")"
+        # Cek versi PHP minimal 8.4 (wajib untuk Laravel 13 & Symfony 8)
+        VER_OK="$("$bin" -r 'echo version_compare(PHP_VERSION, "8.4.0", ">=") ? "1" : "0";' 2>/dev/null || echo "0")"
         if [ "$VER_OK" = "1" ]; then
             PHP_BIN="$bin"
             break
@@ -44,11 +44,11 @@ done
 
 # 3. Auto-Install PHP jika belum ada di perangkat kosongan
 if [ -z "$PHP_BIN" ]; then
-    echo "ℹ PHP >= 8.3 belum terpasang. Menjalankan auto-installer untuk perangkat kosongan..."
+    echo "ℹ PHP >= 8.4 belum terpasang. Menjalankan auto-installer untuk perangkat kosongan..."
     
     if [ "$OS_TYPE" = "Linux" ]; then
         if command -v apt-get >/dev/null 2>&1; then
-            echo "ℹ [Debian/Ubuntu] Memasang dependensi & repositori PHP..."
+            echo "ℹ [Debian/Ubuntu] Memasang dependensi & repositori PHP 8.4..."
             sudo apt-get update -y
             sudo apt-get install -y software-properties-common lsb-release ca-certificates apt-transport-https curl unzip git || true
             
@@ -60,14 +60,9 @@ if [ -z "$PHP_BIN" ]; then
             
             sudo apt-get install -y \
                 php8.4-cli php8.4-fpm php8.4-mysql php8.4-sqlite3 php8.4-xml php8.4-gd \
-                php8.4-mbstring php8.4-curl php8.4-zip php8.4-intl php8.4-bcmath php8.4-fileinfo unzip curl || \
-            sudo apt-get install -y \
-                php8.3-cli php8.3-fpm php8.3-mysql php8.3-sqlite3 php8.3-xml php8.3-gd \
-                php8.3-mbstring php8.3-curl php8.3-zip php8.3-intl php8.3-bcmath php8.3-fileinfo unzip curl || \
-            sudo apt-get install -y \
-                php-cli php-mysql php-sqlite3 php-xml php-gd php-mbstring php-curl php-zip php-intl php-bcmath unzip curl || true
+                php8.4-mbstring php8.4-curl php8.4-zip php8.4-intl php8.4-bcmath php8.4-fileinfo unzip curl || true
             
-            PHP_BIN="$(which php || echo /usr/bin/php8.4)"
+            PHP_BIN="$(which php8.4 || which php || echo /usr/bin/php8.4)"
         elif command -v dnf >/dev/null 2>&1; then
             echo "ℹ [Fedora/RHEL] Memasang dependensi PHP via DNF..."
             sudo dnf install -y php-cli php-mysqlnd php-pdo php-sqlite3 php-xml php-gd php-mbstring php-curl php-zip php-intl php-bcmath unzip curl || true
@@ -93,10 +88,19 @@ fi
 
 # Validasi ulang PHP
 if [ -z "$PHP_BIN" ] || [ ! -x "$PHP_BIN" ]; then
-    echo "❌ [ERROR] PHP >= 8.3 tidak ditemukan di sistem!"
+    echo "❌ [ERROR] PHP >= 8.4 tidak ditemukan di sistem!"
     echo "Panduan:"
-    echo "  - Ubuntu/Debian : sudo add-apt-repository -y ppa:ondrej/php && sudo apt install -y php8.4-cli php8.4-xml php8.4-sqlite3 php8.4-mysql php8.4-curl php8.4-mbstring php8.4-zip php8.4-intl php8.4-bcmath php8.4-gd unzip"
+    echo "  - Ubuntu/Debian : sudo add-apt-repository -y ppa:ondrej/php && sudo apt update && sudo apt install -y php8.4-cli php8.4-xml php8.4-sqlite3 php8.4-mysql php8.4-curl php8.4-mbstring php8.4-zip php8.4-intl php8.4-bcmath php8.4-gd unzip"
     echo "  - macOS         : brew install php"
+    exit 1
+fi
+
+VER_OK="$("$PHP_BIN" -r 'echo version_compare(PHP_VERSION, "8.4.0", ">=") ? "1" : "0";' 2>/dev/null || echo "0")"
+if [ "$VER_OK" != "1" ]; then
+    CURR_VER="$("$PHP_BIN" -r 'echo PHP_VERSION;' 2>/dev/null || echo "unknown")"
+    echo "❌ [ERROR] Versi PHP saat ini ($CURR_VER) kurang dari 8.4!"
+    echo "Laravel 13 & Symfony 8 memerlukan minimal PHP 8.4.0."
+    echo "Silakan gunakan /usr/bin/php8.4 atau update PHP ke 8.4."
     exit 1
 fi
 

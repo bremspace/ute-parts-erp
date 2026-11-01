@@ -11,52 +11,99 @@ echo.
 cd /d "%~dp0"
 
 :: 1. Deteksi PHP Binary (System PATH, Tools Lokal, Laragon, XAMPP)
+:: Wajib PHP >= 8.4 (Rekomendasi PHP 8.5+) untuk performa maksimal
 set "PHP_BIN="
 
-where php >nul 2>nul
-if %errorlevel% equ 0 (
-    set "PHP_BIN=php"
-) else (
-    if exist "%~dp0tools\php\php.exe" (
+:: Periksa apakah tools\php lokal sudah ada dan versinya >= 8.4
+if exist "%~dp0tools\php\php.exe" (
+    "%~dp0tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
+    if not errorlevel 1 (
         set "PHP_BIN=%~dp0tools\php\php.exe"
-    ) else if exist "C:\laragon\bin\php\php-8.4*\php.exe" (
-        for /d %%D in (C:\laragon\bin\php\php-8.4*) do set "PHP_BIN=%%D\php.exe"
-    ) else if exist "C:\laragon\bin\php\php-8.3*\php.exe" (
-        for /d %%D in (C:\laragon\bin\php\php-8.3*) do set "PHP_BIN=%%D\php.exe"
-    ) else if exist "C:\xampp\php\php.exe" (
-        set "PHP_BIN=C:\xampp\php\php.exe"
-    ) else if exist "C:\php\php.exe" (
-        set "PHP_BIN=C:\php\php.exe"
+    ) else (
+        echo [INFO] PHP portable di tools\php terdeteksi versi lama (^< 8.4). Menyiapkan pembaruan ke PHP 8.5...
+        rd /s /q "%~dp0tools\php" 2>nul
     )
 )
 
-:: 2. Auto-Install PHP Portable jika perangkat kosongan (Zero-Dependency)
-if "%PHP_BIN%"=="" (
-    echo [INFO] PHP tidak ditemukan di sistem Windows ini.
-    echo [INFO] Menjalankan pengunduhan otomatis PHP 8.3 Portable resmi Windows...
+:: Periksa Laragon PHP 8.5 lalu 8.4
+if "!PHP_BIN!"=="" (
+    if exist "C:\laragon\bin\php\php-8.5*\php.exe" (
+        for /d %%D in (C:\laragon\bin\php\php-8.5*) do (
+            if "!PHP_BIN!"=="" set "PHP_BIN=%%D\php.exe"
+        )
+    )
+)
+if "!PHP_BIN!"=="" (
+    if exist "C:\laragon\bin\php\php-8.4*\php.exe" (
+        for /d %%D in (C:\laragon\bin\php\php-8.4*) do (
+            if "!PHP_BIN!"=="" set "PHP_BIN=%%D\php.exe"
+        )
+    )
+)
+
+:: Periksa system PATH php
+if "!PHP_BIN!"=="" (
+    where php >nul 2>nul
+    if %errorlevel% equ 0 (
+        php -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
+        if not errorlevel 1 (
+            set "PHP_BIN=php"
+        ) else (
+            echo [WARN] PHP di system PATH versinya ^< 8.4. Laravel 13 memerlukan PHP ^>= 8.4 (disarankan 8.5+).
+        )
+    )
+)
+
+:: Periksa XAMPP / path standar lain
+if "!PHP_BIN!"=="" (
+    if exist "C:\xampp\php\php.exe" (
+        "C:\xampp\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
+        if not errorlevel 1 set "PHP_BIN=C:\xampp\php\php.exe"
+    )
+)
+
+:: 2. Auto-Install Visual C++ Redistributable & PHP 8.5 Portable jika belum ada
+if "!PHP_BIN!"=="" (
+    echo [INFO] PHP ^>= 8.4/8.5 belum terpasang. Menjalankan penyiapan otomatis zero-dependency...
     
     if not exist "%~dp0tools" mkdir "%~dp0tools"
     
     powershell -NoProfile -ExecutionPolicy Bypass -Command ^
         "$ErrorActionPreference = 'Stop';" ^
-        "Write-Host 'Mengunduh PHP Portable 8.3 dari windows.php.net...';" ^
+        "Write-Host 'Memeriksa Microsoft Visual C++ 2015-2022 Redistributable (vcredist)...';" ^
+        "$hasVc = (Test-Path \"$env:SystemRoot\System32\vcruntime140.dll\") -and (Test-Path \"$env:SystemRoot\System32\msvcp140.dll\");" ^
+        "if (-not $hasVc) {" ^
+        "  Write-Host 'Mengunduh & memasang Microsoft Visual C++ Redistributable resmi...';" ^
+        "  $vcUrl = 'https://aka.ms/vs/17/release/vc_redist.x64.exe';" ^
+        "  $vcFile = Join-Path $pwd 'tools\vc_redist.x64.exe';" ^
+        "  try {" ^
+        "    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
+        "    Invoke-WebRequest -Uri $vcUrl -OutFile $vcFile -TimeoutSec 60;" ^
+        "    Start-Process -FilePath $vcFile -ArgumentList '/install', '/passive', '/norestart' -Wait;" ^
+        "    Remove-Item -Path $vcFile -Force -ErrorAction SilentlyContinue;" ^
+        "    Write-Host 'Microsoft Visual C++ Redistributable berhasil dipasang.';" ^
+        "  } catch {" ^
+        "    Write-Warning ('Gagal instal vcredist otomatis: ' + $_.Exception.Message);" ^
+        "  }" ^
+        "};" ^
+        "Write-Host 'Mengunduh PHP Portable 8.5 resmi dari windows.php.net...';" ^
         "$zipPath = Join-Path $pwd 'tools\php.zip';" ^
         "$destDir = Join-Path $pwd 'tools\php';" ^
         "$urls = @(" ^
-        "  'https://windows.php.net/downloads/releases/php-8.3.17-Win32-vs16-x64.zip'," ^
-        "  'https://windows.php.net/downloads/releases/archives/php-8.3.16-Win32-vs16-x64.zip'," ^
-        "  'https://windows.php.net/downloads/releases/archives/php-8.3.14-Win32-vs16-x64.zip'" ^
+        "  'https://windows.php.net/downloads/releases/php-8.5.12-1-Win32-vs17-x64.zip'," ^
+        "  'https://windows.php.net/downloads/releases/php-8.4.27-1-Win32-vs17-x64.zip'," ^
+        "  'https://windows.php.net/downloads/releases/archives/php-8.4.27-1-Win32-vs17-x64.zip'" ^
         ");" ^
         "$downloaded = $false;" ^
         "foreach ($u in $urls) {" ^
         "  try {" ^
         "    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
-        "    Invoke-WebRequest -Uri $u -OutFile $zipPath -TimeoutSec 60;" ^
+        "    Invoke-WebRequest -Uri $u -OutFile $zipPath -TimeoutSec 90;" ^
         "    if ((Get-Item $zipPath).Length -gt 1000000) { $downloaded = $true; break }" ^
         "  } catch {}" ^
         "};" ^
         "if ($downloaded) {" ^
-        "  Write-Host 'Mengekstrak PHP...';" ^
+        "  Write-Host 'Mengekstrak PHP 8.5...';" ^
         "  Expand-Archive -Path $zipPath -DestinationPath $destDir -Force;" ^
         "  Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue;" ^
         "  $iniDev = Join-Path $destDir 'php.ini-development';" ^
@@ -77,9 +124,9 @@ if "%PHP_BIN%"=="" (
         "    $c = $c -replace ';extension=bcmath', 'extension=bcmath';" ^
         "    Set-Content -Path $iniTarget -Value $c;" ^
         "  }" ^
-        "  Write-Host 'PHP Portable 8.3 siap digunakan.';" ^
+        "  Write-Host 'PHP Portable 8.5 siap digunakan.';" ^
         "} else {" ^
-        "  Write-Warning 'Gagal mengunduh otomatis. Silakan pasang Laragon atau XAMPP.';" ^
+        "  Write-Warning 'Gagal mengunduh otomatis. Silakan pasang Laragon (PHP 8.5/8.4) atau XAMPP.';" ^
         "}"
         
     if exist "%~dp0tools\php\php.exe" (
@@ -88,8 +135,8 @@ if "%PHP_BIN%"=="" (
 )
 
 if "%PHP_BIN%"=="" (
-    echo [ERROR] PHP tidak berhasil dipasang otomatis.
-    echo Silakan install PHP ^>= 8.3 atau pasang Laragon/XAMPP lalu jalankan kembali file ini.
+    echo [ERROR] PHP ^>= 8.4 tidak berhasil disiapkan secara otomatis.
+    echo Silakan install PHP ^>= 8.4 atau pasang Laragon dengan PHP 8.4 lalu jalankan kembali file ini.
     echo.
     pause
     exit /b 1

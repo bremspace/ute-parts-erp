@@ -38,21 +38,30 @@ if ($isInstalled && empty($_GET['force']) && empty($_POST['action'])) {
 
 function getPhpBinary(): string
 {
+    $winToolsPhp = dirname(__DIR__).DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'php'.DIRECTORY_SEPARATOR.'php.exe';
+    if (PHP_OS_FAMILY === 'Windows' && file_exists($winToolsPhp)) {
+        return '"'.$winToolsPhp.'"';
+    }
+
     $candidates = [
-        '/usr/bin/php8.4',
-        '/usr/bin/php8.3',
-        '/usr/bin/php',
+        '/usr/bin/php8.5',
         '/usr/local/lsws/lsphp85/bin/php',
+        '/usr/bin/php8.4',
         '/usr/local/lsws/lsphp84/bin/php',
         PHP_BINARY,
+        '/usr/local/bin/php',
+        '/usr/bin/php',
     ];
     foreach ($candidates as $bin) {
         if (! empty($bin) && is_executable($bin)) {
-            return $bin;
+            $ver = shell_exec(escapeshellcmd($bin).' -r "echo PHP_VERSION;" 2>/dev/null');
+            if ($ver && version_compare(trim($ver), '8.4.0', '>=')) {
+                return $bin;
+            }
         }
     }
 
-    return 'php';
+    return PHP_BINARY ?: 'php';
 }
 
 function getComposerCommand(): string
@@ -318,7 +327,7 @@ function checkServerDiagnostics(): array
     return [
         'os' => $osInfo,
         'php_version' => PHP_VERSION,
-        'php_ok' => version_compare(PHP_VERSION, '8.3.0', '>='),
+        'php_ok' => version_compare(PHP_VERSION, '8.4.0', '>='),
         'php_ini' => $iniPath,
         'php_binary' => getPhpBinary(),
         'ram_total_mb' => $totalRamMb,
@@ -337,7 +346,7 @@ function checkServerDiagnostics(): array
             'cache' => $writableCache,
             'env' => $writableEnv,
         ],
-        'is_ready' => (version_compare(PHP_VERSION, '8.3.0', '>=') && $allReqPassed && $writableStorage && $writableCache),
+        'is_ready' => (version_compare(PHP_VERSION, '8.4.0', '>=') && $allReqPassed && $writableStorage && $writableCache),
     ];
 }
 
@@ -848,6 +857,17 @@ EOF;
                 case 'key_generate':
                     $res = runCommand("cd {$baseDir} && {$phpBin} artisan key:generate --force");
                     if ($res['status'] !== 0) {
+                        $envPath = $baseDir.'/.env';
+                        if (file_exists($envPath)) {
+                            $envTxt = (string) file_get_contents($envPath);
+                            if (preg_match('/^APP_KEY=(.*)$/m', $envTxt, $m) && empty(trim($m[1]))) {
+                                $newKey = 'base64:'.base64_encode(random_bytes(32));
+                                $envTxt = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY='.$newKey, $envTxt);
+                                file_put_contents($envPath, $envTxt);
+                                echo json_encode(['success' => true, 'message' => 'Application key berhasil di-generate (via Direct Generator).']);
+                                break;
+                            }
+                        }
                         throw new RuntimeException($res['output']);
                     }
                     echo json_encode(['success' => true, 'message' => 'Application key berhasil di-generate.']);
