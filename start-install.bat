@@ -119,13 +119,19 @@ if not errorlevel 1 (
 if not exist "vendor\autoload.php" (
     if not "%COMPOSER_RUN%"=="" (
         echo [INFO] Menjalankan composer install untuk melengkapi dependensi vendor...
-        %COMPOSER_RUN% install --no-interaction --prefer-dist --optimize-autoloader
+        echo [INFO] Catatan Windows: 'Generating optimized autoload files' memindai 11.000+ file kelas.
+        echo [INFO] Normal memakan waktu 1-3 menit karena scanning NTFS ^& antivirus. Mohon tunggu...
+        %COMPOSER_RUN% install --no-interaction --prefer-dist --no-scripts
         if not exist "vendor\autoload.php" (
             echo [WARN] Fallback composer install dengan toleransi platform requirements...
-            %COMPOSER_RUN% install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter
+            %COMPOSER_RUN% install --no-interaction --prefer-dist --no-scripts --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter
         )
         if not exist "vendor\autoload.php" (
-            %COMPOSER_RUN% install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
+            %COMPOSER_RUN% install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
+        )
+        if exist "vendor\autoload.php" (
+            echo [INFO] Mendaftarkan package Laravel...
+            "%PHP_BIN%" artisan package:discover --ansi
         )
     ) else (
         echo [WARN] Composer belum terpasang. Dependensi dapat dilengkapi via GUI Installer.

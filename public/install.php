@@ -185,25 +185,33 @@ function autoConfigureMysqlLan(): bool
 
 function runComposerInstallWithFallback(string $baseDir, string $composerCmd): array
 {
-    // 1. Coba composer install standar
-    $res = runCommand("cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader 2>&1");
+    $phpBin = getPhpBinary();
+
+    // 1. Coba composer install standar (--no-scripts agar tidak hang di boot discovery)
+    $res = runCommand("cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --no-scripts 2>&1");
     if ($res['status'] === 0) {
+        runCommand("cd {$baseDir} && {$phpBin} artisan package:discover --ansi 2>&1");
+
         return ['status' => 0, 'output' => $res['output'], 'fallback' => false];
     }
 
     // 2. Jika gagal karena platform requirement (seperti missing ext-dom, ext-xml, ext-simplexml, dll)
     $output = $res['output'];
     if (stripos($output, '--ignore-platform-req') !== false || stripos($output, 'ext-') !== false || stripos($output, 'requires ext-') !== false) {
-        $fallbackCmd = "cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter 2>&1";
+        $fallbackCmd = "cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --no-scripts --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter 2>&1";
         $fbRes = runCommand($fallbackCmd);
         if ($fbRes['status'] === 0) {
+            runCommand("cd {$baseDir} && {$phpBin} artisan package:discover --ansi 2>&1");
+
             return ['status' => 0, 'output' => $fbRes['output'], 'fallback' => true, 'fallback_type' => 'xml_dom'];
         }
 
         // 3. Fallback toleran menyeluruh jika ada ekstensi lain yang belum termuat di runtime CLI
-        $fallbackAllCmd = "cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs 2>&1";
+        $fallbackAllCmd = "cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs 2>&1";
         $fbAllRes = runCommand($fallbackAllCmd);
         if ($fbAllRes['status'] === 0) {
+            runCommand("cd {$baseDir} && {$phpBin} artisan package:discover --ansi 2>&1");
+
             return ['status' => 0, 'output' => $fbAllRes['output'], 'fallback' => true, 'fallback_type' => 'all'];
         }
 

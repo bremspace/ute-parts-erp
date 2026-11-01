@@ -40,13 +40,16 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Dynamic Brand / App Name dari Konfigurasi Toko (White-Label)
-        try {
-            $brandName = app(KonfigurasiService::class)->get('app_brand_name');
-            if ($brandName) {
-                config(['app.name' => $brandName]);
+        // Abaikan saat console command (artisan package:discover / migrate) agar tidak probe DB prematur
+        if (! $this->app->runningInConsole()) {
+            try {
+                $brandName = app(KonfigurasiService::class)->get('app_brand_name');
+                if ($brandName) {
+                    config(['app.name' => $brandName]);
+                }
+            } catch (\Throwable) {
+                // Abaikan jika DB belum dimigrasi
             }
-        } catch (\Throwable) {
-            // Abaikan jika DB belum dimigrasi
         }
 
         // Super-admin & Owner implicitly grant all permissions (Spatie recommended practice)

@@ -154,9 +154,14 @@ fi
 if [ ! -f "vendor/autoload.php" ]; then
     if [ -n "$COMPOSER_CMD" ]; then
         echo "ℹ [AUTO-FIX] Menjalankan composer install untuk melengkapi vendor..."
-        $COMPOSER_CMD install --no-interaction --prefer-dist --optimize-autoloader || \
-        $COMPOSER_CMD install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter || \
-        $COMPOSER_CMD install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs || true
+        $COMPOSER_CMD install --no-interaction --prefer-dist --no-scripts || \
+        $COMPOSER_CMD install --no-interaction --prefer-dist --no-scripts --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter || \
+        $COMPOSER_CMD install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs || true
+
+        if [ -f "vendor/autoload.php" ]; then
+            echo "ℹ [AUTO-FIX] Mendaftarkan package Laravel..."
+            "$PHP_BIN" artisan package:discover --ansi || true
+        fi
     else
         echo "⚠️ [WARN] Composer belum tersedia. Dependensi dapat dilengkapi via wizard GUI."
     fi
