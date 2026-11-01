@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Modules\Crm\Services\KonfigurasiService;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureSetupCompleted
@@ -26,10 +27,7 @@ class EnsureSetupCompleted
             $request->is('app/setup-wizard*') ||
             $request->is('livewire*') ||
             $request->is('logout') ||
-            $request->is('app/logout') ||
-            $request->is('app/keamanan*') ||
-            $request->is('api/*') ||
-            $request->is('webhook/*')
+            $request->is('app/logout')
         ) {
             return $next($request);
         }
@@ -39,10 +37,19 @@ class EnsureSetupCompleted
         $isSetupCompleted = $rawSetup === null ? $defaultCompleted : filter_var($rawSetup, FILTER_VALIDATE_BOOLEAN);
 
         if (! $isSetupCompleted) {
-            // Super Admin, Owner, atau yang berhak atas pengaturan diarahkan ke wizard
-            if ($user->hasRole(['super-admin', 'owner']) || $user->can('pengaturan.edit')) {
+            // Super Admin, Owner, atau yang berhak atas pengaturan diarahkan ke wizard dan WAJIB menyelesaikan tanpa bisa di-skip
+            if ($user->hasRole(['super-admin', 'owner']) || $user->can('pengaturan.manage')) {
                 return redirect()->route('setup.wizard');
             }
+
+            // Staf lain tanpa wewenang setup tidak dapat masuk sebelum inisialisasi selesai
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')->withErrors([
+                'email' => 'Sistem sedang dalam tahap inisialisasi awal oleh Administrator. Silakan tunggu hingga setup selesai.',
+            ]);
         }
 
         return $next($request);

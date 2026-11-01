@@ -16,6 +16,8 @@ class WebKonsumenSettings extends Component
     use WithFileUploads;
     use WithPagination;
 
+    public const VALID_TABS = ['hero', 'branding', 'banner', 'stok', 'kontak', 'pembayaran', 'preview'];
+
     public string $activeTab = 'hero'; // hero, branding, banner, stok, kontak, preview
 
     public string $previewDevice = 'desktop'; // desktop, mobile
@@ -111,8 +113,13 @@ class WebKonsumenSettings extends Component
         'tanggal_selesai' => null,
     ];
 
-    public function mount(WebKonsumenService $service): void
+    public function mount(WebKonsumenService $service, ?string $tab = null): void
     {
+        $tabParam = $tab ?: request('tab');
+        if ($tabParam && in_array($tabParam, self::VALID_TABS, true)) {
+            $this->activeTab = $tabParam;
+        }
+
         $settings = $service->getAll();
 
         // Populate Branding
@@ -191,7 +198,12 @@ class WebKonsumenSettings extends Component
 
     public function setTab(string $tab): void
     {
+        if (! in_array($tab, self::VALID_TABS, true)) {
+            return;
+        }
+
         $this->activeTab = $tab;
+        $this->dispatch('tab-changed', tab: $tab, url: url('/app/pengaturan/web-konsumen/'.$tab));
     }
 
     public function setDevice(string $device): void

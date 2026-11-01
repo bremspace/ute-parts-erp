@@ -36,6 +36,8 @@ class CrmDashboard extends Component
 
     public string $filterTipeKonsumen = ''; // '', 'retail', 'reseller', 'agen'
 
+    public const VALID_TABS = ['pelanggan', 'tier', 'broadcast'];
+
     public string $activeTab = 'pelanggan'; // 'pelanggan' | 'tier' | 'broadcast'
 
     protected $queryString = [
@@ -68,7 +70,8 @@ class CrmDashboard extends Component
 
     public function switchTab(string $tab): void
     {
-        $this->activeTab = in_array($tab, ['pelanggan', 'tier', 'broadcast']) ? $tab : 'pelanggan';
+        $this->activeTab = in_array($tab, self::VALID_TABS, true) ? $tab : 'pelanggan';
+        $this->dispatch('tab-changed', tab: $this->activeTab, url: url('/app/crm/'.$this->activeTab));
     }
 
     public function resetFilter(): void
@@ -133,8 +136,13 @@ class CrmDashboard extends Component
 
     public float $komisiAgenDefaultPersen = 5.0;
 
-    public function mount(): void
+    public function mount(?string $tab = null): void
     {
+        $tabParam = $tab ?: request('tab');
+        if ($tabParam && in_array($tabParam, self::VALID_TABS, true)) {
+            $this->activeTab = $tabParam;
+        }
+
         $config = app(KonfigurasiService::class);
         $this->poinEarnPersenGlobal = (float) ($config->get('poin_earn_persen') ?? $config->defaults()['poin_earn_persen'] ?? 10.0);
         $this->poinRedeemRupiahGlobal = $config->poinRedeemRupiah();

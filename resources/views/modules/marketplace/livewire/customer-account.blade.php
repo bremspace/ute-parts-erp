@@ -426,9 +426,9 @@
                 @endphp
                 @foreach($tabList as $kode => $item)
                     @php $isActive = ($activeTab === $kode); @endphp
-                    <button
-                        type="button"
-                        wire:click="$set('activeTab', '{{ $kode }}')"
+                    <a
+                        href="{{ url('/account/'.$kode) }}"
+                        wire:click.prevent="switchTab('{{ $kode }}')"
                         class="shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap cursor-pointer transition-[background-color,color,transform,box-shadow] duration-140 active:scale-[0.97] min-h-[44px] {{ $isActive ? 'bg-up-primary text-white shadow-md shadow-up-primary/25 ring-1 ring-up-primary/30' : 'bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/5 hover:text-ink-900 dark:hover:text-white' }}"
                     >
                         @if($item['icon'] === 'bag')
@@ -465,7 +465,7 @@
                                 {{ $unreadNotifCount }}
                             </span>
                         @endif
-                    </button>
+                    </a>
                 @endforeach
             </nav>
         </div>
@@ -1492,4 +1492,22 @@
             </div>
         @endif
     @endif
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('switchTab', last);
+                }
+            });
+        });
+    </script>
 </div>

@@ -168,23 +168,25 @@
             <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:mx-0 sm:px-0 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x overscroll-x-contain">
                 <!-- Group: Inventori -->
                 <div x-show="subModul === 'inventori'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0">
-                    <button
-                        wire:click="$set('activeTab', 'produk')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ in_array($activeTab, ['produk', 'stok']) ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    <a
+                        href="{{ url('/app/wms/produk') }}"
+                        wire:click.prevent="pindahTab('produk')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer inline-flex items-center justify-center {{ in_array($activeTab, ['produk', 'stok']) ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         Master Produk & Stok
-                    </button>
+                    </a>
 
                     <!-- Tab Monitoring Margin & Harga (Khusus Owner / Super Admin) -->
                     @if(function_exists('isSuperAdminOrOwner') && (isSuperAdminOrOwner() || auth()->user()?->can('pengaturan.manage')))
-                    <button
-                        wire:click="$set('activeTab', 'monitoring_harga')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center gap-1.5 {{ $activeTab === 'monitoring_harga' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    <a
+                        href="{{ url('/app/wms/monitoring_harga') }}"
+                        wire:click.prevent="pindahTab('monitoring_harga')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer inline-flex items-center justify-center gap-1.5 {{ $activeTab === 'monitoring_harga' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                         title="Monitoring Margin & Guard Anti-Rugi Harga Jual"
                     >
                         <span>🛡️</span>
                         <span>Monitoring Margin &amp; Harga</span>
-                    </button>
+                    </a>
                     @endif
 
                     <!-- Tombol Auto ABC WMS Seluruh Produk (Sejajar dengan Master Produk & Stok) -->
@@ -202,18 +204,20 @@
 
                 <!-- Group: Operasional -->
                 <div x-show="subModul === 'operasional'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0" x-cloak>
-                    <button
-                        wire:click="$set('activeTab', 'transfer')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'transfer' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    <a
+                        href="{{ url('/app/wms/transfer') }}"
+                        wire:click.prevent="pindahTab('transfer')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer inline-flex items-center justify-center {{ $activeTab === 'transfer' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         Transfer Antar Gudang
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'opname')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'opname' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    </a>
+                    <a
+                        href="{{ url('/app/wms/opname') }}"
+                        wire:click.prevent="pindahTab('opname')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer inline-flex items-center justify-center {{ $activeTab === 'opname' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         Stock Opname
-                    </button>
+                    </a>
                     {{-- [F3-7] Cycle count — halaman terpisah (bukan tab child) --}}
                     <a
                         href="{{ route('wms.cycle-count') }}"
@@ -226,30 +230,34 @@
 
                 <!-- Group: Pengadaan -->
                 <div x-show="subModul === 'pengadaan'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0 pr-2 sm:pr-0" x-cloak>
-                    <button
-                        wire:click="$set('activeTab', 'po')"
-                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 {{ $activeTab === 'po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    <a
+                        href="{{ url('/app/wms/po') }}"
+                        wire:click.prevent="pindahTab('po')"
+                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 inline-flex items-center justify-center {{ $activeTab === 'po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         PO & Supplier
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'grn')"
-                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 {{ $activeTab === 'grn' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    </a>
+                    <a
+                        href="{{ url('/app/wms/grn') }}"
+                        wire:click.prevent="pindahTab('grn')"
+                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 inline-flex items-center justify-center {{ $activeTab === 'grn' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         GRN
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'retur')"
-                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 {{ $activeTab === 'retur' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    </a>
+                    <a
+                        href="{{ url('/app/wms/retur') }}"
+                        wire:click.prevent="pindahTab('retur')"
+                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 inline-flex items-center justify-center {{ $activeTab === 'retur' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         Retur Pembelian
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'histori_po')"
-                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 {{ $activeTab === 'histori_po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    </a>
+                    <a
+                        href="{{ url('/app/wms/histori_po') }}"
+                        wire:click.prevent="pindahTab('histori_po')"
+                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 inline-flex items-center justify-center {{ $activeTab === 'histori_po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         Histori Pengadaan
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -434,4 +442,22 @@
 
     <!-- MODAL PENCARIAN PRODUK GLOBAL -->
     @livewire(\App\Modules\Wms\Livewire\ProductSearchModal::class)
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('pindahTab', last);
+                }
+            });
+        });
+    </script>
 </div>

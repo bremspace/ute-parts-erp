@@ -3,9 +3,9 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-4">
         <!-- Tab Switcher Utama Mitra & Komisi -->
         <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/5 overflow-x-auto scrollbar-none max-w-full flex-nowrap py-1">
-            <button
-                type="button"
-                wire:click="$set('activeTab', 'reseller')"
+            <a
+                href="{{ url('/app/reseller/reseller') }}"
+                wire:click.prevent="switchTab('reseller')"
                 class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0 {{ $activeTab === 'reseller' ? 'bg-up-accent text-white shadow-lg shadow-up-accent/25' : 'text-ink-400 hover:text-white hover:bg-white/5' }}"
             >
                 <span>🤝</span>
@@ -13,11 +13,11 @@
                 <span class="tabular-nums px-2 py-0.5 rounded-full text-[10px] font-mono {{ $activeTab === 'reseller' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300' }}">
                     {{ $statsMitra['total'] ?? count($resellers) }}
                 </span>
-            </button>
+            </a>
 
-            <button
-                type="button"
-                wire:click="$set('activeTab', 'komisi')"
+            <a
+                href="{{ url('/app/reseller/komisi') }}"
+                wire:click.prevent="switchTab('komisi')"
                 class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0 {{ $activeTab === 'komisi' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5' }}"
             >
                 <span>💰</span>
@@ -25,16 +25,16 @@
                 <span class="tabular-nums px-2 py-0.5 rounded-full text-[10px] font-mono {{ $activeTab === 'komisi' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300' }}">
                     {{ $komisiList->where('status', 'pending')->count() }}
                 </span>
-            </button>
+            </a>
 
-            <button
-                type="button"
-                wire:click="$set('activeTab', 'skema')"
+            <a
+                href="{{ url('/app/reseller/skema') }}"
+                wire:click.prevent="switchTab('skema')"
                 class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0 {{ $activeTab === 'skema' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5' }}"
             >
                 <span>⚙️</span>
                 <span>Skema Komisi</span>
-            </button>
+            </a>
         </div>
 
         <!-- Quick Submenu Links (Hubungan Modul Lain) -->
@@ -463,4 +463,22 @@
             </div>
         </div>
     @endif
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('switchTab', last);
+                }
+            });
+        });
+    </script>
 </div>

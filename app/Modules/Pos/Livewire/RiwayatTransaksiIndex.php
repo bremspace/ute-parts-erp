@@ -29,6 +29,8 @@ class RiwayatTransaksiIndex extends Component
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
+    public const VALID_TABS = ['global', 'pos', 'online', 'servis', 'pembelian', 'retur', 'mutasi_kas', 'mutasi-kas'];
+
     public string $activeTab = 'global'; // 'global' | 'pos' | 'online' | 'servis' | 'pembelian' | 'retur' | 'mutasi_kas'
 
     public string $search = '';
@@ -106,9 +108,13 @@ class RiwayatTransaksiIndex extends Component
         'filterJenisRetur' => ['except' => ''],
     ];
 
-    public function mount(?string $activeTab = null): void
+    public function mount(?string $tab = null, ?string $activeTab = null): void
     {
-        $this->activeTab = $activeTab ?? request()->query('tab', request()->query('activeTab', $this->activeTab ?: 'global'));
+        $resolvedTab = $tab ?? $activeTab ?? request()->query('tab', request()->query('activeTab', $this->activeTab ?: 'global'));
+        if ($resolvedTab === 'mutasi-kas') {
+            $resolvedTab = 'mutasi_kas';
+        }
+        $this->activeTab = in_array($resolvedTab, self::VALID_TABS, true) ? $resolvedTab : 'global';
 
         $preset = request()->query('preset', request()->query('filterTanggalPreset', ''));
         $dari = request()->query('dari', request()->query('filterTanggalDari', ''));
@@ -132,6 +138,18 @@ class RiwayatTransaksiIndex extends Component
         }
 
         $this->syncLegacyFilterTanggal();
+    }
+
+    public function switchTab(string $tab): void
+    {
+        $normalized = $tab === 'mutasi-kas' ? 'mutasi_kas' : $tab;
+        if (! in_array($normalized, self::VALID_TABS, true)) {
+            return;
+        }
+
+        $this->activeTab = $normalized;
+        $this->resetPage();
+        $this->dispatch('tab-changed', tab: $tab, url: url('/app/pos/riwayat/'.$tab));
     }
 
     public function updatedFilterTanggalPreset(string $preset): void

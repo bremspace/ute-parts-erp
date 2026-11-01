@@ -408,6 +408,11 @@ Route::get('/account', CustomerAccount::class)
     ->middleware('auth:customer')
     ->name('customer.account');
 
+Route::get('/account/{tab}', CustomerAccount::class)
+    ->whereIn('tab', ['orders', 'servis', 'notifikasi', 'komisi', 'membership', 'profil'])
+    ->middleware('auth:customer')
+    ->name('customer.account.tab');
+
 // [T-15] Cetak label barcode / QR Code produk (multi-produk via ?ids=1,2,3)
 Route::get('/print-barcode', function (Request $request) {
     $ids = collect(explode(',', (string) $request->query('ids', '')))
@@ -592,6 +597,12 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
         ->name('pos.riwayat')
         ->middleware('permission:pos.view|pos.view-own|servis.view');
 
+    // [Permalink Tab Riwayat Transaksi]
+    Route::get('/pos/riwayat/{tab}', RiwayatTransaksiIndex::class)
+        ->name('pos.riwayat.tab')
+        ->whereIn('tab', ['global', 'pos', 'online', 'servis', 'pembelian', 'retur', 'mutasi_kas', 'mutasi-kas'])
+        ->middleware('permission:pos.view|pos.view-own|servis.view');
+
     // Pesanan Online (Fulfillment Marketplace Storefront)
     Route::get('/pos/online-orders', PesananOnlineIndex::class)
         ->name('pos.online-orders')
@@ -606,11 +617,25 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
     Route::get('/wms', WmsDashboard::class)
         ->name('wms')
         ->middleware('permission:wms.view');
+
+    // [Permalink Tab WMS]
+    Route::get('/wms/{tab}', WmsDashboard::class)
+        ->name('wms.tab')
+        ->whereIn('tab', [
+            'produk', 'transfer', 'opname', 'po', 'grn', 'retur', 'stok', 'histori_po', 'monitoring_harga',
+        ])
+        ->middleware('permission:wms.view');
     // WMS Chunked Bulk Foto Upload
 
     // WMS Export & Import Master Produk & Foto
     Route::get('/wms/import-export', ImportExportPage::class)
         ->name('wms.import-export')
+        ->middleware('permission:wms.view');
+
+    // [Permalink Tab WMS Import/Export]
+    Route::get('/wms/import-export/{tab}', ImportExportPage::class)
+        ->name('wms.import-export.tab')
+        ->whereIn('tab', ['import', 'export', 'foto', 'atribut'])
         ->middleware('permission:wms.view');
 
     // WMS Import Foto Massal (halaman terpisah dari Export/Import yang pindah ke Pengaturan)
@@ -717,12 +742,20 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
 
     // CRM & Membership Screen — RBAC: permission crm.view
     Route::get('/crm', CrmDashboard::class)->name('crm')->middleware('permission:crm.view');
+    Route::get('/crm/{tab}', CrmDashboard::class)
+        ->name('crm.tab')
+        ->whereIn('tab', ['pelanggan', 'tier', 'broadcast'])
+        ->middleware('permission:crm.view');
 
     // Lead Pipeline Kanban — [F2-1] wajib permission crm.view
     Route::get('/crm/leads', LeadKanban::class)->name('crm.leads')->middleware('permission:crm.view');
 
     // Reseller & Komisi Screen — RBAC: permission reseller.view
     Route::get('/reseller', ResellerDashboard::class)->name('reseller')->middleware('permission:reseller.view');
+    Route::get('/reseller/{tab}', ResellerDashboard::class)
+        ->name('reseller.tab')
+        ->whereIn('tab', ['reseller', 'komisi', 'skema'])
+        ->middleware('permission:reseller.view');
     Route::get('/crm/reseller', fn () => redirect()->route('reseller'))->name('crm.reseller')->middleware('permission:reseller.view');
 
     // Akunting & Keuangan Screen
@@ -767,12 +800,28 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
 
     // Omnichannel Command Center Screen — RBAC: permission omnichannel.view
     Route::get('/omnichannel', OmnichannelCommandCenter::class)->name('omnichannel')->middleware('permission:omnichannel.view');
+    Route::get('/omnichannel/{tab}', OmnichannelCommandCenter::class)
+        ->name('omnichannel.tab')
+        ->whereIn('tab', ['channels', 'mapping', 'orders', 'returns'])
+        ->middleware('permission:omnichannel.view');
     Route::get('/omnichannel/channels/{id}/auth-redirect', [OmnichannelController::class, 'authRedirect'])->name('omnichannel.auth.redirect')->middleware('permission:omnichannel.manage');
     Route::get('/omnichannel/callback/{platform}', [OmnichannelController::class, 'authCallback'])->name('omnichannel.auth.callback');
 
     // Pengaturan & RBAC Screen — RBAC: permission pengaturan.manage|user.view
     Route::get('/pengaturan', SettingsRbac::class)->name('pengaturan')->middleware('permission:pengaturan.manage|user.view');
     Route::get('/pengaturan/web-konsumen', WebKonsumenSettings::class)->name('pengaturan.web-konsumen')->middleware('permission:pengaturan.manage');
+    Route::get('/pengaturan/web-konsumen/{tab}', WebKonsumenSettings::class)
+        ->name('pengaturan.web-konsumen.tab')
+        ->whereIn('tab', ['hero', 'branding', 'banner', 'stok', 'kontak', 'pembayaran', 'preview'])
+        ->middleware('permission:pengaturan.manage');
+
+    Route::get('/pengaturan/{tab}', SettingsRbac::class)
+        ->name('pengaturan.tab')
+        ->whereIn('tab', [
+            'users', 'role', 'cabang', 'master-produk', 'master_produk', 'export-import', 'export_import',
+            'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan',
+        ])
+        ->middleware('permission:pengaturan.manage|user.view');
 
     // [F1-4] Audit Trail Log Aktivitas Sistem
     Route::get('/audit-log', RiwayatAktivitas::class)->name('audit-log')->middleware('permission:lihat-audit-log');
@@ -799,10 +848,18 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
     Route::get('/hr/payroll', PayrollPage::class)
         ->name('hr.payroll')
         ->middleware('permission:kelola-payroll');
+    Route::get('/hr/payroll/{tab}', PayrollPage::class)
+        ->name('hr.payroll.tab')
+        ->whereIn('tab', ['payroll', 'karyawan'])
+        ->middleware('permission:kelola-payroll');
 
     // [F3-8b] HR Absensi, Shift & KPI — admin/finance (kelola-hr)
     Route::get('/hr/absensi', HrAbsensiKpiPage::class)
         ->name('hr.absensi')
+        ->middleware('permission:kelola-hr');
+    Route::get('/hr/absensi/{tab}', HrAbsensiKpiPage::class)
+        ->name('hr.absensi.tab')
+        ->whereIn('tab', ['shift', 'roster', 'absensi', 'kpi'])
         ->middleware('permission:kelola-hr');
 
     // [F3-8b] Absensi & KPI karyawan (lihat milik sendiri)
@@ -829,7 +886,7 @@ Route::post('/app/login/2fa', [TwoFactorChallengeController::class, 'verify'])
     ->name('two-factor.challenge.post');
 
 // ===== [F1-3] 2FA setup UI — wajib login backoffice =====
-Route::middleware('auth')->prefix('app/keamanan')->group(function () {
+Route::middleware(['auth', 'setup.completed'])->prefix('app/keamanan')->group(function () {
     Route::get('/dua-faktor', [TwoFactorSetupController::class, 'show'])->name('two-factor.setup');
     Route::post('/dua-faktor/aktifkan', [TwoFactorSetupController::class, 'enable'])->name('two-factor.enable');
     Route::post('/dua-faktor/nonaktifkan', [TwoFactorSetupController::class, 'disable'])->name('two-factor.disable');

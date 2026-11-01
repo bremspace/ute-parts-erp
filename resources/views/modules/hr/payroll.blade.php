@@ -28,16 +28,20 @@
 
     {{-- Navigation Tabs --}}
     <div class="flex items-center gap-3 border-b border-ink-200 dark:border-white/10 pb-3">
-        <button wire:click="setTab('payroll')"
-            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition {{ $activeTab === 'payroll' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30' : 'text-ink-600 dark:text-ink-400 hover:bg-black/5 dark:hover:bg-white/5' }}">
+        <a
+            href="{{ url('/app/hr/payroll/payroll') }}"
+            wire:click.prevent="setTab('payroll')"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer {{ $activeTab === 'payroll' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30' : 'text-ink-600 dark:text-ink-400 hover:bg-black/5 dark:hover:bg-white/5' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
             <span>Pemrosesan Payroll &amp; Slip</span>
-        </button>
-        <button wire:click="setTab('karyawan')"
-            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition {{ $activeTab === 'karyawan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30' : 'text-ink-600 dark:text-ink-400 hover:bg-black/5 dark:hover:bg-white/5' }}">
+        </a>
+        <a
+            href="{{ url('/app/hr/payroll/karyawan') }}"
+            wire:click.prevent="setTab('karyawan')"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer {{ $activeTab === 'karyawan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30' : 'text-ink-600 dark:text-ink-400 hover:bg-black/5 dark:hover:bg-white/5' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             <span>Pengaturan Gaji &amp; Komponen Karyawan</span>
-        </button>
+        </a>
     </div>
 
     {{-- TAB 1: PEMROSESAN PAYROLL --}}
@@ -821,4 +825,22 @@
             </div>
         </div>
     @endif
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('setTab', last);
+                }
+            });
+        });
+    </script>
 </div>

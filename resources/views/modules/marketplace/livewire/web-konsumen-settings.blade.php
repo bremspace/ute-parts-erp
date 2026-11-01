@@ -55,63 +55,63 @@
     <!-- Tab Navigation: Segmented Touch Carousel -->
     <div class="relative border-b border-white/[0.08] pb-1">
         <nav class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x -mx-1 px-1 sm:mx-0 sm:px-0">
-            <button type="button" wire:click="setTab('hero')"
+            <a href="{{ url('/app/pengaturan/web-konsumen/hero') }}" wire:click.prevent="setTab('hero')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'hero' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                 </svg>
                 <span>Section Hero</span>
-            </button>
+            </a>
 
-            <button type="button" wire:click="setTab('banner')"
+            <a href="{{ url('/app/pengaturan/web-konsumen/banner') }}" wire:click.prevent="setTab('banner')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'banner' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <span>Banner Promosi</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] {{ $activeTab === 'banner' ? 'bg-white/20 text-white' : 'bg-white/10 text-slate-300' }}">{{ $banners->count() }}</span>
-            </button>
+            </a>
 
-            <button type="button" wire:click="setTab('stok')"
+            <a href="{{ url('/app/pengaturan/web-konsumen/stok') }}" wire:click.prevent="setTab('stok')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'stok' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
                 <span>Kebijakan Stok &amp; Katalog</span>
-            </button>
+            </a>
 
-            <button type="button" wire:click="setTab('branding')"
+            <a href="{{ url('/app/pengaturan/web-konsumen/branding') }}" wire:click.prevent="setTab('branding')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'branding' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                 </svg>
                 <span>Branding &amp; Topbar</span>
-            </button>
+            </a>
 
-            <button type="button" wire:click="setTab('kontak')"
+            <a href="{{ url('/app/pengaturan/web-konsumen/kontak') }}" wire:click.prevent="setTab('kontak')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'kontak' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
                 <span>Kontak &amp; Pop-up</span>
-            </button>
+            </a>
 
-            <button type="button" wire:click="setTab('pembayaran')"
+            <a href="{{ url('/app/pengaturan/web-konsumen/pembayaran') }}" wire:click.prevent="setTab('pembayaran')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'pembayaran' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
                 <span>Metode Pembayaran</span>
-            </button>
+            </a>
 
-            <button type="button" wire:click="setTab('preview')"
+            <a href="{{ url('/app/pengaturan/web-konsumen/preview') }}" wire:click.prevent="setTab('preview')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'preview' ? 'bg-up-mint text-ink-950 shadow-md shadow-up-mint/25' : 'bg-up-mint/10 text-up-mint hover:bg-up-mint/20 border border-up-mint/20' }}">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
                 <span>Live Simulator</span>
-            </button>
+            </a>
         </nav>
     </div>
 
@@ -1360,4 +1360,22 @@
         </div>
     </div>
     @endif
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('setTab', last);
+                }
+            });
+        });
+    </script>
 </div>

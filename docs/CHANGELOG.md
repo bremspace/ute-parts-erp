@@ -5,6 +5,12 @@ Format: `[Fase X] T-XX — ringkasan`.
 
 ## 2026-11-01 — Standardisasi Akunting Industri & Kesiapan Audit ISO (9001 / 27001 / SAK) ✅
 
+- **Permalink Unik Tab Seluruh Modul Utama (Direct Deep-Linking & History Sync)**:
+  - Rute permalink `{tab}` ber-constraint `whereIn` ketat untuk WMS (`/app/wms/{tab}`, `/app/wms/import-export/{tab}`), CRM (`/app/crm/{tab}`), Reseller (`/app/reseller/{tab}`), Omnichannel (`/app/omnichannel/{tab}`), Pengaturan/RBAC (`/app/pengaturan/{tab}`, `/app/pengaturan/web-konsumen/{tab}`), POS Riwayat (`/app/pos/riwayat/{tab}`), HR (`/app/hr/absensi/{tab}`, `/app/hr/payroll/{tab}`), dan Akun Konsumen (`/account/{tab}`).
+  - Resolusi parameter `$tab` di masing-masing Livewire Component `mount(?string $tab)` dan dispatch event browser sync `tab-changed` serta listener popstate navigasi back/forward.
+  - Tautan navigasi tab di Blade view menggunakan tag `<a>` ber-URL direct dengan graceful fallback Livewire.
+  - Test suite komprehensif `tests/Feature/ModulTabPermalinkTest.php` (11 tests, 33 assertions passed).
+
 - **Permalink Unik Tab Akunting (Direct URL & Browser History Sync)**:
   - Rute permalink `/app/akunting/{tab}` (`akunting.tab`) dengan regex constraint `whereIn` pada 11 tab resmi (`laporan`, `jurnal`, `buku-besar`, `coa`, `piutang`, `utang`, `matching-kas`, `diagnosa-neraca`, `tutup-buku`, `neraca-saldo`, `rekonsiliasi-bank`), rute `/app/akunting/aset` tetap aman.
   - Parameter `$tab` di `AkuntingDashboard::mount(?string $tab = null)` dan method `pilihTab()`.

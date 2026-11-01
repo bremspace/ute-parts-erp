@@ -3,7 +3,11 @@
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
             @foreach(['channels' => 'Channels', 'mapping' => 'Mapping Produk', 'orders' => 'Order Terpadu', 'returns' => 'Retur & Komplain'] as $kode => $label)
-                <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">{{ $label }}</button>
+                <a
+                    href="{{ url('/app/omnichannel/'.$kode) }}"
+                    wire:click.prevent="switchTab('{{ $kode }}')"
+                    class="px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}"
+                >{{ $label }}</a>
             @endforeach
         </div>
 
@@ -337,4 +341,22 @@
             </div>
         </div>
     @endif
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('switchTab', last);
+                }
+            });
+        });
+    </script>
 </div>

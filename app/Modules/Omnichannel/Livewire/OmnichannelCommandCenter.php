@@ -18,7 +18,27 @@ use Livewire\Component;
  */
 class OmnichannelCommandCenter extends Component
 {
+    public const VALID_TABS = ['channels', 'mapping', 'orders', 'returns'];
+
     public string $activeTab = 'channels'; // channels, mapping, orders, returns
+
+    public function mount(?string $tab = null): void
+    {
+        $tabParam = $tab ?: request('tab');
+        if ($tabParam && in_array($tabParam, self::VALID_TABS, true)) {
+            $this->activeTab = $tabParam;
+        }
+    }
+
+    public function switchTab(string $tab): void
+    {
+        if (! in_array($tab, self::VALID_TABS, true)) {
+            return;
+        }
+
+        $this->activeTab = $tab;
+        $this->dispatch('tab-changed', tab: $tab, url: url('/app/omnichannel/'.$tab));
+    }
 
     // Modal hubungkan channel
     public bool $showConnectModal = false;

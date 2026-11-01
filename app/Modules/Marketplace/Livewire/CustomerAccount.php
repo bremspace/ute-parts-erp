@@ -21,6 +21,8 @@ class CustomerAccount extends Component
 {
     use WithFileUploads;
 
+    public const VALID_TABS = ['orders', 'servis', 'notifikasi', 'komisi', 'membership', 'profil'];
+
     public string $activeTab = 'orders'; // orders, servis, notifikasi, komisi, membership, profil
 
     // Profil Form State
@@ -46,11 +48,11 @@ class CustomerAccount extends Component
 
     public bool $showOrderDetailModal = false;
 
-    public function mount(): void
+    public function mount(?string $tab = null): void
     {
-        $tab = request()->query('tab');
-        if ($tab && in_array($tab, ['orders', 'servis', 'notifikasi', 'komisi', 'membership', 'profil'], true)) {
-            $this->activeTab = $tab;
+        $tabParam = $tab ?: request()->query('tab');
+        if ($tabParam && in_array($tabParam, self::VALID_TABS, true)) {
+            $this->activeTab = $tabParam;
         }
 
         $customer = auth('customer')->user();
@@ -60,6 +62,16 @@ class CustomerAccount extends Component
             $this->email = $customer->email ?? '';
             $this->alamat = $customer->alamat ?? '';
         }
+    }
+
+    public function switchTab(string $tab): void
+    {
+        if (! in_array($tab, self::VALID_TABS, true)) {
+            return;
+        }
+
+        $this->activeTab = $tab;
+        $this->dispatch('tab-changed', tab: $tab, url: url('/account/'.$tab));
     }
 
     public function bukaDetailOrder(int $orderId): void

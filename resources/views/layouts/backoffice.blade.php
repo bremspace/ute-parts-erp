@@ -119,6 +119,17 @@
 
             <!-- Navigation Links (RBAC Aware) -->
             <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                @if(request()->routeIs('setup.wizard'))
+                    <div class="p-3.5 rounded-2xl bg-up-primary/10 border border-up-primary/20 space-y-2">
+                        <div class="flex items-center gap-2 font-bold text-xs text-up-primary">
+                            <span class="w-2 h-2 rounded-full bg-up-primary animate-ping"></span>
+                            <span>Inisialisasi Sistem Aktif</span>
+                        </div>
+                        <p class="text-[11px] leading-relaxed text-ink-500 dark:text-ink-400">
+                            Sistem sedang dalam proses setup awal toko. Selesaikan seluruh langkah inisialisasi untuk membuka akses modul ERP.
+                        </p>
+                    </div>
+                @else
                 <!-- 1. Dashboard -->
                 <div class="sidebar-group">
                     <button
@@ -511,9 +522,10 @@
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
                         @php
                             $isAkses = request()->is('app/pengaturan*') && (in_array(request('tab'), ['users', 'role', 'cabang']) || (!request()->has('tab') && !request()->routeIs('pengaturan.web-konsumen')));
-                            $isKatalog = request()->is('app/pengaturan*') && (in_array(request('tab'), ['master_produk', 'export_import']) || request()->routeIs('pengaturan.web-konsumen'));
+                            $isKatalog = request()->is('app/pengaturan*') && in_array(request('tab'), ['master_produk', 'export_import']);
+                            $isWebKonsumen = request()->routeIs('pengaturan.web-konsumen');
                             $isOperasional = request()->is('app/pengaturan*') && in_array(request('tab'), ['loyalitas', 'pajak', 'qris', 'master', 'printer', 'integrasi']);
-                            $isSistem = (request()->is('app/pengaturan*') && in_array(request('tab'), ['database', 'audit'])) || request()->is('app/keamanan*') || request()->routeIs('setup.wizard');
+                            $isSistem = (request()->is('app/pengaturan*') && in_array(request('tab'), ['database', 'audit', 'keamanan'])) || request()->is('app/keamanan*');
                         @endphp
 
                         @canany(['pengaturan.manage', 'user.view'])
@@ -526,7 +538,11 @@
                         @can('pengaturan.manage')
                             <a href="/app/pengaturan?tab=master_produk" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isKatalog ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $isKatalog ? 'bg-white' : 'bg-sky-400' }}"></span>
-                                <span>Katalog &amp; Web</span>
+                                <span>Katalog &amp; Master Part</span>
+                            </a>
+                            <a href="{{ route('pengaturan.web-konsumen') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWebKonsumen ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $isWebKonsumen ? 'bg-white' : 'bg-pink-400' }}"></span>
+                                <span>Toko &amp; Web Konsumen</span>
                             </a>
                             <a href="/app/pengaturan?tab=loyalitas" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isOperasional ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $isOperasional ? 'bg-white' : 'bg-up-amber' }}"></span>
@@ -539,6 +555,7 @@
                         @endcan
                     </div>
                 </div>
+                @endif
             </nav>
 
             <!-- User Footer -->
@@ -613,6 +630,7 @@
                                 request()->is('app/keamanan/dua-faktor*') => 'Keamanan Akun & 2FA',
                                 request()->is('app/keamanan/sesi*') => 'Sesi Perangkat',
                                 request()->is('app/audit-log*') => 'Audit Trail & Log',
+                                request()->routeIs('pengaturan.web-konsumen') => 'Toko & Web Konsumen',
                                 request()->is('app/pengaturan*') => 'Pengaturan & Sistem',
                                 default => config('app.name', 'Bremspace').' ERP',
                             };

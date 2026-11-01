@@ -33,30 +33,34 @@
 
     <!-- Main Navigation Tabs: Import vs Foto vs Export vs Atribut -->
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-1.5 bg-black/5 dark:bg-white/[0.03] rounded-2xl border border-black/10 dark:border-white/5 w-full sm:w-fit">
-        <button type="button"
-                wire:click="setTab('import')"
-                class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'import' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
+        <a
+            href="{{ url('/app/wms/import-export/import') }}"
+            wire:click.prevent="setTab('import')"
+            class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'import' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
             <span>📥</span>
             <span>Import Master Produk</span>
-        </button>
-        <button type="button"
-                wire:click="setTab('atribut')"
-                class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'atribut' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
+        </a>
+        <a
+            href="{{ url('/app/wms/import-export/atribut') }}"
+            wire:click.prevent="setTab('atribut')"
+            class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'atribut' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
             <span>🏷️</span>
             <span>Atribut (Kategori, Brand, dll)</span>
-        </button>
-        <button type="button"
-                wire:click="setTab('foto')"
-                class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'foto' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
+        </a>
+        <a
+            href="{{ url('/app/wms/import-export/foto') }}"
+            wire:click.prevent="setTab('foto')"
+            class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'foto' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
             <span>📸</span>
             <span>Import Foto Massal</span>
-        </button>
-        <button type="button"
-                wire:click="setTab('export')"
-                class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'export' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
+        </a>
+        <a
+            href="{{ url('/app/wms/import-export/export') }}"
+            wire:click.prevent="setTab('export')"
+            class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'export' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
             <span>📤</span>
             <span>Ekspor Master &amp; Template</span>
-        </button>
+        </a>
     </div>
 
     <!-- TAB 1: IMPORT WORKSPACE -->
@@ -2263,4 +2267,22 @@
             </div>
         @endif
     @endif
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('setTab', last);
+                }
+            });
+        });
+    </script>
 </div>

@@ -3,10 +3,9 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-4">
         <!-- Tab Switcher Utama CRM -->
         <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/5 overflow-x-auto scrollbar-none max-w-full flex-nowrap py-1">
-            <button
-                type="button"
-                @click="activeTab = 'pelanggan'"
-                wire:click="switchTab('pelanggan')"
+            <a
+                href="{{ url('/app/crm/pelanggan') }}"
+                wire:click.prevent="switchTab('pelanggan')"
                 class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0"
                 :class="activeTab === 'pelanggan' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
             >
@@ -16,12 +15,11 @@
                       :class="activeTab === 'pelanggan' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300'">
                     {{ number_format($totalPelanggan ?? $customers->total()) }}
                 </span>
-            </button>
+            </a>
 
-            <button
-                type="button"
-                @click="activeTab = 'tier'"
-                wire:click="switchTab('tier')"
+            <a
+                href="{{ url('/app/crm/tier') }}"
+                wire:click.prevent="switchTab('tier')"
                 class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0"
                 :class="activeTab === 'tier' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
             >
@@ -31,12 +29,11 @@
                       :class="activeTab === 'tier' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300'">
                     {{ $tiers->count() }}
                 </span>
-            </button>
+            </a>
 
-            <button
-                type="button"
-                @click="activeTab = 'broadcast'"
-                wire:click="switchTab('broadcast')"
+            <a
+                href="{{ url('/app/crm/broadcast') }}"
+                wire:click.prevent="switchTab('broadcast')"
                 class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0"
                 :class="activeTab === 'broadcast' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
             >
@@ -46,7 +43,7 @@
                       :class="activeTab === 'broadcast' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300'">
                     {{ count($riwayatKampanye ?? []) }}
                 </span>
-            </button>
+            </a>
 
             <a
                 href="/app/crm/leads"
@@ -1583,4 +1580,22 @@
 
     {{-- [F1-4] Modal riwayat audit trail per pelanggan --}}
     @include('partials.riwayat-modal')
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('switchTab', last);
+                }
+            });
+        });
+    </script>
 </div>

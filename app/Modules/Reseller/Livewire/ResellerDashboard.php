@@ -20,6 +20,8 @@ class ResellerDashboard extends Component
     use ParsesNominal;
     use WithPagination;
 
+    public const VALID_TABS = ['reseller', 'komisi', 'skema'];
+
     public string $activeTab = 'reseller'; // reseller, komisi, skema
 
     // Mitra filter & search
@@ -52,11 +54,26 @@ class ResellerDashboard extends Component
 
     public float $agenDefaultPersen = 2.0;
 
-    public function mount(): void
+    public function mount(?string $tab = null): void
     {
+        $tabParam = $tab ?: request('tab');
+        if ($tabParam && in_array($tabParam, self::VALID_TABS, true)) {
+            $this->activeTab = $tabParam;
+        }
+
         $config = app(KonfigurasiService::class);
         $this->resellerDefaultPersen = (float) ($config->get('reseller_default_persen') ?? 1.0);
         $this->agenDefaultPersen = (float) ($config->get('agen_default_persen') ?? 2.0);
+    }
+
+    public function switchTab(string $tab): void
+    {
+        if (! in_array($tab, self::VALID_TABS, true)) {
+            return;
+        }
+
+        $this->activeTab = $tab;
+        $this->dispatch('tab-changed', tab: $tab, url: url('/app/reseller/'.$tab));
     }
 
     public function simpanKonfigurasiPersenDefault(): void

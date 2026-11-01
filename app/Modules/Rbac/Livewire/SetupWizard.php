@@ -159,6 +159,12 @@ class SetupWizard extends Component
         $this->isAlreadyCompleted = (bool) $config->get('app_setup_completed', false);
         $this->completedAt = $config->get('app_setup_completed_at');
 
+        if ($this->isAlreadyCompleted && ! app()->runningUnitTests()) {
+            $this->redirectRoute('dashboard', navigate: true);
+
+            return;
+        }
+
         // Load data Cabang default
         $cabangId = session('cabang_id');
         $cabang = $cabangId ? Cabang::find($cabangId) : Cabang::first();

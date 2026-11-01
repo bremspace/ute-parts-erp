@@ -16,6 +16,7 @@
             { id: 'merk_hp', label: 'Merk HP (Brand Smartphone)', subModul: 'katalog', tab: 'master_produk', subTab: 'merk_hp', icon: '📱', group: 'Katalog & Master Produk', desc: 'Daftar merek pabrikan ponsel smartphone (Apple, Samsung, Xiaomi, dll)', keywords: 'merk brand hp smartphone apple samsung xiaomi oppo vivo infinix' },
             { id: 'tipe_hp', label: 'Tipe HP Kompatibel', subModul: 'katalog', tab: 'master_produk', subTab: 'tipe_hp', icon: '📲', group: 'Katalog & Master Produk', desc: 'Model tipe ponsel smartphone yang kompatibel dengan part', keywords: 'tipe model hp ponsel smartphone iphone samsung xiaomi oppo vivo infinix' },
             { id: 'export_import', label: 'Export & Import Master', subModul: 'katalog', tab: 'export_import', subTab: null, icon: '📤', group: 'Katalog & Master Produk', desc: 'Export data master produk, import template, dan manajemen atribut produk', keywords: 'export import master produk template data atribut' },
+            { id: 'web_konsumen', label: 'Pengaturan Toko & Web Konsumen (CMS)', subModul: 'katalog', tab: null, subTab: null, url: '{{ route('pengaturan.web-konsumen') }}', icon: '🌐', group: 'Katalog & Master Produk', desc: 'Branding logo toko, hero headline, banner promo, kebijakan stok & kontak toko', keywords: 'toko web konsumen cms banner promo logo hero branding kontak toko website storefront' },
 
             { id: 'loyalitas', label: 'Strategi Loyalitas & Poin', subModul: 'kebijakan', tab: 'loyalitas', subTab: null, icon: '💎', group: 'Kebijakan & Transaksi', desc: 'Rasio earn/redeem poin belanja & diskon tier membership', keywords: 'loyalitas point poin tier membership diskon potongan cashback member' },
             { id: 'komisi', label: 'Skema Komisi Reseller & Sales', subModul: 'kebijakan', tab: 'loyalitas', subTab: null, icon: '🤝', group: 'Kebijakan & Transaksi', desc: 'Komisi reseller, mitra teknisi dan insentif penjualan tim', keywords: 'komisi reseller komisi sales insentif bagi hasil affiliate bonus' },
@@ -36,7 +37,9 @@
 
             { id: 'coa', label: 'Chart of Accounts (COA)', subModul: 'sistem', tab: 'master', subTab: null, icon: '📊', group: 'Sistem & Keuangan', desc: 'Bagan akun buku besar akuntansi, debit, kredit, klasifikasi aset/beban', keywords: 'coa akun akuntansi buku besar jurnal debit kredit kas bank' },
             { id: 'database', label: 'Basis Data & Backup Sistem', subModul: 'sistem', tab: 'database', subTab: null, icon: '💾', group: 'Sistem & Keuangan', desc: 'Backup snapshot SQL, optimasi database, riwayat pencadangan data', keywords: 'database basis data backup restore dump sql download arsip cadangan' },
-            { id: 'cache', label: 'Clear Cache Server & Optimasi', subModul: 'sistem', tab: 'database', subTab: null, icon: '⚡', group: 'Sistem & Keuangan', desc: 'Bersihkan cache aplikasi, view, route, config, dan OPcache server', keywords: 'cache clear cache server optimasi bersihkan cache flush ram' }
+            { id: 'cache', label: 'Clear Cache Server & Optimasi', subModul: 'sistem', tab: 'database', subTab: null, icon: '⚡', group: 'Sistem & Keuangan', desc: 'Bersihkan cache aplikasi, view, route, config, dan OPcache server', keywords: 'cache clear cache server optimasi bersihkan cache flush ram' },
+            { id: 'keamanan_2fa', label: 'Keamanan Akun & 2FA (Two-Factor)', subModul: 'sistem', tab: 'keamanan', subTab: null, icon: '🛡️', group: 'Sistem & Keuangan', desc: 'Verifikasi login dua langkah via Google Authenticator, secret key & kode cadangan', keywords: 'keamanan 2fa two factor totp autentikasi login otp google authenticator password' },
+            { id: 'keamanan_sesi', label: 'Manajemen Sesi Perangkat & Login', subModul: 'sistem', tab: 'keamanan', subTab: null, icon: '💻', group: 'Sistem & Keuangan', desc: 'Pantau daftar login aktif, alamat IP, browser dan revoke sesi jarak jauh', keywords: 'sesi login perangkat device ip browser revoke logout aktif user' }
         ],
         get filteredItems() {
             if (!this.searchQuery.trim()) return [];
@@ -49,6 +52,10 @@
             );
         },
         selectMenuItem(item) {
+            if (item.url) {
+                window.location.href = item.url;
+                return;
+            }
             this.subModul = item.subModul;
             $wire.set('activeTab', item.tab);
             if (item.subTab) {
@@ -86,9 +93,9 @@
                 }
             } else if (modul === 'sistem') {
                 const target = @js(isSuperAdminOrOwner()) ? 'database' : 'master';
-                if (!['database', 'master'].includes(currentTab)) {
+                if (!['database', 'master', 'audit', 'keamanan'].includes(currentTab)) {
                     $wire.set('activeTab', target);
-                } else if (@js(isSuperAdminOrOwner()) && currentTab !== 'database') {
+                } else if (@js(isSuperAdminOrOwner()) && !['database', 'audit', 'keamanan'].includes(currentTab)) {
                     $wire.set('activeTab', 'database');
                 }
             }
@@ -100,7 +107,7 @@
         else if (['loyalitas', 'pajak', 'qris'].includes(value)) subModul = 'kebijakan';
         else if (['master', 'printer'].includes(value)) subModul = (value === 'master' && subModul === 'sistem') ? 'sistem' : 'operasional';
         else if (value === 'integrasi') subModul = 'integrasi';
-        else if (value === 'database') subModul = 'sistem';
+        else if (['database', 'audit', 'keamanan'].includes(value)) subModul = 'sistem';
     })"
 >
     <!-- TOP TOOLBAR: Redesigned Spotlight Finder & Overview -->
@@ -232,11 +239,11 @@
             >
                 <div class="flex items-center justify-between">
                     <span class="text-lg">📦</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'katalog' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">6 Atribut</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'katalog' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">3 Menu</span>
                 </div>
                 <div>
                     <h3 class="text-xs font-bold leading-snug">Katalog Part</h3>
-                    <p class="text-[10px] opacity-75 truncate">Kategori, Brand, Tipe</p>
+                    <p class="text-[10px] opacity-75 truncate">Kategori, Brand, Web Toko</p>
                 </div>
             </button>
 
@@ -304,11 +311,11 @@
             >
                 <div class="flex items-center justify-between">
                     <span class="text-lg">💾</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'sistem' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">2 Modul</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'sistem' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">4 Menu</span>
                 </div>
                 <div>
-                    <h3 class="text-xs font-bold leading-snug">Sistem & COA</h3>
-                    <p class="text-[10px] opacity-75 truncate">Bagan Akun, Backup</p>
+                    <h3 class="text-xs font-bold leading-snug">Sistem & Keamanan</h3>
+                    <p class="text-[10px] opacity-75 truncate">COA, Backup, 2FA & Sesi</p>
                 </div>
             </button>
         </div>
@@ -353,6 +360,15 @@
                     >
                         📤 Export & Import Master
                     </button>
+                    <a
+                        href="{{ route('pengaturan.web-konsumen') }}"
+                        wire:navigate
+                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500/20 flex items-center gap-1.5"
+                        title="Buka Halaman Pengaturan Toko & Manajemen Web Konsumen"
+                    >
+                        <span>🌐</span>
+                        <span>Toko &amp; Web Konsumen (CMS) &rarr;</span>
+                    </a>
                 </div>
 
                 <!-- Group 3: Kebijakan & Transaksi -->
@@ -427,6 +443,12 @@
                         📜 Audit Trail & Log
                     </button>
                     @endcan
+                    <button
+                        wire:click="$set('activeTab', 'keamanan')"
+                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'keamanan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        🛡️ Keamanan &amp; Sesi
+                    </button>
                 </div>
             </div>
 
@@ -4147,6 +4169,87 @@
         @endcan
     @endif
 
+    @if($activeTab === 'keamanan')
+    <div class="space-y-6">
+        <!-- Header Section -->
+        <div class="glass-panel p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 space-y-1">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl p-2.5 rounded-2xl bg-up-primary/10 text-up-primary border border-up-primary/20">🛡️</span>
+                <div>
+                    <h2 class="text-sm sm:text-base font-bold text-ink-900 dark:text-white">Pusat Keamanan Akun &amp; Sesi Perangkat</h2>
+                    <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Kelola proteksi autentikasi dua faktor (2FA) dan kontrol akses perangkat login aktif.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Card 1: 2FA TOTP -->
+            <div class="glass-panel p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 flex flex-col justify-between space-y-4">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="w-10 h-10 rounded-2xl bg-up-primary/10 text-up-primary flex items-center justify-center text-lg font-bold border border-up-primary/20">🔐</span>
+                        @if(auth()->user()?->hasEnabledTwoFactor())
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-up-mint/15 text-up-mint border border-up-mint/30 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-up-mint"></span>
+                                2FA Aktif
+                            </span>
+                        @else
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-up-amber/15 text-up-amber border border-up-amber/30 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-up-amber"></span>
+                                Belum Aktif
+                            </span>
+                        @endif
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-ink-900 dark:text-white">Verifikasi Dua Faktor (2FA)</h3>
+                        <p class="text-xs text-ink-500 dark:text-ink-400 mt-1 leading-relaxed">
+                            Amankan akun dari akses yang tidak sah menggunakan kode dinamis 6-digit dari aplikasi Google Authenticator atau Authy saat login.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-3">
+                    <span class="text-[11px] text-ink-400">Status perlindungan akun Anda</span>
+                    <a href="{{ route('two-factor.setup') }}" wire:navigate class="px-4 py-2 rounded-xl bg-up-primary hover:opacity-90 text-white font-bold text-xs shadow-md shadow-up-primary/20 transition-[transform,opacity] active:scale-[0.97] min-h-[38px] flex items-center gap-1.5 cursor-pointer">
+                        <span>Konfigurasi 2FA</span>
+                        <span>&rarr;</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Card 2: Sesi Perangkat -->
+            <div class="glass-panel p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 flex flex-col justify-between space-y-4">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="w-10 h-10 rounded-2xl bg-sky-500/10 text-sky-500 flex items-center justify-center text-lg font-bold border border-sky-500/20">💻</span>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-black/5 dark:bg-white/10 text-ink-600 dark:text-ink-300">
+                            Monitoring Sesi
+                        </span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-ink-900 dark:text-white">Sesi Perangkat &amp; Browser</h3>
+                        <p class="text-xs text-ink-500 dark:text-ink-400 mt-1 leading-relaxed">
+                            Pantau riwayat perangkat, browser, lokasi IP yang sedang aktif, dan cabut izin (revoke) sesi perangkat lain dari jarak jauh.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-3">
+                    <span class="text-[11px] text-ink-400">Kontrol sesi aktif pengguna</span>
+                    @can('kelola-sesi')
+                    <a href="{{ route('keamanan.sesi') }}" wire:navigate class="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-900 dark:text-white font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[38px] flex items-center gap-1.5 cursor-pointer">
+                        <span>Kelola Sesi</span>
+                        <span>&rarr;</span>
+                    </a>
+                    @else
+                    <span class="text-xs text-ink-400 italic">Memerlukan hak akses kelola-sesi</span>
+                    @endcan
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- MODAL: USER -->
     @if($showUserModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -5096,4 +5199,22 @@
             </div>
         </div>
     @endif
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('switchTab', last);
+                }
+            });
+        });
+    </script>
 </div>

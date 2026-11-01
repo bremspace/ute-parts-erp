@@ -68,6 +68,11 @@ class SettingsRbac extends Component
      */
     private const PERM_JENIS_SERVIS = ['pengaturan.manage', 'servis.manage'];
 
+    public const VALID_TABS = [
+        'users', 'role', 'cabang', 'master_produk', 'master-produk', 'export_import', 'export-import',
+        'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan',
+    ];
+
     public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak, printer, database, qris
 
     // Konfigurasi QRIS Toko (Upload & Dinamis EMVCo)
@@ -236,20 +241,24 @@ class SettingsRbac extends Component
 
     public ?string $waTestStatus = null;
 
-    public function mount(): void
+    public function mount(?string $tab = null): void
     {
-        if (request()->has('tab')) {
-            $tab = (string) request('tab');
-            if ($tab === 'operasional' || $tab === 'bisnis') {
+        $tabParam = $tab ?: (string) request('tab', '');
+        if ($tabParam) {
+            if ($tabParam === 'operasional' || $tabParam === 'bisnis') {
                 $this->activeTab = 'loyalitas';
-            } elseif ($tab === 'sistem' || $tab === 'keamanan') {
+            } elseif ($tabParam === 'sistem') {
                 $this->activeTab = isSuperAdminOrOwner() ? 'database' : 'audit';
-            } elseif ($tab === 'akses') {
+            } elseif ($tabParam === 'keamanan') {
+                $this->activeTab = 'keamanan';
+            } elseif ($tabParam === 'akses') {
                 $this->activeTab = 'users';
-            } elseif ($tab === 'katalog') {
+            } elseif ($tabParam === 'katalog' || $tabParam === 'master-produk') {
                 $this->activeTab = 'master_produk';
-            } elseif (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'export_import', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit'], true)) {
-                $this->activeTab = $tab;
+            } elseif ($tabParam === 'export-import') {
+                $this->activeTab = 'export_import';
+            } elseif (in_array($tabParam, self::VALID_TABS, true)) {
+                $this->activeTab = $tabParam;
             }
         }
 
@@ -290,6 +299,23 @@ class SettingsRbac extends Component
         $this->loadIntegrasiConfig();
     }
 
+    public function switchTab(string $tab): void
+    {
+        $normalized = match ($tab) {
+            'operasional', 'bisnis' => 'loyalitas',
+            'sistem' => isSuperAdminOrOwner() ? 'database' : 'audit',
+            'akses' => 'users',
+            'katalog', 'master-produk' => 'master_produk',
+            'export-import' => 'export_import',
+            default => $tab,
+        };
+
+        if (in_array($normalized, self::VALID_TABS, true)) {
+            $this->activeTab = $normalized;
+            $this->dispatch('tab-changed', tab: $tab, url: url('/app/pengaturan/'.$tab));
+        }
+    }
+
     public function setSubModul(string $modul): void
     {
         match ($modul) {
@@ -298,7 +324,7 @@ class SettingsRbac extends Component
             'kebijakan' => $this->activeTab = in_array($this->activeTab, ['loyalitas', 'pajak', 'qris'], true) ? $this->activeTab : 'loyalitas',
             'operasional' => $this->activeTab = in_array($this->activeTab, ['master', 'printer'], true) ? $this->activeTab : 'master',
             'integrasi' => $this->activeTab = 'integrasi',
-            'sistem' => $this->activeTab = (isSuperAdminOrOwner() ? 'database' : 'master'),
+            'sistem' => $this->activeTab = in_array($this->activeTab, ['database', 'master', 'audit', 'keamanan'], true) ? $this->activeTab : (isSuperAdminOrOwner() ? 'database' : 'master'),
             default => null,
         };
     }

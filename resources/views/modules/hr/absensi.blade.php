@@ -10,11 +10,13 @@
     <div class="glass-card p-2 sm:p-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
             @foreach(['shift' => 'Shift', 'roster' => 'Roster', 'absensi' => 'Absensi', 'kpi' => 'KPI'] as $key => $label)
-                <button wire:click="pilihTab('{{ $key }}')"
+                <a
+                    href="{{ url('/app/hr/absensi/'.$key) }}"
+                    wire:click.prevent="pilihTab('{{ $key }}')"
                     class="px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center justify-center
                     {{ $tab === $key ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-600 dark:text-ink-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink-900 dark:hover:text-white' }}">
                     {{ $label }}
-                </button>
+                </a>
             @endforeach
         </div>
         @if($tab !== 'shift')
@@ -341,4 +343,22 @@
         </x-prism.dual-scroll>
     </div>
     @endif
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('tab-changed', (event) => {
+                if (event.url && window.location.href !== event.url) {
+                    window.history.pushState(null, '', event.url);
+                }
+            });
+
+            window.addEventListener('popstate', () => {
+                const parts = window.location.pathname.split('/');
+                const last = parts[parts.length - 1];
+                if (last && @this) {
+                    @this.call('pilihTab', last);
+                }
+            });
+        });
+    </script>
 </div>

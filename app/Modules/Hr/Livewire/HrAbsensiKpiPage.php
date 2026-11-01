@@ -18,6 +18,8 @@ use Livewire\Component;
  */
 class HrAbsensiKpiPage extends Component
 {
+    public const VALID_TABS = ['shift', 'roster', 'absensi', 'kpi'];
+
     public string $tab = 'shift';
 
     // Shift form
@@ -66,8 +68,13 @@ class HrAbsensiKpiPage extends Component
         ];
     }
 
-    public function mount(): void
+    public function mount(?string $tab = null): void
     {
+        $tabParam = $tab ?: request('tab');
+        if ($tabParam && in_array($tabParam, self::VALID_TABS, true)) {
+            $this->tab = $tabParam;
+        }
+
         $this->rosterTanggal = now()->toDateString();
         $this->absensiTanggal = now()->toDateString();
         $this->kpiPeriode = now()->format('Y-m');
@@ -75,7 +82,12 @@ class HrAbsensiKpiPage extends Component
 
     public function pilihTab(string $tab): void
     {
-        $this->tab = in_array($tab, ['shift', 'roster', 'absensi', 'kpi'], true) ? $tab : 'shift';
+        if (! in_array($tab, self::VALID_TABS, true)) {
+            return;
+        }
+
+        $this->tab = $tab;
+        $this->dispatch('tab-changed', tab: $tab, url: url('/app/hr/absensi/'.$tab));
     }
 
     // ===== Shift =====

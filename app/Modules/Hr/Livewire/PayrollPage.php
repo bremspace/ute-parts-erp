@@ -22,6 +22,8 @@ class PayrollPage extends Component
     use ParsesNominal;
     use WithPagination;
 
+    public const VALID_TABS = ['payroll', 'karyawan'];
+
     public string $activeTab = 'payroll'; // 'payroll' | 'karyawan'
 
     public string $periode = '';
@@ -104,8 +106,13 @@ class PayrollPage extends Component
 
     protected $listeners = ['periodeRefreshed' => 'mount'];
 
-    public function mount(): void
+    public function mount(?string $tab = null): void
     {
+        $tabParam = $tab ?: request('tab');
+        if ($tabParam && in_array($tabParam, self::VALID_TABS, true)) {
+            $this->activeTab = $tabParam;
+        }
+
         $this->periodeList = PayrollPeriode::orderByDesc('periode')->get()->pluck('periode', 'id')->toArray();
         if (empty($this->periode) && ! empty($this->periodeList)) {
             $this->periode = collect($this->periodeList)->first();
@@ -128,7 +135,12 @@ class PayrollPage extends Component
 
     public function setTab(string $tab): void
     {
-        $this->activeTab = in_array($tab, ['payroll', 'karyawan']) ? $tab : 'payroll';
+        if (! in_array($tab, self::VALID_TABS, true)) {
+            return;
+        }
+
+        $this->activeTab = $tab;
+        $this->dispatch('tab-changed', tab: $tab, url: url('/app/hr/payroll/'.$tab));
     }
 
     public function loadSlips(): void

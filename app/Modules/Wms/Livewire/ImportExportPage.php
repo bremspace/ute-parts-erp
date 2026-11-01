@@ -27,6 +27,8 @@ class ImportExportPage extends Component
 {
     use WithFileUploads;
 
+    public const VALID_TABS = ['import', 'export', 'foto', 'atribut'];
+
     #[Url(as: 'tab')]
     public string $activeTab = 'import'; // 'import' | 'export' | 'foto'
 
@@ -118,10 +120,10 @@ class ImportExportPage extends Component
 
     public string $atributActivePreviewTab = 'kategori';
 
-    public function mount(): void
+    public function mount(?string $tab = null): void
     {
-        $reqTab = request('tab', 'import');
-        $this->activeTab = in_array($reqTab, ['import', 'export', 'foto', 'atribut'], true) ? $reqTab : 'import';
+        $reqTab = $tab ?: request('tab', 'import');
+        $this->activeTab = in_array($reqTab, self::VALID_TABS, true) ? $reqTab : 'import';
 
         $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
         $gudangPertama = Gudang::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->first();
@@ -155,7 +157,12 @@ class ImportExportPage extends Component
 
     public function setTab(string $tab): void
     {
+        if (! in_array($tab, self::VALID_TABS, true)) {
+            return;
+        }
+
         $this->activeTab = $tab;
+        $this->dispatch('tab-changed', tab: $tab, url: url('/app/wms/import-export/'.$tab));
     }
 
     public function downloadTemplate(): mixed
