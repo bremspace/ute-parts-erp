@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Ute Parts ERP & Marketplace — One-Click Universal Launcher (Linux & macOS)
+# ERP & POS System — One-Click Universal Launcher (Linux & macOS)
 # Mendukung auto-fix seluruh dependensi perangkat kosongan, database & multi-device
 # Port Default: 1741 (Akses Lokal & Jaringan LAN / Wi-Fi)
 # ==============================================================================
@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "======================================================================"
-echo "   Ute Parts ERP & Marketplace — One-Click Universal Launcher"
+echo "   ERP & POS System — One-Click Universal Launcher"
 echo "   Target Port: 1741 (Localhost & Jaringan Wi-Fi/LAN)"
 echo "======================================================================"
 echo ""
@@ -18,6 +18,25 @@ echo ""
 # 1. Deteksi Sistem Operasi
 OS_TYPE="$(uname -s)"
 echo "ℹ [INFO] Sistem Operasi terdeteksi: $OS_TYPE ($(uname -m))"
+
+# 1b. Alokasi Swap Memory Otomatis (2GB jika RAM <= 2GB)
+if [ "$OS_TYPE" = "Linux" ] && [ -f /proc/meminfo ]; then
+    MEM_TOTAL_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+    SWAP_TOTAL_MB=$(awk '/SwapTotal/ {print int($2/1024)}' /proc/meminfo)
+    if [ "$MEM_TOTAL_MB" -gt 0 ] && [ "$MEM_TOTAL_MB" -le 2048 ] && [ "$SWAP_TOTAL_MB" -lt 1024 ]; then
+        echo "ℹ [AUTO-FIX] RAM server <= 2GB (${MEM_TOTAL_MB} MB). Menyiapkan alokasi swap memory 2GB..."
+        if [ ! -f /swapfile ]; then
+            sudo fallocate -l 2G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null || true
+            sudo chmod 600 /swapfile 2>/dev/null || true
+            sudo mkswap /swapfile 2>/dev/null || true
+        fi
+        sudo swapon /swapfile 2>/dev/null || true
+        if ! grep -q "/swapfile" /etc/fstab 2>/dev/null; then
+            echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null 2>&1 || true
+        fi
+        echo "✔ [OK] Swap memory 2GB aktif & persisten di /etc/fstab."
+    fi
+fi
 
 # 2. Deteksi PHP Binary
 PHP_BIN=""
@@ -60,7 +79,8 @@ if [ -z "$PHP_BIN" ]; then
             
             sudo apt-get install -y \
                 php8.4-cli php8.4-fpm php8.4-mysql php8.4-sqlite3 php8.4-xml php8.4-gd \
-                php8.4-mbstring php8.4-curl php8.4-zip php8.4-intl php8.4-bcmath php8.4-fileinfo unzip curl || true
+                php8.4-mbstring php8.4-curl php8.4-zip php8.4-intl php8.4-bcmath php8.4-fileinfo \
+                php8.4-opcache php8.4-imagick unzip curl || true
             
             PHP_BIN="$(which php8.4 || which php || echo /usr/bin/php8.4)"
         elif command -v dnf >/dev/null 2>&1; then
@@ -106,7 +126,7 @@ fi
 
 echo "✔ [OK] PHP terverifikasi: $PHP_BIN ($("$PHP_BIN" -v | head -n 1))"
 
-# 4. Validasi Ekstensi PHP Kritis (XML, SQLite, MySQL, Mbstring)
+# 4. Validasi Ekstensi PHP Kritis (XML, SQLite, MySQL, Mbstring, Opcache, Imagick)
 if command -v apt-get >/dev/null 2>&1; then
     MISSING_EXTS=""
     if ! "$PHP_BIN" -m | grep -qi "dom" || ! "$PHP_BIN" -m | grep -qi "xml"; then
@@ -118,10 +138,16 @@ if command -v apt-get >/dev/null 2>&1; then
     if ! "$PHP_BIN" -m | grep -qi "pdo_mysql"; then
         MISSING_EXTS="$MISSING_EXTS php-mysql"
     fi
+    if ! "$PHP_BIN" -m | grep -qi "imagick"; then
+        MISSING_EXTS="$MISSING_EXTS php-imagick"
+    fi
+    if ! "$PHP_BIN" -m | grep -qi "opcache"; then
+        MISSING_EXTS="$MISSING_EXTS php-opcache"
+    fi
     if [ -n "$MISSING_EXTS" ]; then
         echo "ℹ [AUTO-FIX] Memasang ekstensi PHP yang belum aktif:$MISSING_EXTS..."
         PHP_VER="$("$PHP_BIN" -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
-        sudo apt-get update -y && sudo apt-get install -y "php${PHP_VER}-xml" "php${PHP_VER}-sqlite3" "php${PHP_VER}-mysql" "php${PHP_VER}-mbstring" "php${PHP_VER}-curl" unzip || true
+        sudo apt-get update -y && sudo apt-get install -y "php${PHP_VER}-xml" "php${PHP_VER}-sqlite3" "php${PHP_VER}-mysql" "php${PHP_VER}-mbstring" "php${PHP_VER}-curl" "php${PHP_VER}-imagick" "php${PHP_VER}-opcache" unzip || true
     fi
 fi
 
@@ -216,7 +242,7 @@ fi
 if command -v ufw >/dev/null 2>&1; then
     if sudo ufw status 2>/dev/null | grep -qi "active"; then
         sudo ufw allow "$PORT"/tcp >/dev/null 2>&1 || true
-        sudo ufw allow 3306/tcp comment 'Ute Parts MySQL LAN' >/dev/null 2>&1 || true
+        sudo ufw allow 3306/tcp comment 'ERP MySQL LAN' >/dev/null 2>&1 || true
     fi
 fi
 

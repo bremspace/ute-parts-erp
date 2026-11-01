@@ -1,9 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
-title Ute Parts ERP - Universal One-Click Launcher (Port 1741)
+title ERP & POS System - Universal One-Click Launcher (Port 1741)
 
 echo ======================================================================
-echo    Ute Parts ERP ^& Marketplace - Universal Local Launcher
+echo    ERP & POS System - Universal Local Launcher
 echo    Port Default: 1741 (Akses Lokal ^& Jaringan Wi-Fi/LAN/HP/iOS)
 echo ======================================================================
 echo.
@@ -186,8 +186,8 @@ if errorlevel 1 (
 )
 
 :: Buka port di Windows Defender Firewall (Port 1741 & 3306)
-netsh advfirewall firewall add rule name="Ute Parts ERP (Port %PORT%)" dir=in action=allow protocol=TCP localport=%PORT% >nul 2>nul
-netsh advfirewall firewall add rule name="Ute Parts MySQL LAN (Port 3306)" dir=in action=allow protocol=TCP localport=3306 >nul 2>nul
+netsh advfirewall firewall add rule name="ERP POS System (Port %PORT%)" dir=in action=allow protocol=TCP localport=%PORT% >nul 2>nul
+netsh advfirewall firewall add rule name="ERP MySQL LAN (Port 3306)" dir=in action=allow protocol=TCP localport=3306 >nul 2>nul
 
 set "LOCAL_URL=http://localhost:%PORT%/install.php"
 set "NETWORK_URL="
@@ -198,7 +198,7 @@ if not "%LAN_IP%"=="" (
 echo [OK] Port aktif: %PORT%
 echo.
 echo ======================================================================
-echo    Server Ute Parts Berhasil Dijalankan!
+echo    Server ERP & POS Berhasil Dijalankan!
 echo    - Dari Komputer Ini       : %LOCAL_URL%
 if not "%NETWORK_URL%"=="" (
 echo    - Dari HP / iPhone / iPad : %NETWORK_URL%

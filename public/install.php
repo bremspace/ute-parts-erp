@@ -1,6 +1,6 @@
 <?php
 /**
- * Ute Parts ERP & Marketplace — Universal Web GUI Installer
+ * Universal ERP & POS System — Web GUI Installer
  *
  * Mengakomodasi:
  * 1. Pengecekan otomatis kondisi server (OS, RAM, Disk, PHP Ext, Nginx/OLS, DB, Git, Supervisor)
@@ -276,7 +276,7 @@ function checkServerDiagnostics(): array
         'xmlwriter' => 'Export Excel (Maatwebsite) & manifest XML',
         'gd' => 'Kompresi & manipulasi gambar WebP',
         'mbstring' => 'Pemrosesan string UTF-8 multibyte',
-        'curl' => 'Koneksi API Duitku & Biteship',
+        'curl' => 'Koneksi API Payment Gateway & Ekspedisi',
         'zip' => 'Ekstraksi bulk foto & impor Excel',
         'intl' => 'Format angka & ribuan Rupiah',
         'bcmath' => 'Kalkulasi finansial & double-entry',
@@ -284,12 +284,11 @@ function checkServerDiagnostics(): array
         'openssl' => 'Enkripsi data & security token',
         'tokenizer' => 'Parser kode Laravel Blade & Livewire',
         'ctype' => 'Validasi karakter string standar Laravel',
+        'opcache' => 'Akselerasi performa opcode bytecode (wajib zero-lag)',
+        'imagick' => 'Decoder cerdas gambar HEIC, AVIF, TIFF, PNG & optimasi media',
     ];
 
-    $optionalExts = [
-        'imagick' => 'Decoder cerdas gambar HEIC, AVIF, TIFF, RAW, PSD',
-        'opcache' => 'Akselerasi performa script PHP di produksi',
-    ];
+    $optionalExts = [];
 
     $extStatus = [];
     $allReqPassed = $hasDbDriver;
@@ -305,7 +304,9 @@ function checkServerDiagnostics(): array
     ];
 
     foreach ($requiredExts as $ext => $desc) {
-        $loaded = extension_loaded($ext);
+        $loaded = ($ext === 'opcache')
+            ? (extension_loaded('Zend OPcache') || extension_loaded('opcache'))
+            : extension_loaded($ext);
         if (! $loaded) {
             $allReqPassed = false;
         }
@@ -423,16 +424,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             case 'extensions':
                 $iniFile = php_ini_loaded_file();
-                $extsToCheck = ['pdo_mysql', 'dom', 'xml', 'simplexml', 'xmlwriter', 'gd', 'mbstring', 'curl', 'zip', 'intl', 'bcmath', 'fileinfo', 'openssl', 'tokenizer', 'ctype'];
+                $extsToCheck = ['pdo_mysql', 'dom', 'xml', 'simplexml', 'xmlwriter', 'gd', 'mbstring', 'curl', 'zip', 'intl', 'bcmath', 'fileinfo', 'openssl', 'tokenizer', 'ctype', 'opcache', 'imagick'];
                 $missing = [];
                 foreach ($extsToCheck as $e) {
-                    if (! extension_loaded($e)) {
+                    $isLoaded = ($e === 'opcache')
+                        ? (extension_loaded('Zend OPcache') || extension_loaded('opcache'))
+                        : extension_loaded($e);
+                    if (! $isLoaded) {
                         $missing[] = $e;
                     }
                 }
 
                 if (empty($missing)) {
-                    $logs[] = 'Semua ekstensi PHP wajib sudah aktif di memori.';
+                    $logs[] = 'Semua ekstensi PHP wajib (termasuk Opcache & Imagick) sudah aktif di memori.';
                     break;
                 }
 
@@ -441,6 +445,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $content = (string) file_get_contents($iniFile);
                     $modified = false;
                     foreach ($missing as $e) {
+                        if ($e === 'opcache') {
+                            $pattern = '/^[;\s]*zend_extension\s*=\s*(php_)?opcache(\.dll)?/mi';
+                            if (preg_match($pattern, $content)) {
+                                $content = preg_replace($pattern, 'zend_extension=opcache', $content);
+                                $modified = true;
+                                $logs[] = "Mengaktifkan baris 'zend_extension=opcache' di php.ini.";
+                            } elseif (! str_contains($content, 'zend_extension=opcache')) {
+                                $content .= "\nzend_extension=opcache\nopcache.enable=1\nopcache.enable_cli=1\n";
+                                $modified = true;
+                                $logs[] = "Menambahkan konfigurasi 'zend_extension=opcache' di php.ini.";
+                            }
+
+                            continue;
+                        }
                         $pattern = '/^[;\s]*extension\s*=\s*(php_)?'.preg_quote($e, '/').'(\.dll)?/mi';
                         if (preg_match($pattern, $content)) {
                             $content = preg_replace($pattern, 'extension='.$e, $content);
@@ -472,6 +490,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         'intl' => "php{$majorMinor}-intl",
                         'bcmath' => "php{$majorMinor}-bcmath",
                         'imagick' => "php{$majorMinor}-imagick",
+                        'opcache' => "php{$majorMinor}-opcache",
                         'tokenizer' => "php{$majorMinor}-common",
                         'ctype' => "php{$majorMinor}-common",
                     ];
@@ -546,19 +565,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             case 'swap':
                 $diagCheck = checkServerDiagnostics();
-                if ($diagCheck['ram_total_mb'] > 0 && $diagCheck['ram_total_mb'] <= 1500 && $diagCheck['swap_mb'] < 512) {
+                if ($diagCheck['ram_total_mb'] > 0 && $diagCheck['ram_total_mb'] <= 2048 && $diagCheck['swap_mb'] < 1024) {
                     $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
                     $canSudo = runCommand('sudo -n true 2>/dev/null')['status'] === 0;
                     if ($isRoot || $canSudo) {
                         $pfx = $isRoot ? '' : 'sudo ';
-                        runCommand("{$pfx}fallocate -l 2G /swapfile 2>/dev/null || {$pfx}dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null");
-                        runCommand("{$pfx}chmod 600 /swapfile && {$pfx}mkswap /swapfile 2>/dev/null && {$pfx}swapon /swapfile 2>/dev/null");
-                        $logs[] = 'Swap memori 2GB berhasil diaktifkan untuk menjaga stabilitas RAM.';
+                        if (! file_exists('/swapfile')) {
+                            runCommand("{$pfx}fallocate -l 2G /swapfile 2>/dev/null || {$pfx}dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null");
+                            runCommand("{$pfx}chmod 600 /swapfile 2>/dev/null && {$pfx}mkswap /swapfile 2>/dev/null");
+                        }
+                        runCommand("{$pfx}swapon /swapfile 2>/dev/null || true");
+                        runCommand("if ! grep -q '/swapfile' /etc/fstab 2>/dev/null; then echo '/swapfile none swap sw 0 0' | {$pfx}tee -a /etc/fstab >/dev/null 2>&1; fi");
+                        $logs[] = 'Swap memori 2GB berhasil diaktifkan & disimpan persisten di /etc/fstab.';
                     } else {
-                        $logs[] = 'RAM server <= 1.5GB tanpa Swap. Disarankan alokasi swap dengan: sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile';
+                        $logs[] = 'RAM server <= 2GB tanpa Swap. Disarankan alokasi swap dengan: sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab';
                     }
                 } else {
-                    $logs[] = 'Alokasi memori RAM/Swap mencukupi.';
+                    $logs[] = 'Alokasi memori RAM/Swap mencukupi (RAM: '.$diagCheck['ram_total_mb'].'MB, Swap: '.$diagCheck['swap_mb'].'MB).';
                 }
                 break;
         }
@@ -611,7 +634,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         $host = trim($_POST['db_host'] ?? '127.0.0.1');
         $port = trim($_POST['db_port'] ?? '3306');
-        $name = trim($_POST['db_name'] ?? 'uteparts_db');
+        $name = trim($_POST['db_name'] ?? 'erp_pos_db');
         $user = trim($_POST['db_user'] ?? 'root');
         $pass = trim($_POST['db_pass'] ?? '');
 
@@ -730,7 +753,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             $found[$tip] = [
                                 'ip' => $tip,
                                 'port' => (int) $tport,
-                                'type' => $tport === '3306' ? 'MySQL Database Server' : 'Ute Parts Web Server (Port 1741)',
+                                'type' => $tport === '3306' ? 'MySQL Database Server' : 'ERP Web Server (Port 1741)',
                             ];
                         }
                     }
@@ -765,7 +788,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             switch ($step) {
                 case 'write_env':
                     $appRole = trim($_POST['app_role'] ?? 'server');
-                    $appName = addslashes(trim($_POST['app_name'] ?? 'Ute Parts'));
+                    $appName = addslashes(trim($_POST['app_name'] ?? 'ERP POS System'));
                     $appUrl = rtrim(trim($_POST['app_url'] ?? 'http://localhost:1741'), '/');
                     $dbDriver = trim($_POST['db_driver'] ?? 'mysql');
 
@@ -784,7 +807,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     } else {
                         $dbHost = trim($_POST['db_host'] ?? '127.0.0.1');
                         $dbPort = trim($_POST['db_port'] ?? '3306');
-                        $dbName = trim($_POST['db_name'] ?? 'uteparts_db');
+                        $dbName = trim($_POST['db_name'] ?? 'erp_pos_db');
                         $dbUser = trim($_POST['db_user'] ?? 'root');
                         $dbPass = trim($_POST['db_pass'] ?? '');
                         $dbConfig = "DB_CONNECTION=mysql\nDB_HOST={$dbHost}\nDB_PORT={$dbPort}\nDB_DATABASE={$dbName}\nDB_USERNAME={$dbUser}\nDB_PASSWORD={$dbPass}";
@@ -997,7 +1020,7 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ute Parts ERP — Setup Wizard &amp; Server Installer</title>
+    <title>ERP &amp; POS System — Setup Wizard &amp; Server Installer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -1014,14 +1037,14 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
     <div class="flex items-center justify-between border-b border-white/10 pb-5">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl brand-gradient flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-500/20">
-                UP
+                EP
             </div>
             <div>
                 <h1 class="text-lg font-black tracking-tight text-white flex items-center gap-2">
-                    Ute Parts ERP &amp; Marketplace
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">Installer v2.4</span>
+                    ERP &amp; POS System
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">Installer v2.5</span>
                 </h1>
-                <p class="text-xs text-slate-400">One-Click Universal Server Deployment &amp; AI Node Setup</p>
+                <p class="text-xs text-slate-400">Universal One-Click Server Deployment &amp; Multi-Device LAN Setup</p>
             </div>
         </div>
         <div class="text-right hidden sm:block">
@@ -1302,7 +1325,7 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                             <span>🔍</span> <span>Deteksi Otomatis Server di Jaringan LAN</span>
                         </div>
                         <div class="text-[11px] text-slate-400 mt-0.5">
-                            Pindai komputer Server Ute Parts yang aktif di Wi-Fi / kabel LAN yang sama.
+                            Pindai komputer Server Induk yang aktif di Wi-Fi / kabel LAN yang sama.
                         </div>
                     </div>
                     <button type="button" onclick="scanLanServers()" id="btn-scan-lan" class="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer">
@@ -1351,7 +1374,7 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                 </div>
                 <div>
                     <label class="block font-bold text-slate-300 mb-1">Nama Database</label>
-                    <input type="text" id="db_name" value="uteparts_db" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
+                    <input type="text" id="db_name" value="erp_pos_db" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-300 mb-1">Username MySQL</label>
@@ -1411,8 +1434,8 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                 <!-- App & Domain -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-bold text-slate-300 mb-1">Nama Aplikasi</label>
-                        <input type="text" id="app_name" value="Ute Parts" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
+                        <label class="block font-bold text-slate-300 mb-1">Nama Aplikasi / Brand Toko</label>
+                        <input type="text" id="app_name" value="ERP POS System" placeholder="Contoh: Toko Berkah POS" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
                     </div>
                     <div>
                         <label class="block font-bold text-slate-300 mb-1">Public URL / Domain / IP</label>
@@ -1527,12 +1550,12 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                     ✓
                 </div>
                 <div class="space-y-1">
-                    <h3 class="text-lg font-black text-white">Setup Selesai! Ute Parts ERP Siap Digunakan</h3>
+                    <h3 class="text-lg font-black text-white">Setup Selesai! Sistem ERP &amp; POS Siap Digunakan</h3>
                     <p class="text-xs text-slate-400">Database termigrasi, cache aktif, symlink terhubung, dan akun super admin siap digunakan.</p>
                 </div>
                 <div class="p-3 rounded-xl bg-black/40 border border-white/10 max-w-sm mx-auto text-left font-mono text-xs space-y-1">
                     <div class="text-[10px] text-slate-400 uppercase font-sans font-bold">Akun Bawaan Super Admin:</div>
-                    <div>Email: <strong class="text-white">superadmin@uteparts.id</strong></div>
+                    <div>Email: <strong class="text-white">superadmin@uteparts.id</strong> <span class="text-[10px] text-slate-400">(dapat disesuaikan di profil)</span></div>
                     <div>Pass : <strong class="text-white">Password123!</strong></div>
                 </div>
                 <div>
@@ -1556,7 +1579,7 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
 </div>
 
 <footer class="mt-8 text-center text-xs text-slate-500 font-mono">
-    Ute Parts ERP &bull; Modern Glassmorphism &bull; Universal Setup Wizard
+    Universal ERP &amp; POS System &bull; Universal Setup Wizard
 </footer>
 
 <script>
