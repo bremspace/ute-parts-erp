@@ -12,6 +12,9 @@
                 'utang' => 'Utang',
                 'matching-kas' => 'Matching Kas',
                 'diagnosa-neraca' => 'Diagnosa Neraca',
+                'tutup-buku' => 'Tutup Buku',
+                'neraca-saldo' => 'Neraca Saldo (4K)',
+                'rekonsiliasi-bank' => 'Rekonsiliasi Bank',
             ] as $kode => $label)
                 <button
                     wire:click="$set('activeTab', '{{ $kode }}')"
@@ -338,7 +341,21 @@
         <x-prism.data-table :headers="['No. Jurnal', 'Akun', 'Sumber', 'Deskripsi', 'Debit', 'Kredit', '']">
             @forelse($jurnals as $j)
                 <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors text-xs">
-                    <td class="py-3.5 px-4 font-mono font-bold text-ink-900 dark:text-white">{{ $j->no_jurnal }}</td>
+                    <td class="py-3.5 px-4 font-mono font-bold text-ink-900 dark:text-white">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span>{{ $j->no_jurnal }}</span>
+                            @if($j->header?->status_approval === 'pending')
+                                <span class="px-1.5 py-0.5 rounded bg-up-amber/15 border border-up-amber/30 text-up-amber text-[9px] font-bold" title="Menunggu Approval Maker-Checker">PENDING APPROVAL</span>
+                            @elseif($j->header?->status_approval === 'ditolak')
+                                <span class="px-1.5 py-0.5 rounded bg-up-red/15 border border-up-red/30 text-up-red text-[9px] font-bold" title="Ditolak Approver">DITOLAK</span>
+                            @endif
+                            @if($j->header?->is_reversed)
+                                <span class="px-1.5 py-0.5 rounded bg-up-red/10 border border-up-red/20 text-up-red text-[9px] font-bold" title="Dibalik oleh {{ $j->header->reversed_by_no_jurnal }}">DIBALIK</span>
+                            @elseif($j->header?->reversal_of_no_jurnal)
+                                <span class="px-1.5 py-0.5 rounded bg-up-mint/10 border border-up-mint/20 text-up-mint text-[9px] font-bold" title="Pembalik dari {{ $j->header->reversal_of_no_jurnal }}">PEMBALIK</span>
+                            @endif
+                        </div>
+                    </td>
                     <td class="py-3.5 px-4">
                         <button type="button" wire:click="lihatMutasiAkun({{ $j->akun_coa_id }})" class="text-left group cursor-pointer" title="Klik untuk lihat mutasi buku besar">
                             <span class="text-ink-800 dark:text-ink-100 font-medium group-hover:text-up-primary transition-colors">{{ $j->akun?->nama }}</span>
@@ -346,12 +363,31 @@
                         </button>
                     </td>
                     <td class="py-3.5 px-4"><x-prism.status-pill :status="$j->sumber" /></td>
-                    <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300">{{ $j->deskripsi }}</td>
+                    <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300">
+                        <div>{{ $j->deskripsi }}</div>
+                        @if($j->header?->lampiran_path)
+                            <div class="mt-1">
+                                <a href="{{ asset('storage/' . $j->header->lampiran_path) }}" target="_blank" class="inline-flex items-center gap-1 text-[10px] text-up-primary hover:underline font-medium">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                                    <span>Lampiran: {{ $j->header->lampiran_nama ?: 'Berkas Bukti' }}</span>
+                                </a>
+                            </div>
+                        @endif
+                    </td>
                     <td class="py-3.5 px-4 tabular-nums {{ $j->debit > 0 ? 'text-up-amber font-semibold' : 'text-ink-500' }}">{{ $j->debit > 0 ? 'Rp '.number_format($j->debit, 0, ',', '.') : '-' }}</td>
                     <td class="py-3.5 px-4 tabular-nums {{ $j->kredit > 0 ? 'text-up-mint font-semibold' : 'text-ink-500' }}">{{ $j->kredit > 0 ? 'Rp '.number_format($j->kredit, 0, ',', '.') : '-' }}</td>
                     <td class="py-3.5 px-4">
                         <div class="flex items-center gap-1.5">
                             <button wire:click="lihatMutasiAkun({{ $j->akun_coa_id }})" class="px-2.5 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/25 font-bold text-[10px] cursor-pointer" title="Cek Mutasi Buku Besar">Mutasi</button>
+                            @can('akunting.approve')
+                                @if($j->header?->status_approval === 'pending')
+                                    <button type="button" wire:click="setujuiJurnal('{{ $j->no_jurnal }}')" class="px-2.5 py-1 rounded-lg bg-up-mint/15 hover:bg-up-mint/25 text-up-mint border border-up-mint/30 font-bold text-[10px] cursor-pointer" title="Setujui Jurnal Ini (Maker-Checker)">Setujui</button>
+                                    <button type="button" wire:click="tolakJurnal('{{ $j->no_jurnal }}')" class="px-2.5 py-1 rounded-lg bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 font-bold text-[10px] cursor-pointer" title="Tolak Jurnal Ini">Tolak</button>
+                                @endif
+                                @if(!($j->header?->is_reversed) && $j->sumber !== 'reversal')
+                                    <button type="button" wire:click="bukaModalReversal('{{ $j->no_jurnal }}')" class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/25 font-bold text-[10px] cursor-pointer" title="Balik Jurnal Ini (Reversal / Storno)">Balik</button>
+                                @endif
+                            @endcan
                             @can('lihat-audit-log')
                                 <button wire:click="bukaRiwayat('jurnal', {{ $j->id }})" class="px-2.5 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white font-bold text-[10px] cursor-pointer">Riwayat</button>
                             @endcan
@@ -883,6 +919,411 @@
         </div>
     @endif
 
+    <!-- TAB: TUTUP BUKU & KONTROL PERIODE (ISO / AUDIT) -->
+    @if($activeTab === 'tutup-buku')
+        <div class="space-y-6">
+            <!-- Filter Pemilihan Periode -->
+            <x-prism.glass-card title="Pengendalian Periode Akuntansi & Tutup Buku" subtitle="Kunci transaksi historis dan pindahkan saldo pendapatan & beban ke Laba Ditahan untuk memenuhi standar audit ISO.">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-ink-400 mb-1">Bulan</label>
+                            <select wire:model.live="tutupBukuBulan" class="px-3 py-2 rounded-xl glass-input text-xs font-semibold">
+                                @foreach([
+                                    1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                                    5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                                    9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                                ] as $num => $nama)
+                                    <option value="{{ $num }}">{{ $nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-ink-400 mb-1">Tahun</label>
+                            <input type="number" wire:model.live="tutupBukuTahun" min="2020" max="2035" class="w-24 px-3 py-2 rounded-xl glass-input text-xs font-semibold tabular-nums" />
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        @if($periodeAktif && $periodeAktif->isClosed())
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-up-red/10 border border-up-red/20 text-up-red font-bold text-xs">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                PERIODE TERKUNCI (CLOSED)
+                            </span>
+                            @if(isSuperAdminOrOwner(auth()->user()))
+                                <button type="button" wire:click="bukaModalBukaBuku"
+                                    class="px-4 py-2 rounded-xl bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 text-ink-700 dark:text-ink-200 border border-black/10 dark:border-white/10 text-xs font-bold transition cursor-pointer">
+                                    🔓 Buka Kembali Periode
+                                </button>
+                            @endif
+                        @else
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-up-mint/10 border border-up-mint/20 text-up-mint font-bold text-xs">
+                                <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
+                                PERIODE TERBUKA (OPEN)
+                            </span>
+                            @can('akunting.approve')
+                                <button type="button" wire:click="bukaModalTutupBuku"
+                                    class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/25 transition cursor-pointer flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    <span>Tutup Buku Periode Ini</span>
+                                </button>
+                            @endcan
+                        @endif
+                    </div>
+                </div>
+
+                @if($periodeAktif && $periodeAktif->isClosed())
+                    <div class="mt-4 p-4 rounded-xl bg-up-red/[0.04] border border-up-red/15 text-xs text-ink-300 space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="font-semibold text-white">Informasi Penguncian:</span>
+                            <span class="text-ink-400">Ditutup pada: {{ $periodeAktif->closed_at?->format('d/m/Y H:i') }}</span>
+                        </div>
+                        <p>Oleh: <strong class="text-white">{{ $periodeAktif->closedByUser?->name ?? 'Sistem' }}</strong></p>
+                        @if($periodeAktif->no_jurnal_penutup)
+                            <p>No. Jurnal Penutup: <span class="font-mono text-up-mint font-bold">{{ $periodeAktif->no_jurnal_penutup }}</span></p>
+                        @endif
+                        @if($periodeAktif->catatan)
+                            <p class="italic text-ink-400">Catatan: "{{ $periodeAktif->catatan }}"</p>
+                        @endif
+                        <p class="text-[11px] text-ink-400 pt-1 border-t border-white/5">Seluruh penambahan dan perubahan jurnal transaksi pada periode ini diblokir secara mutlak.</p>
+                    </div>
+                @endif
+            </x-prism.glass-card>
+
+            <!-- Tabel Riwayat Penutupan Buku -->
+            <x-prism.glass-card title="Riwayat Penutupan Buku Cabang Ini" subtitle="Daftar rekam jejak penguncian buku bulanan untuk pemenuhan kepatuhan ISO 9001 / ISO 27001.">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-black/5 dark:bg-white/5 text-ink-400 uppercase text-[10px] tracking-wider">
+                            <tr>
+                                <th class="px-4 py-3">Periode</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3">Waktu Penutupan</th>
+                                <th class="px-4 py-3">Otorisator</th>
+                                <th class="px-4 py-3">Jurnal Penutup</th>
+                                <th class="px-4 py-3">Catatan Audit</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-black/5 dark:divide-white/5">
+                            @forelse($riwayatTutupBuku as $r)
+                                <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
+                                    <td class="px-4 py-3 font-bold text-ink-900 dark:text-white">
+                                        {{ $r->label_periode }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        @if($r->isClosed())
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-up-red/10 text-up-red text-[11px] font-bold">
+                                                🔒 Ditutup
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-up-mint/10 text-up-mint text-[11px] font-bold">
+                                                🟢 Terbuka
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-3 text-ink-400">
+                                        {{ $r->closed_at ? $r->closed_at->format('d/m/Y H:i') : '—' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-ink-300">
+                                        {{ $r->closedByUser?->name ?? '—' }}
+                                    </td>
+                                    <td class="px-4 py-3 font-mono text-ink-200">
+                                        {{ $r->no_jurnal_penutup ?? '—' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-ink-400 italic max-w-xs truncate">
+                                        {{ $r->catatan ?? '—' }}
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="px-4 py-8 text-center text-ink-400 text-xs">
+                                        Belum ada riwayat penutupan buku untuk cabang ini.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
+    <!-- TAB: NERACA SALDO 4 KOLOM (TRIAL BALANCE) -->
+    @if($activeTab === 'neraca-saldo')
+        <div class="space-y-6">
+            <!-- Filter & Aksi Ekspor -->
+            <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 flex-wrap">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-semibold text-ink-300">Periode Neraca Saldo:</span>
+                    <input type="date" wire:model.live="neracaSaldoDari" class="px-2.5 py-1.5 rounded-xl glass-input text-xs font-medium min-h-[40px]" />
+                    <span class="text-ink-400 text-xs">—</span>
+                    <input type="date" wire:model.live="neracaSaldoSampai" class="px-2.5 py-1.5 rounded-xl glass-input text-xs font-medium min-h-[40px]" />
+                    <button type="button" wire:click="segarkanLaporan" class="px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 text-xs font-bold text-white border border-white/10 cursor-pointer min-h-[40px]">
+                        Segarkan
+                    </button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" wire:click="export('neraca_saldo', 'xlsx')" class="px-3.5 py-2 rounded-xl bg-up-mint/20 hover:bg-up-mint/30 border border-up-mint/40 text-up-mint text-xs font-bold transition-all cursor-pointer min-h-[40px] flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Export Excel
+                    </button>
+                    <button type="button" wire:click="export('neraca_saldo', 'csv')" class="px-3.5 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 border border-black/10 dark:border-white/10 text-ink-300 text-xs font-bold transition-all cursor-pointer min-h-[40px]">
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Ringkasan Status Balance -->
+            @if($neracaSaldoData)
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div class="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                        <div class="text-[10px] uppercase font-bold text-ink-400">Total Saldo Awal (D / K)</div>
+                        <div class="text-sm font-bold text-ink-900 dark:text-white tabular-nums mt-1">
+                            Rp {{ number_format($neracaSaldoData['total']['saldo_awal_debit'], 0, ',', '.') }}
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                        <div class="text-[10px] uppercase font-bold text-ink-400">Total Mutasi Periode (D)</div>
+                        <div class="text-sm font-bold text-up-amber tabular-nums mt-1">
+                            Rp {{ number_format($neracaSaldoData['total']['mutasi_debit'], 0, ',', '.') }}
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                        <div class="text-[10px] uppercase font-bold text-ink-400">Total Mutasi Periode (K)</div>
+                        <div class="text-sm font-bold text-up-mint tabular-nums mt-1">
+                            Rp {{ number_format($neracaSaldoData['total']['mutasi_kredit'], 0, ',', '.') }}
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-2xl {{ $neracaSaldoData['is_balanced'] ? 'bg-up-mint/10 border border-up-mint/30' : 'bg-up-red/10 border border-up-red/30' }}">
+                        <div class="text-[10px] uppercase font-bold {{ $neracaSaldoData['is_balanced'] ? 'text-up-mint' : 'text-up-red' }}">
+                            {{ $neracaSaldoData['is_balanced'] ? '✓ STATUS SEIMBANG' : '⚠ TIDAK SEIMBANG' }}
+                        </div>
+                        <div class="text-sm font-bold {{ $neracaSaldoData['is_balanced'] ? 'text-up-mint' : 'text-up-red' }} tabular-nums mt-1">
+                            Selisih: Rp {{ number_format(abs($neracaSaldoData['total']['mutasi_debit'] - $neracaSaldoData['total']['mutasi_kredit']), 2, ',', '.') }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabel Neraca Saldo 4 Kolom -->
+                <x-prism.glass-card title="Kertas Kerja Neraca Saldo 4 Kolom" subtitle="Format standar ISO/Audit: Menampilkan Saldo Awal, Pergerakan Mutasi Debit/Kredit, dan Saldo Akhir Buku Besar.">
+                    <div class="overflow-x-auto -mx-4 sm:mx-0">
+                        <table class="w-full text-left text-xs whitespace-nowrap">
+                            <thead>
+                                <tr class="border-b border-black/10 dark:border-white/10 text-[10px] uppercase text-ink-400">
+                                    <th rowspan="2" class="py-3 px-3">Kode Akun</th>
+                                    <th rowspan="2" class="py-3 px-3">Nama Akun</th>
+                                    <th rowspan="2" class="py-3 px-2 text-center">Pos</th>
+                                    <th colspan="2" class="py-2 px-3 text-center border-b border-white/5 bg-white/[0.02]">Saldo Awal</th>
+                                    <th colspan="2" class="py-2 px-3 text-center border-b border-white/5 bg-white/[0.04]">Mutasi Periode</th>
+                                    <th colspan="2" class="py-2 px-3 text-center border-b border-white/5 bg-white/[0.02]">Saldo Akhir</th>
+                                </tr>
+                                <tr class="border-b border-black/10 dark:border-white/10 text-[10px] uppercase text-ink-400">
+                                    <th class="py-2 px-3 text-right">Debit</th>
+                                    <th class="py-2 px-3 text-right">Kredit</th>
+                                    <th class="py-2 px-3 text-right text-up-amber">Debit</th>
+                                    <th class="py-2 px-3 text-right text-up-mint">Kredit</th>
+                                    <th class="py-2 px-3 text-right">Debit</th>
+                                    <th class="py-2 px-3 text-right">Kredit</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-black/5 dark:divide-white/5 font-mono">
+                                @forelse($neracaSaldoData['akun'] as $row)
+                                    <tr class="hover:bg-black/5 dark:hover:bg-white/[0.02] transition-colors">
+                                        <td class="py-2.5 px-3 font-bold text-ink-900 dark:text-white">{{ $row['kode'] }}</td>
+                                        <td class="py-2.5 px-3 font-sans text-ink-700 dark:text-ink-200">{{ $row['nama'] }}</td>
+                                        <td class="py-2.5 px-2 text-center text-[10px] uppercase font-bold text-ink-500">{{ substr($row['saldo_normal'], 0, 1) }}</td>
+                                        <td class="py-2.5 px-3 text-right tabular-nums text-ink-400">{{ $row['saldo_awal_debit'] > 0 ? number_format($row['saldo_awal_debit'], 0, ',', '.') : '-' }}</td>
+                                        <td class="py-2.5 px-3 text-right tabular-nums text-ink-400">{{ $row['saldo_awal_kredit'] > 0 ? number_format($row['saldo_awal_kredit'], 0, ',', '.') : '-' }}</td>
+                                        <td class="py-2.5 px-3 text-right tabular-nums font-semibold {{ $row['mutasi_debit'] > 0 ? 'text-up-amber' : 'text-ink-500' }}">{{ $row['mutasi_debit'] > 0 ? number_format($row['mutasi_debit'], 0, ',', '.') : '-' }}</td>
+                                        <td class="py-2.5 px-3 text-right tabular-nums font-semibold {{ $row['mutasi_kredit'] > 0 ? 'text-up-mint' : 'text-ink-500' }}">{{ $row['mutasi_kredit'] > 0 ? number_format($row['mutasi_kredit'], 0, ',', '.') : '-' }}</td>
+                                        <td class="py-2.5 px-3 text-right tabular-nums font-bold text-ink-900 dark:text-white">{{ $row['saldo_akhir_debit'] > 0 ? number_format($row['saldo_akhir_debit'], 0, ',', '.') : '-' }}</td>
+                                        <td class="py-2.5 px-3 text-right tabular-nums font-bold text-ink-900 dark:text-white">{{ $row['saldo_akhir_kredit'] > 0 ? number_format($row['saldo_akhir_kredit'], 0, ',', '.') : '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="9" class="py-8 text-center text-ink-500 font-sans text-xs">Tidak ada mutasi buku besar pada periode ini.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                            <tfoot class="border-t-2 border-black/20 dark:border-white/20 font-mono font-bold bg-black/5 dark:bg-white/[0.03]">
+                                <tr>
+                                    <td colspan="3" class="py-3 px-3 font-sans text-right uppercase text-[11px] text-ink-300">TOTAL</td>
+                                    <td class="py-3 px-3 text-right tabular-nums">{{ number_format($neracaSaldoData['total']['saldo_awal_debit'], 0, ',', '.') }}</td>
+                                    <td class="py-3 px-3 text-right tabular-nums">{{ number_format($neracaSaldoData['total']['saldo_awal_kredit'], 0, ',', '.') }}</td>
+                                    <td class="py-3 px-3 text-right tabular-nums text-up-amber">{{ number_format($neracaSaldoData['total']['mutasi_debit'], 0, ',', '.') }}</td>
+                                    <td class="py-3 px-3 text-right tabular-nums text-up-mint">{{ number_format($neracaSaldoData['total']['mutasi_kredit'], 0, ',', '.') }}</td>
+                                    <td class="py-3 px-3 text-right tabular-nums">{{ number_format($neracaSaldoData['total']['saldo_akhir_debit'], 0, ',', '.') }}</td>
+                                    <td class="py-3 px-3 text-right tabular-nums">{{ number_format($neracaSaldoData['total']['saldo_akhir_kredit'], 0, ',', '.') }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </x-prism.glass-card>
+            @endif
+        </div>
+    @endif
+
+    <!-- TAB: REKONSILIASI BANK MULTI-FORMAT (PDF, CSV, XLSX) -->
+    @if($activeTab === 'rekonsiliasi-bank')
+        <div class="space-y-6">
+            <div class="flex justify-between items-center gap-3 flex-wrap">
+                <div>
+                    <h3 class="text-sm font-bold text-ink-900 dark:text-white">Rekonsiliasi Rekening Koran Bank</h3>
+                    <p class="text-xs text-ink-400">Pencocokan otomatis transaksi bank (e-Statement PDF BCA/Mandiri, CSV, Excel) dengan buku besar.</p>
+                </div>
+                <button type="button" wire:click="$set('showUploadRekonModal', true)" class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer min-h-[44px] flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    Import Rekening Koran (PDF / CSV)
+                </button>
+            </div>
+
+            <!-- Sesi Terpilih / Detail Rekonsiliasi -->
+            @if($detailRekonsiliasi)
+                <x-prism.glass-card title="Sesi Rekonsiliasi: {{ $detailRekonsiliasi->nama_bank }} ({{ $detailRekonsiliasi->nama_file }})" subtitle="Periode {{ $detailRekonsiliasi->periode_dari->format('d/m/Y') }} — {{ $detailRekonsiliasi->periode_sampai->format('d/m/Y') }} | Akun: {{ $detailRekonsiliasi->akun?->kode }} - {{ $detailRekonsiliasi->akun?->nama }}">
+                    <x-slot:action>
+                        <button wire:click="$set('selectedRekonId', null)" class="px-3 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 text-xs font-bold text-ink-300 cursor-pointer">✕ Tutup Detail</button>
+                    </x-slot:action>
+
+                    <div class="space-y-4">
+                        <!-- Progress Cards -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="p-3.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                                <div class="text-[10px] uppercase font-bold text-ink-400">Total Baris Mutasi</div>
+                                <div class="text-lg font-bold text-white tabular-nums mt-0.5">{{ $detailRekonsiliasi->total_baris_bank }} Transaksi</div>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-up-mint/10 border border-up-mint/30">
+                                <div class="text-[10px] uppercase font-bold text-up-mint">Cocok Otomatis (Matched)</div>
+                                <div class="text-lg font-bold text-up-mint tabular-nums mt-0.5">{{ $detailRekonsiliasi->total_matched }} ({{ $detailRekonsiliasi->total_baris_bank > 0 ? round(($detailRekonsiliasi->total_matched / $detailRekonsiliasi->total_baris_bank) * 100) : 0 }}%)</div>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-up-amber/10 border border-up-amber/30">
+                                <div class="text-[10px] uppercase font-bold text-up-amber">Belum Cocok (Unmatched)</div>
+                                <div class="text-lg font-bold text-up-amber tabular-nums mt-0.5">{{ max(0, $detailRekonsiliasi->total_baris_bank - $detailRekonsiliasi->total_matched) }} Transaksi</div>
+                            </div>
+                        </div>
+
+                        <!-- Tabel Items Rekonsiliasi -->
+                        <div class="overflow-x-auto -mx-4 sm:mx-0">
+                            <table class="w-full text-left text-xs whitespace-nowrap">
+                                <thead>
+                                    <tr class="border-b border-black/10 dark:border-white/10 text-[10px] uppercase text-ink-400">
+                                        <th class="py-2.5 px-3">Tanggal</th>
+                                        <th class="py-2.5 px-3">Deskripsi Rekening Koran</th>
+                                        <th class="py-2.5 px-2 text-center">Tipe</th>
+                                        <th class="py-2.5 px-3 text-right">Nominal</th>
+                                        <th class="py-2.5 px-3 text-center">Status</th>
+                                        <th class="py-2.5 px-3">No. Jurnal Terkait</th>
+                                        <th class="py-2.5 px-3 text-center">Aksi Penyesuaian</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-black/5 dark:divide-white/5">
+                                    @foreach($detailRekonsiliasi->items as $it)
+                                        <tr class="hover:bg-black/5 dark:hover:bg-white/[0.02]">
+                                            <td class="py-2.5 px-3 font-mono text-ink-400">{{ $it->tanggal->format('d/m/Y') }}</td>
+                                            <td class="py-2.5 px-3 text-ink-900 dark:text-ink-100 max-w-sm truncate" title="{{ $it->deskripsi }}">{{ $it->deskripsi }}</td>
+                                            <td class="py-2.5 px-2 text-center">
+                                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold {{ $it->tipe === 'CR' ? 'bg-up-mint/20 text-up-mint' : 'bg-up-amber/20 text-up-amber' }}">
+                                                    {{ $it->tipe === 'CR' ? 'CR (Masuk)' : 'DB (Keluar)' }}
+                                                </span>
+                                            </td>
+                                            <td class="py-2.5 px-3 text-right font-mono font-bold tabular-nums {{ $it->tipe === 'CR' ? 'text-up-mint' : 'text-up-amber' }}">
+                                                Rp {{ number_format($it->nominal, 0, ',', '.') }}
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center">
+                                                @if($it->status === 'matched')
+                                                    <span class="px-2 py-0.5 rounded-full bg-up-mint/15 text-up-mint text-[10px] font-bold">COCOK</span>
+                                                @elseif($it->status === 'adjusted')
+                                                    <span class="px-2 py-0.5 rounded-full bg-up-primary/15 text-up-primary text-[10px] font-bold">DISESUAIKAN</span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-full bg-up-red/15 text-up-red text-[10px] font-bold">BELUM COCOK</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3 font-mono text-xs text-ink-300">
+                                                {{ $it->no_jurnal_matched ?? '—' }}
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center">
+                                                @if($it->status === 'unmatched')
+                                                    <div class="flex items-center justify-center gap-1.5">
+                                                        @if($it->tipe === 'DB')
+                                                            <button type="button" wire:click="bukaModalPenyesuaian({{ $it->id }}, 'biaya_admin')" class="px-2 py-1 rounded-lg bg-up-amber/15 hover:bg-up-amber/25 text-up-amber text-[10px] font-bold cursor-pointer">
+                                                                + Biaya Admin
+                                                            </button>
+                                                        @else
+                                                            <button type="button" wire:click="bukaModalPenyesuaian({{ $it->id }}, 'pendapatan_bunga')" class="px-2 py-1 rounded-lg bg-up-mint/15 hover:bg-up-mint/25 text-up-mint text-[10px] font-bold cursor-pointer">
+                                                                + Bunga Bank
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                @else
+                                                    <span class="text-ink-500 text-[10px]">Terselesaikan</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </x-prism.glass-card>
+            @endif
+
+            <!-- Riwayat Sesi Rekonsiliasi -->
+            <x-prism.glass-card title="Daftar Sesi Rekonsiliasi Rekening Koran" subtitle="Pilih sesi untuk melihat rincian transaksi bank dan melakukan jurnal penyesuaian.">
+                <div class="overflow-x-auto -mx-4 sm:mx-0">
+                    <table class="w-full text-left text-xs whitespace-nowrap">
+                        <thead>
+                            <tr class="border-b border-black/10 dark:border-white/10 text-[10px] uppercase text-ink-400">
+                                <th class="py-3 px-4">Nama Bank</th>
+                                <th class="py-3 px-4">Berkas Sumber</th>
+                                <th class="py-3 px-4">Akun COA</th>
+                                <th class="py-3 px-4">Periode Mutasi</th>
+                                <th class="py-3 px-4 text-center">Total Baris</th>
+                                <th class="py-3 px-4 text-center">Tingkat Kecocokan</th>
+                                <th class="py-3 px-4">Tanggal Import</th>
+                                <th class="py-3 px-4 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-black/5 dark:divide-white/5">
+                            @if($rekonsiliasiList)
+                                @forelse($rekonsiliasiList as $rk)
+                                    <tr class="hover:bg-black/5 dark:hover:bg-white/[0.02]">
+                                        <td class="py-3 px-4 font-bold text-ink-900 dark:text-white flex items-center gap-1.5">
+                                            <span class="w-2 h-2 rounded-full {{ $rk->total_matched === $rk->total_baris_bank ? 'bg-up-mint' : 'bg-up-amber' }}"></span>
+                                            {{ $rk->nama_bank }}
+                                        </td>
+                                        <td class="py-3 px-4 text-ink-400">
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] uppercase font-mono bg-white/5 border border-white/10 text-ink-300 mr-1">{{ $rk->format_file }}</span>
+                                            {{ $rk->nama_file }}
+                                        </td>
+                                        <td class="py-3 px-4 font-mono text-ink-300">{{ $rk->akun?->kode }} - {{ $rk->akun?->nama }}</td>
+                                        <td class="py-3 px-4 text-ink-400">{{ $rk->periode_dari->format('d/m/Y') }} s/d {{ $rk->periode_sampai->format('d/m/Y') }}</td>
+                                        <td class="py-3 px-4 text-center font-mono">{{ $rk->total_baris_bank }}</td>
+                                        <td class="py-3 px-4 text-center">
+                                            <span class="font-bold tabular-nums {{ $rk->total_matched === $rk->total_baris_bank ? 'text-up-mint' : 'text-up-amber' }}">
+                                                {{ $rk->total_matched }} / {{ $rk->total_baris_bank }} ({{ $rk->total_baris_bank > 0 ? round(($rk->total_matched / $rk->total_baris_bank) * 100) : 0 }}%)
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-ink-500">{{ $rk->created_at->format('d/m/Y H:i') }}</td>
+                                        <td class="py-3 px-4 text-center">
+                                            <button type="button" wire:click="pilihRekonsiliasi({{ $rk->id }})" class="px-3 py-1.5 rounded-lg bg-up-primary/15 hover:bg-up-primary/25 text-up-primary text-xs font-bold cursor-pointer">
+                                                Buka Rincian
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="8" class="py-8 text-center text-ink-400 text-xs">
+                                            Belum ada data rekonsiliasi rekening koran. Klik "Import Rekening Koran" untuk memulai.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            @endif
+                        </tbody>
+                    </table>
+                </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
     <!-- MODAL: JURNAL MANUAL -->
     @if($showJurnalManual)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
@@ -910,7 +1351,7 @@
                 @endphp
 
                 <div class="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                             <label for="jurnal-tanggal" class="block text-xs font-semibold text-ink-300 mb-1.5">Tanggal *</label>
                             <input
@@ -937,6 +1378,16 @@
                             @if($errorDeskripsi)
                                 <p id="jurnal-error-deskripsi" class="mt-1.5 text-[11px] font-medium text-up-red">{{ $errorDeskripsi }}</p>
                             @endif
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Lampiran Bukti (PDF/Foto) *</label>
+                            <input
+                                type="file"
+                                wire:model="manualLampiran"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                class="w-full text-xs text-ink-300 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-[11px] file:font-semibold file:bg-up-primary file:text-white hover:file:bg-up-primary/80 cursor-pointer"
+                            />
+                            <div wire:loading wire:target="manualLampiran" class="text-[10px] text-up-amber mt-1">Mengunggah berkas...</div>
                         </div>
                     </div>
 
@@ -1477,6 +1928,263 @@
                 <div class="mt-5 flex gap-3 border-t border-white/10 pt-4">
                     <button type="button" wire:click="tutupFormMatching" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                     <button type="button" wire:click="simpanMatchingKas" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer min-h-[44px]">Simpan Hasil Pencocokan</button>
+                </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
+    <!-- MODAL: KONFIRMASI TUTUP BUKU -->
+    @if($showTutupBukuModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+            <x-prism.glass-card
+                title="Konfirmasi Penutupan Buku Periode"
+                subtitle="Verifikasi pra-cek neraca dan jurnal penutup otomatis sebelum mengunci periode buku."
+                class="w-full max-w-2xl max-h-[92vh] flex flex-col my-auto"
+            >
+                <x-slot:action>
+                    <button wire:click="$set('showTutupBukuModal', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                </x-slot:action>
+
+                <div class="space-y-4 overflow-y-auto pr-1">
+                    <!-- Status Neraca Pra-cek -->
+                    <div class="p-3.5 rounded-xl {{ ($tutupBukuPraCek['neraca_balance'] ?? false) ? 'bg-up-mint/10 border border-up-mint/30' : 'bg-up-red/10 border border-up-red/30' }} flex items-center justify-between">
+                        <div>
+                            <div class="text-xs font-bold {{ ($tutupBukuPraCek['neraca_balance'] ?? false) ? 'text-up-mint' : 'text-up-red' }}">
+                                {{ ($tutupBukuPraCek['neraca_balance'] ?? false) ? '✓ NERACA SEIMBANG (BALANCE)' : '⚠ NERACA TIDAK SEIMBANG' }}
+                            </div>
+                            <div class="text-[11px] text-ink-300 mt-0.5">
+                                {{ $tutupBukuPraCek['pesan'] ?? '' }}
+                            </div>
+                        </div>
+                        <div class="text-xs font-bold tabular-nums text-white">
+                            Selisih: Rp {{ number_format(abs($tutupBukuPraCek['selisih_neraca'] ?? 0), 2, ',', '.') }}
+                        </div>
+                    </div>
+
+                    <!-- Ringkasan Nominal yang Ditutup -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                            <span class="text-[11px] text-ink-400 font-semibold block">Total Pendapatan</span>
+                            <span class="text-sm font-bold text-up-mint tabular-nums">
+                                Rp {{ number_format($tutupBukuPraCek['total_pendapatan'] ?? 0, 0, ',', '.') }}
+                            </span>
+                        </div>
+                        <div class="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                            <span class="text-[11px] text-ink-400 font-semibold block">Total Beban</span>
+                            <span class="text-sm font-bold text-up-red tabular-nums">
+                                Rp {{ number_format($tutupBukuPraCek['total_beban'] ?? 0, 0, ',', '.') }}
+                            </span>
+                        </div>
+                        <div class="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                            <span class="text-[11px] text-ink-400 font-semibold block">Laba / (Rugi) Bersih</span>
+                            <span class="text-sm font-bold {{ ($tutupBukuPraCek['laba_rugi_bersih'] ?? 0) >= 0 ? 'text-up-mint' : 'text-up-red' }} tabular-nums">
+                                Rp {{ number_format($tutupBukuPraCek['laba_rugi_bersih'] ?? 0, 0, ',', '.') }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Keterangan Jurnal Penutup Otomatis -->
+                    <div class="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-xs text-ink-300 space-y-1">
+                        <p class="font-semibold text-ink-900 dark:text-white">Dampak Penutupan Buku:</p>
+                        <p>1. Menghasilkan Jurnal Penutup (Closing Entry): saldo akun pendapatan didebit dan beban dikredit menjadi Rp 0.</p>
+                        <p>2. Laba / Rugi Bersih (Rp {{ number_format($tutupBukuPraCek['laba_rugi_bersih'] ?? 0, 0, ',', '.') }}) dipindahkan ke akun <strong class="text-up-primary font-mono">310-02 (Laba Ditahan)</strong>.</p>
+                        <p>3. Periode bulan tersebut dikunci permanen. Transaksi baru tidak dapat dimasukkan ke periode ini.</p>
+                    </div>
+
+                    <!-- Input Catatan Otorisator -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Catatan Penutupan Buku (Opsional)</label>
+                        <textarea wire:model="tutupBukuCatatan" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Tutup buku bulanan telah direview dan disetujui audit internal..."></textarea>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex gap-3 border-t border-black/10 dark:border-white/10 pt-4">
+                    <button type="button" wire:click="$set('showTutupBukuModal', false)" class="flex-1 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-600 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
+                        Batal
+                    </button>
+                    @if($tutupBukuPraCek['siap_tutup'] ?? false)
+                        <button type="button" wire:click="eksekusiTutupBuku" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer min-h-[44px] flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            <span>Konfirmasi & Kunci Periode</span>
+                        </button>
+                    @else
+                        <button type="button" disabled class="flex-1 py-2.5 rounded-xl bg-ink-800 text-ink-500 font-bold text-xs cursor-not-allowed min-h-[44px]">
+                            Tidak Dapat Ditutup (Neraca Belum Seimbang)
+                        </button>
+                    @endif
+                </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
+    <!-- MODAL: BUKA KEMBALI PERIODE BUKU -->
+    @if($showBukaBukuModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+            <x-prism.glass-card
+                title="Buka Kembali Periode Akuntansi"
+                subtitle="Otorisasi Super Admin: Pembukaan periode akan memposting Jurnal Pembalik otomatis."
+                class="w-full max-w-lg flex flex-col my-auto"
+            >
+                <x-slot:action>
+                    <button wire:click="$set('showBukaBukuModal', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                </x-slot:action>
+
+                <div class="space-y-4">
+                    <div class="p-3.5 rounded-xl bg-up-amber/10 border border-up-amber/30 text-xs text-up-amber space-y-1">
+                        <p class="font-bold">PERINGATAN AUDIT (ISO 27001):</p>
+                        <p>Membuka kembali buku periode yang sudah ditutup akan memposting Jurnal Pembalik (Reversal) atas jurnal penutup sebelumnya, dan memungkinkan mutasi baru.</p>
+                        <p>Setiap pembukaan periode dicatat secara permanen di Audit Trail.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alasan Pembukaan Kembali * (Wajib untuk ISO Audit)</label>
+                        <textarea wire:model="bukaBukuAlasan" rows="3" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Revisi faktur pajak masukan berdasarkan temuan audit internal..."></textarea>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex gap-3 border-t border-black/10 dark:border-white/10 pt-4">
+                    <button type="button" wire:click="$set('showBukaBukuModal', false)" class="flex-1 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-600 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="eksekusiBukaBuku" class="flex-1 py-2.5 rounded-xl bg-up-red hover:bg-up-red/90 text-white font-bold text-xs shadow-md shadow-up-red/25 cursor-pointer min-h-[44px]">
+                        Konfirmasi Buka Kembali
+                    </button>
+                </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
+    <!-- MODAL: REVERSAL / PEMBALIK JURNAL (ISO / AUDIT) -->
+    @if($showReversalModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+            <x-prism.glass-card
+                title="Pembalik Jurnal (Reversal / Storno)"
+                subtitle="Kepatuhan ISO: Jurnal posted tidak dapat dihapus/diedit. Koreksi dilakukan dengan membalik posisi Debit & Kredit."
+                class="w-full max-w-lg flex flex-col my-auto"
+            >
+                <x-slot:action>
+                    <button wire:click="$set('showReversalModal', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                </x-slot:action>
+
+                <div class="space-y-4">
+                    <div class="p-3.5 rounded-xl bg-up-amber/10 border border-up-amber/30 text-xs text-up-amber space-y-1">
+                        <p class="font-bold">INFORMASI REVERSAL:</p>
+                        <p>Nomor Jurnal Asal: <strong class="font-mono text-white">{{ $reversalNoJurnal }}</strong></p>
+                        <p>Sistem akan membuat jurnal baru dengan tanggal hari ini yang membalik seluruh baris transaksi (Debit menjadi Kredit, Kredit menjadi Debit).</p>
+                        <p>Status jurnal asal akan ditandai <span class="text-up-red font-bold">DIBALIK</span> dan tidak dapat di-reversal ulang.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alasan Pembalikan Jurnal * (Wajib untuk Rekam Audit ISO)</label>
+                        <textarea wire:model="reversalAlasan" rows="3" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Kesalahan pemilihan akun kas/bank pada saat input POS..."></textarea>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex gap-3 border-t border-black/10 dark:border-white/10 pt-4">
+                    <button type="button" wire:click="$set('showReversalModal', false)" class="flex-1 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-600 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="eksekusiReversal" class="flex-1 py-2.5 rounded-xl bg-up-red hover:bg-up-red/90 text-white font-bold text-xs shadow-md shadow-up-red/25 cursor-pointer min-h-[44px]">
+                        Konfirmasi Balik Jurnal
+                    </button>
+                </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
+    <!-- MODAL: UPLOAD REKENING KORAN BANK MULTI-FORMAT (PDF, CSV, XLSX) -->
+    @if($showUploadRekonModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+            <x-prism.glass-card
+                title="Import Rekening Koran Bank"
+                subtitle="Dukung format e-Statement PDF (BCA, Mandiri, BRI, BNI), CSV KlikBCA, dan Excel."
+                class="w-full max-w-lg flex flex-col my-auto"
+            >
+                <x-slot:action>
+                    <button wire:click="$set('showUploadRekonModal', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                </x-slot:action>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Bank</label>
+                        <select wire:model="rekonNamaBank" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white">
+                            <option value="BCA">Bank Central Asia (BCA)</option>
+                            <option value="Mandiri">Bank Mandiri</option>
+                            <option value="BRI">Bank BRI</option>
+                            <option value="BNI">Bank BNI</option>
+                            <option value="Lainnya">Bank Lainnya</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Akun Buku Besar Bank di Sistem *</label>
+                        <select wire:model="rekonAkunId" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white">
+                            <option value="">-- Pilih Akun Bank --</option>
+                            @foreach($akunBankOptions as $ab)
+                                <option value="{{ $ab->id }}">{{ $ab->kode }} - {{ $ab->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nomor Rekening (Opsional)</label>
+                        <input type="text" wire:model="rekonNomorRekening" placeholder="Contoh: 8010293841" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Berkas Rekening Koran (PDF / CSV / XLSX) *</label>
+                        <input type="file" wire:model="rekonFile" accept=".pdf,.csv,.txt,.xlsx,.xls" class="w-full text-xs text-ink-300 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-up-primary file:text-white hover:file:bg-up-primary/80 cursor-pointer" />
+                        <div wire:loading wire:target="rekonFile" class="text-xs text-up-amber mt-1">Mengunggah dan membaca berkas...</div>
+                        <p class="text-[11px] text-ink-400 mt-1">Sistem cerdas akan otomatis mengekstrak tanggal, mutasi DB/CR, dan nominal transaksi dari layout berkas.</p>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex gap-3 border-t border-black/10 dark:border-white/10 pt-4">
+                    <button type="button" wire:click="$set('showUploadRekonModal', false)" class="flex-1 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="uploadRekonsiliasiBank" wire:loading.attr="disabled" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer min-h-[44px]">
+                        Mulai Analisa & Matching
+                    </button>
+                </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
+    <!-- MODAL: PENYESUAIAN ITEM REKONSILIASI (BIAYA ADMIN / BUNGA) -->
+    @if($penyesuaianModalOpen)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+            <x-prism.glass-card
+                title="Jurnal Penyesuaian Rekonsiliasi Bank"
+                subtitle="Posting jurnal 1-klik untuk menyelesaikan selisih mutasi rekening koran."
+                class="w-full max-w-md flex flex-col my-auto"
+            >
+                <x-slot:action>
+                    <button wire:click="$set('penyesuaianModalOpen', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                </x-slot:action>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jenis Penyesuaian</label>
+                        <select wire:model="penyesuaianJenis" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white">
+                            <option value="biaya_admin">Biaya Administrasi Bank (Beban)</option>
+                            <option value="pendapatan_bunga">Pendapatan Bunga Bank (Pendapatan)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Keterangan Tambahan (Opsional)</label>
+                        <textarea wire:model="penyesuaianKeterangan" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Biaya admin bulanan kartu debit BCA..."></textarea>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex gap-3 border-t border-black/10 dark:border-white/10 pt-4">
+                    <button type="button" wire:click="$set('penyesuaianModalOpen', false)" class="flex-1 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="eksekusiPenyesuaian" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer min-h-[44px]">
+                        Posting Penyesuaian
+                    </button>
                 </div>
             </x-prism.glass-card>
         </div>

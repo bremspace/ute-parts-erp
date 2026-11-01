@@ -192,13 +192,24 @@ class ActivityLogTest extends TestCase
 
         $kasus = [
             // model, update atribut, kunci cabang utk verifikasi properties
-            [$jurnal, ['deskripsi' => 'Jurnal audit diperbarui'], 'Jurnal', $this->cabang->id],
             [$stok, ['jumlah' => 7], 'StokItem', $this->cabang->id], // cabang via gudang
             [$po, ['status' => 'dikirim'], 'Purchase Order', $this->cabang->id], // cabang via gudang_tujuan
             [$piutang, ['jumlah_dibayar' => 50000], 'Piutang', $this->cabang->id],
             [$utang, ['jumlah_dibayar' => 100000], 'Utang', $this->cabang->id],
             [$this->produk, ['harga_jual_retail' => 800000], 'Produk', null], // master global
         ];
+
+        // Jurnal Akuntansi immutable (ISO audit): create ter-log, update/delete dicegah
+        $this->assertNotNull(
+            AktivitasLog::where('subject_type', JurnalAkuntansi::class)->where('subject_id', $jurnal->id)->where('event', 'created')->first(),
+            'Create JurnalAkuntansi wajib ter-log'
+        );
+        try {
+            $jurnal->update(['deskripsi' => 'coba update']);
+            $this->fail('Jurnal seharusnya immutable');
+        } catch (\DomainException $e) {
+            $this->assertStringContainsString('immutable', $e->getMessage());
+        }
 
         foreach ($kasus as [$model, $ubah, $nama, $cabangId]) {
             $tipe = $model::class;

@@ -3,6 +3,7 @@
 namespace App\Modules\Workflow\Services;
 
 use App\Models\User;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
@@ -316,6 +317,30 @@ class ApprovalService
                 if (! empty($newPassword)) {
                     $pelanggan->update([
                         'password' => Hash::make($newPassword),
+                    ]);
+                }
+            }
+
+            return;
+        }
+
+        // [ISO 9001 / ISO 27001 Maker-Checker] Jurnal Manual
+        if ($request->entity_type === 'jurnal_manual') {
+            $header = JurnalHeader::find($request->entity_id);
+            if ($header) {
+                if ($status === 'disetujui') {
+                    $header->update([
+                        'status_approval' => 'disetujui',
+                        'approved_by_user_id' => $actionedBy,
+                        'approved_at' => now(),
+                        'catatan_approval' => $catatan,
+                    ]);
+                } else {
+                    $header->update([
+                        'status_approval' => 'ditolak',
+                        'approved_by_user_id' => $actionedBy,
+                        'approved_at' => now(),
+                        'catatan_approval' => $catatan,
                     ]);
                 }
             }

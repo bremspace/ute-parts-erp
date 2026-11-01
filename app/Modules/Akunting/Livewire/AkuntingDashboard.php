@@ -6,17 +6,25 @@ use App\Models\User;
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\KasMatching;
+use App\Modules\Akunting\Models\PeriodeAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Models\RekonsiliasiBank;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\DiagnosaNeracaService;
 use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PembayaranSubledgerService;
+use App\Modules\Akunting\Services\RekonsiliasiBankService;
+use App\Modules\Akunting\Services\TutupBukuService;
 use App\Modules\Akunting\Services\ValidasiBarisJurnal;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
+use App\Modules\Workflow\Models\ApprovalRequest;
+use App\Modules\Workflow\Models\ApprovalRule;
+use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -26,12 +34,14 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator as LaravelValidator;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 class AkuntingDashboard extends Component
 {
     use ParsesNominal;
     use PunyaRiwayatAktivitas;
+    use WithFileUploads;
     use WithPagination;
 
     /**
@@ -58,7 +68,7 @@ class AkuntingDashboard extends Component
      */
     private const PER_HALAMAN_SUBLEDGER = 15;
 
-    public string $activeTab = 'laporan'; // laporan, jurnal, buku-besar, coa, piutang, utang, matching-kas, diagnosa-neraca
+    public string $activeTab = 'laporan'; // laporan, jurnal, buku-besar, coa, piutang, utang, matching-kas, diagnosa-neraca, tutup-buku
 
     /** Cakupan laporan keuangan: 'cabang' (cabang aktif) atau 'konsolidasi' (gabungan seluruh cabang) */
     public string $cakupanLaporan = 'cabang';
@@ -67,10 +77,58 @@ class AkuntingDashboard extends Component
 
     public string $periodeSampai = '';
 
+    // Tutup Buku state (ISO / Audit)
+    public int $tutupBukuTahun = 0;
+
+    public int $tutupBukuBulan = 0;
+
+    public bool $showTutupBukuModal = false;
+
+    public bool $showBukaBukuModal = false;
+
+    public string $tutupBukuCatatan = '';
+
+    public string $bukaBukuAlasan = '';
+
+    public array $tutupBukuPraCek = [];
+
     // Jurnal filter & search
     public string $jurnalSearch = '';
 
     public string $jurnalFilterSumber = '';
+
+    // Reversal / Storno state (ISO / Audit)
+    public bool $showReversalModal = false;
+
+    public string $reversalNoJurnal = '';
+
+    public string $reversalAlasan = '';
+
+    // Neraca Saldo (Trial Balance 4 Kolom) state (ISO / Audit)
+    public string $neracaSaldoDari = '';
+
+    public string $neracaSaldoSampai = '';
+
+    // Rekonsiliasi Bank Multi-Format state (ISO / Audit)
+    public mixed $rekonFile = null;
+
+    public ?int $rekonAkunId = null;
+
+    public string $rekonNamaBank = 'BCA';
+
+    public string $rekonNomorRekening = '';
+
+    public ?int $selectedRekonId = null;
+
+    public bool $showUploadRekonModal = false;
+
+    public bool $penyesuaianModalOpen = false;
+
+    public ?int $penyesuaianItemId = null;
+
+    public string $penyesuaianJenis = 'biaya_admin';
+
+    public string $penyesuaianKeterangan = '';
 
     // Buku Besar / Mutasi Akun
     public ?int $selectedBukuBesarAkunId = null;
@@ -89,6 +147,9 @@ class AkuntingDashboard extends Component
     public string $manualDeskripsi = '';
 
     public array $manualLines = [];
+
+    // Lampiran Bukti Transaksi Jurnal Manual (ISO / Audit)
+    public mixed $manualLampiran = null;
 
     // COA modal. `id` = null → mode tambah; terisi → mode edit.
     public bool $showCoaModal = false;
@@ -154,8 +215,14 @@ class AkuntingDashboard extends Component
         $firstAkun = AkunCOA::where('kode', '110-01')->first() ?? AkunCOA::where('is_active', true)->orderBy('kode')->first();
         $this->selectedBukuBesarAkunId = $firstAkun?->id;
 
+        $this->tutupBukuTahun = (int) now()->format('Y');
+        $this->tutupBukuBulan = (int) now()->format('n');
+
+        $this->neracaSaldoDari = now()->startOfMonth()->toDateString();
+        $this->neracaSaldoSampai = now()->toDateString();
+
         $tab = request('tab');
-        if ($tab && in_array($tab, ['laporan', 'jurnal', 'buku-besar', 'coa', 'piutang', 'utang', 'matching-kas', 'diagnosa-neraca'], true)) {
+        if ($tab && in_array($tab, ['laporan', 'jurnal', 'buku-besar', 'coa', 'piutang', 'utang', 'matching-kas', 'diagnosa-neraca', 'tutup-buku'], true)) {
             $this->activeTab = $tab;
         }
 
@@ -424,7 +491,7 @@ class AkuntingDashboard extends Component
     {
         // [B-10a / P0-2] list jurnal scoped cabang aktif (atau seluruh cabang jika konsolidasi)
         $cabangId = $this->cabangScopeId();
-        $query = JurnalAkuntansi::with(['akun', 'cabang']);
+        $query = JurnalAkuntansi::with(['akun', 'cabang', 'header']);
 
         if ($cabangId !== null) {
             $query->where('cabang_id', $cabangId);
@@ -459,6 +526,49 @@ class AkuntingDashboard extends Component
     {
         $this->showJurnalManual = false;
         $this->showJurnalConfirmation = false;
+    }
+
+    public function bukaModalReversal(string $noJurnal): void
+    {
+        $this->izin('akunting.approve');
+        $this->reversalNoJurnal = $noJurnal;
+        $this->reversalAlasan = '';
+        $this->showReversalModal = true;
+    }
+
+    public function eksekusiReversal(): void
+    {
+        $this->izin('akunting.approve');
+        $cabangId = (int) (session('cabang_id') ?? 0);
+        if ($cabangId <= 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Cabang aktif belum dipilih.']);
+
+            return;
+        }
+
+        if (trim($this->reversalAlasan) === '') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Alasan pembalikan jurnal (reversal) wajib diisi untuk kepatuhan audit.']);
+
+            return;
+        }
+
+        try {
+            $hasil = app(JurnalService::class)->reversalJurnal(
+                noJurnalAsal: $this->reversalNoJurnal,
+                cabangId: $cabangId,
+                userId: (int) auth()->id(),
+                alasan: $this->reversalAlasan
+            );
+
+            $this->bersihkanCacheLaporan();
+            $this->showReversalModal = false;
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Jurnal {$this->reversalNoJurnal} berhasil dibalik dengan nomor {$hasil['no_jurnal_reversal']}.",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal membalik jurnal: '.$e->getMessage()]);
+        }
     }
 
     public function getAkunJurnalOptionsProperty(): Collection
@@ -545,19 +655,65 @@ class AkuntingDashboard extends Component
 
         try {
             $jurnalService = app(JurnalService::class);
+            $approvalService = app(ApprovalService::class);
             $cabangId = $this->cabangAktif();
+            $userId = (int) auth()->id();
+
+            // Lampiran file upload
+            $lampiranPath = null;
+            $lampiranNama = null;
+            if ($this->manualLampiran) {
+                $lampiranNama = $this->manualLampiran->getClientOriginalName();
+                $lampiranPath = $this->manualLampiran->store('lampiran-jurnal', 'public');
+            }
+
+            // Segregation of Duties / Maker-Checker Rule
+            $totalDebit = $validation['summary']['debit'] ?? 0;
+            $hasApprovalRule = ApprovalRule::where('entity_type', 'jurnal_manual')
+                ->where('is_aktif', true)
+                ->where(function ($q) use ($cabangId) {
+                    $q->whereNull('cabang_id')->orWhere('cabang_id', $cabangId);
+                })
+                ->exists();
+
+            $statusApproval = $hasApprovalRule ? 'pending' : 'disetujui';
+
             $noJurnal = $jurnalService->generateNoJurnal('manual', $cabangId);
             $jurnalService->post(
-                $noJurnal,
-                $this->manualTanggal,
-                'manual',
-                $validation['lines'],
-                $this->manualDeskripsi,
-                $cabangId,
-                auth()->id()
+                noJurnal: $noJurnal,
+                tanggal: $this->manualTanggal,
+                sumber: 'manual',
+                lines: $validation['lines'],
+                deskripsi: $this->manualDeskripsi,
+                cabangId: $cabangId,
+                userId: $userId,
+                statusApproval: $statusApproval,
+                lampiranPath: $lampiranPath,
+                lampiranNama: $lampiranNama
             );
 
+            $header = JurnalHeader::where('no_jurnal', $noJurnal)
+                ->where('cabang_key', $cabangId)
+                ->first();
+
+            if ($hasApprovalRule && $header) {
+                $approvalService->ajukan(
+                    entityType: 'jurnal_manual',
+                    entityId: $header->id,
+                    cabangId: $cabangId,
+                    payload: [
+                        'no_jurnal' => $noJurnal,
+                        'amount' => $totalDebit,
+                        'deskripsi' => $this->manualDeskripsi,
+                        'tanggal' => $this->manualTanggal,
+                        'lampiran_nama' => $lampiranNama,
+                    ],
+                    requestedBy: $userId
+                );
+            }
+
             $this->resetManualJournalForm();
+            $this->manualLampiran = null;
             $this->showJurnalManual = false;
             $this->bersihkanCacheLaporan();
 
@@ -571,9 +727,13 @@ class AkuntingDashboard extends Component
             }
             $this->activeTab = 'jurnal';
 
+            $pesan = $hasApprovalRule
+                ? "Jurnal manual {$noJurnal} berhasil diajukan dan menunggu persetujuan (Maker-Checker)"
+                : "Jurnal manual {$noJurnal} diposting dan tercatat di sistem";
+
             $this->dispatch('alert', [
                 'type' => 'success',
-                'message' => "Jurnal manual {$noJurnal} diposting dan tercatat di sistem",
+                'message' => $pesan,
             ]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
@@ -602,6 +762,100 @@ class AkuntingDashboard extends Component
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => 'Laporan keuangan berhasil disinkronkan ulang dengan data terbaru.',
+        ]);
+    }
+
+    public function setujuiJurnal(string $noJurnal): void
+    {
+        $this->izin('akunting.approve');
+        $cabangId = $this->cabangAktif();
+        $header = JurnalHeader::where('no_jurnal', $noJurnal)
+            ->where('cabang_key', $cabangId)
+            ->first();
+
+        if (! $header) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Jurnal tidak ditemukan.']);
+
+            return;
+        }
+
+        // Segregation of Duties: pembuat tidak boleh approve pengajuannya sendiri kecuali super-admin / owner
+        $isSuperOrOwner = auth()->user()?->hasRole('super-admin') || auth()->user()?->hasRole('owner');
+        if ($header->user_id === auth()->id() && ! $isSuperOrOwner) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Prinsip 4-Mata (Segregation of Duties): Pembuat jurnal tidak boleh menyetujui jurnalnya sendiri.',
+            ]);
+
+            return;
+        }
+
+        $approvalReq = ApprovalRequest::where('entity_type', 'jurnal_manual')
+            ->where('entity_id', $header->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($approvalReq) {
+            app(ApprovalService::class)->proses(
+                requestId: $approvalReq->id,
+                action: 'disetujui',
+                actionedBy: (int) auth()->id(),
+                catatan: 'Disetujui via UI Akunting'
+            );
+        } else {
+            $header->update([
+                'status_approval' => 'disetujui',
+                'approved_by_user_id' => auth()->id(),
+                'approved_at' => now(),
+            ]);
+        }
+
+        $this->bersihkanCacheLaporan();
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Jurnal {$noJurnal} berhasil disetujui (Approved).",
+        ]);
+    }
+
+    public function tolakJurnal(string $noJurnal, ?string $alasan = null): void
+    {
+        $this->izin('akunting.approve');
+        $cabangId = $this->cabangAktif();
+        $header = JurnalHeader::where('no_jurnal', $noJurnal)
+            ->where('cabang_key', $cabangId)
+            ->first();
+
+        if (! $header) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Jurnal tidak ditemukan.']);
+
+            return;
+        }
+
+        $approvalReq = ApprovalRequest::where('entity_type', 'jurnal_manual')
+            ->where('entity_id', $header->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($approvalReq) {
+            app(ApprovalService::class)->proses(
+                requestId: $approvalReq->id,
+                action: 'ditolak',
+                actionedBy: (int) auth()->id(),
+                catatan: $alasan ?: 'Ditolak via UI Akunting'
+            );
+        } else {
+            $header->update([
+                'status_approval' => 'ditolak',
+                'approved_by_user_id' => auth()->id(),
+                'approved_at' => now(),
+                'catatan_approval' => $alasan,
+            ]);
+        }
+
+        $this->bersihkanCacheLaporan();
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Jurnal {$noJurnal} telah ditolak.",
         ]);
     }
 
@@ -1482,6 +1736,275 @@ class AkuntingDashboard extends Component
         }
     }
 
+    // ===== TUTUP BUKU & KONTROL PERIODE (ISO / AUDIT) =====
+
+    public function getPeriodeAktifProperty(): ?PeriodeAkuntansi
+    {
+        $cabangId = (int) (session('cabang_id') ?? 0);
+        if ($cabangId <= 0) {
+            return null;
+        }
+
+        return app(TutupBukuService::class)->getPeriode(
+            $cabangId,
+            $this->tutupBukuTahun ?: (int) now()->format('Y'),
+            $this->tutupBukuBulan ?: (int) now()->format('n')
+        );
+    }
+
+    public function getRiwayatTutupBukuProperty()
+    {
+        $cabangId = (int) (session('cabang_id') ?? 0);
+        if ($cabangId <= 0) {
+            return collect();
+        }
+
+        return app(TutupBukuService::class)->riwayatPeriode($cabangId, 24);
+    }
+
+    public function updatedTutupBukuTahun(): void
+    {
+        $this->tutupBukuPraCek = [];
+    }
+
+    public function updatedTutupBukuBulan(): void
+    {
+        $this->tutupBukuPraCek = [];
+    }
+
+    public function bukaModalTutupBuku(): void
+    {
+        $this->izin('akunting.approve');
+        $cabangId = (int) (session('cabang_id') ?? 0);
+        if ($cabangId <= 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Cabang aktif belum dipilih.']);
+
+            return;
+        }
+
+        $this->tutupBukuPraCek = app(TutupBukuService::class)->praCek(
+            $cabangId,
+            $this->tutupBukuTahun ?: (int) now()->format('Y'),
+            $this->tutupBukuBulan ?: (int) now()->format('n')
+        );
+
+        $this->tutupBukuCatatan = '';
+        $this->showTutupBukuModal = true;
+    }
+
+    public function eksekusiTutupBuku(): void
+    {
+        $this->izin('akunting.approve');
+        $cabangId = (int) (session('cabang_id') ?? 0);
+        if ($cabangId <= 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Cabang aktif belum dipilih.']);
+
+            return;
+        }
+
+        try {
+            $periode = app(TutupBukuService::class)->tutupBuku(
+                $cabangId,
+                $this->tutupBukuTahun ?: (int) now()->format('Y'),
+                $this->tutupBukuBulan ?: (int) now()->format('n'),
+                (int) auth()->id(),
+                $this->tutupBukuCatatan
+            );
+
+            $this->bersihkanCacheLaporan();
+            $this->showTutupBukuModal = false;
+            $this->tutupBukuPraCek = [];
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Tutup buku periode {$periode->label_periode} berhasil diselesaikan. Periode resmi dikunci.",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal tutup buku: '.$e->getMessage()]);
+        }
+    }
+
+    public function bukaModalBukaBuku(): void
+    {
+        if (! isSuperAdminOrOwner(auth()->user())) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin / Owner yang berhak membuka kembali periode tutup buku.']);
+
+            return;
+        }
+
+        $this->bukaBukuAlasan = '';
+        $this->showBukaBukuModal = true;
+    }
+
+    public function eksekusiBukaBuku(): void
+    {
+        if (! isSuperAdminOrOwner(auth()->user())) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin / Owner yang berhak membuka kembali periode tutup buku.']);
+
+            return;
+        }
+
+        $cabangId = (int) (session('cabang_id') ?? 0);
+        if ($cabangId <= 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Cabang aktif belum dipilih.']);
+
+            return;
+        }
+
+        if (trim($this->bukaBukuAlasan) === '') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Alasan pembukaan kembali wajib diisi untuk rekam audit ISO.']);
+
+            return;
+        }
+
+        try {
+            $periode = app(TutupBukuService::class)->bukaBukuKembali(
+                $cabangId,
+                $this->tutupBukuTahun ?: (int) now()->format('Y'),
+                $this->tutupBukuBulan ?: (int) now()->format('n'),
+                (int) auth()->id(),
+                $this->bukaBukuAlasan
+            );
+
+            $this->bersihkanCacheLaporan();
+            $this->showBukaBukuModal = false;
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Periode {$periode->label_periode} berhasil dibuka kembali. Jurnal pembalik telah diposting.",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal membuka buku: '.$e->getMessage()]);
+        }
+    }
+
+    public function getNeracaSaldoDataProperty(): array
+    {
+        $cabangId = $this->cabangScopeId();
+        $dari = $this->neracaSaldoDari ?: now()->startOfMonth()->toDateString();
+        $sampai = $this->neracaSaldoSampai ?: now()->toDateString();
+
+        return app(ExportLaporanService::class)->neracaSaldo4Kolom($cabangId, $dari, $sampai);
+    }
+
+    public function getAkunBankOptionsProperty(): Collection
+    {
+        return AkunCOA::query()
+            ->where('is_active', true)
+            ->where('tipe', 'aset')
+            ->whereIn('kelompok', ['kas', 'bank'])
+            ->orderBy('kode')
+            ->get(['id', 'kode', 'nama']);
+    }
+
+    public function getRekonsiliasiListProperty()
+    {
+        $cabangId = $this->cabangScopeId();
+        $q = RekonsiliasiBank::with(['akun', 'user'])
+            ->latest();
+
+        if ($cabangId !== null) {
+            $q->where('cabang_id', $cabangId);
+        }
+
+        return $q->paginate(10, ['*'], 'pageRekon');
+    }
+
+    public function getDetailRekonsiliasiProperty(): ?RekonsiliasiBank
+    {
+        if (! $this->selectedRekonId) {
+            return null;
+        }
+
+        return RekonsiliasiBank::with(['akun', 'user', 'items.jurnal'])
+            ->find($this->selectedRekonId);
+    }
+
+    public function pilihRekonsiliasi(int $id): void
+    {
+        $this->selectedRekonId = $id;
+    }
+
+    public function uploadRekonsiliasiBank(): void
+    {
+        $this->izin('akunting.create');
+        $cabangId = (int) (session('cabang_id') ?? 0);
+        if ($cabangId <= 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Cabang aktif belum dipilih.']);
+
+            return;
+        }
+
+        $this->validate([
+            'rekonFile' => 'required|file|max:10240', // 10MB
+            'rekonAkunId' => 'required|exists:akun_coa,id',
+            'rekonNamaBank' => 'required|string|max:50',
+        ]);
+
+        try {
+            $service = app(RekonsiliasiBankService::class);
+            $ext = strtolower($this->rekonFile->getClientOriginalExtension());
+            $parsed = $service->parseFile($this->rekonFile->getRealPath(), $ext);
+
+            $rekon = $service->prosesImport(
+                cabangId: $cabangId,
+                akunCoaId: (int) $this->rekonAkunId,
+                namaBank: $this->rekonNamaBank,
+                namaFile: $this->rekonFile->getClientOriginalName(),
+                formatFile: $ext,
+                items: $parsed,
+                userId: (int) auth()->id(),
+                nomorRekening: $this->rekonNomorRekening ?: null
+            );
+
+            $this->selectedRekonId = $rekon->id;
+            $this->showUploadRekonModal = false;
+            $this->rekonFile = null;
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Berkas mutasi bank berhasil diuraikan: {$rekon->total_baris_bank} transaksi, {$rekon->total_matched} cocok otomatis.",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memproses rekening koran: '.$e->getMessage()]);
+        }
+    }
+
+    public function bukaModalPenyesuaian(int $itemId, string $jenis): void
+    {
+        $this->penyesuaianItemId = $itemId;
+        $this->penyesuaianJenis = $jenis;
+        $this->penyesuaianKeterangan = '';
+        $this->penyesuaianModalOpen = true;
+    }
+
+    public function eksekusiPenyesuaian(): void
+    {
+        $this->izin('akunting.create');
+        if (! $this->penyesuaianItemId) {
+            return;
+        }
+
+        try {
+            $service = app(RekonsiliasiBankService::class);
+            $hasil = $service->buatJurnalPenyesuaian(
+                itemId: $this->penyesuaianItemId,
+                jenisPenyesuaian: $this->penyesuaianJenis,
+                userId: (int) auth()->id(),
+                keterangan: $this->penyesuaianKeterangan ?: null
+            );
+
+            $this->bersihkanCacheLaporan();
+            $this->penyesuaianModalOpen = false;
+            $this->penyesuaianItemId = null;
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Jurnal penyesuaian berhasil dibuat dengan nomor {$hasil['no_jurnal']}.",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal membuat jurnal penyesuaian: '.$e->getMessage()]);
+        }
+    }
+
     public function render()
     {
         $manualFormVisible = $this->showJurnalManual || $this->showJurnalConfirmation;
@@ -1511,6 +2034,12 @@ class AkuntingDashboard extends Component
             'kasMatchings' => $this->kasMatchings,
             'daftarCabang' => Cabang::where('is_active', true)->orderBy('nama')->get(['id', 'nama', 'kode']),
             'hasilDiagnosa' => $this->hasilDiagnosa,
+            'periodeAktif' => $this->periodeAktif,
+            'riwayatTutupBuku' => $this->riwayatTutupBuku,
+            'neracaSaldoData' => $this->activeTab === 'neraca-saldo' ? $this->neracaSaldoData : null,
+            'rekonsiliasiList' => $this->activeTab === 'rekonsiliasi-bank' ? $this->rekonsiliasiList : null,
+            'detailRekonsiliasi' => $this->activeTab === 'rekonsiliasi-bank' ? $this->detailRekonsiliasi : null,
+            'akunBankOptions' => $this->akunBankOptions,
         ])->layout('layouts.backoffice', ['header' => 'Akunting & Keuangan']);
     }
 }

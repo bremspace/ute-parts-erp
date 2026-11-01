@@ -3,6 +3,32 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-01 — Standardisasi Akunting Industri & Kesiapan Audit ISO (9001 / 27001 / SAK) ✅
+
+- **Fase 1: Periode Akuntansi & Fitur Tutup Buku Periodik**:
+  - Migrasi skema database tabel `periode_akuntansi` dengan constraint unique (cabang_id, tahun, bulan).
+  - Implementasi `TutupBukuService`: pra-cek kelayakan & keseimbangan neraca, penjurnalan penutup otomatis double-entry menutup akun nominal (pendapatan & beban) ke Laba Ditahan (`310-02`), hard lock status `closed` untuk pencegahan backdating transaksi, serta re-open terkontrol dengan audit trail.
+  - Guard immutabilitas periode buku di `JurnalService::cekPeriodeTerbuka()`.
+  - UI Tab Tutup Buku di `AkuntingDashboard`: kartu ringkasan status periode, daftar riwayat penutupan, modal pra-cek neraca, dan tombol eksekusi tutup/buka buku.
+- **Fase 2: Immutabilitas Model Jurnal Eloquent & Jurnal Pembalik (Reversal/Storno)**:
+  - Migrasi kolom metadata reversal di `jurnal_header` (`is_reversed`, `reversed_by_no_jurnal`, `reversal_of_no_jurnal`, `reversed_at`, `reversed_by_user_id`).
+  - Model hook immutabilitas di `JurnalAkuntansi` (`updating`/`deleting` throw `DomainException`) dan dirty check atribut finansial inti di `JurnalHeader`.
+  - Service `JurnalService::reversalJurnal()` atomik dengan pencatatan activity log.
+  - Endpoint API `POST /api/akunting/jurnal/{noJurnal}/reversal` & modal reversal 1-klik di UI tab Jurnal.
+- **Fase 3: Rekonsiliasi Bank Multi-Format (CSV, XLSX, PDF BCA/Mandiri) & Neraca Saldo 4 Kolom**:
+  - Migrasi skema database `rekonsiliasi_bank` dan `rekonsiliasi_bank_item`.
+  - Parser mutasi bank `RekonsiliasiBankService`: ekstraksi PDF mutasi (BCA/Mandiri/BRI) via `pdftotext -layout` dengan fallback biner, parsing CSV/XLSX, auto-matching 2-tahap (exact date+amount & fuzzy kliring ±3 hari), dan posting jurnal penyesuaian (biaya admin / bunga) 1-klik.
+  - Laporan Neraca Saldo (Trial Balance) 4 Kolom di `ExportLaporanService::neracaSaldo4Kolom()`: Saldo Awal, Mutasi Debit/Kredit, Saldo Akhir, penanganan kontra-saldo akun, export Excel/CSV, dan tab UI viewer di dashboard.
+- **Fase 4: Governance Maker-Checker (Segregation of Duties) & Lampiran Bukti Transaksi**:
+  - Migrasi kolom approval & lampiran pada `jurnal_header` (`status_approval`, `approved_by_user_id`, `approved_at`, `catatan_approval`, `lampiran_path`, `lampiran_nama`).
+  - Integrasi workflow engine (`ApprovalRule` & `ApprovalRequest` entity `jurnal_manual`) pada API `storeJurnalManual` dan Livewire form.
+  - Penegakan prinsip 4-mata (Four-Eyes Principle / Segregation of Duties): pembuat dilarang menyetujui jurnalnya sendiri.
+  - Upload dan penyimpanan bukti fisik transaksi (PDF/JPG/PNG) dengan tautan berkas di UI tabel jurnal.
+- **Pengujian & Verifikasi Otomatis**:
+  - 4 test suite baru komprehensif: `TutupBukuTest.php`, `JurnalImmutabilityAndReversalTest.php`, `RekonsiliasiBankAndNeracaSaldoTest.php`, `JurnalMakerCheckerAndAttachmentTest.php` (total 21 tests, 123 assertions lulus 100%).
+  - Full suite Akunting (54 tests, 315 assertions) lulus tanpa regresi.
+  - Lolos Laravel Pint PSR-12 dan frontend build `npm run build` sukses.
+
 ## 2026-10-31 — Setup Wizard Interaktif Pasca-Instalasi & Factory Reset ✅
 
 - **Middleware Deteksi Setup Awal (`EnsureSetupCompleted.php`)**:

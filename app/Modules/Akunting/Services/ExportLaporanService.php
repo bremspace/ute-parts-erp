@@ -57,6 +57,7 @@ class ExportLaporanService
             'jurnal' => $this->dataJurnal($dari, $sampai, $cabangId),       // [F2-5]
             'transaksi' => $this->dataTransaksi($dari, $sampai, $cabangId), // [F2-5]
             'komisi' => $this->dataKomisi($cabangId),                       // [F2-5]
+            'neraca_saldo' => $this->dataNeracaSaldo($dari, $sampai, $cabangId), // [ISO/Audit] Trial Balance 4 Kolom
             default => throw new \Exception("Jenis laporan '{$jenis}' tidak dikenal"),
         };
 
@@ -636,6 +637,169 @@ class ExportLaporanService
         $rows[] = ['PPN TERUTANG (Keluaran - Masukan)', '', '', '', '', round($totalPpn - $totalMasukan, 2)];
         $rows[] = [];
         $rows[] = ['KETERANGAN', 'Jumlah transaksi yang terkena PPN: '.$ppnCount];
+
+        return $rows;
+    }
+
+    /**
+     * [ISO / Audit] Neraca Saldo 4 Kolom (Trial Balance):
+     * 1. Saldo Awal (kumulatif s/d $dari - 1 hari)
+     * 2. Mutasi Debit (periode $dari s/d $sampai)
+     * 3. Mutasi Kredit (periode $dari s/d $sampai)
+     * 4. Saldo Akhir (kumulatif s/d $sampai)
+     *
+     * @return array{periode: array{dari: string, sampai: string}, akun: array, total: array{saldo_awal_debit: float, saldo_awal_kredit: float, mutasi_debit: float, mutasi_kredit: float, saldo_akhir_debit: float, saldo_akhir_kredit: float}, is_balanced: bool}
+     */
+    public function neracaSaldo4Kolom(?int $cabangId, string $dari, string $sampai): array
+    {
+        $akuns = AkunCOA::where('is_active', true)->orderBy('kode')->get();
+
+        // 1. Saldo Awal: akumulasi baris jurnal sebelum tanggal $dari (< $dari)
+        $qAwal = $this->queryJurnal($cabangId)->whereDate('tanggal', '<', $dari);
+        $saldoAwalMap = $qAwal->select(
+            'akun_coa_id',
+            DB::raw('SUM(debit) as total_debit'),
+            DB::raw('SUM(kredit) as total_kredit')
+        )->groupBy('akun_coa_id')->get()->keyBy('akun_coa_id');
+
+        // 2. Mutasi Periode: antara $dari s/d $sampai
+        $qMutasi = $this->queryJurnal($cabangId)
+            ->whereDate('tanggal', '>=', $dari)
+            ->whereDate('tanggal', '<=', $sampai);
+        $mutasiMap = $qMutasi->select(
+            'akun_coa_id',
+            DB::raw('SUM(debit) as total_debit'),
+            DB::raw('SUM(kredit) as total_kredit')
+        )->groupBy('akun_coa_id')->get()->keyBy('akun_coa_id');
+
+        $rows = [];
+        $totalAwalDebit = 0.0;
+        $totalAwalKredit = 0.0;
+        $totalMutasiDebit = 0.0;
+        $totalMutasiKredit = 0.0;
+        $totalAkhirDebit = 0.0;
+        $totalAkhirKredit = 0.0;
+
+        foreach ($akuns as $akun) {
+            $awalRow = $saldoAwalMap->get($akun->id);
+            $mutasiRow = $mutasiMap->get($akun->id);
+
+            $awalD = (float) ($awalRow?->total_debit ?? 0);
+            $awalK = (float) ($awalRow?->total_kredit ?? 0);
+            $mutD = (float) ($mutasiRow?->total_debit ?? 0);
+            $mutK = (float) ($mutasiRow?->total_kredit ?? 0);
+
+            // Hitung net saldo awal
+            $netAwal = $akun->saldo_normal === 'debit' ? ($awalD - $awalK) : ($awalK - $awalD);
+            if ($akun->saldo_normal === 'debit') {
+                $saldoAwalDebit = $netAwal >= 0 ? $netAwal : 0;
+                $saldoAwalKredit = $netAwal < 0 ? abs($netAwal) : 0;
+            } else {
+                $saldoAwalDebit = $netAwal < 0 ? abs($netAwal) : 0;
+                $saldoAwalKredit = $netAwal >= 0 ? $netAwal : 0;
+            }
+
+            // Hitung net saldo akhir
+            $akhirD = $awalD + $mutD;
+            $akhirK = $awalK + $mutK;
+            $netAkhir = $akun->saldo_normal === 'debit' ? ($akhirD - $akhirK) : ($akhirK - $akhirD);
+            if ($akun->saldo_normal === 'debit') {
+                $saldoAkhirDebit = $netAkhir >= 0 ? $netAkhir : 0;
+                $saldoAkhirKredit = $netAkhir < 0 ? abs($netAkhir) : 0;
+            } else {
+                $saldoAkhirDebit = $netAkhir < 0 ? abs($netAkhir) : 0;
+                $saldoAkhirKredit = $netAkhir >= 0 ? $netAkhir : 0;
+            }
+
+            // Jangan tampilkan jika seluruh komponen 0 (idle account)
+            if ($netAwal == 0 && $mutD == 0 && $mutK == 0 && $netAkhir == 0) {
+                continue;
+            }
+
+            $totalAwalDebit += $saldoAwalDebit;
+            $totalAwalKredit += $saldoAwalKredit;
+            $totalMutasiDebit += $mutD;
+            $totalMutasiKredit += $mutK;
+            $totalAkhirDebit += $saldoAkhirDebit;
+            $totalAkhirKredit += $saldoAkhirKredit;
+
+            $rows[] = [
+                'akun_id' => $akun->id,
+                'kode' => $akun->kode,
+                'nama' => $akun->nama,
+                'tipe' => $akun->tipe,
+                'saldo_normal' => $akun->saldo_normal,
+                'saldo_awal' => round($netAwal, 2),
+                'saldo_awal_debit' => round($saldoAwalDebit, 2),
+                'saldo_awal_kredit' => round($saldoAwalKredit, 2),
+                'mutasi_debit' => round($mutD, 2),
+                'mutasi_kredit' => round($mutK, 2),
+                'saldo_akhir' => round($netAkhir, 2),
+                'saldo_akhir_debit' => round($saldoAkhirDebit, 2),
+                'saldo_akhir_kredit' => round($saldoAkhirKredit, 2),
+            ];
+        }
+
+        return [
+            'periode' => ['dari' => $dari, 'sampai' => $sampai],
+            'akun' => $rows,
+            'total' => [
+                'saldo_awal_debit' => round($totalAwalDebit, 2),
+                'saldo_awal_kredit' => round($totalAwalKredit, 2),
+                'mutasi_debit' => round($totalMutasiDebit, 2),
+                'mutasi_kredit' => round($totalMutasiKredit, 2),
+                'saldo_akhir_debit' => round($totalAkhirDebit, 2),
+                'saldo_akhir_kredit' => round($totalAkhirKredit, 2),
+            ],
+            'is_balanced' => abs($totalAwalDebit - $totalAwalKredit) < 0.01
+                && abs($totalMutasiDebit - $totalMutasiKredit) < 0.01
+                && abs($totalAkhirDebit - $totalAkhirKredit) < 0.01,
+        ];
+    }
+
+    /**
+     * Data tabular Neraca Saldo 4 Kolom untuk ekspor file Excel/CSV.
+     */
+    private function dataNeracaSaldo(string $dari, string $sampai, ?int $cabangId): array
+    {
+        $ns = $this->neracaSaldo4Kolom($cabangId, $dari, $sampai);
+
+        $rows = [
+            ['NERACA SALDO (TRIAL BALANCE) 4 KOLOM', $dari.' s.d. '.$sampai],
+            [],
+            [
+                'KODE AKUN', 'NAMA AKUN', 'TIPE', 'SALDO NORMAL',
+                'SALDO AWAL (DEBIT)', 'SALDO AWAL (KREDIT)',
+                'MUTASI DEBIT', 'MUTASI KREDIT',
+                'SALDO AKHIR (DEBIT)', 'SALDO AKHIR (KREDIT)',
+            ],
+        ];
+
+        foreach ($ns['akun'] as $a) {
+            $rows[] = [
+                $a['kode'],
+                $a['nama'],
+                strtoupper($a['tipe']),
+                strtoupper($a['saldo_normal']),
+                $a['saldo_awal_debit'] ?: 0,
+                $a['saldo_awal_kredit'] ?: 0,
+                $a['mutasi_debit'] ?: 0,
+                $a['mutasi_kredit'] ?: 0,
+                $a['saldo_akhir_debit'] ?: 0,
+                $a['saldo_akhir_kredit'] ?: 0,
+            ];
+        }
+
+        $rows[] = [];
+        $rows[] = [
+            'TOTAL', '', '', '',
+            $ns['total']['saldo_awal_debit'],
+            $ns['total']['saldo_awal_kredit'],
+            $ns['total']['mutasi_debit'],
+            $ns['total']['mutasi_kredit'],
+            $ns['total']['saldo_akhir_debit'],
+            $ns['total']['saldo_akhir_kredit'],
+        ];
 
         return $rows;
     }

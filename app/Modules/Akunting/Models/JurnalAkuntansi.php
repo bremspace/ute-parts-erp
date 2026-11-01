@@ -47,4 +47,25 @@ class JurnalAkuntansi extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function header(): BelongsTo
+    {
+        return $this->belongsTo(JurnalHeader::class, 'no_jurnal', 'no_jurnal');
+    }
+
+    /**
+     * [ISO 9001 / ISO 27001] Integritas Jurnal Akuntansi: baris jurnal bersifat
+     * immutable (tidak dapat diubah atau dihapus). Koreksi wajib melalui mekanisme
+     * Jurnal Pembalik (Reversal / Storno).
+     */
+    protected static function booted(): void
+    {
+        static::updating(function () {
+            throw new \DomainException('Baris jurnal akuntansi bersifat immutable (tidak dapat diubah) demi kepatuhan ISO/audit. Gunakan jurnal pembalik (reversal) untuk koreksi.');
+        });
+
+        static::deleting(function () {
+            throw new \DomainException('Baris jurnal akuntansi bersifat immutable (tidak dapat dihapus) demi kepatuhan ISO/audit. Gunakan jurnal pembalik (reversal) untuk pembatalan.');
+        });
+    }
 }

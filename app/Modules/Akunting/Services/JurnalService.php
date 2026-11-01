@@ -4,6 +4,8 @@ namespace App\Modules\Akunting\Services;
 
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\JurnalHeader;
+use App\Modules\Akunting\Models\PeriodeAkuntansi;
+use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -28,7 +30,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class JurnalService
 {
-    public const SUMBER_VALID = ['pos', 'servis', 'servis-bayar', 'pembelian', 'beli', 'komisi', 'opname', 'manual', 'kas', 'channel', 'pembayaran', 'payroll', 'payroll-bayar', 'asset', 'depresiasi', 'disposal', 'import', 'grn', 'stok_awal'];
+    public const SUMBER_VALID = ['pos', 'servis', 'servis-bayar', 'pembelian', 'beli', 'komisi', 'opname', 'manual', 'kas', 'channel', 'pembayaran', 'payroll', 'payroll-bayar', 'asset', 'depresiasi', 'disposal', 'import', 'grn', 'stok_awal', 'tutup_buku', 'reversal'];
 
     /**
      * Cache status keberadaan tabel per request (server 1GB RAM: hindari
@@ -72,11 +74,16 @@ class JurnalService
         ?int $userId = null,
         ?string $referensiTipe = null,
         ?int $referensiId = null,
-        ?string $idempotencyKey = null
+        ?string $idempotencyKey = null,
+        string $statusApproval = 'disetujui',
+        ?string $lampiranPath = null,
+        ?string $lampiranNama = null
     ): array {
         if (! in_array($sumber, self::SUMBER_VALID, true)) {
             throw new \InvalidArgumentException("Sumber jurnal '{$sumber}' tidak valid");
         }
+
+        $this->cekPeriodeTerbuka($tanggal, $cabangId, $sumber);
 
         if (empty($lines)) {
             throw new \Exception('Jurnal membutuhkan minimal 1 baris entri');
@@ -140,7 +147,8 @@ class JurnalService
         // [P0-3] Satu transaction: klaim header (idempotensi) → insert lines.
         $created = DB::transaction(function () use (
             $normalized, $noJurnal, $tanggal, $sumber, $deskripsi, $cabangId, $userId,
-            $referensiTipe, $referensiId, $idempotencyKey, $totalDebit, $totalKredit
+            $referensiTipe, $referensiId, $idempotencyKey, $totalDebit, $totalKredit,
+            $statusApproval, $lampiranPath, $lampiranNama
         ) {
             $this->klaimHeader(
                 noJurnal: $noJurnal,
@@ -155,6 +163,9 @@ class JurnalService
                 totalDebit: $totalDebit,
                 totalKredit: $totalKredit,
                 jumlahBaris: count($normalized),
+                statusApproval: $statusApproval,
+                lampiranPath: $lampiranPath,
+                lampiranNama: $lampiranNama
             );
 
             $created = [];
@@ -261,7 +272,10 @@ class JurnalService
         ?string $idempotencyKey,
         float $totalDebit,
         float $totalKredit,
-        int $jumlahBaris
+        int $jumlahBaris,
+        string $statusApproval = 'disetujui',
+        ?string $lampiranPath = null,
+        ?string $lampiranNama = null
     ): void {
         $sudahAda = JurnalAkuntansi::where('no_jurnal', $noJurnal)->exists();
 
@@ -293,6 +307,9 @@ class JurnalService
                 'referensi_id' => $referensiId,
                 'idempotency_key' => $idempotencyKey,
                 'user_id' => $userId,
+                'status_approval' => $statusApproval,
+                'lampiran_path' => $lampiranPath,
+                'lampiran_nama' => $lampiranNama,
             ]);
         } catch (QueryException $e) {
             if (! $this->isUniqueViolation($e)) {
@@ -351,5 +368,145 @@ class JurnalService
 
             return sprintf('JRL-%s-%s-%s-%04d', $prefix, $cabangId ?? 'X', $date, $next);
         }, 3);
+    }
+
+    /**
+     * [ISO/Audit] Guard periode buku: tolak posting bila periode sudah ditutup.
+     *
+     * @throws \Exception jika periode akuntansi tanggal tsb berstatus 'closed'
+     */
+    public function cekPeriodeTerbuka($tanggal, ?int $cabangId, string $sumber = ''): void
+    {
+        if ($sumber === 'tutup_buku' || $cabangId === null || $cabangId <= 0) {
+            return;
+        }
+
+        if (! Schema::hasTable('periode_akuntansi')) {
+            return;
+        }
+
+        $parsed = $tanggal instanceof \DateTimeInterface
+            ? Carbon::instance($tanggal)
+            : Carbon::parse($tanggal ?? now());
+
+        $tahun = (int) $parsed->format('Y');
+        $bulan = (int) $parsed->format('n');
+
+        $tertutup = PeriodeAkuntansi::where('cabang_id', $cabangId)
+            ->where('tahun', $tahun)
+            ->where('bulan', $bulan)
+            ->where('status', 'closed')
+            ->exists();
+
+        if ($tertutup) {
+            $namaBulan = [
+                1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+            ][$bulan] ?? (string) $bulan;
+
+            throw new \Exception("Periode akuntansi {$namaBulan} {$tahun} sudah ditutup (tutup buku). Transaksi tidak dapat diposting.");
+        }
+    }
+
+    /**
+     * [ISO/Audit] Jurnal Pembalik (Storno / Reversal 1-Klik).
+     *
+     * Membalik entri jurnal yang salah dengan menukar posisi Debit dan Kredit,
+     * menandai jurnal asal sebagai `is_reversed = true`, menautkan nomor referensi,
+     * dan mencatat activity log audit.
+     *
+     * @throws \Exception jika jurnal tidak ditemukan, sudah di-reversed, atau periode ditutup
+     */
+    public function reversalJurnal(string $noJurnalAsal, int $cabangId, int $userId, string $alasan): array
+    {
+        $alasan = trim($alasan);
+        if ($alasan === '') {
+            throw new \InvalidArgumentException('Alasan pembalikan jurnal (reversal) wajib diisi untuk kepatuhan audit ISO.');
+        }
+
+        $this->cekPeriodeTerbuka(now(), $cabangId, 'reversal');
+
+        $linesAsal = JurnalAkuntansi::where('no_jurnal', $noJurnalAsal)
+            ->where('cabang_id', $cabangId)
+            ->with('akun')
+            ->get();
+
+        if ($linesAsal->isEmpty()) {
+            throw new \Exception("Jurnal dengan nomor '{$noJurnalAsal}' tidak ditemukan pada cabang ini.");
+        }
+
+        $header = JurnalHeader::where('no_jurnal', $noJurnalAsal)
+            ->where('cabang_key', $cabangId)
+            ->first();
+
+        if ($header?->is_reversed) {
+            throw new \Exception("Jurnal {$noJurnalAsal} sudah pernah dibalik sebelumnya oleh jurnal {$header->reversed_by_no_jurnal}.");
+        }
+
+        if ($header?->sumber === 'reversal') {
+            throw new \Exception("Jurnal dengan sumber 'reversal' tidak dapat dibalik ulang.");
+        }
+
+        $reversalLines = [];
+        foreach ($linesAsal as $line) {
+            $reversalLines[] = [
+                'akun_kode' => $line->akun?->kode,
+                'debit' => (float) $line->kredit, // Tukar D <-> K
+                'kredit' => (float) $line->debit,
+            ];
+        }
+
+        $noReversal = $this->generateNoJurnal('reversal', $cabangId);
+
+        return DB::transaction(function () use ($noReversal, $noJurnalAsal, $header, $linesAsal, $reversalLines, $cabangId, $userId, $alasan) {
+            $this->post(
+                noJurnal: $noReversal,
+                tanggal: now(),
+                sumber: 'reversal',
+                lines: $reversalLines,
+                deskripsi: "Pembalik (Reversal) Jurnal {$noJurnalAsal}: {$alasan}",
+                cabangId: $cabangId,
+                userId: $userId,
+                referensiTipe: 'jurnal_header',
+                referensiId: $header?->id
+            );
+
+            // Perbarui metadata reversal pada header asal
+            if ($header) {
+                $header->update([
+                    'is_reversed' => true,
+                    'reversed_by_no_jurnal' => $noReversal,
+                    'reversed_at' => now(),
+                    'reversed_by_user_id' => $userId,
+                ]);
+            }
+
+            // Tautkan referensi pada header jurnal reversal baru
+            JurnalHeader::where('no_jurnal', $noReversal)
+                ->where('cabang_key', $cabangId)
+                ->update([
+                    'reversal_of_no_jurnal' => $noJurnalAsal,
+                ]);
+
+            activity()
+                ->performedOn($header ?: $linesAsal->first())
+                ->event('reversed')
+                ->withProperties([
+                    'no_jurnal_asal' => $noJurnalAsal,
+                    'no_jurnal_reversal' => $noReversal,
+                    'cabang_id' => $cabangId,
+                    'user_id' => $userId,
+                    'alasan' => $alasan,
+                ])
+                ->log("Jurnal {$noJurnalAsal} dibalik (reversal) oleh jurnal {$noReversal}. Alasan: {$alasan}");
+
+            return [
+                'no_jurnal_reversal' => $noReversal,
+                'jurnal_asal' => $noJurnalAsal,
+                'total_debit' => $linesAsal->sum('kredit'),
+                'total_kredit' => $linesAsal->sum('debit'),
+            ];
+        });
     }
 }

@@ -5,14 +5,18 @@ namespace App\Modules\Akunting\Controllers;
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PembayaranSubledgerService;
+use App\Modules\Akunting\Services\RekonsiliasiBankService;
 use App\Modules\Akunting\Services\ValidasiBarisJurnal;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Workflow\Models\ApprovalRule;
+use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ApiResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -194,6 +198,7 @@ class AkuntingController extends Controller
             'lines.*.akun_kode' => 'required|string|max:20',
             'lines.*.debit' => 'nullable|numeric|min:0',
             'lines.*.kredit' => 'nullable|numeric|min:0',
+            'lampiran' => 'nullable|file|max:10240|mimes:pdf,jpg,jpeg,png',
         ]);
 
         // [B-10e / P2-1] Aturan yang sama dgn form UI jurnal manual: akun aktif,
@@ -213,21 +218,96 @@ class AkuntingController extends Controller
         }
 
         try {
-            $noJurnal = $this->jurnalService->generateNoJurnal('manual', $this->cabangAktif());
+            $cabangId = $this->cabangAktif();
+            $userId = (int) auth()->id();
+            $totalDebit = collect($lines)->sum('debit');
+
+            $lampiranPath = null;
+            $lampiranNama = null;
+            if ($request->hasFile('lampiran')) {
+                $file = $request->file('lampiran');
+                $lampiranNama = $file->getClientOriginalName();
+                $lampiranPath = $file->store('lampiran-jurnal', 'public');
+            }
+
+            // Segregation of Duties / Maker-Checker Rule
+            $approvalService = app(ApprovalService::class);
+            $hasApprovalRule = ApprovalRule::where('entity_type', 'jurnal_manual')
+                ->where('is_aktif', true)
+                ->where(function ($q) use ($cabangId) {
+                    $q->whereNull('cabang_id')->orWhere('cabang_id', $cabangId);
+                })
+                ->exists();
+
+            $statusApproval = $hasApprovalRule ? 'pending' : 'disetujui';
+
+            $noJurnal = $this->jurnalService->generateNoJurnal('manual', $cabangId);
             $this->jurnalService->post(
-                $noJurnal,
-                $request->tanggal,
-                'manual',
-                $request->lines,
-                $request->deskripsi,
-                $this->cabangAktif(),
-                auth()->id()
+                noJurnal: $noJurnal,
+                tanggal: $request->tanggal,
+                sumber: 'manual',
+                lines: $request->lines,
+                deskripsi: $request->deskripsi,
+                cabangId: $cabangId,
+                userId: $userId,
+                statusApproval: $statusApproval,
+                lampiranPath: $lampiranPath,
+                lampiranNama: $lampiranNama
             );
 
-            return $this->success(['no_jurnal' => $noJurnal], 'Jurnal manual berhasil diposting', 201);
+            $header = JurnalHeader::where('no_jurnal', $noJurnal)
+                ->where('cabang_key', $cabangId)
+                ->first();
+
+            if ($hasApprovalRule && $header) {
+                $approvalService->ajukan(
+                    entityType: 'jurnal_manual',
+                    entityId: $header->id,
+                    cabangId: $cabangId,
+                    payload: [
+                        'no_jurnal' => $noJurnal,
+                        'amount' => $totalDebit,
+                        'deskripsi' => $request->deskripsi,
+                        'tanggal' => $request->tanggal,
+                        'lampiran_nama' => $lampiranNama,
+                    ],
+                    requestedBy: $userId
+                );
+
+                return $this->success([
+                    'no_jurnal' => $noJurnal,
+                    'status_approval' => 'pending',
+                ], 'Jurnal manual berhasil diajukan dan menunggu persetujuan approver (Maker-Checker)', 201);
+            }
+
+            return $this->success([
+                'no_jurnal' => $noJurnal,
+                'status_approval' => 'disetujui',
+            ], 'Jurnal manual berhasil diposting', 201);
         } catch (\Exception $e) {
             // Termasuk "Jurnal tidak balance" — wajib balance sebelum disimpan.
             return $this->error($e->getMessage(), 400);
+        }
+    }
+
+    // [API: ACC-04c] Jurnal Pembalik / Reversal (ISO/Audit compliance)
+    public function reversalJurnal(Request $request, string $noJurnal)
+    {
+        $request->validate([
+            'alasan' => 'required|string|max:255',
+        ]);
+
+        try {
+            $hasil = $this->jurnalService->reversalJurnal(
+                noJurnalAsal: $noJurnal,
+                cabangId: $this->cabangAktif(),
+                userId: (int) auth()->id(),
+                alasan: (string) $request->alasan
+            );
+
+            return $this->success($hasil, "Jurnal {$noJurnal} berhasil dibalik (reversal) dengan nomor {$hasil['no_jurnal_reversal']}");
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
         }
     }
 
@@ -314,6 +394,88 @@ class AkuntingController extends Controller
         return $this->success($neraca, 'Laporan Neraca berhasil diambil (cache 15 menit)');
     }
 
+    // [API: ACC-06b] Neraca Saldo (Trial Balance 4 Kolom) — ISO / Audit Compliance
+    public function neracaSaldo(Request $request)
+    {
+        $dari = $request->query('dari', now()->startOfMonth()->toDateString());
+        $sampai = $request->query('sampai', now()->toDateString());
+        $cabangId = $this->resolveCabangScope($request);
+
+        $cacheKey = $cabangId !== null
+            ? "laporan-neracasaldo-{$cabangId}-{$dari}-{$sampai}"
+            : "laporan-neracasaldo-konsolidasi-{$dari}-{$sampai}";
+
+        $hasil = cache()->remember(
+            $cacheKey,
+            now()->addMinutes(15),
+            fn () => app(ExportLaporanService::class)->neracaSaldo4Kolom($cabangId, $dari, $sampai)
+        );
+
+        return $this->success($hasil, 'Laporan Neraca Saldo 4 Kolom berhasil diambil (cache 15 menit)');
+    }
+
+    // [API: ACC-12] Upload Rekening Koran Bank & Auto-Matching (PDF, CSV, XLSX)
+    public function uploadRekonsiliasiBank(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|max:10240', // max 10MB
+            'akun_coa_id' => 'required|exists:akun_coa,id',
+            'nama_bank' => 'nullable|string|max:50',
+            'nomor_rekening' => 'nullable|string|max:50',
+        ]);
+
+        $file = $request->file('file');
+        $ext = strtolower($file->getClientOriginalExtension());
+        $service = app(RekonsiliasiBankService::class);
+
+        try {
+            $parsedItems = $service->parseFile($file->getRealPath(), $ext);
+
+            $rekonsiliasi = $service->prosesImport(
+                cabangId: $this->cabangAktif(),
+                akunCoaId: (int) $request->akun_coa_id,
+                namaBank: (string) ($request->nama_bank ?: 'BCA'),
+                namaFile: $file->getClientOriginalName(),
+                formatFile: $ext,
+                items: $parsedItems,
+                userId: (int) auth()->id(),
+                nomorRekening: $request->nomor_rekening
+            );
+
+            return $this->success([
+                'rekonsiliasi_id' => $rekonsiliasi->id,
+                'total_baris' => $rekonsiliasi->total_baris_bank,
+                'total_matched' => $rekonsiliasi->total_matched,
+                'unmatched' => $rekonsiliasi->total_baris_bank - $rekonsiliasi->total_matched,
+            ], 'Berkas mutasi bank berhasil diuraikan dan diproses auto-matching', 201);
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+    }
+
+    // [API: ACC-13] Jurnal Penyesuaian 1-Klik Rekonsiliasi Bank Item
+    public function penyesuaianRekonsiliasiItem(Request $request, int $id)
+    {
+        $request->validate([
+            'jenis' => 'required|in:biaya_admin,pendapatan_bunga',
+            'keterangan' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            $service = app(RekonsiliasiBankService::class);
+            $hasil = $service->buatJurnalPenyesuaian(
+                itemId: $id,
+                jenisPenyesuaian: $request->jenis,
+                userId: (int) auth()->id(),
+                keterangan: $request->keterangan
+            );
+
+            return $this->success($hasil, 'Jurnal penyesuaian rekonsiliasi berhasil diposting');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+    }
+
     // [API: ACC-07] Buku Besar per akun
     public function bukuBesar(Request $request, $akunId)
     {
@@ -377,7 +539,7 @@ class AkuntingController extends Controller
     public function export(Request $request)
     {
         $request->validate([
-            'jenis' => 'required|in:laba_rugi,neraca,buku_besar,arus_kas,stok,pelanggan,servis,piutang,utang,pajak,jurnal,transaksi,komisi',
+            'jenis' => 'required|in:laba_rugi,neraca,buku_besar,arus_kas,stok,pelanggan,servis,piutang,utang,pajak,jurnal,transaksi,komisi,neraca_saldo',
             'periode_dari' => 'nullable|date',
             'periode_sampai' => 'nullable|date',
             'akun_id' => 'nullable|exists:akun_coa,id',

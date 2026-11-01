@@ -85,7 +85,7 @@ class ApprovalController
     public function adaPending(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'entity_type' => 'required|string|in:po,retur,retur_pembelian,diskon,selisih_kas',
+            'entity_type' => 'required|string|in:po,retur,retur_pembelian,diskon,selisih_kas,member,jurnal_manual',
             'entity_id' => 'required|integer',
         ]);
 

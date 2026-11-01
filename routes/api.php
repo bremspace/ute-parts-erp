@@ -209,10 +209,14 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::put('/coa/{id}', [AkuntingController::class, 'updateCoa'])->middleware('permission:akunting.edit');
             Route::get('/jurnal', [AkuntingController::class, 'indexJurnal'])->middleware('permission:akunting.view');
             Route::post('/jurnal-manual', [AkuntingController::class, 'storeJurnalManual'])->middleware('permission:akunting.create');
+            Route::post('/jurnal/{noJurnal}/reversal', [AkuntingController::class, 'reversalJurnal'])->middleware('permission:akunting.approve');
             Route::get('/laporan/laba-rugi', [AkuntingController::class, 'labaRugi'])->middleware('permission:laporan.cabang');
             Route::get('/laporan/neraca', [AkuntingController::class, 'neraca'])->middleware('permission:laporan.cabang');
+            Route::get('/laporan/neraca-saldo', [AkuntingController::class, 'neracaSaldo'])->middleware('permission:laporan.cabang');
             Route::get('/laporan/arus-kas', [AkuntingController::class, 'arusKas'])->middleware('permission:laporan.cabang');
             Route::get('/kas-sesi', [AkuntingController::class, 'kasSesi'])->middleware('permission:laporan.cabang'); // [T-33] riwayat sesi kas
+            Route::post('/rekonsiliasi-bank/upload', [AkuntingController::class, 'uploadRekonsiliasiBank'])->middleware('permission:akunting.create');
+            Route::post('/rekonsiliasi-bank/item/{id}/penyesuaian', [AkuntingController::class, 'penyesuaianRekonsiliasiItem'])->middleware('permission:akunting.create');
             Route::post('/export', [AkuntingController::class, 'export'])->middleware('permission:laporan.cabang'); // [T-24] ACC-11
             Route::get('/export/download', [AkuntingController::class, 'exportDownload'])->middleware('permission:laporan.cabang'); // ACC-11b
             Route::get('/buku-besar/{akunId}', [AkuntingController::class, 'bukuBesar'])->middleware('permission:akunting.view');
