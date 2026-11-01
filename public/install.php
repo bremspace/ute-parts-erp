@@ -20,7 +20,7 @@ declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
-// Deteksi jika sistem sudah terinstall
+// Deteksi jika sistem sudah terinstall (.env sudah memiliki APP_KEY & DB_DATABASE)
 $envFile = __DIR__.'/../.env';
 $isInstalled = false;
 if (file_exists($envFile)) {
@@ -28,12 +28,6 @@ if (file_exists($envFile)) {
     if (preg_match('/^APP_KEY=base64:.+/m', $envContent) && preg_match('/^DB_DATABASE=.+/m', $envContent)) {
         $isInstalled = true;
     }
-}
-
-// Redirect ke login jika sudah terkonfigurasi dan bukan mode AJAX
-if ($isInstalled && empty($_GET['force']) && empty($_POST['action'])) {
-    header('Location: /app/login');
-    exit;
 }
 
 // =============================================================================
@@ -377,7 +371,7 @@ function checkServerDiagnostics(): array
 // AJAX API ENDPOINTS
 // =============================================================================
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json; charset=utf-8');
     $action = $_POST['action'];
 
@@ -1021,12 +1015,33 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERP &amp; POS System — Setup Wizard &amp; Server Installer</title>
+    <script>
+        // Pastikan Tailwind CDN mengenali dark mode sebelum CSS di-compile
+        window.tailwind = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            primary: '#5B4FE9',
+                            accent: '#E8873B',
+                        }
+                    }
+                }
+            }
+        };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
-        .glass-panel { background: rgba(18, 20, 29, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        /* Base fallback styling agar layout langsung rapi tanpa menunggu Tailwind CDN */
+        *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: rgba(255, 255, 255, 0.1); }
+        html { line-height: 1.5; -webkit-text-size-adjust: 100%; tab-size: 4; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
+        body { margin: 0; line-height: inherit; background-color: #0D0F17; color: #f1f5f9; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+        code, pre, .font-mono { font-family: 'JetBrains Mono', monospace, ui-monospace; }
+        .glass-panel { background: rgba(18, 20, 29, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
         .brand-gradient { background: linear-gradient(135deg, #5B4FE9 0%, #E8873B 100%); }
     </style>
 </head>
@@ -1052,6 +1067,25 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
             <div class="text-[10px] text-emerald-400 font-bold">● Server Live Ready</div>
         </div>
     </div>
+
+    <?php if ($isInstalled) { ?>
+    <!-- Notice jika sistem sudah terinstall sebelumnya -->
+    <div class="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-start gap-3">
+            <span class="text-2xl">⚡</span>
+            <div>
+                <div class="font-bold text-white text-sm">Sistem Sudah Terkonfigurasi (.env Aktif)</div>
+                <div class="text-xs text-slate-400 mt-0.5">Database dan Kunci Aplikasi sudah ada. Anda dapat langsung masuk ke dashboard backoffice atau tetap menggunakan wizard di bawah untuk meninjau/mengubah konfigurasi.</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <a href="/app/login" class="px-5 py-2.5 rounded-xl brand-gradient text-white font-bold text-xs shadow-lg shadow-indigo-600/25 hover:opacity-95 transition flex items-center gap-1.5">
+                <span>Buka Halaman Login</span>
+                <span>→</span>
+            </a>
+        </div>
+    </div>
+    <?php } ?>
 
     <!-- Step Wizard Nav -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">

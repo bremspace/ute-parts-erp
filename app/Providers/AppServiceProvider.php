@@ -39,9 +39,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Dynamic Brand / App Name dari Konfigurasi Toko (White-Label)
+        // Dynamic Brand / App Name & Host Resolver (Multi-Port & LAN zero-config)
         // Abaikan saat console command (artisan package:discover / migrate) agar tidak probe DB prematur
         if (! $this->app->runningInConsole()) {
+            if (request()->hasHeader('host')) {
+                config(['app.url' => request()->getSchemeAndHttpHost()]);
+            }
+
             try {
                 $brandName = app(KonfigurasiService::class)->get('app_brand_name');
                 if ($brandName) {
