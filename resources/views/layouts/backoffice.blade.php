@@ -667,6 +667,18 @@
                         <span class="hidden sm:inline text-[11px] font-semibold">DB Online</span>
                     </div>
 
+                    @can('pengaturan.manage')
+                        <!-- Cek Update Quick Button -->
+                        <a href="/app/pengaturan?tab=database&check_update=1"
+                           title="Cek Pembaruan Aplikasi dari GitHub"
+                           class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 text-[11px] font-bold transition flex-shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span>Cek Update</span>
+                        </a>
+                    @endcan
+
                     <!-- [2026] Font Size Switcher (Fluid rem scaling) -->
                     <div class="relative flex-shrink-0" x-data="fontSizeManager()" @click.outside="open = false">
                         <button type="button" @click="open = !open"

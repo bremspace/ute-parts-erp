@@ -142,6 +142,38 @@ function runCommand(string $command): array
     ];
 }
 
+function autoConfigureMysqlLan(): bool
+{
+    $candidates = [
+        '/etc/mysql/mysql.conf.d/mysqld.cnf',
+        '/etc/mysql/mariadb.conf.d/50-server.cnf',
+        '/etc/mysql/my.cnf',
+    ];
+
+    if (PHP_OS_FAMILY === 'Windows') {
+        $winPaths = glob('C:\\laragon\\bin\\mysql\\*\\my.ini') ?: [];
+        $winPaths = array_merge($winPaths, glob('C:\\xampp\\mysql\\bin\\my.ini') ?: []);
+        $winPaths = array_merge($winPaths, glob('C:\\ProgramData\\MySQL\\MySQL Server *\\my.ini') ?: []);
+        $candidates = array_merge($candidates, $winPaths);
+    }
+
+    $updated = false;
+    foreach ($candidates as $conf) {
+        if (file_exists($conf) && is_writable($conf)) {
+            $content = (string) file_get_contents($conf);
+            if (preg_match('/^(\s*bind-address\s*=\s*)(127\.0\.0\.1|::1)/m', $content)) {
+                $newContent = preg_replace('/^(\s*bind-address\s*=\s*)(127\.0\.0\.1|::1)/m', '${1}0.0.0.0', $content);
+                if ($newContent && $newContent !== $content) {
+                    @file_put_contents($conf, $newContent);
+                    $updated = true;
+                }
+            }
+        }
+    }
+
+    return $updated;
+}
+
 function runComposerInstallWithFallback(string $baseDir, string $composerCmd): array
 {
     // 1. Coba composer install standar
@@ -205,8 +237,8 @@ function checkServerDiagnostics(): array
     $diskTotalGb = round(disk_total_space(__DIR__) / (1024 * 1024 * 1024), 1);
 
     // 4. PHP Extensions Check (Wajib untuk Laravel 13, WMS, Excel & E-Payment)
+    $hasDbDriver = extension_loaded('pdo_mysql') || extension_loaded('pdo_sqlite');
     $requiredExts = [
-        'pdo_mysql' => 'Koneksi database MySQL',
         'dom' => 'Manipulasi DOM, Blade view compiler & PhpSpreadsheet',
         'xml' => 'Penguraian XML & konfigurasi Laravel/Excel',
         'simplexml' => 'Format XML data export & barcode generator',
@@ -226,11 +258,21 @@ function checkServerDiagnostics(): array
     $optionalExts = [
         'imagick' => 'Decoder cerdas gambar HEIC, AVIF, TIFF, RAW, PSD',
         'opcache' => 'Akselerasi performa script PHP di produksi',
-        'sqlite3' => 'Penyimpanan cache testing lokal',
     ];
 
     $extStatus = [];
-    $allReqPassed = true;
+    $allReqPassed = $hasDbDriver;
+    $extStatus['pdo_mysql'] = [
+        'loaded' => extension_loaded('pdo_mysql'),
+        'required' => ! extension_loaded('pdo_sqlite'),
+        'desc' => 'Koneksi database MySQL / MariaDB',
+    ];
+    $extStatus['pdo_sqlite'] = [
+        'loaded' => extension_loaded('pdo_sqlite'),
+        'required' => ! extension_loaded('pdo_mysql'),
+        'desc' => 'Koneksi database SQLite lokal (zero-config standalone)',
+    ];
+
     foreach ($requiredExts as $ext => $desc) {
         $loaded = extension_loaded($ext);
         if (! $loaded) {
@@ -502,6 +544,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($action === 'test_db') {
+        $driver = trim($_POST['db_driver'] ?? 'mysql');
+
+        if ($driver === 'sqlite') {
+            $baseDir = dirname(__DIR__);
+            $sqlitePath = trim($_POST['db_sqlite_path'] ?? 'database/database.sqlite');
+            if (! str_starts_with($sqlitePath, '/') && ! preg_match('/^[a-zA-Z]:[\\\\\/]/', $sqlitePath)) {
+                $sqlitePath = $baseDir.'/'.ltrim($sqlitePath, '/');
+            }
+            $sqliteDir = dirname($sqlitePath);
+            if (! is_dir($sqliteDir)) {
+                @mkdir($sqliteDir, 0775, true);
+            }
+            if (! file_exists($sqlitePath)) {
+                @touch($sqlitePath);
+                @chmod($sqlitePath, 0666);
+            }
+            try {
+                $pdo = new PDO("sqlite:{$sqlitePath}", null, null, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                ]);
+                echo json_encode([
+                    'success' => true,
+                    'message' => "Koneksi SQLite berhasil! Berkas database '{$sqlitePath}' siap digunakan.",
+                    'db_exists' => true,
+                ]);
+            } catch (PDOException $e) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Gagal koneksi/membuat berkas SQLite: '.$e->getMessage(),
+                ]);
+            }
+            exit;
+        }
+
         $host = trim($_POST['db_host'] ?? '127.0.0.1');
         $port = trim($_POST['db_port'] ?? '3306');
         $name = trim($_POST['db_name'] ?? 'uteparts_db');
@@ -524,19 +600,123 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $exists = true;
             }
 
+            // Otomatis siapkan hak akses user ke % (seluruh client LAN) jika di Mode Server
+            $lanGranted = false;
+            if (($host === '127.0.0.1' || $host === 'localhost') && ! empty($user)) {
+                try {
+                    $pdo->exec("CREATE USER IF NOT EXISTS '{$user}'@'%' IDENTIFIED BY '{$pass}'");
+                    if (! empty($pass)) {
+                        $pdo->exec("ALTER USER '{$user}'@'%' IDENTIFIED BY '{$pass}'");
+                    }
+                    $pdo->exec("GRANT ALL PRIVILEGES ON `{$name}`.* TO '{$user}'@'%'");
+                    $pdo->exec('FLUSH PRIVILEGES');
+                    $lanGranted = true;
+                } catch (Throwable) {
+                    // Abaikan jika user bukan superuser MySQL atau privilege terbatas
+                }
+            }
+
+            autoConfigureMysqlLan();
+
+            $lanNote = $lanGranted ? " • Akses kasir LAN ('{$user}'@'%') otomatis diaktifkan." : '';
+
             echo json_encode([
                 'success' => true,
                 'message' => $exists
-                    ? "Koneksi berhasil! Database '{$name}' siap digunakan."
-                    : "Koneksi ke MySQL sukses, namun database '{$name}' belum ada (centang opsi buat otomatis).",
+                    ? "Koneksi berhasil! Database '{$name}' siap digunakan.{$lanNote}"
+                    : "Koneksi ke MySQL sukses, namun database '{$name}' belum ada (centang opsi buat otomatis).{$lanNote}",
                 'db_exists' => $exists,
             ]);
         } catch (PDOException $e) {
             echo json_encode([
                 'success' => false,
-                'message' => 'Gagal koneksi MySQL: '.$e->getMessage(),
+                'message' => 'Gagal koneksi MySQL: '.$e->getMessage().' (Pastikan service MySQL aktif, atau pilih SQLite).',
             ]);
         }
+        exit;
+    }
+
+    if ($action === 'scan_lan') {
+        $localIps = [];
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $out = shell_exec('ipconfig');
+            if (preg_match_all('/IPv4 Address[.\s]*:\s*([0-9.]+)/i', (string) $out, $m)) {
+                $localIps = array_filter($m[1], fn ($ip) => $ip !== '127.0.0.1' && ! str_starts_with($ip, '169.254.'));
+            }
+        } else {
+            $out = shell_exec("hostname -I 2>/dev/null || ip -4 addr show 2>/dev/null | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'");
+            if ($out) {
+                $parts = preg_split('/\s+/', trim($out));
+                $localIps = array_filter($parts, fn ($ip) => ! empty($ip) && $ip !== '127.0.0.1' && ! str_starts_with($ip, '127.') && ! str_starts_with($ip, '169.254.'));
+            }
+        }
+
+        if (empty($localIps) && ! empty($_SERVER['SERVER_ADDR']) && $_SERVER['SERVER_ADDR'] !== '127.0.0.1') {
+            $localIps[] = $_SERVER['SERVER_ADDR'];
+        }
+
+        $subnets = [];
+        foreach ($localIps as $lip) {
+            $p = explode('.', $lip);
+            if (count($p) === 4) {
+                $subnets[$p[0].'.'.$p[1].'.'.$p[2].'.'] = true;
+            }
+        }
+
+        if (empty($subnets)) {
+            $subnets['192.168.1.'] = true;
+            $subnets['192.168.0.'] = true;
+        }
+
+        $found = [];
+        foreach (array_keys($subnets) as $prefix) {
+            $sockets = [];
+            for ($i = 1; $i <= 254; $i++) {
+                $target = $prefix.$i;
+                $s3306 = @stream_socket_client("tcp://{$target}:3306", $errno, $errstr, 0.04, STREAM_CLIENT_ASYNC_CONNECT);
+                if ($s3306) {
+                    stream_set_blocking($s3306, false);
+                    $sockets["{$target}:3306"] = $s3306;
+                }
+                $s1741 = @stream_socket_client("tcp://{$target}:1741", $errno, $errstr, 0.04, STREAM_CLIENT_ASYNC_CONNECT);
+                if ($s1741) {
+                    stream_set_blocking($s1741, false);
+                    $sockets["{$target}:1741"] = $s1741;
+                }
+            }
+
+            $w = array_values($sockets);
+            $r = [];
+            $e = [];
+            if (! empty($w)) {
+                $changed = @stream_select($r, $w, $e, 0, 450000);
+                if ($changed > 0) {
+                    foreach ($w as $sock) {
+                        $key = array_search($sock, $sockets, true);
+                        if ($key !== false) {
+                            [$tip, $tport] = explode(':', $key);
+                            $found[$tip] = [
+                                'ip' => $tip,
+                                'port' => (int) $tport,
+                                'type' => $tport === '3306' ? 'MySQL Database Server' : 'Ute Parts Web Server (Port 1741)',
+                            ];
+                        }
+                    }
+                }
+            }
+
+            foreach ($sockets as $s) {
+                @fclose($s);
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'local_ips' => array_values(array_unique($localIps)),
+            'servers' => array_values($found),
+            'count' => count($found),
+        ]);
         exit;
     }
 
@@ -548,13 +728,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         try {
             switch ($step) {
                 case 'write_env':
+                    $appRole = trim($_POST['app_role'] ?? 'server');
                     $appName = addslashes(trim($_POST['app_name'] ?? 'Ute Parts'));
-                    $appUrl = rtrim(trim($_POST['app_url'] ?? 'http://localhost'), '/');
-                    $dbHost = trim($_POST['db_host'] ?? '127.0.0.1');
-                    $dbPort = trim($_POST['db_port'] ?? '3306');
-                    $dbName = trim($_POST['db_name'] ?? 'uteparts_db');
-                    $dbUser = trim($_POST['db_user'] ?? 'root');
-                    $dbPass = trim($_POST['db_pass'] ?? '');
+                    $appUrl = rtrim(trim($_POST['app_url'] ?? 'http://localhost:1741'), '/');
+                    $dbDriver = trim($_POST['db_driver'] ?? 'mysql');
+
+                    if ($dbDriver === 'sqlite') {
+                        $sqliteRel = trim($_POST['db_sqlite_path'] ?? 'database/database.sqlite');
+                        $sqliteAbs = $baseDir.'/'.ltrim($sqliteRel, '/');
+                        $sqliteDir = dirname($sqliteAbs);
+                        if (! is_dir($sqliteDir)) {
+                            @mkdir($sqliteDir, 0775, true);
+                        }
+                        if (! file_exists($sqliteAbs)) {
+                            @touch($sqliteAbs);
+                            @chmod($sqliteAbs, 0666);
+                        }
+                        $dbConfig = "DB_CONNECTION=sqlite\nDB_DATABASE={$sqliteRel}\nDB_HOST=127.0.0.1\nDB_PORT=3306\nDB_USERNAME=root\nDB_PASSWORD=";
+                    } else {
+                        $dbHost = trim($_POST['db_host'] ?? '127.0.0.1');
+                        $dbPort = trim($_POST['db_port'] ?? '3306');
+                        $dbName = trim($_POST['db_name'] ?? 'uteparts_db');
+                        $dbUser = trim($_POST['db_user'] ?? 'root');
+                        $dbPass = trim($_POST['db_pass'] ?? '');
+                        $dbConfig = "DB_CONNECTION=mysql\nDB_HOST={$dbHost}\nDB_PORT={$dbPort}\nDB_DATABASE={$dbName}\nDB_USERNAME={$dbUser}\nDB_PASSWORD={$dbPass}";
+
+                        if (($dbHost === '127.0.0.1' || $dbHost === 'localhost') && ! empty($dbUser)) {
+                            try {
+                                $pdo = new PDO("mysql:host={$dbHost};port={$dbPort}", $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 3]);
+                                $pdo->exec("CREATE USER IF NOT EXISTS '{$dbUser}'@'%' IDENTIFIED BY '{$dbPass}'");
+                                if (! empty($dbPass)) {
+                                    $pdo->exec("ALTER USER '{$dbUser}'@'%' IDENTIFIED BY '{$dbPass}'");
+                                }
+                                $pdo->exec("GRANT ALL PRIVILEGES ON `{$dbName}`.* TO '{$dbUser}'@'%'");
+                                $pdo->exec('FLUSH PRIVILEGES');
+                            } catch (Throwable) {
+                            }
+                            autoConfigureMysqlLan();
+                        }
+                    }
 
                     $duitkuSandbox = ! empty($_POST['duitku_sandbox']) ? 'true' : 'false';
                     $duitkuCode = trim($_POST['duitku_code'] ?? '');
@@ -571,17 +783,13 @@ APP_DEBUG=false
 APP_URL={$appUrl}
 APP_LOCALE=id
 APP_FALLBACK_LOCALE=en
+APP_ROLE={$appRole}
 
 LOG_CHANNEL=stack
 LOG_STACK=single
 LOG_LEVEL=error
 
-DB_CONNECTION=mysql
-DB_HOST={$dbHost}
-DB_PORT={$dbPort}
-DB_DATABASE={$dbName}
-DB_USERNAME={$dbUser}
-DB_PASSWORD={$dbPass}
+{$dbConfig}
 
 SESSION_DRIVER=database
 SESSION_LIFETIME=120
@@ -646,17 +854,38 @@ EOF;
                     break;
 
                 case 'migrate_seed':
-                    $resMigrate = runCommand("cd {$baseDir} && {$phpBin} artisan migrate --force");
-                    if ($resMigrate['status'] !== 0) {
-                        throw new RuntimeException('Migrasi gagal: '.$resMigrate['output']);
+                    if (($_POST['app_role'] ?? 'server') === 'client') {
+                        echo json_encode([
+                            'success' => true,
+                            'message' => 'Mode Client: Skema database & data master menggunakan database Server Induk (migrasi dilewati).',
+                        ]);
+                        break;
                     }
-                    $resSeed = runCommand("cd {$baseDir} && {$phpBin} artisan db:seed --force");
+
+                    if (file_exists($baseDir.'/.env')) {
+                        $envTxt = (string) file_get_contents($baseDir.'/.env');
+                        if (preg_match('/^DB_CONNECTION=sqlite/m', $envTxt)) {
+                            $sqliteFile = $baseDir.'/database/database.sqlite';
+                            if (! file_exists($sqliteFile)) {
+                                @touch($sqliteFile);
+                                @chmod($sqliteFile, 0666);
+                            }
+                        }
+                    }
+                    $resMigrate = runCommand("cd {$baseDir} && {$phpBin} -d memory_limit=512M artisan migrate --force");
+                    if ($resMigrate['status'] !== 0) {
+                        throw new RuntimeException('Migrasi skema database gagal: '.$resMigrate['output']);
+                    }
+                    $resSeed = runCommand("cd {$baseDir} && {$phpBin} -d memory_limit=512M artisan db:seed --force");
+                    if ($resSeed['status'] !== 0) {
+                        throw new RuntimeException('Seeder data master gagal: '.$resSeed['output']);
+                    }
                     echo json_encode(['success' => true, 'message' => 'Struktur database & data bawaan berhasil di-seed.']);
                     break;
 
                 case 'storage_link':
-                    runCommand("cd {$baseDir} && {$phpBin} artisan storage:link");
-                    echo json_encode(['success' => true, 'message' => 'Symlink storage publik berhasil dibuat.']);
+                    runCommand("cd {$baseDir} && {$phpBin} artisan storage:link 2>&1");
+                    echo json_encode(['success' => true, 'message' => 'Symlink storage media berhasil disiapkan.']);
                     break;
 
                 case 'optimize_cache':
@@ -961,12 +1190,84 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
             <div class="border-b border-white/5 pb-3">
                 <h2 class="text-base font-bold text-white flex items-center gap-2">
                     <span>🗄️</span>
-                    <span>Koneksi Database MySQL / MariaDB</span>
+                    <span>Konfigurasi Peran &amp; Database (Server / Client)</span>
                 </h2>
-                <p class="text-xs text-slate-400 mt-0.5">Tentukan kredensial database lokal atau remote.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Tentukan peran perangkat ini dan hubungkan ke database lokal atau database Server di LAN.</p>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <!-- Peran Komputer Selector (Server vs Client) -->
+            <div>
+                <label class="block font-bold text-slate-300 mb-2 text-xs">Pilih Peran Perangkat Ini</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label id="label-role-server" class="flex items-start gap-3 p-3.5 rounded-xl border border-indigo-500/50 bg-indigo-500/10 cursor-pointer transition">
+                        <input type="radio" name="app_role_choice" value="server" checked onchange="toggleAppRole('server')" class="mt-0.5 text-indigo-600 focus:ring-0">
+                        <div>
+                            <div class="font-bold text-white text-xs flex items-center gap-1.5">
+                                <span>🖥️</span> <span>Mode Server (Induk / Pusat Toko)</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">Komputer utama penyimpan database. Menjalankan migrasi skema tabel &amp; data master toko awal.</div>
+                        </div>
+                    </label>
+                    <label id="label-role-client" class="flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/5 cursor-pointer transition">
+                        <input type="radio" name="app_role_choice" value="client" onchange="toggleAppRole('client')" class="mt-0.5 text-indigo-600 focus:ring-0">
+                        <div>
+                            <div class="font-bold text-white text-xs flex items-center gap-1.5">
+                                <span>💻</span> <span>Mode Client (Terminal Kasir Tambahan)</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">Kasir satelit di jaringan LAN yang sama. Terhubung ke server database induk tanpa perlu migrasi ulang.</div>
+                        </div>
+                    </label>
+                </div>
+                <input type="hidden" id="app_role" value="server">
+            </div>
+
+            <!-- Auto-Scan LAN Server Box (Khusus Mode Client) -->
+            <div id="client-scan-panel" class="hidden p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 space-y-3">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                        <div class="font-bold text-white text-xs flex items-center gap-1.5">
+                            <span>🔍</span> <span>Deteksi Otomatis Server di Jaringan LAN</span>
+                        </div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">
+                            Pindai komputer Server Ute Parts yang aktif di Wi-Fi / kabel LAN yang sama.
+                        </div>
+                    </div>
+                    <button type="button" onclick="scanLanServers()" id="btn-scan-lan" class="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer">
+                        <span id="btn-scan-lan-text">Pindai Server Sekarang</span>
+                    </button>
+                </div>
+
+                <div id="scan-lan-loading" class="hidden py-3 text-center text-xs text-indigo-300 font-mono">
+                    <span class="inline-block animate-spin mr-1.5">🌀</span> Sedang memindai subnet LAN lokal untuk port 3306 &amp; 1741...
+                </div>
+
+                <div id="scan-lan-results" class="hidden space-y-2 pt-1"></div>
+            </div>
+
+            <!-- Tipe Database Selector -->
+            <div id="driver-selector-container">
+                <label class="block font-bold text-slate-300 mb-2 text-xs">Pilih Tipe Database</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label id="label-driver-mysql" class="flex items-start gap-3 p-3.5 rounded-xl border border-indigo-500/50 bg-indigo-500/10 cursor-pointer transition">
+                        <input type="radio" name="db_driver_choice" value="mysql" checked onchange="toggleDbDriver('mysql')" class="mt-0.5 text-indigo-600 focus:ring-0">
+                        <div>
+                            <div class="font-bold text-white text-xs">MySQL / MariaDB</div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">Rekomendasi produksi, multi-kasir &amp; volume transaksi tinggi. Memerlukan service MySQL/Laragon/XAMPP.</div>
+                        </div>
+                    </label>
+                    <label id="label-driver-sqlite" class="flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/5 cursor-pointer transition">
+                        <input type="radio" name="db_driver_choice" value="sqlite" onchange="toggleDbDriver('sqlite')" class="mt-0.5 text-indigo-600 focus:ring-0">
+                        <div>
+                            <div class="font-bold text-white text-xs">SQLite (Standalone / Zero-Config)</div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">Sangat ideal untuk demo lokal &amp; perangkat kosongan tanpa perlu instalasi server MySQL.</div>
+                        </div>
+                    </label>
+                </div>
+                <input type="hidden" id="db_driver" value="mysql">
+            </div>
+
+            <!-- MySQL Connection Fields -->
+            <div id="mysql-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div>
                     <label class="block font-bold text-slate-300 mb-1">Database Host</label>
                     <input type="text" id="db_host" value="127.0.0.1" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
@@ -990,6 +1291,17 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                 <div class="sm:col-span-2 flex items-center gap-2">
                     <input type="checkbox" id="db_create" checked class="rounded text-indigo-600 focus:ring-0">
                     <label for="db_create" class="text-xs text-slate-300 cursor-pointer">Buat database otomatis jika belum ada di MySQL server</label>
+                </div>
+            </div>
+
+            <!-- SQLite Connection Fields -->
+            <div id="sqlite-fields" class="hidden space-y-3 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Path Berkas Database SQLite</label>
+                    <input type="text" id="db_sqlite_path" value="database/database.sqlite" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
+                </div>
+                <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs">
+                    ℹ Berkas SQLite akan dibuat otomatis di dalam direktori proyek. Tidak memerlukan login/password atau daemon service server database.
                 </div>
             </div>
 
@@ -1449,21 +1761,132 @@ window.addEventListener('DOMContentLoaded', () => {
     <?php } ?>
 });
 
+function toggleAppRole(role) {
+    document.getElementById('app_role').value = role;
+    const isServer = role === 'server';
+    const isClient = role === 'client';
+
+    const lblServer = document.getElementById('label-role-server');
+    const lblClient = document.getElementById('label-role-client');
+    const clientScanPanel = document.getElementById('client-scan-panel');
+    const driverContainer = document.getElementById('driver-selector-container');
+
+    if (isServer) {
+        lblServer.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-indigo-500/50 bg-indigo-500/10 cursor-pointer transition';
+        lblClient.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/5 cursor-pointer transition';
+        clientScanPanel.classList.add('hidden');
+        driverContainer.classList.remove('hidden');
+    } else {
+        lblClient.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-indigo-500/50 bg-indigo-500/10 cursor-pointer transition';
+        lblServer.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/5 cursor-pointer transition';
+        clientScanPanel.classList.remove('hidden');
+        // Klien wajib menggunakan MySQL bersama (sembunyikan opsi SQLite)
+        toggleDbDriver('mysql');
+        driverContainer.classList.add('hidden');
+        // Otomatis picu scan LAN
+        scanLanServers();
+    }
+}
+
+async function scanLanServers() {
+    const loading = document.getElementById('scan-lan-loading');
+    const results = document.getElementById('scan-lan-results');
+    const btnText = document.getElementById('btn-scan-lan-text');
+
+    loading.classList.remove('hidden');
+    results.classList.add('hidden');
+    results.innerHTML = '';
+    btnText.textContent = 'Memindai...';
+
+    const formData = new FormData();
+    formData.append('action', 'scan_lan');
+
+    try {
+        const res = await fetch('install.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        loading.classList.add('hidden');
+        btnText.textContent = 'Pindai Ulang';
+        results.classList.remove('hidden');
+
+        if (data.success && data.servers && data.servers.length > 0) {
+            let html = '<div class=\"text-[11px] font-bold text-slate-300 mb-1.5\">Server Ditemukan di LAN:</div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-2\">';
+            data.servers.forEach(srv => {
+                html += `
+                    <div class=\"p-2.5 rounded-xl bg-slate-900/80 border border-white/10 flex items-center justify-between gap-2\">
+                        <div class=\"min-w-0\">
+                            <div class=\"font-mono text-xs font-bold text-emerald-400\">${srv.ip}:${srv.port}</div>
+                            <div class=\"text-[10px] text-slate-400 truncate\">${srv.type}</div>
+                        </div>
+                        <button type=\"button\" onclick=\"selectScannedServer('${srv.ip}', ${srv.port})\" class=\"px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition shrink-0 cursor-pointer\">
+                            Gunakan Ini
+                        </button>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            results.innerHTML = html;
+        } else {
+            results.innerHTML = `
+                <div class=\"p-3 rounded-xl bg-slate-900/60 border border-white/5 text-xs text-slate-400\">
+                    Tidak menemukan host server terbuka di subnet ini secara otomatis. Anda dapat mengetikkan <strong>IP Server Induk</strong> (misal <code>192.168.1.15</code>) pada kolom <strong>Database Host</strong> di bawah secara manual.
+                </div>
+            `;
+        }
+    } catch (e) {
+        loading.classList.add('hidden');
+        btnText.textContent = 'Pindai Ulang';
+        results.classList.remove('hidden');
+        results.innerHTML = `<div class=\"text-xs text-rose-400\">Gagal memindai LAN: ${e.message}</div>`;
+    }
+}
+
+function selectScannedServer(ip, port) {
+    document.getElementById('db_host').value = ip;
+    if (port) {
+        document.getElementById('db_port').value = port;
+    }
+    testDatabaseConnection();
+}
+
+function toggleDbDriver(driver) {
+    document.getElementById('db_driver').value = driver;
+    const isMysql = driver === 'mysql';
+    document.getElementById('mysql-fields').classList.toggle('hidden', !isMysql);
+    document.getElementById('sqlite-fields').classList.toggle('hidden', isMysql);
+
+    const lblMysql = document.getElementById('label-driver-mysql');
+    const lblSqlite = document.getElementById('label-driver-sqlite');
+    if (isMysql) {
+        lblMysql.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-indigo-500/50 bg-indigo-500/10 cursor-pointer transition';
+        lblSqlite.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/5 cursor-pointer transition';
+    } else {
+        lblSqlite.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-indigo-500/50 bg-indigo-500/10 cursor-pointer transition';
+        lblMysql.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/5 cursor-pointer transition';
+    }
+}
+
 async function testDatabaseConnection() {
     const resBox = document.getElementById('db-test-result');
     resBox.className = 'p-3 rounded-xl text-xs font-mono bg-white/5 text-slate-300';
     resBox.textContent = '⏳ Menguji koneksi database...';
     resBox.classList.remove('hidden');
 
+    const driver = document.getElementById('db_driver').value;
     const formData = new FormData();
     formData.append('action', 'test_db');
-    formData.append('db_host', document.getElementById('db_host').value);
-    formData.append('db_port', document.getElementById('db_port').value);
-    formData.append('db_name', document.getElementById('db_name').value);
-    formData.append('db_user', document.getElementById('db_user').value);
-    formData.append('db_pass', document.getElementById('db_pass').value);
-    if (document.getElementById('db_create').checked) {
-        formData.append('create_if_missing', '1');
+    formData.append('db_driver', driver);
+
+    if (driver === 'sqlite') {
+        formData.append('db_sqlite_path', document.getElementById('db_sqlite_path').value);
+    } else {
+        formData.append('db_host', document.getElementById('db_host').value);
+        formData.append('db_port', document.getElementById('db_port').value);
+        formData.append('db_name', document.getElementById('db_name').value);
+        formData.append('db_user', document.getElementById('db_user').value);
+        formData.append('db_pass', document.getElementById('db_pass').value);
+        if (document.getElementById('db_create').checked) {
+            formData.append('create_if_missing', '1');
+        }
     }
 
     try {
@@ -1487,7 +1910,8 @@ async function startExecution() {
     document.getElementById('btn-start-install').classList.add('opacity-50', 'cursor-not-allowed');
     document.getElementById('execution-container').classList.remove('hidden');
 
-    const steps = [
+    const appRole = document.getElementById('app_role').value;
+    let steps = [
         { id: 'write_env', label: '1/7 Menyimpan konfigurasi .env' },
         { id: 'check_vendor', label: '2/7 Memeriksa & instal dependensi Composer' },
         { id: 'key_generate', label: '3/7 Generate kunci aplikasi (APP_KEY)' },
@@ -1496,6 +1920,10 @@ async function startExecution() {
         { id: 'optimize_cache', label: '6/7 Mengoptimasi cache konfigurasi & rute produksi' },
         { id: 'setup_ai_dev', label: '7/7 Menyiapkan AI Stack (OpenCode + 9router + MCP)' }
     ];
+
+    if (appRole === 'client') {
+        steps = steps.filter(s => s.id !== 'migrate_seed');
+    }
 
     const logBox = document.getElementById('execution-log');
     const statusText = document.getElementById('progress-status');
@@ -1512,8 +1940,11 @@ async function startExecution() {
         const formData = new FormData();
         formData.append('action', 'execute_step');
         formData.append('step', step.id);
+        formData.append('app_role', appRole);
         formData.append('app_name', document.getElementById('app_name').value);
         formData.append('app_url', document.getElementById('app_url').value);
+        formData.append('db_driver', document.getElementById('db_driver').value);
+        formData.append('db_sqlite_path', document.getElementById('db_sqlite_path').value);
         formData.append('db_host', document.getElementById('db_host').value);
         formData.append('db_port', document.getElementById('db_port').value);
         formData.append('db_name', document.getElementById('db_name').value);

@@ -3,6 +3,7 @@
 namespace App\Modules\Rbac\Livewire;
 
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\AppUpdateService;
 use App\Modules\Rbac\Services\DatabaseManagementService;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
@@ -43,9 +44,64 @@ class DatabaseManagement extends Component
 
     public int $keepDays = 7;
 
-    public function mount(): void
+    // Konfigurasi Database Lokal (Hanya Super Admin)
+    public string $dbDriver = 'mysql';
+
+    public string $dbHost = '127.0.0.1';
+
+    public string $dbPort = '3306';
+
+    public string $dbDatabase = 'uteparts_db';
+
+    public string $dbUsername = 'root';
+
+    public string $dbPassword = '';
+
+    public string $dbSqlitePath = 'database/database.sqlite';
+
+    public ?string $dbTestMessage = null;
+
+    public ?string $dbTestStatus = null; // 'success' | 'error'
+
+    public array $discoveredLanServers = [];
+
+    public bool $isScanningLan = false;
+
+    // Update Checker (GitHub Sync)
+    public bool $showUpdateModal = false;
+
+    public bool $isCheckingUpdate = false;
+
+    public bool $isInstallingUpdate = false;
+
+    public ?array $updateCheckResult = null;
+
+    public string $gitDeployToken = '';
+
+    public ?string $sshPublicKey = null;
+
+    public array $updateLogs = [];
+
+    public ?array $currentVersionInfo = null;
+
+    public function mount(AppUpdateService $updateService): void
     {
         $this->authorizeAccess();
+
+        $this->dbDriver = (string) env('DB_CONNECTION', config('database.default', 'mysql'));
+        $this->dbHost = (string) env('DB_HOST', '127.0.0.1');
+        $this->dbPort = (string) env('DB_PORT', '3306');
+        $this->dbDatabase = (string) env('DB_DATABASE', 'uteparts_db');
+        $this->dbUsername = (string) env('DB_USERNAME', 'root');
+        $this->dbPassword = (string) env('DB_PASSWORD', '');
+        $this->dbSqlitePath = (string) env('DB_DATABASE', 'database/database.sqlite');
+        $this->gitDeployToken = $updateService->getGitToken();
+        $this->sshPublicKey = $updateService->getSshPublicKey();
+        $this->currentVersionInfo = $updateService->getCurrentVersionInfo();
+
+        if (request()->has('check_update')) {
+            $this->checkAppUpdates($updateService);
+        }
     }
 
     private function authorizeAccess(): void
@@ -53,6 +109,215 @@ class DatabaseManagement extends Component
         $user = auth()->user();
         if (! $user || (! $user->hasRole('super-admin') && ! $user->hasRole('owner'))) {
             abort(403, 'Akses ditolak: Hanya Super Admin dan Owner yang dapat mengelola manajemen database.');
+        }
+    }
+
+    private function authorizeSuperAdminOnly(): void
+    {
+        $user = auth()->user();
+        if (! $user || ! $user->hasRole('super-admin')) {
+            abort(403, 'Akses dibatasi khusus untuk akun Super Admin.');
+        }
+    }
+
+    /**
+     * Uji coba koneksi database sebelum disimpan.
+     */
+    public function testDbConnection(): void
+    {
+        $this->authorizeSuperAdminOnly();
+        $this->dbTestMessage = null;
+        $this->dbTestStatus = null;
+
+        try {
+            if ($this->dbDriver === 'sqlite') {
+                $path = $this->dbSqlitePath;
+                if (! str_starts_with($path, '/') && ! preg_match('/^[a-zA-Z]:[\\\\\/]/', $path)) {
+                    $path = base_path(ltrim($path, '/'));
+                }
+                $dir = dirname($path);
+                if (! is_dir($dir)) {
+                    @mkdir($dir, 0775, true);
+                }
+                if (! file_exists($path)) {
+                    @touch($path);
+                    @chmod($path, 0666);
+                }
+                new \PDO("sqlite:{$path}", null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
+                $this->dbTestStatus = 'success';
+                $this->dbTestMessage = "Koneksi SQLite Sukses! Berkas basis data '{$this->dbSqlitePath}' dapat diakses dan ditulis.";
+            } else {
+                $dsn = "mysql:host={$this->dbHost};port={$this->dbPort};dbname={$this->dbDatabase}";
+                new \PDO($dsn, $this->dbUsername, $this->dbPassword, [
+                    \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                    \PDO::ATTR_TIMEOUT => 3,
+                ]);
+                $this->dbTestStatus = 'success';
+                $this->dbTestMessage = "Koneksi MySQL Sukses! Terhubung ke database '{$this->dbDatabase}' di {$this->dbHost}:{$this->dbPort}.";
+            }
+        } catch (Throwable $e) {
+            $this->dbTestStatus = 'error';
+            $this->dbTestMessage = 'Gagal terhubung: '.$e->getMessage();
+        }
+    }
+
+    /**
+     * Simpan konfigurasi database ke .env (Hanya Super Admin).
+     */
+    public function saveDatabaseConfig(AppUpdateService $updateService, DatabaseManagementService $dbService): void
+    {
+        $this->authorizeSuperAdminOnly();
+
+        try {
+            $updates = [
+                'DB_CONNECTION' => $this->dbDriver,
+            ];
+
+            if ($this->dbDriver === 'sqlite') {
+                $path = $this->dbSqlitePath;
+                if (! str_starts_with($path, '/') && ! preg_match('/^[a-zA-Z]:[\\\\\/]/', $path)) {
+                    $absPath = base_path(ltrim($path, '/'));
+                } else {
+                    $absPath = $path;
+                }
+                if (! file_exists($absPath)) {
+                    @touch($absPath);
+                    @chmod($absPath, 0666);
+                }
+                $updates['DB_DATABASE'] = $this->dbSqlitePath;
+            } else {
+                $updates['DB_HOST'] = $this->dbHost;
+                $updates['DB_PORT'] = $this->dbPort;
+                $updates['DB_DATABASE'] = $this->dbDatabase;
+                $updates['DB_USERNAME'] = $this->dbUsername;
+                $updates['DB_PASSWORD'] = $this->dbPassword;
+            }
+
+            $updateService->updateEnv($updates);
+            $dbService->clearServerCache();
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => 'Konfigurasi database berhasil disimpan ke .env dan cache konfigurasi di-refresh!',
+            ]);
+        } catch (Throwable $e) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Gagal menyimpan konfigurasi: '.$e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Pindai server database di jaringan LAN secara otomatis.
+     */
+    public function scanLanDatabase(DatabaseManagementService $dbService): void
+    {
+        $this->authorizeSuperAdminOnly();
+        $this->isScanningLan = true;
+        $res = $dbService->scanLanDatabaseServers(450);
+        $this->discoveredLanServers = $res['servers'] ?? [];
+        $this->isScanningLan = false;
+
+        $count = count($this->discoveredLanServers);
+        if ($count > 0) {
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Ditemukan {$count} host server di jaringan LAN!",
+            ]);
+        } else {
+            $this->dispatch('alert', [
+                'type' => 'info',
+                'message' => 'Tidak ditemukan server MySQL/Ute Parts aktif lain di subnet LAN ini.',
+            ]);
+        }
+    }
+
+    /**
+     * Terapkan IP server hasil scan LAN ke form koneksi database.
+     */
+    public function selectLanServer(string $ip, int $port = 3306): void
+    {
+        $this->authorizeSuperAdminOnly();
+        $this->dbHost = $ip;
+        $this->dbPort = (string) $port;
+        $this->dbDriver = 'mysql';
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Host database disetel ke {$ip}:{$port}.",
+        ]);
+    }
+
+    /**
+     * Cek update dari GitHub.
+     */
+    public function checkAppUpdates(AppUpdateService $updateService): void
+    {
+        $this->isCheckingUpdate = true;
+        $this->updateCheckResult = $updateService->checkForUpdates();
+        $this->currentVersionInfo = $updateService->getCurrentVersionInfo();
+        $this->showUpdateModal = true;
+        $this->isCheckingUpdate = false;
+    }
+
+    /**
+     * Simpan token private repository GitHub ke .env.
+     */
+    public function saveGitToken(AppUpdateService $updateService): void
+    {
+        $this->authorizeSuperAdminOnly();
+        $updateService->updateEnv(['GITHUB_DEPLOY_TOKEN' => trim($this->gitDeployToken)]);
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Token autentikasi GitHub Private Repo berhasil disimpan ke .env!',
+        ]);
+    }
+
+    /**
+     * Generate pasangan SSH Key dari antarmuka aplikasi.
+     */
+    public function generateSshKey(AppUpdateService $updateService): void
+    {
+        $this->authorizeSuperAdminOnly();
+        $res = $updateService->generateSshDeployKey();
+
+        if ($res['success']) {
+            $this->sshPublicKey = $res['public_key'];
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => $res['message'],
+            ]);
+        } else {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => $res['message'],
+            ]);
+        }
+    }
+
+    /**
+     * Pasang pembaruan terbaru dari GitHub.
+     */
+    public function applyAppUpdate(AppUpdateService $updateService): void
+    {
+        $this->authorizeSuperAdminOnly();
+        $this->isInstallingUpdate = true;
+        $res = $updateService->applyUpdate();
+        $this->updateLogs = $res['logs'] ?? [];
+        $this->isInstallingUpdate = false;
+
+        if ($res['success']) {
+            $this->currentVersionInfo = $res['current'] ?? $updateService->getCurrentVersionInfo();
+            $this->updateCheckResult = null;
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => $res['message'],
+            ]);
+        } else {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => $res['message'],
+            ]);
         }
     }
 

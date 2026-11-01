@@ -587,23 +587,28 @@ class ProdukService
 
             $stok = StokItem::where('produk_id', $produkId)
                 ->where('gudang_id', $gudangId)
-                ->where(function ($q) use ($variantId) {
-                    $q->where('sku_variant_id', $variantId)
-                        ->orWhereNull('sku_variant_id');
-                })
+                ->when($variantId, fn ($q) => $q->where('sku_variant_id', $variantId))
                 ->first();
 
             if (! $stok) {
-                $stok = StokItem::create([
-                    'produk_id' => $produkId,
-                    'sku_variant_id' => $variantId,
-                    'gudang_id' => $gudangId,
-                    'jumlah' => 0,
-                    'jumlah_minimum' => 0,
-                    'rak_id' => $rakId,
-                ]);
-            } elseif (is_null($stok->sku_variant_id) && $variantId) {
-                $stok->update(['sku_variant_id' => $variantId]);
+                $orphan = StokItem::where('produk_id', $produkId)
+                    ->where('gudang_id', $gudangId)
+                    ->whereNull('sku_variant_id')
+                    ->first();
+
+                if ($orphan && $variantId) {
+                    $orphan->update(['sku_variant_id' => $variantId]);
+                    $stok = $orphan;
+                } else {
+                    $stok = StokItem::create([
+                        'produk_id' => $produkId,
+                        'sku_variant_id' => $variantId,
+                        'gudang_id' => $gudangId,
+                        'jumlah' => 0,
+                        'jumlah_minimum' => 0,
+                        'rak_id' => $rakId,
+                    ]);
+                }
             }
 
             $sebelum = (int) $stok->jumlah;

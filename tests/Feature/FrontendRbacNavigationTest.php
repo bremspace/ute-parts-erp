@@ -235,7 +235,7 @@ class FrontendRbacNavigationTest extends TestCase
 
         // Sidebar dropdown Pengaturan memiliki pengelompokan kategori yang jelas
         $response->assertSee('Akses &amp; Pengguna', false);
-        $response->assertSee('Katalog &amp; Web', false);
+        $response->assertSee('Katalog &amp; Master Part', false);
         $response->assertSee('Operasional &amp; Bisnis', false);
         $response->assertSee('Sistem &amp; Keamanan', false);
     }

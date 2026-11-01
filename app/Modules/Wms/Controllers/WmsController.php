@@ -374,7 +374,7 @@ class WmsController extends Controller
                     [
                         'stok_opname_id' => $opname->id,
                         'produk_id' => $item['produk_id'],
-                        'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                        'sku_variant_id' => $item['sku_variant_id'] ?? SkuVariant::where('produk_id', $item['produk_id'])->value('id'),
                     ],
                     [
                         'rak_id' => $item['rak_id'] ?? null,
@@ -427,14 +427,21 @@ class WmsController extends Controller
             $totalSelisihAbs = 0;
 
             foreach ($opname->items as $item) {
-                $stok = StokItem::firstOrCreate(
-                    [
+                $variantId = $item->sku_variant_id ?: SkuVariant::where('produk_id', $item->produk_id)->value('id');
+                $stok = StokItem::where('gudang_id', $opname->gudang_id)
+                    ->where('produk_id', $item->produk_id)
+                    ->when($variantId, fn ($q) => $q->where('sku_variant_id', $variantId))
+                    ->first();
+
+                if (! $stok) {
+                    $stok = StokItem::create([
                         'gudang_id' => $opname->gudang_id,
                         'produk_id' => $item->produk_id,
-                        'sku_variant_id' => $item->sku_variant_id,
-                    ],
-                    ['jumlah' => 0, 'jumlah_minimum' => 0]
-                );
+                        'sku_variant_id' => $variantId,
+                        'jumlah' => 0,
+                        'jumlah_minimum' => 0,
+                    ]);
+                }
 
                 $sebelum = $stok->jumlah;
                 $stok->update(['jumlah' => $item->stok_fisik]);

@@ -861,4 +861,90 @@ class DatabaseManagementService
 
         return $bytes.' B';
     }
+
+    /**
+     * Pindai subnet LAN lokal untuk menemukan host MySQL atau Ute Parts Server secara otomatis.
+     */
+    public function scanLanDatabaseServers(int $timeoutMs = 450): array
+    {
+        $localIps = [];
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $out = shell_exec('ipconfig');
+            if (preg_match_all('/IPv4 Address[.\s]*:\s*([0-9.]+)/i', (string) $out, $m)) {
+                $localIps = array_filter($m[1], fn ($ip) => $ip !== '127.0.0.1' && ! str_starts_with($ip, '169.254.'));
+            }
+        } else {
+            $out = shell_exec("hostname -I 2>/dev/null || ip -4 addr show 2>/dev/null | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'");
+            if ($out) {
+                $parts = preg_split('/\s+/', trim($out));
+                $localIps = array_filter($parts, fn ($ip) => ! empty($ip) && $ip !== '127.0.0.1' && ! str_starts_with($ip, '127.') && ! str_starts_with($ip, '169.254.'));
+            }
+        }
+
+        if (empty($localIps) && ! empty($_SERVER['SERVER_ADDR']) && $_SERVER['SERVER_ADDR'] !== '127.0.0.1') {
+            $localIps[] = $_SERVER['SERVER_ADDR'];
+        }
+
+        $subnets = [];
+        foreach ($localIps as $lip) {
+            $p = explode('.', $lip);
+            if (count($p) === 4) {
+                $subnets[$p[0].'.'.$p[1].'.'.$p[2].'.'] = true;
+            }
+        }
+
+        if (empty($subnets)) {
+            $subnets['192.168.1.'] = true;
+            $subnets['192.168.0.'] = true;
+        }
+
+        $found = [];
+        foreach (array_keys($subnets) as $prefix) {
+            $sockets = [];
+            for ($i = 1; $i <= 254; $i++) {
+                $target = $prefix.$i;
+                $s3306 = @stream_socket_client("tcp://{$target}:3306", $errno, $errstr, 0.04, STREAM_CLIENT_ASYNC_CONNECT);
+                if ($s3306) {
+                    stream_set_blocking($s3306, false);
+                    $sockets["{$target}:3306"] = $s3306;
+                }
+                $s1741 = @stream_socket_client("tcp://{$target}:1741", $errno, $errstr, 0.04, STREAM_CLIENT_ASYNC_CONNECT);
+                if ($s1741) {
+                    stream_set_blocking($s1741, false);
+                    $sockets["{$target}:1741"] = $s1741;
+                }
+            }
+
+            $w = array_values($sockets);
+            $r = [];
+            $e = [];
+            if (! empty($w)) {
+                $changed = @stream_select($r, $w, $e, 0, $timeoutMs * 1000);
+                if ($changed > 0) {
+                    foreach ($w as $sock) {
+                        $key = array_search($sock, $sockets, true);
+                        if ($key !== false) {
+                            [$tip, $tport] = explode(':', $key);
+                            $found[$tip] = [
+                                'ip' => $tip,
+                                'port' => (int) $tport,
+                                'type' => $tport === '3306' ? 'MySQL Database Server' : 'Ute Parts Web Server (Port 1741)',
+                            ];
+                        }
+                    }
+                }
+            }
+
+            foreach ($sockets as $s) {
+                @fclose($s);
+            }
+        }
+
+        return [
+            'local_ips' => array_values(array_unique($localIps)),
+            'servers' => array_values($found),
+            'count' => count($found),
+        ];
+    }
 }

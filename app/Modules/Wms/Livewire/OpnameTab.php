@@ -160,6 +160,7 @@ class OpnameTab extends Component
             // Blind Opname: stok_fisik kosong di awal
             $this->opnameRows[] = [
                 'produk_id' => $prod->id,
+                'sku_variant_id' => $prod->skuVariants->first()?->id,
                 'nama' => $prod->nama,
                 'sku' => $sku,
                 'barcode' => $barcode,
@@ -308,6 +309,7 @@ class OpnameTab extends Component
                 $newIndex = count($this->opnameRows);
                 $this->opnameRows[] = [
                     'produk_id' => $prod->id,
+                    'sku_variant_id' => $prod->skuVariants->first()?->id,
                     'nama' => $prod->nama,
                     'sku' => $prod->skuVariants->first()?->sku ?: ($prod->barcode ?: $prod->kode_lama),
                     'barcode' => $prod->barcode,
@@ -380,7 +382,7 @@ class OpnameTab extends Component
                 StokOpnameItem::create([
                     'stok_opname_id' => $opname->id,
                     'produk_id' => $row['produk_id'],
-                    'sku_variant_id' => null,
+                    'sku_variant_id' => $row['sku_variant_id'] ?? SkuVariant::where('produk_id', $row['produk_id'])->value('id'),
                     'rak_id' => $this->opnameRakId, // [T-14] scope per rak
                     'stok_sistem' => $stokSistem,
                     'stok_fisik' => $stokFisik,
@@ -420,15 +422,22 @@ class OpnameTab extends Component
         DB::transaction(function () use ($opname) {
             $jurnalLines = [];
             foreach ($opname->items as $item) {
-                $stok = StokItem::firstOrCreate(
-                    [
+                $variantId = $item->sku_variant_id ?: SkuVariant::where('produk_id', $item->produk_id)->value('id');
+                $stok = StokItem::where('gudang_id', $opname->gudang_id)
+                    ->where('produk_id', $item->produk_id)
+                    ->when($variantId, fn ($q) => $q->where('sku_variant_id', $variantId))
+                    ->first();
+
+                if (! $stok) {
+                    $stok = StokItem::create([
                         'gudang_id' => $opname->gudang_id,
                         'produk_id' => $item->produk_id,
-                        'sku_variant_id' => $item->sku_variant_id,
-                        'rak_id' => $item->rak_id ?? $opname->rak_id, // [T-14] scope rak
-                    ],
-                    ['jumlah' => 0, 'jumlah_minimum' => 0]
-                );
+                        'sku_variant_id' => $variantId,
+                        'rak_id' => $item->rak_id ?? $opname->rak_id,
+                        'jumlah' => 0,
+                        'jumlah_minimum' => 0,
+                    ]);
+                }
 
                 $sebelum = $stok->jumlah;
                 $stok->update(['jumlah' => $item->stok_fisik]);

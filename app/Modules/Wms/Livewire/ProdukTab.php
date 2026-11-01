@@ -1350,11 +1350,43 @@ class ProdukTab extends Component
 
         if ($gudangsCabang->isNotEmpty()) {
             foreach ($gudangsCabang as $gc) {
+                // Cari stok item yang valid untuk varian ini di gudang ini
                 $existingStok = StokItem::where('produk_id', $p->id)
                     ->where('gudang_id', $gc->id)
+                    ->when($variantId, fn ($q) => $q->where('sku_variant_id', $variantId))
                     ->first();
 
-                if (! $existingStok) {
+                // Cari apakah ada baris duplicate/orphan (sku_variant_id IS NULL)
+                $orphanNulls = StokItem::where('produk_id', $p->id)
+                    ->where('gudang_id', $gc->id)
+                    ->whereNull('sku_variant_id')
+                    ->get();
+
+                if ($existingStok) {
+                    // Jika stok varian sudah ada, bersihkan baris orphan
+                    foreach ($orphanNulls as $orphan) {
+                        if ($orphan->id !== $existingStok->id) {
+                            if ((int) $orphan->jumlah > 0 && (int) $existingStok->jumlah === 0) {
+                                $existingStok->update(['jumlah' => (int) $orphan->jumlah]);
+                            }
+                            $orphan->delete();
+                        }
+                    }
+                } elseif ($orphanNulls->isNotEmpty()) {
+                    // Jika belum ada stok varian, gunakan baris orphan pertama
+                    $adopter = $orphanNulls->first();
+                    if ($variantId) {
+                        $adopter->update(['sku_variant_id' => $variantId]);
+                    }
+                    $existingStok = $adopter;
+
+                    foreach ($orphanNulls->slice(1) as $orphan) {
+                        if ((int) $orphan->jumlah > 0 && (int) $existingStok->jumlah === 0) {
+                            $existingStok->update(['jumlah' => (int) $orphan->jumlah]);
+                        }
+                        $orphan->delete();
+                    }
+                } else {
                     StokItem::create([
                         'produk_id' => $p->id,
                         'sku_variant_id' => $variantId,
@@ -1363,8 +1395,6 @@ class ProdukTab extends Component
                         'jumlah_minimum' => $p->min_stock ?? 0,
                         'rak_id' => null,
                     ]);
-                } elseif (is_null($existingStok->sku_variant_id) && $variantId) {
-                    $existingStok->update(['sku_variant_id' => $variantId]);
                 }
             }
         }

@@ -208,10 +208,7 @@ class PosController extends Controller
             });
 
         $customers = Pelanggan::query()
-            ->where(function ($q) use ($cabangId) {
-                $q->where('cabang_id', $cabangId)->orWhereNull('cabang_id');
-            })
-            ->where('is_active', true)
+            ->where('status', 'aktif')
             ->with('tierMembership')
             ->limit(200)
             ->get()

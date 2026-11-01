@@ -5,6 +5,15 @@ Format: `[Fase X] T-XX — ringkasan`.
 
 ## 2026-11-01 — Standardisasi Akunting Industri & Kesiapan Audit ISO (9001 / 27001 / SAK) ✅
 
+- **Fix WMS Master Data Produk Edit Error 500 (SQLSTATE 23000 Duplicate Key)**:
+  - Akar masalah: Stok opname sebelumnya membuat record `stok_items` dengan `sku_variant_id = NULL`. Saat membuka modal edit produk (`openEditProdukModal`), sistem mencoba update record NULL tersebut menjadi `$variantId`, yang memicu error duplikasi unik `stok_items_produk_id_sku_variant_id_gudang_id_unique`.
+  - Perbaikan `ProdukTab::openEditProdukModal`: pencarian `StokItem` kini spesifik memeriksa `sku_variant_id`, membersihkan baris orphan/duplicate secara otomatis, dan menggabungkan stok jika ada.
+  - Perbaikan `OpnameTab` & `WmsController`: pembuatan item opname kini otomatis menyertakan `sku_variant_id` dari varian utama produk, mencegah terciptanya record orphan baru.
+  - Perbaikan query offline sync `PosController::masterOffline`: menghilangkan filter kolom `cabang_id` dan `is_active` pada model `Pelanggan` yang tidak memiliki kolom tersebut.
+  - Pembersihan data: 100 record orphan `sku_variant_id IS NULL` pada database live `ute_parts_prod` telah dibersihkan dan disinkronkan ke varian utama.
+  - Test baru `tests/Feature/MasterProdukEditStokDuplicateTest.php` (passed).
+
+
 - **Permalink Unik Tab Seluruh Modul Utama (Direct Deep-Linking & History Sync)**:
   - Rute permalink `{tab}` ber-constraint `whereIn` ketat untuk WMS (`/app/wms/{tab}`, `/app/wms/import-export/{tab}`), CRM (`/app/crm/{tab}`), Reseller (`/app/reseller/{tab}`), Omnichannel (`/app/omnichannel/{tab}`), Pengaturan/RBAC (`/app/pengaturan/{tab}`, `/app/pengaturan/web-konsumen/{tab}`), POS Riwayat (`/app/pos/riwayat/{tab}`), HR (`/app/hr/absensi/{tab}`, `/app/hr/payroll/{tab}`), dan Akun Konsumen (`/account/{tab}`).
   - Resolusi parameter `$tab` di masing-masing Livewire Component `mount(?string $tab)` dan dispatch event browser sync `tab-changed` serta listener popstate navigasi back/forward.
