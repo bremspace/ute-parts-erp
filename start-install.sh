@@ -196,17 +196,6 @@ if command -v mysql >/dev/null 2>&1; then
     if ! netstat -tuln 2>/dev/null | grep -q ":3306 " && ! ss -tuln 2>/dev/null | grep -q ":3306 "; then
         sudo systemctl start mysql 2>/dev/null || sudo systemctl start mariadb 2>/dev/null || sudo service mysql start 2>/dev/null || true
     fi
-
-    for mycnf in /etc/mysql/mysql.conf.d/mysqld.cnf /etc/mysql/mariadb.conf.d/50-server.cnf /etc/mysql/my.cnf; do
-        if [ -f "$mycnf" ] && grep -q "127.0.0.1" "$mycnf" 2>/dev/null; then
-            echo "ℹ [AUTO-FIX] Menyesuaikan MySQL bind-address ke 0.0.0.0 agar dapat diakses komputer kasir LAN..."
-            sudo sed -i 's/bind-address\s*=\s*127.0.0.1/bind-address = 0.0.0.0/g' "$mycnf" 2>/dev/null || true
-            sudo systemctl restart mysql 2>/dev/null || sudo service mysql restart 2>/dev/null || true
-        fi
-    done
-    if sudo mysql -e "SELECT 1;" >/dev/null 2>&1; then
-        sudo mysql -e "CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY ''; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;" 2>/dev/null || true
-    fi
 fi
 
 # 8. Konfigurasi Port 1741 (Unik & Jarang Dipakai)
@@ -239,7 +228,6 @@ fi
 if command -v ufw >/dev/null 2>&1; then
     if sudo ufw status 2>/dev/null | grep -qi "active"; then
         sudo ufw allow "$PORT"/tcp >/dev/null 2>&1 || true
-        sudo ufw allow 3306/tcp comment 'ERP MySQL LAN' >/dev/null 2>&1 || true
     fi
 fi
 

@@ -163,9 +163,6 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address" /c:"Al
     )
 )
 
-:: Cek & sesuaikan bind-address MySQL di Laragon / XAMPP agar bisa diakses LAN secara otomatis
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path 'C:\laragon\bin\mysql\*\my.ini', 'C:\xampp\mysql\bin\my.ini' -ErrorAction SilentlyContinue | ForEach-Object { (Get-Content $_.FullName) -replace 'bind-address\s*=\s*127\.0\.0\.1', 'bind-address = 0.0.0.0' | Set-Content $_.FullName }" >nul 2>nul
-
 :: Cek & Otomatis Nyalakan Service MySQL lokal jika port 3306 belum aktif
 netstat -ano | findstr /r /c:":3306 " >nul 2>nul
 if errorlevel 1 (
@@ -190,9 +187,8 @@ if errorlevel 1 (
     )
 )
 
-:: Buka port di Windows Defender Firewall (Port 1741 & 3306)
+:: Buka port web server di Windows Defender Firewall (Port %PORT%)
 netsh advfirewall firewall add rule name="ERP POS System (Port %PORT%)" dir=in action=allow protocol=TCP localport=%PORT% >nul 2>nul
-netsh advfirewall firewall add rule name="ERP MySQL LAN (Port 3306)" dir=in action=allow protocol=TCP localport=3306 >nul 2>nul
 
 :: Periksa apakah MySQL port 3306 aktif
 set "MYSQL_ACTIVE=0"

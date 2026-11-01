@@ -164,34 +164,9 @@ function runCommand(string $command): array
 
 function autoConfigureMysqlLan(): bool
 {
-    $candidates = [
-        '/etc/mysql/mysql.conf.d/mysqld.cnf',
-        '/etc/mysql/mariadb.conf.d/50-server.cnf',
-        '/etc/mysql/my.cnf',
-    ];
-
-    if (PHP_OS_FAMILY === 'Windows') {
-        $winPaths = glob('C:\\laragon\\bin\\mysql\\*\\my.ini') ?: [];
-        $winPaths = array_merge($winPaths, glob('C:\\xampp\\mysql\\bin\\my.ini') ?: []);
-        $winPaths = array_merge($winPaths, glob('C:\\ProgramData\\MySQL\\MySQL Server *\\my.ini') ?: []);
-        $candidates = array_merge($candidates, $winPaths);
-    }
-
-    $updated = false;
-    foreach ($candidates as $conf) {
-        if (file_exists($conf) && is_writable($conf)) {
-            $content = (string) file_get_contents($conf);
-            if (preg_match('/^(\s*bind-address\s*=\s*)(127\.0\.0\.1|::1)/m', $content)) {
-                $newContent = preg_replace('/^(\s*bind-address\s*=\s*)(127\.0\.0\.1|::1)/m', '${1}0.0.0.0', $content);
-                if ($newContent && $newContent !== $content) {
-                    @file_put_contents($conf, $newContent);
-                    $updated = true;
-                }
-            }
-        }
-    }
-
-    return $updated;
+    // Keamanan: Jangan pernah membuka bind-address MySQL ke 0.0.0.0
+    // Akses aplikasi selalu via web server lokal (127.0.0.1)
+    return false;
 }
 
 function runComposerInstallWithFallback(string $baseDir, string $composerCmd): array
@@ -690,31 +665,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                 $exists = true;
             }
 
-            // Otomatis siapkan hak akses user ke % (seluruh client LAN) jika di Mode Server
-            $lanGranted = false;
-            if (($host === '127.0.0.1' || $host === 'localhost') && ! empty($user)) {
-                try {
-                    $pdo->exec("CREATE USER IF NOT EXISTS '{$user}'@'%' IDENTIFIED BY '{$pass}'");
-                    if (! empty($pass)) {
-                        $pdo->exec("ALTER USER '{$user}'@'%' IDENTIFIED BY '{$pass}'");
-                    }
-                    $pdo->exec("GRANT ALL PRIVILEGES ON `{$name}`.* TO '{$user}'@'%'");
-                    $pdo->exec('FLUSH PRIVILEGES');
-                    $lanGranted = true;
-                } catch (Throwable) {
-                    // Abaikan jika user bukan superuser MySQL atau privilege terbatas
-                }
-            }
-
-            autoConfigureMysqlLan();
-
-            $lanNote = $lanGranted ? " • Akses kasir LAN ('{$user}'@'%') otomatis diaktifkan." : '';
-
             echo json_encode([
                 'success' => true,
                 'message' => $exists
-                    ? "Koneksi berhasil! Database '{$name}' siap digunakan.{$lanNote}"
-                    : "Koneksi ke MySQL sukses, namun database '{$name}' belum ada (centang opsi buat otomatis).{$lanNote}",
+                    ? "Koneksi berhasil! Database '{$name}' siap digunakan."
+                    : "Koneksi ke MySQL sukses, namun database '{$name}' belum ada (centang opsi buat otomatis).",
                 'db_exists' => $exists,
             ]);
         } catch (PDOException $e) {
@@ -852,15 +807,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                             try {
                                 $pdo = new PDO("mysql:host={$dbHost};port={$dbPort}", $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 3]);
                                 $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-                                $pdo->exec("CREATE USER IF NOT EXISTS '{$dbUser}'@'%' IDENTIFIED BY '{$dbPass}'");
-                                if (! empty($dbPass)) {
-                                    $pdo->exec("ALTER USER '{$dbUser}'@'%' IDENTIFIED BY '{$dbPass}'");
-                                }
-                                $pdo->exec("GRANT ALL PRIVILEGES ON `{$dbName}`.* TO '{$dbUser}'@'%'");
-                                $pdo->exec('FLUSH PRIVILEGES');
                             } catch (Throwable) {
                             }
-                            autoConfigureMysqlLan();
                         }
                     }
 
