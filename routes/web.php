@@ -733,6 +733,24 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
         ->name('akunting')
         ->middleware('permission:akunting.view');
 
+    // [Permalink Tab Akunting (ISO/SAK)]
+    Route::get('/akunting/{tab}', AkuntingDashboard::class)
+        ->name('akunting.tab')
+        ->whereIn('tab', [
+            'laporan',
+            'jurnal',
+            'buku-besar',
+            'coa',
+            'piutang',
+            'utang',
+            'matching-kas',
+            'diagnosa-neraca',
+            'tutup-buku',
+            'neraca-saldo',
+            'rekonsiliasi-bank',
+        ])
+        ->middleware('permission:akunting.view');
+
     // [F3-3] Register Aset Tetap & Depresiasi — halaman terpisah dari dashboard
     // akunting (sebelumnya komponennya ada tapi tanpa view & tanpa route → tidak
     // bisa diakses user sama sekali, audit B-10).

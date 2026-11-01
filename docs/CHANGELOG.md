@@ -5,6 +5,12 @@ Format: `[Fase X] T-XX — ringkasan`.
 
 ## 2026-11-01 — Standardisasi Akunting Industri & Kesiapan Audit ISO (9001 / 27001 / SAK) ✅
 
+- **Permalink Unik Tab Akunting (Direct URL & Browser History Sync)**:
+  - Rute permalink `/app/akunting/{tab}` (`akunting.tab`) dengan regex constraint `whereIn` pada 11 tab resmi (`laporan`, `jurnal`, `buku-besar`, `coa`, `piutang`, `utang`, `matching-kas`, `diagnosa-neraca`, `tutup-buku`, `neraca-saldo`, `rekonsiliasi-bank`), rute `/app/akunting/aset` tetap aman.
+  - Parameter `$tab` di `AkuntingDashboard::mount(?string $tab = null)` dan method `pilihTab()`.
+  - Tautan tab tag `<a>` ber-URL permalink langsung dengan sinkronisasi browser URL via `history.pushState` dan listener `popstate`.
+  - Penyesuaian submenu sidebar backoffice ke permalink `/app/akunting/laporan` dan `/app/akunting/jurnal`.
+  - Feature test `tests/Feature/AkuntingTabPermalinkTest.php` (4/4 passed).
 - **Fase 1: Periode Akuntansi & Fitur Tutup Buku Periodik**:
   - Migrasi skema database tabel `periode_akuntansi` dengan constraint unique (cabang_id, tahun, bulan).
   - Implementasi `TutupBukuService`: pra-cek kelayakan & keseimbangan neraca, penjurnalan penutup otomatis double-entry menutup akun nominal (pendapatan & beban) ke Laba Ditahan (`310-02`), hard lock status `closed` untuk pencegahan backdating transaksi, serta re-open terkontrol dengan audit trail.

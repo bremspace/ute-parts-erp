@@ -338,17 +338,17 @@
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
                         @php
-                            $isAkuntingDashboard = request()->is('app/akunting') && (!request()->has('tab') || request('tab') === 'laporan');
-                            $isAkuntingJurnal = request()->is('app/akunting') && request('tab') === 'jurnal';
+                            $isAkuntingDashboard = request()->is('app/akunting/laporan') || (request()->is('app/akunting') && (!request()->has('tab') || request('tab') === 'laporan'));
+                            $isAkuntingJurnal = request()->is('app/akunting/jurnal') || (request()->is('app/akunting') && request('tab') === 'jurnal');
                             $isAkuntingAset = request()->is('app/akunting/aset*');
                             $isAkuntingPajak = request()->is('app/laporan-pajak*');
                         @endphp
                         @can('akunting.view')
-                            <a href="/app/akunting?tab=laporan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkuntingDashboard ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <a href="/app/akunting/laporan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkuntingDashboard ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $isAkuntingDashboard ? 'bg-white' : 'bg-up-primary/60' }}"></span>
                                 <span>Laporan / Dashboard Akuntansi</span>
                             </a>
-                            <a href="/app/akunting?tab=jurnal" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkuntingJurnal ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <a href="/app/akunting/jurnal" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkuntingJurnal ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $isAkuntingJurnal ? 'bg-white' : 'bg-up-mint/60' }}"></span>
                                 <span>Jurnal</span>
                             </a>

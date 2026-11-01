@@ -68,7 +68,21 @@ class AkuntingDashboard extends Component
      */
     private const PER_HALAMAN_SUBLEDGER = 15;
 
-    public string $activeTab = 'laporan'; // laporan, jurnal, buku-besar, coa, piutang, utang, matching-kas, diagnosa-neraca, tutup-buku
+    public const VALID_TABS = [
+        'laporan',
+        'jurnal',
+        'buku-besar',
+        'coa',
+        'piutang',
+        'utang',
+        'matching-kas',
+        'diagnosa-neraca',
+        'tutup-buku',
+        'neraca-saldo',
+        'rekonsiliasi-bank',
+    ];
+
+    public string $activeTab = 'laporan';
 
     /** Cakupan laporan keuangan: 'cabang' (cabang aktif) atau 'konsolidasi' (gabungan seluruh cabang) */
     public string $cakupanLaporan = 'cabang';
@@ -204,7 +218,7 @@ class AkuntingDashboard extends Component
     // Diagnosa Neraca Cerdas
     public ?array $hasilDiagnosa = null;
 
-    public function mount()
+    public function mount(?string $tab = null)
     {
         $this->periodeDari = now()->startOfMonth()->toDateString();
         $this->periodeSampai = now()->toDateString();
@@ -221,15 +235,30 @@ class AkuntingDashboard extends Component
         $this->neracaSaldoDari = now()->startOfMonth()->toDateString();
         $this->neracaSaldoSampai = now()->toDateString();
 
-        $tab = request('tab');
-        if ($tab && in_array($tab, ['laporan', 'jurnal', 'buku-besar', 'coa', 'piutang', 'utang', 'matching-kas', 'diagnosa-neraca', 'tutup-buku'], true)) {
-            $this->activeTab = $tab;
+        $tabParam = $tab ?: request('tab');
+        if ($tabParam && in_array($tabParam, self::VALID_TABS, true)) {
+            $this->activeTab = $tabParam;
         }
 
         if (request()->has('akun_id')) {
             $this->selectedBukuBesarAkunId = (int) request('akun_id');
             $this->activeTab = 'buku-besar';
         }
+    }
+
+    public function pilihTab(string $tab): void
+    {
+        if (! in_array($tab, self::VALID_TABS, true)) {
+            return;
+        }
+
+        $this->activeTab = $tab;
+
+        if ($tab === 'rekonsiliasi-bank' && ! $this->rekonAkunId) {
+            $this->rekonAkunId = AkunCOA::where('kode', '110-02')->value('id') ?? AkunCOA::where('tipe', 'aset')->where('kelompok', 'kas')->value('id');
+        }
+
+        $this->dispatch('tab-changed', tab: $tab, url: url('/app/akunting/'.$tab));
     }
 
     // ===== GUARD [B-10a / P0-2] =====
@@ -863,6 +892,7 @@ class AkuntingDashboard extends Component
     {
         $this->selectedBukuBesarAkunId = $akunId;
         $this->activeTab = 'buku-besar';
+        $this->dispatch('tab-changed', tab: 'buku-besar', url: url('/app/akunting/buku-besar?akun_id='.$akunId));
     }
 
     public function getBukuBesarDataProperty(): ?array
