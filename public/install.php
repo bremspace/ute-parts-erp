@@ -268,7 +268,7 @@ function checkServerDiagnostics(): array
         'xml' => 'Penguraian XML & konfigurasi Laravel/Excel',
         'simplexml' => 'Format XML data export & barcode generator',
         'xmlwriter' => 'Export Excel (Maatwebsite) & manifest XML',
-        'gd' => 'Kompresi & manipulasi gambar WebP',
+        'gd' => 'Kompresi & manipulasi gambar WebP/PNG/JPG',
         'mbstring' => 'Pemrosesan string UTF-8 multibyte',
         'curl' => 'Koneksi API Payment Gateway & Ekspedisi',
         'zip' => 'Ekstraksi bulk foto & impor Excel',
@@ -279,10 +279,11 @@ function checkServerDiagnostics(): array
         'tokenizer' => 'Parser kode Laravel Blade & Livewire',
         'ctype' => 'Validasi karakter string standar Laravel',
         'opcache' => 'Akselerasi performa opcode bytecode (wajib zero-lag)',
-        'imagick' => 'Decoder cerdas gambar HEIC, AVIF, TIFF, PNG & optimasi media',
     ];
 
-    $optionalExts = [];
+    $optionalExts = [
+        'imagick' => 'Decoder gambar lanjutan (HEIC Apple iOS, AVIF, TIFF) — opsional, sistem otomatis menggunakan GD bawaan',
+    ];
 
     $extStatus = [];
     $allReqPassed = $hasDbDriver;
@@ -331,18 +332,37 @@ function checkServerDiagnostics(): array
 
     $iniPath = php_ini_loaded_file() ?: 'Tidak terdeteksi (default)';
     $majorMinor = PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;
+    $isWindows = (PHP_OS_FAMILY === 'Windows');
+    $isMac = (PHP_OS_FAMILY === 'Darwin');
 
     $missingExtsList = [];
+    $missingRequiredExts = [];
     foreach ($extStatus as $ext => $info) {
         if (! $info['loaded']) {
             $missingExtsList[] = $ext.($info['required'] ? ' (wajib)' : ' (opsional)');
+            if ($info['required']) {
+                $missingRequiredExts[] = $ext;
+            }
         }
     }
 
-    $recommendedCmd = 'sudo apt-get update && sudo apt-get install -y php'.$majorMinor.'-mysql php'.$majorMinor.'-xml php'.$majorMinor.'-gd php'.$majorMinor.'-mbstring php'.$majorMinor.'-curl php'.$majorMinor.'-zip php'.$majorMinor.'-intl php'.$majorMinor.'-bcmath php'.$majorMinor.'-imagick unzip';
+    if ($isWindows) {
+        if (! empty($missingRequiredExts)) {
+            $recommendedCmd = 'powershell -ExecutionPolicy Bypass -File scripts\setup-windows-php.ps1';
+        } else {
+            $recommendedCmd = 'start-install.bat';
+        }
+    } elseif ($isMac) {
+        $recommendedCmd = 'brew install php';
+    } elseif (file_exists('/etc/debian_version') || runCommand('which apt-get')['status'] === 0) {
+        $recommendedCmd = 'sudo apt-get update && sudo apt-get install -y php'.$majorMinor.'-mysql php'.$majorMinor.'-xml php'.$majorMinor.'-gd php'.$majorMinor.'-mbstring php'.$majorMinor.'-curl php'.$majorMinor.'-zip php'.$majorMinor.'-intl php'.$majorMinor.'-bcmath unzip';
+    } else {
+        $recommendedCmd = 'sudo dnf install -y php-mysqlnd php-xml php-gd php-mbstring php-intl php-bcmath php-zip unzip';
+    }
 
     return [
         'os' => $osInfo,
+        'is_windows' => $isWindows,
         'php_version' => PHP_VERSION,
         'php_ok' => version_compare(PHP_VERSION, '8.4.0', '>='),
         'php_ini' => $iniPath,
@@ -355,6 +375,7 @@ function checkServerDiagnostics(): array
         'extensions' => $extStatus,
         'extensions_ok' => $allReqPassed,
         'missing_extensions' => $missingExtsList,
+        'missing_required_count' => count($missingRequiredExts),
         'recommended_cmd' => $recommendedCmd,
         'tools' => $tools,
         'vendor_ready' => $vendorReady,
@@ -418,7 +439,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
 
             case 'extensions':
                 $iniFile = php_ini_loaded_file();
-                $extsToCheck = ['pdo_mysql', 'dom', 'xml', 'simplexml', 'xmlwriter', 'gd', 'mbstring', 'curl', 'zip', 'intl', 'bcmath', 'fileinfo', 'openssl', 'tokenizer', 'ctype', 'opcache', 'imagick'];
+                $isWindows = (PHP_OS_FAMILY === 'Windows');
+                $isMac = (PHP_OS_FAMILY === 'Darwin');
+                $extsToCheck = ['pdo_mysql', 'dom', 'xml', 'simplexml', 'xmlwriter', 'gd', 'mbstring', 'curl', 'zip', 'intl', 'bcmath', 'fileinfo', 'openssl', 'tokenizer', 'ctype', 'opcache'];
                 $missing = [];
                 foreach ($extsToCheck as $e) {
                     $isLoaded = ($e === 'opcache')
@@ -430,7 +453,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                 }
 
                 if (empty($missing)) {
-                    $logs[] = 'Semua ekstensi PHP wajib (termasuk Opcache & Imagick) sudah aktif di memori.';
+                    $logs[] = 'Semua ekstensi PHP wajib (termasuk Opcache & GD) sudah aktif di memori.';
                     break;
                 }
 
@@ -463,12 +486,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                     if ($modified) {
                         file_put_contents($iniFile, $content);
                         $restartNeeded = true;
-                        $logs[] = "File php.ini ({$iniFile}) berhasil diperbarui! Server PHP perlu di-restart agar ekstensi aktif di memori.";
+                        $logs[] = "File php.ini ({$iniFile}) berhasil disesuaikan! Server PHP perlu di-restart agar ekstensi aktif.";
+                        if ($isWindows) {
+                            $manualCmd = 'start-install.bat';
+                        }
                     }
                 }
 
-                // 2. Jika di Linux (Debian/Ubuntu), coba instalasi paket apt
-                if (file_exists('/etc/debian_version') || runCommand('which apt-get')['status'] === 0) {
+                // 2. Panduan & Perintah berdasarkan OS
+                if ($isWindows) {
+                    if (! empty($missing) && ! $restartNeeded) {
+                        $manualCmd = 'powershell -ExecutionPolicy Bypass -File scripts\setup-windows-php.ps1';
+                        $logs[] = 'Di Windows, ekstensi belum aktif di php.ini. Jalankan setup-windows-php.ps1 atau buka file '.$iniPath.' dan hilangkan tanda titik koma (;) pada baris ekstensi.';
+                    }
+                } elseif ($isMac) {
+                    $manualCmd = 'brew install php';
+                    $logs[] = 'Di macOS, silakan jalankan: '.$manualCmd;
+                } elseif (file_exists('/etc/debian_version') || runCommand('which apt-get')['status'] === 0) {
+                    // Linux Debian/Ubuntu
                     $majorMinor = PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;
                     $pkgList = [];
                     $extPkgMap = [
@@ -483,7 +518,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                         'zip' => "php{$majorMinor}-zip",
                         'intl' => "php{$majorMinor}-intl",
                         'bcmath' => "php{$majorMinor}-bcmath",
-                        'imagick' => "php{$majorMinor}-imagick",
                         'opcache' => "php{$majorMinor}-opcache",
                         'tokenizer' => "php{$majorMinor}-common",
                         'ctype' => "php{$majorMinor}-common",
@@ -493,6 +527,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                             $pkgList[] = $extPkgMap[$m];
                         }
                     }
+                    // Tambahkan php-imagick sebagai paket rekomendasi jika di Linux
+                    if (! extension_loaded('imagick')) {
+                        $pkgList[] = "php{$majorMinor}-imagick";
+                    }
+
                     if (! empty($pkgList)) {
                         $manualCmd = 'sudo apt-get update && sudo apt-get install -y '.implode(' ', $pkgList).' unzip';
                         $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
@@ -853,7 +892,7 @@ SESSION_DOMAIN=null
 
 QUEUE_CONNECTION=database
 CACHE_STORE=database
-CACHE_PREFIX=ute
+CACHE_PREFIX=erp_pos
 
 FILESYSTEM_DISK=public
 
@@ -1220,11 +1259,11 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                 </div>
 
                 <!-- Alert Callout jika membutuhkan restart atau aksi manual di terminal -->
-                <div id="manual-action-card" class="<?= ! empty($diag['missing_extensions']) ? '' : 'hidden' ?> p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                <div id="manual-action-card" class="<?= (! $diag['extensions_ok']) ? '' : 'hidden' ?> p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
                     <div class="flex items-center justify-between">
                         <div class="font-bold text-amber-300 flex items-center gap-1.5">
                             <span>💡</span>
-                            <span id="manual-action-title">Perintah Terminal Diperlukan / Restart PHP</span>
+                            <span id="manual-action-title"><?= $diag['is_windows'] ? 'Panduan Windows: Aktifkan Ekstensi PHP' : 'Perintah Terminal Diperlukan / Restart PHP' ?></span>
                         </div>
                         <button type="button" onclick="copyManualCmd()" class="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-[11px] font-bold border border-amber-500/30 transition cursor-pointer flex items-center gap-1">
                             <span>📋</span>
@@ -1232,11 +1271,11 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                         </button>
                     </div>
                     <p id="manual-action-desc" class="text-[11px] text-slate-300">
-                        Jika ekstensi PHP belum otomatis terpasang atau konfigurasi php.ini baru diubah, jalankan perintah ini di terminal Anda:
+                        <?= $diag['is_windows'] ? 'Di Windows, jalankan skrip otomatis PowerShell berikut atau aktifkan ekstensi pada berkas php.ini:' : 'Jika ekstensi PHP belum otomatis terpasang atau konfigurasi php.ini baru diubah, jalankan perintah ini di terminal Anda:' ?>
                     </p>
                     <pre id="manual-action-code" class="p-2.5 rounded-lg bg-black/60 font-mono text-[11px] text-amber-200 overflow-x-auto select-all"><?= htmlspecialchars($diag['recommended_cmd']) ?></pre>
                     <div class="text-[10px] text-slate-400">
-                        *Setelah perintah selesai, hentikan PHP server (<code class="text-white">Ctrl+C</code>) lalu jalankan kembali launcher (<code class="text-white">./start-install.sh</code> atau <code class="text-white">start-install.bat</code>) kemudian klik <strong>Segarkan</strong>.
+                        *Setelah selesai, hentikan PHP server (<code class="text-white">Ctrl+C</code>) lalu jalankan kembali launcher (<code class="text-white"><?= $diag['is_windows'] ? 'start-install.bat' : './start-install.sh' ?></code>) kemudian klik <strong>Segarkan</strong>.
                     </div>
                 </div>
             </div>
@@ -1718,9 +1757,13 @@ function updateDiagnosticsUI(d) {
     // 5. Manual Action Callout Box
     const manualCard = document.getElementById('manual-action-card');
     if (manualCard) {
-        if (d.missing_extensions && d.missing_extensions.length > 0) {
+        if (!d.extensions_ok && d.recommended_cmd) {
             manualCard.classList.remove('hidden');
+            const titleEl = document.getElementById('manual-action-title');
+            const descEl = document.getElementById('manual-action-desc');
             const codeEl = document.getElementById('manual-action-code');
+            if (titleEl) titleEl.textContent = d.is_windows ? 'Panduan Windows: Aktifkan Ekstensi PHP' : 'Perintah Terminal Diperlukan / Restart PHP';
+            if (descEl) descEl.textContent = d.is_windows ? 'Di Windows, jalankan skrip otomatis PowerShell berikut atau aktifkan ekstensi pada berkas php.ini:' : 'Jika ekstensi PHP belum otomatis terpasang atau konfigurasi php.ini baru diubah, jalankan perintah ini di terminal Anda:';
             if (codeEl) codeEl.textContent = d.recommended_cmd || '';
         } else {
             manualCard.classList.add('hidden');
@@ -1860,7 +1903,7 @@ function copyFullDiagnosticReport() {
     const btn = document.getElementById('copy-report-text');
     const diagStr = JSON.stringify(serverDiagnosticsCache, null, 2);
     const report = [
-        '=== LAPORAN DIAGNOSTIK & LOG INSTALLER UTE PARTS ===',
+        '=== LAPORAN DIAGNOSTIK & LOG INSTALLER ERP & POS SYSTEM ===',
         `Waktu Laporan: ${new Date().toISOString()}`,
         '',
         '--- DATA DIAGNOSTIK SISTEM ---',
@@ -1939,15 +1982,15 @@ async function scanLanServers() {
         results.classList.remove('hidden');
 
         if (data.success && data.servers && data.servers.length > 0) {
-            let html = '<div class=\"text-[11px] font-bold text-slate-300 mb-1.5\">Server Ditemukan di LAN:</div><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-2\">';
+            let html = '<div class="text-[11px] font-bold text-slate-300 mb-1.5">Server Ditemukan di LAN:</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2">';
             data.servers.forEach(srv => {
                 html += `
-                    <div class=\"p-2.5 rounded-xl bg-slate-900/80 border border-white/10 flex items-center justify-between gap-2\">
-                        <div class=\"min-w-0\">
-                            <div class=\"font-mono text-xs font-bold text-emerald-400\">${srv.ip}:${srv.port}</div>
-                            <div class=\"text-[10px] text-slate-400 truncate\">${srv.type}</div>
+                    <div class="p-2.5 rounded-xl bg-slate-900/80 border border-white/10 flex items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="font-mono text-xs font-bold text-emerald-400">${srv.ip}:${srv.port}</div>
+                            <div class="text-[10px] text-slate-400 truncate">${srv.type}</div>
                         </div>
-                        <button type=\"button\" onclick=\"selectScannedServer('${srv.ip}', ${srv.port})\" class=\"px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition shrink-0 cursor-pointer\">
+                        <button type="button" onclick="selectScannedServer('${srv.ip}', ${srv.port})" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition shrink-0 cursor-pointer">
                             Gunakan Ini
                         </button>
                     </div>
@@ -1957,7 +2000,7 @@ async function scanLanServers() {
             results.innerHTML = html;
         } else {
             results.innerHTML = `
-                <div class=\"p-3 rounded-xl bg-slate-900/60 border border-white/5 text-xs text-slate-400\">
+                <div class="p-3 rounded-xl bg-slate-900/60 border border-white/5 text-xs text-slate-400">
                     Tidak menemukan host server terbuka di subnet ini secara otomatis. Anda dapat mengetikkan <strong>IP Server Induk</strong> (misal <code>192.168.1.15</code>) pada kolom <strong>Database Host</strong> di bawah secara manual.
                 </div>
             `;
@@ -1966,7 +2009,7 @@ async function scanLanServers() {
         loading.classList.add('hidden');
         btnText.textContent = 'Pindai Ulang';
         results.classList.remove('hidden');
-        results.innerHTML = `<div class=\"text-xs text-rose-400\">Gagal memindai LAN: ${e.message}</div>`;
+        results.innerHTML = `<div class="text-xs text-rose-400">Gagal memindai LAN: ${e.message}</div>`;
     }
 }
 

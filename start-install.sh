@@ -138,9 +138,6 @@ if command -v apt-get >/dev/null 2>&1; then
     if ! "$PHP_BIN" -m | grep -qi "pdo_mysql"; then
         MISSING_EXTS="$MISSING_EXTS php-mysql"
     fi
-    if ! "$PHP_BIN" -m | grep -qi "imagick"; then
-        MISSING_EXTS="$MISSING_EXTS php-imagick"
-    fi
     if ! "$PHP_BIN" -m | grep -qi "opcache"; then
         MISSING_EXTS="$MISSING_EXTS php-opcache"
     fi

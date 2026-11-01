@@ -89,7 +89,6 @@ if (Test-Path $iniDev) {
     $c = $c -replace ';extension=intl', 'extension=intl'
     $c = $c -replace ';extension=zip', 'extension=zip'
     $c = $c -replace ';extension=bcmath', 'extension=bcmath'
-    $c = $c -replace ';extension=imagick', 'extension=imagick'
     $c = $c -replace ';zend_extension=opcache', 'zend_extension=opcache'
     if ($c -notmatch '(?m)^\s*zend_extension\s*=\s*opcache') {
         $c += "`r`nzend_extension=opcache`r`nopcache.enable=1`r`nopcache.enable_cli=1`r`nopcache.memory_consumption=128`r`n"

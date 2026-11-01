@@ -1,9 +1,10 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
-title ERP & POS System - Universal One-Click Launcher (Port 1741)
+title ERP ^& POS System - Universal One-Click Launcher (Port 1741)
 
 echo ======================================================================
-echo    ERP & POS System - Universal Local Launcher
+echo    ERP ^& POS System - Universal Local Launcher
 echo    Port Default: 1741 (Akses Lokal ^& Jaringan Wi-Fi/LAN/HP/iOS)
 echo ======================================================================
 echo.
@@ -198,7 +199,7 @@ if not "%LAN_IP%"=="" (
 echo [OK] Port aktif: %PORT%
 echo.
 echo ======================================================================
-echo    Server ERP & POS Berhasil Dijalankan!
+echo    Server ERP ^& POS Berhasil Dijalankan!
 echo    - Dari Komputer Ini       : %LOCAL_URL%
 if not "%NETWORK_URL%"=="" (
 echo    - Dari HP / iPhone / iPad : %NETWORK_URL%
