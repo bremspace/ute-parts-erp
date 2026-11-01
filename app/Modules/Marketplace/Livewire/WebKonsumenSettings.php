@@ -3,10 +3,17 @@
 namespace App\Modules\Marketplace\Livewire;
 
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Marketplace\Models\WebArticle;
 use App\Modules\Marketplace\Models\WebBanner;
+use App\Modules\Marketplace\Models\WebFaq;
+use App\Modules\Marketplace\Models\WebReview;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Servis\Models\JenisServis;
+use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Services\SmartSearchService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -16,9 +23,9 @@ class WebKonsumenSettings extends Component
     use WithFileUploads;
     use WithPagination;
 
-    public const VALID_TABS = ['hero', 'branding', 'banner', 'stok', 'kontak', 'pembayaran', 'preview'];
+    public const VALID_TABS = ['hero', 'branding', 'banner', 'stok', 'panduan', 'review', 'faq', 'kontak', 'pembayaran', 'preview'];
 
-    public string $activeTab = 'hero'; // hero, branding, banner, stok, kontak, preview
+    public string $activeTab = 'hero'; // hero, branding, banner, stok, panduan, review, faq, kontak, pembayaran, preview
 
     public string $previewDevice = 'desktop'; // desktop, mobile
 
@@ -32,6 +39,10 @@ class WebKonsumenSettings extends Component
     public $uploadBannerDesktop = null;
 
     public $uploadBannerMobile = null;
+
+    public $uploadBannerVideoDesktop = null;
+
+    public $uploadBannerVideoMobile = null;
 
     // Form states
     public array $brandingForm = [
@@ -48,7 +59,7 @@ class WebKonsumenSettings extends Component
         'hero_display_mode' => 'hero_standard', // hero_standard, carousel_replace, hero_and_carousel
         'hero_bg_image' => '',
         'hero_bg_overlay' => 'scrim_dark', // scrim_dark, scrim_heavy, glass_card
-        'hero_badge_text' => 'Standard Ute Prism™ Precision Parts',
+        'hero_badge_text' => 'Official Quality Parts & Repair Center',
         'hero_headline' => "Suku Cadang Presisi.\nGaransi Nyata Toko Resmi.",
         'hero_subheadline' => 'Layar LCD grade OEM, modul baterai densitas tinggi, hingga sparepart IC dengan kalibrasi uji pabrik.',
         'hero_right_widget' => 'member_card',
@@ -103,14 +114,74 @@ class WebKonsumenSettings extends Component
         'id' => null,
         'judul' => '',
         'badge_label' => '',
+        'tipe_media' => 'image', // image, gif, video
         'gambar_desktop' => '',
         'gambar_mobile' => '',
+        'video_desktop' => '',
+        'video_mobile' => '',
         'target_url' => '',
         'posisi' => 'hero_slider',
         'urutan' => 1,
         'is_active' => true,
         'tanggal_mulai' => null,
         'tanggal_selesai' => null,
+    ];
+
+    // Knowledge Base / Panduan State
+    public bool $articleModalOpen = false;
+
+    public string $articleSearch = '';
+
+    public string $articleKategoriFilter = '';
+
+    public $uploadArticleCover = null;
+
+    public $uploadArticleVideo = null;
+
+    // Smart Search untuk Part & Jasa di Modal Artikel
+    public string $partSearchQuery = '';
+
+    public string $servisSearchQuery = '';
+
+    public array $articleForm = [
+        'id' => null,
+        'judul' => '',
+        'slug' => '',
+        'kategori' => 'panduan_servis',
+        'ringkasan' => '',
+        'konten_lengkap' => '',
+        'tipe_media_cover' => 'image', // image, gif, video
+        'cover_image' => '',
+        'cover_video' => '',
+        'youtube_url' => '',
+        'produk_terkait_ids' => [],
+        'rekomendasi_servis_id' => null,
+        'meta_title' => '',
+        'meta_description' => '',
+        'is_published' => true,
+    ];
+
+    // Review & Moderasi State
+    public string $reviewFilter = 'all'; // all, pending, approved, featured
+
+    public string $reviewTipe = 'all'; // all, produk, servis
+
+    public bool $tanggapanModalOpen = false;
+
+    public ?int $selectedReviewId = null;
+
+    public string $adminTanggapanText = '';
+
+    // FAQ State
+    public bool $faqModalOpen = false;
+
+    public array $faqForm = [
+        'id' => null,
+        'kategori' => 'garansi',
+        'pertanyaan' => '',
+        'jawaban' => '',
+        'urutan' => 1,
+        'is_active' => true,
     ];
 
     public function mount(WebKonsumenService $service, ?string $tab = null): void
@@ -326,8 +397,11 @@ class WebKonsumenSettings extends Component
             'id' => null,
             'judul' => '',
             'badge_label' => '',
+            'tipe_media' => 'image',
             'gambar_desktop' => '',
             'gambar_mobile' => '',
+            'video_desktop' => '',
+            'video_mobile' => '',
             'target_url' => '/shop',
             'posisi' => 'hero_slider',
             'urutan' => WebBanner::count() + 1,
@@ -337,6 +411,8 @@ class WebKonsumenSettings extends Component
         ];
         $this->uploadBannerDesktop = null;
         $this->uploadBannerMobile = null;
+        $this->uploadBannerVideoDesktop = null;
+        $this->uploadBannerVideoMobile = null;
         $this->bannerModalOpen = true;
     }
 
@@ -347,8 +423,11 @@ class WebKonsumenSettings extends Component
             'id' => $banner->id,
             'judul' => $banner->judul,
             'badge_label' => $banner->badge_label ?? '',
+            'tipe_media' => $banner->tipe_media ?? 'image',
             'gambar_desktop' => $banner->gambar_desktop,
             'gambar_mobile' => $banner->gambar_mobile ?? '',
+            'video_desktop' => $banner->video_desktop ?? '',
+            'video_mobile' => $banner->video_mobile ?? '',
             'target_url' => $banner->target_url ?? '',
             'posisi' => $banner->posisi,
             'urutan' => $banner->urutan,
@@ -358,6 +437,8 @@ class WebKonsumenSettings extends Component
         ];
         $this->uploadBannerDesktop = null;
         $this->uploadBannerMobile = null;
+        $this->uploadBannerVideoDesktop = null;
+        $this->uploadBannerVideoMobile = null;
         $this->bannerModalOpen = true;
     }
 
@@ -365,10 +446,13 @@ class WebKonsumenSettings extends Component
     {
         $this->validate([
             'bannerForm.judul' => 'required|string|max:150',
+            'bannerForm.tipe_media' => 'required|in:image,gif,video',
             'bannerForm.posisi' => 'required|in:hero_slider,hero_side,mid_catalog,popup_modal',
             'bannerForm.urutan' => 'required|integer|min:0',
-            'uploadBannerDesktop' => $this->bannerForm['id'] ? 'nullable|image|max:2048' : ($this->bannerForm['gambar_desktop'] ? 'nullable' : 'required|image|max:2048'),
-            'uploadBannerMobile' => 'nullable|image|max:2048',
+            'uploadBannerDesktop' => $this->bannerForm['id'] ? 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192' : ($this->bannerForm['gambar_desktop'] ? 'nullable' : 'required|mimes:jpeg,png,jpg,webp,gif|max:8192'),
+            'uploadBannerMobile' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',
+            'uploadBannerVideoDesktop' => 'nullable|mimes:mp4,webm,ogg|max:15360',
+            'uploadBannerVideoMobile' => 'nullable|mimes:mp4,webm,ogg|max:15360',
         ]);
 
         if ($this->uploadBannerDesktop) {
@@ -381,11 +465,24 @@ class WebKonsumenSettings extends Component
             $this->bannerForm['gambar_mobile'] = '/storage/'.$path;
         }
 
+        if ($this->uploadBannerVideoDesktop) {
+            $path = $this->uploadBannerVideoDesktop->store('web-konsumen/videos', 'public');
+            $this->bannerForm['video_desktop'] = '/storage/'.$path;
+        }
+
+        if ($this->uploadBannerVideoMobile) {
+            $path = $this->uploadBannerVideoMobile->store('web-konsumen/videos', 'public');
+            $this->bannerForm['video_mobile'] = '/storage/'.$path;
+        }
+
         $data = [
             'judul' => $this->bannerForm['judul'],
             'badge_label' => $this->bannerForm['badge_label'] ?: null,
+            'tipe_media' => $this->bannerForm['tipe_media'],
             'gambar_desktop' => $this->bannerForm['gambar_desktop'],
             'gambar_mobile' => $this->bannerForm['gambar_mobile'] ?: null,
+            'video_desktop' => $this->bannerForm['video_desktop'] ?: null,
+            'video_mobile' => $this->bannerForm['video_mobile'] ?: null,
             'target_url' => $this->bannerForm['target_url'] ?: null,
             'posisi' => $this->bannerForm['posisi'],
             'urutan' => (int) $this->bannerForm['urutan'],
@@ -433,6 +530,334 @@ class WebKonsumenSettings extends Component
         ]);
     }
 
+    // Knowledge Base / Panduan Actions
+    public function openCreateArticle(): void
+    {
+        $this->articleForm = [
+            'id' => null,
+            'judul' => '',
+            'slug' => '',
+            'kategori' => 'panduan_servis',
+            'ringkasan' => '',
+            'konten_lengkap' => '',
+            'tipe_media_cover' => 'image',
+            'cover_image' => '',
+            'cover_video' => '',
+            'youtube_url' => '',
+            'produk_terkait_ids' => [],
+            'rekomendasi_servis_id' => null,
+            'meta_title' => '',
+            'meta_description' => '',
+            'is_published' => true,
+        ];
+        $this->uploadArticleCover = null;
+        $this->uploadArticleVideo = null;
+        $this->partSearchQuery = '';
+        $this->servisSearchQuery = '';
+        $this->articleModalOpen = true;
+    }
+
+    public function openEditArticle(int $id): void
+    {
+        $article = WebArticle::findOrFail($id);
+        $this->articleForm = [
+            'id' => $article->id,
+            'judul' => $article->judul,
+            'slug' => $article->slug,
+            'kategori' => $article->kategori,
+            'ringkasan' => $article->ringkasan,
+            'konten_lengkap' => $article->konten_lengkap,
+            'tipe_media_cover' => $article->tipe_media_cover ?? 'image',
+            'cover_image' => $article->cover_image ?? '',
+            'cover_video' => $article->cover_video ?? '',
+            'youtube_url' => $article->youtube_url ?? '',
+            'produk_terkait_ids' => $article->produk_terkait_ids ?? [],
+            'rekomendasi_servis_id' => $article->rekomendasi_servis_id,
+            'meta_title' => $article->meta_title ?? '',
+            'meta_description' => $article->meta_description ?? '',
+            'is_published' => (bool) $article->is_published,
+        ];
+        $this->uploadArticleCover = null;
+        $this->uploadArticleVideo = null;
+        $this->partSearchQuery = '';
+        $this->servisSearchQuery = '';
+        $this->articleModalOpen = true;
+    }
+
+    public function toggleProdukTerkait(int $produkId): void
+    {
+        $current = (array) ($this->articleForm['produk_terkait_ids'] ?? []);
+        if (in_array($produkId, $current, true)) {
+            $this->articleForm['produk_terkait_ids'] = array_values(array_filter($current, fn ($id) => (int) $id !== $produkId));
+        } else {
+            $current[] = $produkId;
+            $this->articleForm['produk_terkait_ids'] = array_values(array_unique($current));
+        }
+    }
+
+    public function saveArticle(): void
+    {
+        $this->validate([
+            'articleForm.judul' => 'required|string|max:200',
+            'articleForm.kategori' => 'required|string|max:50',
+            'articleForm.ringkasan' => 'required|string|max:300',
+            'articleForm.konten_lengkap' => 'required|string',
+            'uploadArticleCover' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',
+            'uploadArticleVideo' => 'nullable|mimes:mp4,webm,ogg|max:15360',
+        ]);
+
+        $slug = trim((string) $this->articleForm['slug']);
+        if ($slug === '') {
+            $slug = Str::slug($this->articleForm['judul']);
+        } else {
+            $slug = Str::slug($slug);
+        }
+
+        // Pastikan slug unik
+        $querySlug = WebArticle::where('slug', $slug);
+        if ($this->articleForm['id']) {
+            $querySlug->where('id', '!=', $this->articleForm['id']);
+        }
+        if ($querySlug->exists()) {
+            $slug .= '-'.substr(md5((string) mt_rand()), 0, 4);
+        }
+
+        if ($this->uploadArticleCover) {
+            $path = $this->uploadArticleCover->store('web-konsumen/articles', 'public');
+            $this->articleForm['cover_image'] = '/storage/'.$path;
+        }
+
+        if ($this->uploadArticleVideo) {
+            $path = $this->uploadArticleVideo->store('web-konsumen/articles', 'public');
+            $this->articleForm['cover_video'] = '/storage/'.$path;
+        }
+
+        $youtubeId = WebArticle::extractYouTubeId($this->articleForm['youtube_url'] ?: null);
+
+        $data = [
+            'judul' => $this->articleForm['judul'],
+            'slug' => $slug,
+            'kategori' => $this->articleForm['kategori'],
+            'ringkasan' => $this->articleForm['ringkasan'],
+            'konten_lengkap' => $this->articleForm['konten_lengkap'],
+            'tipe_media_cover' => $this->articleForm['tipe_media_cover'],
+            'cover_image' => $this->articleForm['cover_image'] ?: null,
+            'cover_video' => $this->articleForm['cover_video'] ?: null,
+            'youtube_url' => $this->articleForm['youtube_url'] ?: null,
+            'youtube_video_id' => $youtubeId,
+            'produk_terkait_ids' => ! empty($this->articleForm['produk_terkait_ids']) ? array_values(array_map('intval', (array) $this->articleForm['produk_terkait_ids'])) : null,
+            'rekomendasi_servis_id' => $this->articleForm['rekomendasi_servis_id'] ?: null,
+            'meta_title' => $this->articleForm['meta_title'] ?: null,
+            'meta_description' => $this->articleForm['meta_description'] ?: null,
+            'penulis_id' => Auth::id(),
+            'is_published' => (bool) $this->articleForm['is_published'],
+            'published_at' => $this->articleForm['is_published'] ? now() : null,
+        ];
+
+        if ($this->articleForm['id']) {
+            WebArticle::where('id', $this->articleForm['id'])->update($data);
+        } else {
+            WebArticle::create($data);
+        }
+
+        $this->articleModalOpen = false;
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Artikel panduan berhasil disimpan!',
+        ]);
+    }
+
+    public function togglePublishArticle(int $id): void
+    {
+        $article = WebArticle::findOrFail($id);
+        $newState = ! $article->is_published;
+        $article->update([
+            'is_published' => $newState,
+            'published_at' => $newState ? now() : $article->published_at,
+        ]);
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => $newState ? 'Artikel berhasil dipublikasikan.' : 'Artikel ditarik dari publikasi.',
+        ]);
+    }
+
+    public function deleteArticle(int $id): void
+    {
+        $article = WebArticle::findOrFail($id);
+        $article->delete();
+
+        $this->dispatch('alert', [
+            'type' => 'warning',
+            'message' => 'Artikel panduan berhasil dihapus.',
+        ]);
+    }
+
+    // Review & Moderasi Actions
+    public function approveReview(int $id): void
+    {
+        $review = WebReview::findOrFail($id);
+        $review->update([
+            'is_approved' => true,
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+        ]);
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Ulasan disetujui dan kini tampil di web konsumen.',
+        ]);
+    }
+
+    public function rejectReview(int $id): void
+    {
+        $review = WebReview::findOrFail($id);
+        $review->update([
+            'is_approved' => false,
+        ]);
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Ulasan disembunyikan dari publik.',
+        ]);
+    }
+
+    public function toggleFeaturedReview(int $id): void
+    {
+        $review = WebReview::findOrFail($id);
+        $review->update([
+            'is_featured' => ! $review->is_featured,
+            'is_approved' => true,
+        ]);
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => $review->is_featured ? 'Ulasan disematkan sebagai featured testimoni.' : 'Sematkan ulasan dinonaktifkan.',
+        ]);
+    }
+
+    public function openTanggapanModal(int $id): void
+    {
+        $review = WebReview::findOrFail($id);
+        $this->selectedReviewId = $review->id;
+        $this->adminTanggapanText = $review->tanggapan_admin ?? '';
+        $this->tanggapanModalOpen = true;
+    }
+
+    public function saveTanggapanReview(): void
+    {
+        if (! $this->selectedReviewId) {
+            return;
+        }
+
+        $review = WebReview::findOrFail($this->selectedReviewId);
+        $review->update([
+            'tanggapan_admin' => trim($this->adminTanggapanText) ?: null,
+            'approved_by' => Auth::id(),
+            'approved_at' => $review->approved_at ?: now(),
+        ]);
+
+        $this->tanggapanModalOpen = false;
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Tanggapan resmi toko berhasil disimpan!',
+        ]);
+    }
+
+    public function deleteReview(int $id): void
+    {
+        $review = WebReview::findOrFail($id);
+        $review->delete();
+
+        $this->dispatch('alert', [
+            'type' => 'warning',
+            'message' => 'Ulasan berhasil dihapus.',
+        ]);
+    }
+
+    // FAQ Actions
+    public function openCreateFaq(): void
+    {
+        $this->faqForm = [
+            'id' => null,
+            'kategori' => 'garansi',
+            'pertanyaan' => '',
+            'jawaban' => '',
+            'urutan' => WebFaq::count() + 1,
+            'is_active' => true,
+        ];
+        $this->faqModalOpen = true;
+    }
+
+    public function openEditFaq(int $id): void
+    {
+        $faq = WebFaq::findOrFail($id);
+        $this->faqForm = [
+            'id' => $faq->id,
+            'kategori' => $faq->kategori,
+            'pertanyaan' => $faq->pertanyaan,
+            'jawaban' => $faq->jawaban,
+            'urutan' => $faq->urutan,
+            'is_active' => (bool) $faq->is_active,
+        ];
+        $this->faqModalOpen = true;
+    }
+
+    public function saveFaq(): void
+    {
+        $this->validate([
+            'faqForm.pertanyaan' => 'required|string|max:255',
+            'faqForm.jawaban' => 'required|string',
+            'faqForm.kategori' => 'required|string|max:50',
+            'faqForm.urutan' => 'required|integer|min:0',
+        ]);
+
+        $data = [
+            'kategori' => $this->faqForm['kategori'],
+            'pertanyaan' => $this->faqForm['pertanyaan'],
+            'jawaban' => $this->faqForm['jawaban'],
+            'urutan' => (int) $this->faqForm['urutan'],
+            'is_active' => (bool) $this->faqForm['is_active'],
+        ];
+
+        if ($this->faqForm['id']) {
+            WebFaq::where('id', $this->faqForm['id'])->update($data);
+        } else {
+            WebFaq::create($data);
+        }
+
+        $this->faqModalOpen = false;
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'FAQ berhasil disimpan!',
+        ]);
+    }
+
+    public function toggleFaqStatus(int $id): void
+    {
+        $faq = WebFaq::findOrFail($id);
+        $faq->update(['is_active' => ! $faq->is_active]);
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Status FAQ berhasil diperbarui.',
+        ]);
+    }
+
+    public function deleteFaq(int $id): void
+    {
+        $faq = WebFaq::findOrFail($id);
+        $faq->delete();
+
+        $this->dispatch('alert', [
+            'type' => 'warning',
+            'message' => 'FAQ berhasil dihapus.',
+        ]);
+    }
+
     public function render()
     {
         $banners = WebBanner::orderBy('posisi')
@@ -440,8 +865,76 @@ class WebKonsumenSettings extends Component
             ->orderByDesc('id')
             ->get();
 
+        // Articles Query
+        $articlesQuery = WebArticle::with('penulis')->latest();
+        if ($this->articleSearch !== '') {
+            $articlesQuery->where(function ($q) {
+                $q->where('judul', 'like', '%'.$this->articleSearch.'%')
+                    ->orWhere('ringkasan', 'like', '%'.$this->articleSearch.'%');
+            });
+        }
+        if ($this->articleKategoriFilter !== '') {
+            $articlesQuery->where('kategori', $this->articleKategoriFilter);
+        }
+        $articles = $articlesQuery->paginate(12, ['*'], 'articlesPage');
+
+        // Reviews Query
+        $reviewsQuery = WebReview::with(['pelanggan', 'produk', 'tiketServis'])->latest();
+        if ($this->reviewFilter === 'pending') {
+            $reviewsQuery->where('is_approved', false);
+        } elseif ($this->reviewFilter === 'approved') {
+            $reviewsQuery->where('is_approved', true);
+        } elseif ($this->reviewFilter === 'featured') {
+            $reviewsQuery->where('is_featured', true);
+        }
+        if ($this->reviewTipe !== 'all') {
+            $reviewsQuery->where('tipe_ulasan', $this->reviewTipe);
+        }
+        $reviews = $reviewsQuery->paginate(15, ['*'], 'reviewsPage');
+
+        // FAQs Query
+        $faqs = WebFaq::orderBy('kategori')->orderBy('urutan')->get();
+
+        // Autocomplete Options menggunakan SmartSearchService engine terpusat
+        $smartSearch = app(SmartSearchService::class);
+
+        $produkQuery = Produk::where('is_active', true)->select('id', 'nama', 'kode_produk', 'harga_jual_retail', 'foto_utama');
+        if (trim($this->partSearchQuery) !== '') {
+            $smartSearch->applySmartSearch($produkQuery, $this->partSearchQuery);
+        }
+        $produkList = $produkQuery->limit(20)->get();
+
+        // Ambil produk terpilih jika belum masuk di list
+        $selectedIds = (array) ($this->articleForm['produk_terkait_ids'] ?? []);
+        if (! empty($selectedIds)) {
+            $selectedProduks = Produk::whereIn('id', $selectedIds)->select('id', 'nama', 'kode_produk', 'harga_jual_retail', 'foto_utama')->get();
+            $produkList = $selectedProduks->merge($produkList)->unique('id')->values();
+        }
+
+        // Jenis Servis Query
+        $servisQuery = JenisServis::where('is_active', true)->select('id', 'nama', 'kategori', 'biaya_jasa');
+        if (trim($this->servisSearchQuery) !== '') {
+            $sq = trim($this->servisSearchQuery);
+            $servisQuery->where(function ($q) use ($sq) {
+                $q->where('nama', 'like', "%{$sq}%")
+                    ->orWhere('kategori', 'like', "%{$sq}%");
+            });
+        }
+        $jenisServisList = $servisQuery->orderBy('nama')->limit(20)->get();
+
+        // Daftar kategori artikel yang pernah dibuat (dinamis & fleksibel)
+        $existingCategories = WebArticle::distinct()->pluck('kategori')->filter()->values()->all();
+        $defaultCategories = ['panduan_servis', 'edukasi_part', 'tips_trik', 'diagnosa_alat', 'troubleshooting', 'unboxing_review'];
+        $allCategories = array_values(array_unique(array_merge($defaultCategories, $existingCategories)));
+
         return view('modules.marketplace.livewire.web-konsumen-settings', [
             'banners' => $banners,
+            'articles' => $articles,
+            'reviews' => $reviews,
+            'faqs' => $faqs,
+            'produkList' => $produkList,
+            'jenisServisList' => $jenisServisList,
+            'allCategories' => $allCategories,
         ])->layout('layouts.backoffice', ['title' => 'Pengaturan Web Konsumen']);
     }
 }

@@ -51,9 +51,19 @@
                    x-transition:leave-start="opacity-100 scale-100"
                    x-transition:leave-end="opacity-0 scale-[0.99]"
                    class="absolute inset-0 block group">
-                    <img src="{{ $banner->gambar_desktop }}"
-                         alt="{{ $banner->judul }}"
-                         class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]">
+                    @if($banner->tipe_media === 'video' && ($banner->video_desktop || $banner->video_mobile))
+                        <!-- Short Loop Video Banner -->
+                        <video autoplay loop muted playsinline
+                               poster="{{ $banner->gambar_desktop }}"
+                               class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]">
+                            <source src="{{ $banner->video_desktop ?: $banner->video_mobile }}" type="video/mp4">
+                        </video>
+                    @else
+                        <!-- Image / Animated GIF Banner -->
+                        <img src="{{ $banner->gambar_desktop }}"
+                             alt="{{ $banner->judul }}"
+                             class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]">
+                    @endif
 
                     <!-- Dynamic Scrim Gradient for Readability -->
                     <div class="absolute inset-0 bg-gradient-to-t from-[#070B14]/95 via-[#070B14]/40 to-transparent p-6 sm:p-10 lg:p-12 flex flex-col justify-end">
@@ -129,7 +139,7 @@
                 <!-- Exclusive Pill -->
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.12] border border-white/20 backdrop-blur-md text-[11px] font-semibold tracking-wider uppercase text-slate-100 max-w-full">
                     <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.9)] flex-shrink-0"></span>
-                    <span class="truncate">{{ $webConfig['hero_badge_text'] ?? 'Standard Ute Prism™ Precision Parts' }}</span>
+                    <span class="truncate">{{ $webConfig['hero_badge_text'] ?? 'Official Quality Parts & Repair Center' }}</span>
                 </div>
 
                 <!-- Headline with dynamic high contrast -->
@@ -225,7 +235,15 @@
                                    x-transition:leave-start="opacity-100"
                                    x-transition:leave-end="opacity-0"
                                    class="absolute inset-0 block group">
-                                    <img src="{{ $banner->gambar_desktop }}" alt="{{ $banner->judul }}" class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105">
+                                    @if($banner->tipe_media === 'video' && ($banner->video_desktop || $banner->video_mobile))
+                                        <video autoplay loop muted playsinline
+                                               poster="{{ $banner->gambar_desktop }}"
+                                               class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105">
+                                            <source src="{{ $banner->video_desktop ?: $banner->video_mobile }}" type="video/mp4">
+                                        </video>
+                                    @else
+                                        <img src="{{ $banner->gambar_desktop }}" alt="{{ $banner->judul }}" class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105">
+                                    @endif
                                     <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent p-5 flex flex-col justify-end">
                                         @if($banner->badge_label)
                                             <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-up-primary/80 text-white w-max uppercase tracking-wider mb-1">
@@ -955,7 +973,13 @@
             <div class="pt-6">
                 @foreach($midBanners as $mb)
                     <a href="{{ $mb->target_url ?: '#' }}" class="block rounded-3xl overflow-hidden border border-white/10 shadow-lg hover:border-up-primary/40 transition-all duration-200 group">
-                        <img src="{{ $mb->gambar_desktop }}" alt="{{ $mb->judul }}" class="w-full h-auto max-h-48 sm:max-h-64 object-cover">
+                        @if($mb->tipe_media === 'video' && ($mb->video_desktop || $mb->video_mobile))
+                            <video autoplay loop muted playsinline poster="{{ $mb->gambar_desktop }}" class="w-full h-auto max-h-48 sm:max-h-64 object-cover">
+                                <source src="{{ $mb->video_desktop ?: $mb->video_mobile }}" type="video/mp4">
+                            </video>
+                        @else
+                            <img src="{{ $mb->gambar_desktop }}" alt="{{ $mb->judul }}" class="w-full h-auto max-h-48 sm:max-h-64 object-cover">
+                        @endif
                     </a>
                 @endforeach
             </div>

@@ -12,8 +12,11 @@ class WebBanner extends Model
     protected $fillable = [
         'judul',
         'badge_label',
+        'tipe_media',
         'gambar_desktop',
         'gambar_mobile',
+        'video_desktop',
+        'video_mobile',
         'target_url',
         'posisi',
         'urutan',
@@ -30,6 +33,16 @@ class WebBanner extends Model
         'tanggal_mulai' => 'datetime',
         'tanggal_selesai' => 'datetime',
     ];
+
+    public function isVideo(): bool
+    {
+        return $this->tipe_media === 'video' && ! empty($this->video_desktop);
+    }
+
+    public function isGif(): bool
+    {
+        return $this->tipe_media === 'gif';
+    }
 
     public function scopeActive(Builder $query): Builder
     {

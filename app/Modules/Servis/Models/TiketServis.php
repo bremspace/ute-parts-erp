@@ -4,6 +4,7 @@ namespace App\Modules\Servis\Models;
 
 use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Marketplace\Models\WebReview;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
@@ -333,5 +334,10 @@ class TiketServis extends Model
             'total_part' => $totalPart,
             'total' => $totalJasa + $totalPart,
         ];
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(WebReview::class, 'tiket_servis_id');
     }
 }

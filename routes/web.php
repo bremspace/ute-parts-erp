@@ -26,6 +26,8 @@ use App\Modules\Marketplace\Controllers\PaymentController;
 use App\Modules\Marketplace\Livewire\BookingServis;
 use App\Modules\Marketplace\Livewire\CartCheckout;
 use App\Modules\Marketplace\Livewire\CustomerAccount;
+use App\Modules\Marketplace\Livewire\EstimasiBiayaServisPage;
+use App\Modules\Marketplace\Livewire\KnowledgeBasePage;
 use App\Modules\Marketplace\Livewire\ShopPage;
 use App\Modules\Marketplace\Livewire\WebKonsumenSettings;
 use App\Modules\Marketplace\Services\WebKonsumenService;
@@ -71,6 +73,9 @@ Route::get('/', fn () => redirect('/shop'));
 Route::get('/dashboard', fn () => redirect('/app/dashboard'));
 Route::get('/shop', ShopPage::class)->name('shop');
 Route::get('/shop/{slug}', ShopPage::class)->name('shop.detail');
+Route::get('/panduan', KnowledgeBasePage::class)->name('panduan.index');
+Route::get('/panduan/{slug}', KnowledgeBasePage::class)->name('panduan.detail');
+Route::get('/estimasi-biaya', EstimasiBiayaServisPage::class)->name('estimasi.biaya');
 
 // Tracking servis publik (PRD §4.3: link status via token, dengan verifikasi 5 digit no HP atau login)
 Route::match(['GET', 'POST'], '/tracking', function (Request $request) {

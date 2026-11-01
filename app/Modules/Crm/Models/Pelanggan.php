@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Models;
 
+use App\Modules\Marketplace\Models\WebReview;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use App\Modules\Reseller\Models\Komisi;
@@ -68,5 +69,10 @@ class Pelanggan extends Model implements Authenticatable
     public function poinLogs(): HasMany
     {
         return $this->hasMany(PelangganPoinLog::class)->latest();
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(WebReview::class, 'pelanggan_id');
     }
 }

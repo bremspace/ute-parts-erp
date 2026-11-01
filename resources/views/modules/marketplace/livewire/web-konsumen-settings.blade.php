@@ -68,8 +68,35 @@
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span>Banner Promosi</span>
+                <span>Banner &amp; Media</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] {{ $activeTab === 'banner' ? 'bg-white/20 text-white' : 'bg-white/10 text-slate-300' }}">{{ $banners->count() }}</span>
+            </a>
+
+            <a href="{{ url('/app/pengaturan/web-konsumen/panduan') }}" wire:click.prevent="setTab('panduan')"
+                    class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'panduan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span>Knowledge Base</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] {{ $activeTab === 'panduan' ? 'bg-white/20 text-white' : 'bg-white/10 text-slate-300' }}">{{ $articles->total() }}</span>
+            </a>
+
+            <a href="{{ url('/app/pengaturan/web-konsumen/review') }}" wire:click.prevent="setTab('review')"
+                    class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'review' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+                <span>Ulasan &amp; Testimoni</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] {{ $activeTab === 'review' ? 'bg-white/20 text-white' : 'bg-white/10 text-slate-300' }}">{{ $reviews->total() }}</span>
+            </a>
+
+            <a href="{{ url('/app/pengaturan/web-konsumen/faq') }}" wire:click.prevent="setTab('faq')"
+                    class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'faq' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>FAQ &amp; Garansi</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] {{ $activeTab === 'faq' ? 'bg-white/20 text-white' : 'bg-white/10 text-slate-300' }}">{{ $faqs->count() }}</span>
             </a>
 
             <a href="{{ url('/app/pengaturan/web-konsumen/stok') }}" wire:click.prevent="setTab('stok')"
@@ -270,7 +297,7 @@
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Pill Badge Text</label>
                         <input type="text" wire:model.live="heroForm.hero_badge_text"
-                               placeholder="Contoh: Standard Ute Prism™ Precision Parts"
+                               placeholder="Contoh: Premium Guaranteed Suku Cadang &amp; Servis"
                                class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary">
                     </div>
 
@@ -1110,6 +1137,346 @@
     </div>
     @endif
 
+    <!-- Tab 4: Knowledge Base / Panduan Teknis -->
+    @if ($activeTab === 'panduan')
+    <div class="space-y-6">
+        <x-prism.glass-card class="p-4 sm:p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                <div>
+                    <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <span>Pusat Edukasi &amp; Knowledge Base Panduan</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                            {{ $articles->total() }} Artikel
+                        </span>
+                    </h2>
+                    <p class="text-xs text-ink-400">Kelola artikel panduan teknis, edukasi suku cadang, video YouTube embed, dan rekomendasi produk terkait.</p>
+                </div>
+                <button type="button" wire:click="openCreateArticle"
+                        class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-up-primary hover:bg-up-primary/90 active:scale-[0.97] transition-[background-color,transform] duration-140 shadow-sm cursor-pointer min-h-[44px]">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <span>Tulis Panduan Baru</span>
+                </button>
+            </div>
+
+            <!-- Search & Filter Bar -->
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+                <div class="sm:col-span-8">
+                    <input type="text" wire:model.live.debounce.300ms="articleSearch" placeholder="Cari judul artikel, topik perbaikan, atau kata kunci..."
+                           class="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white placeholder-ink-400 focus:outline-none focus:border-up-primary min-h-[40px]">
+                </div>
+                <div class="sm:col-span-4">
+                    <select wire:model.live="articleKategoriFilter"
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-up-primary min-h-[40px]">
+                        <option value="">-- Semua Kategori Panduan --</option>
+                        @foreach($allCategories as $cOpt)
+                            <option value="{{ $cOpt }}">{{ ucwords(str_replace('_', ' ', $cOpt)) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <!-- Table Daftar Artikel -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-ink-300">
+                    <thead class="bg-white/[0.02] text-ink-400 uppercase text-[10px] tracking-wider border-b border-white/10">
+                        <tr>
+                            <th class="py-3 px-3">Cover &amp; Media</th>
+                            <th class="py-3 px-3">Judul &amp; Ringkasan</th>
+                            <th class="py-3 px-3">Kategori</th>
+                            <th class="py-3 px-3">Commerce Link</th>
+                            <th class="py-3 px-3">Status</th>
+                            <th class="py-3 px-3 text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/[0.06]">
+                        @forelse ($articles as $art)
+                        <tr class="hover:bg-white/[0.02] transition-colors">
+                            <td class="py-3 px-3 w-24">
+                                <div class="w-20 h-14 rounded-xl overflow-hidden bg-black/40 border border-white/10 relative flex items-center justify-center">
+                                    @if ($art->cover_image)
+                                        <img src="{{ $art->cover_image }}" alt="{{ $art->judul }}" class="w-full h-full object-cover">
+                                    @else
+                                        <span class="text-ink-500 font-bold text-[10px]">No Media</span>
+                                    @endif
+
+                                    @if ($art->youtube_video_id)
+                                        <span class="absolute top-1 right-1 px-1 rounded bg-red-600 text-white text-[8px] font-black uppercase">YT</span>
+                                    @elseif ($art->tipe_media_cover === 'video')
+                                        <span class="absolute top-1 right-1 px-1 rounded bg-up-primary text-white text-[8px] font-black uppercase">VID</span>
+                                    @elseif ($art->tipe_media_cover === 'gif')
+                                        <span class="absolute top-1 right-1 px-1 rounded bg-up-accent text-white text-[8px] font-black uppercase">GIF</span>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="py-3 px-3 max-w-sm">
+                                <div class="font-bold text-white text-xs line-clamp-1">{{ $art->judul }}</div>
+                                <div class="text-ink-400 text-[11px] line-clamp-1 mt-0.5">{{ $art->ringkasan }}</div>
+                                <div class="text-[10px] text-ink-500 font-mono mt-0.5">/panduan/{{ $art->slug }}</div>
+                            </td>
+                            <td class="py-3 px-3">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $art->kategori === 'panduan_servis' ? 'bg-up-primary/20 text-up-primary border border-up-primary/30' : ($art->kategori === 'edukasi_part' ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-up-accent/20 text-up-accent border border-up-accent/30') }}">
+                                    {{ $art->kategori === 'panduan_servis' ? 'Panduan Servis' : ($art->kategori === 'edukasi_part' ? 'Edukasi Suku Cadang' : 'Tips & Perawatan') }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-3">
+                                <div class="space-y-0.5 text-[11px]">
+                                    @if (!empty($art->produk_terkait_ids))
+                                        <div class="text-slate-200">📦 {{ count($art->produk_terkait_ids) }} Part Terkait</div>
+                                    @endif
+                                    @if ($art->rekomendasi_servis_id)
+                                        <div class="text-up-mint">🔧 Layanan Servis Di-link</div>
+                                    @endif
+                                    @if (empty($art->produk_terkait_ids) && !$art->rekomendasi_servis_id)
+                                        <span class="text-ink-500">-</span>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="py-3 px-3">
+                                <button type="button" wire:click="togglePublishArticle({{ $art->id }})"
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer {{ $art->is_published ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/10 text-ink-400 border border-white/10' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $art->is_published ? 'bg-emerald-400' : 'bg-ink-500' }}"></span>
+                                    <span>{{ $art->is_published ? 'Terbit' : 'Draf' }}</span>
+                                </button>
+                            </td>
+                            <td class="py-3 px-3 text-right whitespace-nowrap">
+                                <button type="button" wire:click="openEditArticle({{ $art->id }})"
+                                        class="px-2.5 py-1 text-xs text-up-primary hover:underline font-semibold cursor-pointer">
+                                    Edit
+                                </button>
+                                <span class="text-ink-500">|</span>
+                                <button type="button" wire:click="deleteArticle({{ $art->id }})"
+                                        wire:confirm="Yakin ingin menghapus artikel panduan ini?"
+                                        class="px-2.5 py-1 text-xs text-red-400 hover:underline cursor-pointer">
+                                    Hapus
+                                </button>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-ink-500 text-xs">
+                                Belum ada artikel panduan. Klik tombol "Tulis Panduan Baru" di atas.
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pt-2">
+                {{ $articles->links() }}
+            </div>
+        </x-prism.glass-card>
+    </div>
+    @endif
+
+    <!-- Tab 5: Review & Moderasi Testimoni -->
+    @if ($activeTab === 'review')
+    <div class="space-y-6">
+        <x-prism.glass-card class="p-4 sm:p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                <div>
+                    <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <span>Moderasi Ulasan Pembeli &amp; Testimoni Servis</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                            {{ $reviews->total() }} Ulasan
+                        </span>
+                    </h2>
+                    <p class="text-xs text-ink-400">Verifikasi ulasan kepuasan suku cadang dan perbaikan sebelum tampil di etalase web konsumen.</p>
+                </div>
+
+                <!-- Status Filter Badges -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button type="button" wire:click="$set('reviewFilter', 'all')"
+                            class="px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer {{ $reviewFilter === 'all' ? 'bg-up-primary text-white' : 'bg-white/5 text-ink-400 hover:text-white' }}">
+                        Semua
+                    </button>
+                    <button type="button" wire:click="$set('reviewFilter', 'pending')"
+                            class="px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer {{ $reviewFilter === 'pending' ? 'bg-amber-500 text-white' : 'bg-white/5 text-ink-400 hover:text-white' }}">
+                        Menunggu Persetujuan
+                    </button>
+                    <button type="button" wire:click="$set('reviewFilter', 'approved')"
+                            class="px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer {{ $reviewFilter === 'approved' ? 'bg-emerald-500 text-white' : 'bg-white/5 text-ink-400 hover:text-white' }}">
+                        Disetujui
+                    </button>
+                    <button type="button" wire:click="$set('reviewFilter', 'featured')"
+                            class="px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer {{ $reviewFilter === 'featured' ? 'bg-up-accent text-white' : 'bg-white/5 text-ink-400 hover:text-white' }}">
+                        ⭐ Unggulan (Featured)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tipe Filter Tab -->
+            <div class="flex items-center gap-2 text-xs">
+                <span class="text-ink-400">Tipe Ulasan:</span>
+                <button type="button" wire:click="$set('reviewTipe', 'all')" class="px-2.5 py-1 rounded-lg {{ $reviewTipe === 'all' ? 'bg-white/20 text-white font-bold' : 'text-ink-400 hover:text-white' }}">Semua</button>
+                <button type="button" wire:click="$set('reviewTipe', 'produk')" class="px-2.5 py-1 rounded-lg {{ $reviewTipe === 'produk' ? 'bg-white/20 text-white font-bold' : 'text-ink-400 hover:text-white' }}">📦 Suku Cadang</button>
+                <button type="button" wire:click="$set('reviewTipe', 'servis')" class="px-2.5 py-1 rounded-lg {{ $reviewTipe === 'servis' ? 'bg-white/20 text-white font-bold' : 'text-ink-400 hover:text-white' }}">🔧 Servis Gadget</button>
+            </div>
+
+            <!-- List Ulasan Cards -->
+            <div class="space-y-3">
+                @forelse ($reviews as $rev)
+                <div class="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <span class="w-8 h-8 rounded-full bg-gradient-to-tr from-up-primary to-indigo-500 text-white flex items-center justify-center text-xs font-bold">
+                                {{ substr($rev->pelanggan?->nama ?? 'Konsumen', 0, 1) }}
+                            </span>
+                            <div>
+                                <span class="font-bold text-white text-xs">{{ $rev->pelanggan?->nama ?? 'Konsumen' }}</span>
+                                <span class="text-[10px] text-ink-400 ml-1">({{ $rev->created_at->format('d M Y H:i') }})</span>
+                            </div>
+
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $rev->tipe_ulasan === 'produk' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-emerald-500/20 text-emerald-300' }}">
+                                {{ $rev->tipe_ulasan === 'produk' ? 'Part: '.($rev->produk?->nama ?? 'Item') : 'Servis: '.($rev->tiketServis?->no_tiket ?? 'Tiket') }}
+                            </span>
+
+                            @if ($rev->is_featured)
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                                    ⭐ Featured
+                                </span>
+                            @endif
+                        </div>
+
+                        <!-- Rating Stars -->
+                        <div class="flex items-center gap-1 text-amber-400 text-xs">
+                            @for ($s = 1; $s <= 5; $s++)
+                                <span>{{ $s <= $rev->rating ? '★' : '☆' }}</span>
+                            @endfor
+                            <span class="text-white font-bold ml-1">({{ $rev->rating }}/5)</span>
+                        </div>
+                    </div>
+
+                    @if ($rev->judul_ulasan)
+                        <h4 class="font-bold text-slate-100 text-xs">{{ $rev->judul_ulasan }}</h4>
+                    @endif
+
+                    <p class="text-xs text-ink-300 leading-relaxed">{{ $rev->isi_ulasan }}</p>
+
+                    @if (!empty($rev->media_foto) && is_array($rev->media_foto))
+                    <div class="flex items-center gap-2 overflow-x-auto pt-1">
+                        @foreach ($rev->media_foto as $foto)
+                            <a href="{{ $foto }}" target="_blank" class="w-16 h-16 rounded-xl overflow-hidden border border-white/10 shrink-0">
+                                <img src="{{ $foto }}" class="w-full h-full object-cover">
+                            </a>
+                        @endforeach
+                    </div>
+                    @endif
+
+                    @if ($rev->tanggapan_admin)
+                    <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/20 text-xs text-slate-200">
+                        <div class="font-bold text-up-primary text-[11px] mb-0.5">Tanggapan Toko:</div>
+                        <p>{{ $rev->tanggapan_admin }}</p>
+                    </div>
+                    @endif
+
+                    <!-- Action Buttons -->
+                    <div class="pt-2 border-t border-white/[0.06] flex items-center justify-between flex-wrap gap-2 text-xs">
+                        <div class="flex items-center gap-2">
+                            @if (!$rev->is_approved)
+                                <button type="button" wire:click="approveReview({{ $rev->id }})"
+                                        class="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 font-semibold cursor-pointer">
+                                    ✓ Setujui Tampil
+                                </button>
+                            @else
+                                <button type="button" wire:click="rejectReview({{ $rev->id }})"
+                                        class="px-3 py-1.5 rounded-lg bg-white/10 text-ink-400 hover:text-white font-semibold cursor-pointer">
+                                    ✕ Sembunyikan
+                                </button>
+                            @endif
+
+                            <button type="button" wire:click="toggleFeaturedReview({{ $rev->id }})"
+                                    class="px-3 py-1.5 rounded-lg border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 font-semibold cursor-pointer">
+                                {{ $rev->is_featured ? 'Batalkan Featured' : '⭐ Sematkan ke Beranda' }}
+                            </button>
+
+                            <button type="button" wire:click="openTanggapanModal({{ $rev->id }})"
+                                    class="px-3 py-1.5 rounded-lg bg-up-primary/20 text-up-primary hover:bg-up-primary/30 font-semibold cursor-pointer">
+                                💬 {{ $rev->tanggapan_admin ? 'Ubah Tanggapan' : 'Beri Tanggapan' }}
+                            </button>
+                        </div>
+
+                        <button type="button" wire:click="deleteReview({{ $rev->id }})"
+                                wire:confirm="Hapus ulasan ini secara permanen?"
+                                class="text-red-400 hover:underline cursor-pointer">
+                            Hapus
+                        </button>
+                    </div>
+                </div>
+                @empty
+                <div class="py-12 text-center text-ink-500 text-xs">
+                    Belum ada ulasan yang sesuai dengan filter ini.
+                </div>
+                @endforelse
+            </div>
+
+            <div class="pt-2">
+                {{ $reviews->links() }}
+            </div>
+        </x-prism.glass-card>
+    </div>
+    @endif
+
+    <!-- Tab 6: FAQ & Garansi -->
+    @if ($activeTab === 'faq')
+    <div class="space-y-6">
+        <x-prism.glass-card class="p-4 sm:p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                <div>
+                    <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <span>Pusat Tanya Jawab (FAQ) &amp; Kebijakan Garansi</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                            {{ $faqs->count() }} Pertanyaan
+                        </span>
+                    </h2>
+                    <p class="text-xs text-ink-400">Kelola informasi syarat garansi LCD, segel toko, retur barang cacat, dan proses pengiriman.</p>
+                </div>
+                <button type="button" wire:click="openCreateFaq"
+                        class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-up-primary hover:bg-up-primary/90 active:scale-[0.97] transition-[background-color,transform] duration-140 shadow-sm cursor-pointer min-h-[44px]">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <span>Tambah FAQ Baru</span>
+                </button>
+            </div>
+
+            <!-- List FAQ Cards -->
+            <div class="space-y-3">
+                @forelse ($faqs as $fq)
+                <div class="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/10 text-slate-300">
+                                {{ strtoupper($fq->kategori) }}
+                            </span>
+                            <h4 class="font-bold text-white text-xs">{{ $fq->pertanyaan }}</h4>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" wire:click="toggleFaqStatus({{ $fq->id }})"
+                                    class="px-2 py-0.5 rounded-full text-[10px] font-semibold cursor-pointer {{ $fq->is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-ink-500' }}">
+                                {{ $fq->is_active ? 'Aktif' : 'Non-aktif' }}
+                            </button>
+                            <button type="button" wire:click="openEditFaq({{ $fq->id }})"
+                                    class="text-xs text-up-primary hover:underline font-semibold cursor-pointer">
+                                Edit
+                            </button>
+                            <button type="button" wire:click="deleteFaq({{ $fq->id }})"
+                                    wire:confirm="Hapus FAQ ini?"
+                                    class="text-xs text-red-400 hover:underline cursor-pointer">
+                                Hapus
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-ink-400 leading-relaxed whitespace-pre-line">{{ $fq->jawaban }}</p>
+                </div>
+                @empty
+                <div class="py-12 text-center text-ink-500 text-xs">
+                    Belum ada FAQ terdaftar. Klik tombol Tambah FAQ Baru di atas.
+                </div>
+                @endforelse
+            </div>
+        </x-prism.glass-card>
+    </div>
+    @endif
+
     <!-- Tab 7: Live Simulator Preview -->
     @if ($activeTab === 'preview')
     <div class="space-y-4">
@@ -1303,11 +1670,19 @@
                     @error('bannerForm.judul') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                         <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Badge Tag</label>
                         <input type="text" wire:model="bannerForm.badge_label" placeholder="HOT DEAL"
                                class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Tipe Media</label>
+                        <select wire:model.live="bannerForm.tipe_media" class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
+                            <option value="image">Gambar Statis (JPG, PNG, WebP)</option>
+                            <option value="gif">GIF Animasi</option>
+                            <option value="video">Video Pendek Loop (MP4, WebM)</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Posisi Tampil</label>
@@ -1327,11 +1702,39 @@
                 </div>
 
                 <div>
-                    <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Upload Gambar Desktop</label>
-                    <input type="file" wire:model="uploadBannerDesktop" accept="image/*"
+                    <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">
+                        {{ $bannerForm['tipe_media'] === 'gif' ? 'Upload File GIF Desktop' : ($bannerForm['tipe_media'] === 'video' ? 'Upload Poster Gambar Fallback Desktop' : 'Upload Gambar Desktop') }}
+                    </label>
+                    <input type="file" wire:model="uploadBannerDesktop" accept="{{ $bannerForm['tipe_media'] === 'gif' ? 'image/gif,image/*' : 'image/*' }}"
                            class="w-full text-ink-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-white/10 file:text-white file:text-[11px]">
                     @error('uploadBannerDesktop') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
                 </div>
+
+                @if ($bannerForm['tipe_media'] === 'video')
+                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-3">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-up-mint">
+                        <span>🎬 Pengaturan Video Pendek (Autoplay, Loop, Muted)</span>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Upload File Video Desktop (MP4 / WebM maks 15MB)</label>
+                        <input type="file" wire:model="uploadBannerVideoDesktop" accept="video/mp4,video/webm,video/ogg"
+                               class="w-full text-ink-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-white/10 file:text-white file:text-[11px]">
+                        @if ($bannerForm['video_desktop'])
+                            <p class="text-[10px] text-ink-400 font-mono mt-1 truncate">Current: {{ $bannerForm['video_desktop'] }}</p>
+                        @endif
+                        @error('uploadBannerVideoDesktop') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Upload Video Mobile (Opsional / Rasio Vertikal)</label>
+                        <input type="file" wire:model="uploadBannerVideoMobile" accept="video/mp4,video/webm,video/ogg"
+                               class="w-full text-ink-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-white/10 file:text-white file:text-[11px]">
+                        @if ($bannerForm['video_mobile'])
+                            <p class="text-[10px] text-ink-400 font-mono mt-1 truncate">Current: {{ $bannerForm['video_mobile'] }}</p>
+                        @endif
+                        @error('uploadBannerVideoMobile') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+                @endif
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -1355,6 +1758,323 @@
                 <button type="button" wire:click="saveBanner"
                         class="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-up-primary hover:bg-up-primary/90 active:scale-[0.97] transition-[background-color,transform] duration-140 min-h-[44px] cursor-pointer">
                     Simpan Banner
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <!-- Article Create/Edit Modal -->
+    @if ($articleModalOpen)
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        <div class="w-full max-w-2xl rounded-2xl bg-[#0F172A] border border-white/10 p-4 sm:p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+             @click.away="$wire.set('articleModalOpen', false)">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 class="text-sm font-semibold text-white">
+                    {{ $articleForm['id'] ? 'Edit Artikel Panduan' : 'Tulis Panduan Baru' }}
+                </h3>
+                <button type="button" wire:click="$set('articleModalOpen', false)" class="w-8 h-8 flex items-center justify-center rounded-lg text-ink-400 hover:text-white hover:bg-white/10 transition-colors min-h-[44px] min-w-[44px] cursor-pointer">✕</button>
+            </div>
+
+            <div class="space-y-3.5 text-xs">
+                <div>
+                    <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Judul Panduan Teknis <span class="text-red-400">*</span></label>
+                    <input type="text" wire:model="articleForm.judul" placeholder="Cara Bedakan LCD Original vs Incell pada iPhone..."
+                           class="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
+                    @error('articleForm.judul') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Kategori Panduan (Pilih / Ketik Kustom)</label>
+                        <input type="text"
+                               wire:model="articleForm.kategori"
+                               list="kategori-list-options"
+                               placeholder="Contoh: panduan_servis, edukasi_part, unboxing..."
+                               class="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
+                        <datalist id="kategori-list-options">
+                            @foreach($allCategories as $cOpt)
+                                <option value="{{ $cOpt }}">{{ ucwords(str_replace('_', ' ', $cOpt)) }}</option>
+                            @endforeach
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Custom Slug (Opsional)</label>
+                        <input type="text" wire:model="articleForm.slug" placeholder="otomatis-dari-judul"
+                               class="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Ringkasan Singkat (Lead paragraph, maks 300 char) <span class="text-red-400">*</span></label>
+                    <textarea wire:model="articleForm.ringkasan" rows="2" maxlength="300" placeholder="Ringkasan penjelasan untuk ditampilkan di kartu panduan..."
+                              class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary"></textarea>
+                    @error('articleForm.ringkasan') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
+                </div>
+
+                <!-- Rich Media Cover & YouTube -->
+                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-3">
+                    <div class="text-xs font-semibold text-white flex items-center gap-2">
+                        <span>🎬 Media Visual Cover &amp; Video Tutorial</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Tipe Media Cover</label>
+                            <select wire:model.live="articleForm.tipe_media_cover" class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
+                                <option value="image">Gambar Standar (JPG, PNG, WebP)</option>
+                                <option value="gif">GIF Animasi</option>
+                                <option value="video">Video Pendek Loop (MP4, WebM)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Link Video YouTube</label>
+                            <input type="text" wire:model.live.debounce.400ms="articleForm.youtube_url" placeholder="https://www.youtube.com/watch?v=..."
+                                   class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
+                        </div>
+                    </div>
+
+                    @php
+                        $ytId = \App\Modules\Marketplace\Models\WebArticle::extractYouTubeId($articleForm['youtube_url'] ?? null);
+                    @endphp
+                    @if ($ytId)
+                    <div class="p-2.5 rounded-lg bg-red-600/10 border border-red-500/20 flex items-center gap-3">
+                        <img src="https://img.youtube.com/vi/{{ $ytId }}/hqdefault.jpg" class="w-16 h-10 object-cover rounded">
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[11px] font-bold text-red-400">YouTube Video Terdeteksi</span>
+                            <p class="text-[10px] text-ink-400 font-mono truncate">ID: {{ $ytId }}</p>
+                        </div>
+                    </div>
+                    @endif
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Upload Cover Gambar / GIF</label>
+                            <input type="file" wire:model="uploadArticleCover" accept="image/*"
+                                   class="w-full text-ink-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-white/10 file:text-white file:text-[11px]">
+                            @if ($articleForm['cover_image'])
+                                <p class="text-[10px] text-ink-400 font-mono mt-1 truncate">Current: {{ $articleForm['cover_image'] }}</p>
+                            @endif
+                        </div>
+                        @if ($articleForm['tipe_media_cover'] === 'video')
+                        <div>
+                            <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Upload Video Cover (MP4 maks 15MB)</label>
+                            <input type="file" wire:model="uploadArticleVideo" accept="video/mp4,video/webm"
+                                   class="w-full text-ink-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-white/10 file:text-white file:text-[11px]">
+                            @if ($articleForm['cover_video'])
+                                <p class="text-[10px] text-ink-400 font-mono mt-1 truncate">Current: {{ $articleForm['cover_video'] }}</p>
+                            @endif
+                        </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Konten Lengkap -->
+                <div>
+                    <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Konten Lengkap Panduan <span class="text-red-400">*</span></label>
+                    <textarea wire:model="articleForm.konten_lengkap" rows="6" placeholder="Tulis langkah-langkah, analisa kerusakan, dan tips perbaikan secara mendalam..."
+                              class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary font-sans"></textarea>
+                    @error('articleForm.konten_lengkap') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
+                </div>
+
+                <!-- Content to Commerce Relations -->
+                <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-4">
+                    <div class="text-xs font-semibold text-white flex items-center justify-between">
+                        <span class="flex items-center gap-2">🛒 Integrasi Belanja &amp; Servis (Content-to-Commerce)</span>
+                        <span class="text-[10px] text-ink-400">Smart Search Engine Terpadu</span>
+                    </div>
+
+                    <!-- 1. Rekomendasi Jasa Servis -->
+                    <div class="space-y-2">
+                        <label class="block font-semibold text-ink-300 uppercase tracking-wider text-[11px]">Rekomendasi Layanan Servis Terkait</label>
+                        <div class="space-y-2">
+                            <input type="text"
+                                   wire:model.live.debounce.300ms="servisSearchQuery"
+                                   placeholder="Cari jenis servis (misal: ganti lcd, baterai, bypass)..."
+                                   class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-up-primary">
+
+                            <select wire:model="articleForm.rekomendasi_servis_id" class="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-up-primary">
+                                <option value="">-- Tanpa Tautan Layanan Servis --</option>
+                                @foreach ($jenisServisList as $js)
+                                    <option value="{{ $js->id }}">{{ $js->nama }} (Mulai Rp {{ number_format($js->biaya_jasa, 0, ',', '.') }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 2. Sematkan Suku Cadang Terkait dengan Smart Search -->
+                    <div class="space-y-2 pt-2 border-t border-white/10">
+                        <div class="flex items-center justify-between">
+                            <label class="block font-semibold text-ink-300 uppercase tracking-wider text-[11px]">Sematkan Suku Cadang Terkait</label>
+                            <span class="text-[10px] font-bold text-up-mint">
+                                {{ count($articleForm['produk_terkait_ids'] ?? []) }} Part Disematkan
+                            </span>
+                        </div>
+
+                        <!-- Pencarian Part dengan SmartSearch Engine -->
+                        <div class="relative">
+                            <input type="text"
+                                   wire:model.live.debounce.300ms="partSearchQuery"
+                                   placeholder="Ketik nama part, kode SKU, tipe hp (Smart Search: sinonim 'ip11', 'batre', 'lcd')..."
+                                   class="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-up-primary">
+                        </div>
+
+                        <!-- Hasil Pencarian & Checkbox Toggle Card -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+                            @forelse ($produkList as $pr)
+                                @php
+                                    $isAttached = in_array($pr->id, (array) ($articleForm['produk_terkait_ids'] ?? []), true);
+                                @endphp
+                                <div wire:click="toggleProdukTerkait({{ $pr->id }})"
+                                     class="p-2.5 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer transition-colors {{ $isAttached ? 'bg-up-primary/20 border-up-primary text-white' : 'bg-black/30 border-white/5 hover:border-white/20 text-ink-300' }}">
+                                    <div class="w-8 h-8 rounded-lg bg-black/40 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
+                                        @if($pr->foto_utama)
+                                            <img src="{{ $pr->foto_utama }}" class="w-full h-full object-cover">
+                                        @else
+                                            <span class="text-[9px] font-bold text-ink-500">PART</span>
+                                        @endif
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="text-[11px] font-bold truncate {{ $isAttached ? 'text-white' : 'text-slate-200' }}">{{ $pr->nama }}</div>
+                                        <div class="text-[10px] text-ink-400 font-mono">Rp {{ number_format($pr->harga_jual_retail, 0, ',', '.') }}</div>
+                                    </div>
+                                    <span class="text-xs font-bold shrink-0 {{ $isAttached ? 'text-up-mint' : 'text-ink-500' }}">
+                                        {{ $isAttached ? '✓' : '+' }}
+                                    </span>
+                                </div>
+                            @empty
+                                <div class="col-span-full py-4 text-center text-[11px] text-ink-400">
+                                    Tidak ada produk yang cocok dengan pencarian smart search.
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <!-- 3. Status Publikasi -->
+                    <div class="pt-2 border-t border-white/10">
+                        <label class="flex items-center gap-2 cursor-pointer text-white text-xs">
+                            <input type="checkbox" wire:model="articleForm.is_published" class="rounded border-white/20 text-up-primary focus:ring-0">
+                            <span>Publikasikan Langsung ke Web Konsumen</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-white/10 flex flex-col-reverse sm:flex-row justify-end gap-2">
+                <button type="button" wire:click="$set('articleModalOpen', false)"
+                        class="px-4 py-2.5 rounded-xl text-xs text-ink-400 hover:text-white bg-white/5 active:scale-[0.97] transition-all min-h-[44px] cursor-pointer">
+                    Batal
+                </button>
+                <button type="button" wire:click="saveArticle"
+                        class="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-up-primary hover:bg-up-primary/90 active:scale-[0.97] transition-all min-h-[44px] cursor-pointer">
+                    Simpan Panduan
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <!-- Tanggapan Review Modal -->
+    @if ($tanggapanModalOpen)
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+        <div class="w-full max-w-md rounded-2xl bg-[#0F172A] border border-white/10 p-5 space-y-4 shadow-2xl"
+             @click.away="$wire.set('tanggapanModalOpen', false)">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 class="text-sm font-semibold text-white">Tanggapan Resmi Toko / Teknisi</h3>
+                <button type="button" wire:click="$set('tanggapanModalOpen', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+            </div>
+
+            <div class="space-y-2 text-xs">
+                <label class="block font-semibold text-ink-300">Respon Terhadap Ulasan Pelanggan:</label>
+                <textarea wire:model="adminTanggapanText" rows="4" placeholder="Terima kasih atas kepercayaannya terhadap layanan kami..."
+                          class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-up-primary"></textarea>
+            </div>
+
+            <div class="pt-3 border-t border-white/10 flex justify-end gap-2">
+                <button type="button" wire:click="$set('tanggapanModalOpen', false)"
+                        class="px-3.5 py-2 rounded-xl text-xs text-ink-400 hover:text-white bg-white/5 cursor-pointer">
+                    Batal
+                </button>
+                <button type="button" wire:click="saveTanggapanReview"
+                        class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-up-primary hover:bg-up-primary/90 cursor-pointer">
+                    Simpan Respon
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <!-- FAQ Create/Edit Modal -->
+    @if ($faqModalOpen)
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+        <div class="w-full max-w-lg rounded-2xl bg-[#0F172A] border border-white/10 p-5 space-y-4 shadow-2xl"
+             @click.away="$wire.set('faqModalOpen', false)">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 class="text-sm font-semibold text-white">
+                    {{ $faqForm['id'] ? 'Edit Pertanyaan & Jawaban' : 'Tambah FAQ Baru' }}
+                </h3>
+                <button type="button" wire:click="$set('faqModalOpen', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Kategori</label>
+                        <select wire:model="faqForm.kategori" class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-up-primary">
+                            <option value="garansi">Ketentuan Garansi</option>
+                            <option value="servis">Prosedur Servis</option>
+                            <option value="pengiriman">Pengiriman &amp; Packing</option>
+                            <option value="part_original">Keaslian Suku Cadang</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Urutan</label>
+                        <input type="number" wire:model="faqForm.urutan" class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-up-primary">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Pertanyaan</label>
+                    <input type="text" wire:model="faqForm.pertanyaan" placeholder="Apakah LCD baru bergaransi jika sudah dipasang lem?"
+                           class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-up-primary">
+                    @error('faqForm.pertanyaan') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-ink-300 uppercase tracking-wider mb-1">Jawaban</label>
+                    <textarea wire:model="faqForm.jawaban" rows="4" placeholder="Jelaskan secara jelas dan transparan kepada konsumen..."
+                              class="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-up-primary"></textarea>
+                    @error('faqForm.jawaban') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="pt-1">
+                    <label class="flex items-center gap-2 cursor-pointer text-white">
+                        <input type="checkbox" wire:model="faqForm.is_active" class="rounded border-white/20 text-up-primary focus:ring-0">
+                        <span>Status Aktif Tampil</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-white/10 flex justify-end gap-2">
+                <button type="button" wire:click="$set('faqModalOpen', false)"
+                        class="px-3.5 py-2 rounded-xl text-xs text-ink-400 hover:text-white bg-white/5 cursor-pointer">
+                    Batal
+                </button>
+                <button type="button" wire:click="saveFaq"
+                        class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-up-primary hover:bg-up-primary/90 cursor-pointer">
+                    Simpan FAQ
                 </button>
             </div>
         </div>

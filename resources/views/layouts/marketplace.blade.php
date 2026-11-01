@@ -106,6 +106,15 @@
                     <span>Katalog</span>
                 </a>
 
+                <!-- Panduan Lab & Edukasi (desktop) -->
+                <a href="{{ route('panduan.index') }}"
+                   class="hidden md:inline-flex min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->is('panduan') || request()->is('panduan/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
+                    <svg class="w-4 h-4 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <span>Panduan Lab</span>
+                </a>
+
                 <!-- Booking (desktop only, mobile di bottom dock) -->
                 <a href="{{ route('servis.booking') }}"
                    class="hidden md:inline-flex min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->routeIs('servis.booking') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
@@ -504,6 +513,7 @@
             </div>
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium text-ink-600 dark:text-ink-400">
                 <a href="{{ route('shop') }}" class="hover:text-up-primary transition-colors">Katalog Sparepart</a>
+                <a href="{{ route('panduan.index') }}" class="hover:text-up-primary transition-colors">Panduan Lab</a>
                 <a href="{{ route('servis.booking') }}" class="hover:text-up-primary transition-colors">Booking Servis</a>
                 <a href="{{ url('/tracking') }}" class="hover:text-up-primary transition-colors">Lacak Servis</a>
                 <a href="{{ route('customer.account') }}" class="hover:text-up-primary transition-colors">Akun & Membership</a>
@@ -621,7 +631,13 @@
                     ✕
                 </button>
                 <a href="{{ $popupBanner->target_url ?: '#' }}" @click="close()" class="block group">
-                    <img src="{{ $popupBanner->gambar_desktop }}" alt="{{ $popupBanner->judul }}" class="w-full h-auto object-cover max-h-[420px]">
+                    @if ($popupBanner->tipe_media === 'video' && ($popupBanner->video_desktop || $popupBanner->video_mobile))
+                        <video autoplay loop muted playsinline poster="{{ $popupBanner->gambar_desktop }}" class="w-full h-auto object-cover max-h-[420px]">
+                            <source src="{{ $popupBanner->video_desktop ?: $popupBanner->video_mobile }}" type="video/mp4">
+                        </video>
+                    @else
+                        <img src="{{ $popupBanner->gambar_desktop }}" alt="{{ $popupBanner->judul }}" class="w-full h-auto object-cover max-h-[420px]">
+                    @endif
                     @if ($popupBanner->judul)
                         <div class="p-4 bg-[#0F172A] text-white flex items-center justify-between">
                             <div>

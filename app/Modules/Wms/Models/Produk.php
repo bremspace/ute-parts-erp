@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Models;
 
+use App\Modules\Marketplace\Models\WebReview;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\TransaksiItem;
@@ -656,5 +657,15 @@ class Produk extends Model
             ->orderByDesc('total_terjual')
             ->orderByDesc('stok_katalog')
             ->orderBy('produk.id', 'asc');
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(WebReview::class, 'produk_id');
+    }
+
+    public function approvedReviews(): HasMany
+    {
+        return $this->reviews()->where('is_approved', true);
     }
 }

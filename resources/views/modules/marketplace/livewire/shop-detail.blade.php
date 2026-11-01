@@ -31,14 +31,24 @@
                 $galeri = $produk->galeri_foto;
                 $fotoUtama = $produk->foto_utama ?: $produk->gambar;
             @endphp
-            <div class="lg:col-span-6 space-y-4 lg:sticky lg:top-24" x-data="{ activeFoto: @js($fotoUtama) }">
+            <div class="lg:col-span-6 space-y-4 lg:sticky lg:top-24"
+                 x-data="{
+                    activeMedia: @js($fotoUtama),
+                    isVideo(url) {
+                        if (!url) return false;
+                        return url.match(/\.(mp4|webm|ogg)(\?.*)?$/i);
+                    }
+                 }">
                 <!-- Main Stage Canvas -->
                 <div class="aspect-square bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/90 dark:border-white/[0.08] flex items-center justify-center overflow-hidden relative shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-                    <template x-if="activeFoto">
-                        <img :src="activeFoto" alt="{{ $produk->nama }}" class="w-full h-full object-cover transition-opacity duration-200"
-                             x-on:error="activeFoto = null">
+                    <template x-if="activeMedia && isVideo(activeMedia)">
+                        <video :src="activeMedia" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
                     </template>
-                    <template x-if="!activeFoto">
+                    <template x-if="activeMedia && !isVideo(activeMedia)">
+                        <img :src="activeMedia" alt="{{ $produk->nama }}" class="w-full h-full object-cover transition-opacity duration-200"
+                             x-on:error="activeMedia = null">
+                    </template>
+                    <template x-if="!activeMedia">
                         <div class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-8 text-center">
                             <svg class="w-20 h-20 stroke-[1.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
@@ -52,13 +62,22 @@
                 @if(count($galeri) > 1)
                     <div class="flex gap-2 sm:gap-3 overflow-x-auto no-scrollbar pb-2 min-w-0">
                         @foreach($galeri as $item)
+                            @php
+                                $itemUrl = $item['url'] ?? '';
+                                $isVideoItem = preg_match('/\.(mp4|webm|ogg)(\?.*)?$/i', $itemUrl);
+                            @endphp
                             <button
                                 type="button"
-                                x-on:click="activeFoto = @js($item['url'])"
-                                :class="activeFoto === @js($item['url']) ? 'ring-2 ring-up-primary dark:ring-white scale-100 opacity-100' : 'opacity-60 hover:opacity-100 scale-95'"
-                                class="w-14 sm:w-18 h-14 sm:h-18 rounded-2xl overflow-hidden border border-ink-200/80 dark:border-white/10 flex-shrink-0 transition-[opacity,transform] duration-140 cursor-pointer bg-white dark:bg-ink-900"
+                                x-on:click="activeMedia = @js($itemUrl)"
+                                :class="activeMedia === @js($itemUrl) ? 'ring-2 ring-up-primary dark:ring-white scale-100 opacity-100' : 'opacity-60 hover:opacity-100 scale-95'"
+                                class="w-14 sm:w-18 h-14 sm:h-18 rounded-2xl overflow-hidden border border-ink-200/80 dark:border-white/10 flex-shrink-0 transition-[opacity,transform] duration-140 cursor-pointer bg-white dark:bg-ink-900 relative"
                             >
-                                <img src="{{ $item['thumb'] ?? $item['url'] }}" alt="Thumbnail" class="w-full h-full object-cover">
+                                @if($isVideoItem)
+                                    <video src="{{ $itemUrl }}" muted class="w-full h-full object-cover pointer-events-none"></video>
+                                    <span class="absolute inset-0 bg-black/40 flex items-center justify-center text-white text-[10px] font-bold">▶ VID</span>
+                                @else
+                                    <img src="{{ $item['thumb'] ?? $itemUrl }}" alt="Thumbnail" class="w-full h-full object-cover">
+                                @endif
                             </button>
                         @endforeach
                     </div>
@@ -346,6 +365,88 @@
                         </div>
                     </div>
                 @endif
+
+                <!-- Ulasan & Testimoni Pelanggan -->
+                <div class="pt-6 border-t border-ink-100/80 dark:border-white/10 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Ulasan &amp; Penilaian Pelanggan</h3>
+                            <p class="text-[11px] text-ink-400">Pengalaman nyata dari teknisi dan pembeli terverifikasi.</p>
+                        </div>
+                        <span class="text-xs font-bold text-up-primary">{{ count($reviews ?? []) }} Ulasan</span>
+                    </div>
+
+                    <!-- List Review Cards -->
+                    <div class="space-y-3">
+                        @forelse($reviews ?? [] as $rev)
+                        <div class="p-4 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-full bg-up-primary/20 text-up-primary font-bold text-xs flex items-center justify-center">
+                                        {{ substr($rev->pelanggan?->nama ?? 'P', 0, 1) }}
+                                    </div>
+                                    <div>
+                                        <span class="text-xs font-bold text-ink-900 dark:text-white">{{ $rev->pelanggan?->nama ?? 'Konsumen' }}</span>
+                                        <span class="text-[10px] text-up-mint ml-1">✓ Pembeli Terverifikasi</span>
+                                    </div>
+                                </div>
+                                <div class="text-amber-400 text-xs">
+                                    @for($s = 1; $s <= 5; $s++)
+                                        <span>{{ $s <= $rev->rating ? '★' : '☆' }}</span>
+                                    @endfor
+                                </div>
+                            </div>
+
+                            @if($rev->judul_ulasan)
+                                <div class="text-xs font-bold text-ink-900 dark:text-white">{{ $rev->judul_ulasan }}</div>
+                            @endif
+
+                            <p class="text-xs text-ink-600 dark:text-ink-300 leading-relaxed">{{ $rev->isi_ulasan }}</p>
+
+                            @if($rev->tanggapan_admin)
+                                <div class="p-2.5 rounded-xl bg-up-primary/10 border border-up-primary/20 text-[11px] text-ink-800 dark:text-ink-200">
+                                    <strong class="text-up-primary">Respon Toko:</strong> {{ $rev->tanggapan_admin }}
+                                </div>
+                            @endif
+                        </div>
+                        @empty
+                        <div class="py-6 text-center text-xs text-ink-400 bg-ink-50/50 dark:bg-white/[0.02] rounded-2xl border border-dashed border-ink-200 dark:border-white/10">
+                            Belum ada ulasan untuk suku cadang ini. Jadilah yang pertama memberikan review!
+                        </div>
+                        @endforelse
+                    </div>
+
+                    <!-- Form Tulis Review (Login Customer) -->
+                    @auth('customer')
+                    <div class="p-4 rounded-2xl bg-white dark:bg-ink-950/60 border border-ink-200 dark:border-white/10 space-y-3">
+                        <h4 class="text-xs font-bold text-ink-900 dark:text-white uppercase tracking-wider">Tulis Ulasan Anda</h4>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex items-center gap-2">
+                                <label class="text-ink-500">Rating:</label>
+                                <select wire:model="reviewRating" class="px-2 py-1 rounded-lg border border-ink-200 dark:border-white/10 bg-transparent text-ink-900 dark:text-white">
+                                    <option value="5">⭐⭐⭐⭐⭐ (5/5) Sempurna</option>
+                                    <option value="4">⭐⭐⭐⭐ (4/5) Bagus</option>
+                                    <option value="3">⭐⭐⭐ (3/5) Cukup</option>
+                                    <option value="2">⭐⭐ (2/5) Kurang</option>
+                                    <option value="1">⭐ (1/5) Buruk</option>
+                                </select>
+                            </div>
+                            <input type="text" wire:model="reviewJudul" placeholder="Judul ulasan (opsional)..." class="w-full px-3 py-2 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 text-xs text-ink-900 dark:text-white">
+                            <textarea wire:model="reviewIsi" rows="3" placeholder="Ceritakan kualitas fisik part, kemudahan pemasangan, atau respon layar..." class="w-full px-3 py-2 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 text-xs text-ink-900 dark:text-white"></textarea>
+                            @error('reviewIsi') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
+                            <div class="flex justify-end">
+                                <button type="button" wire:click="submitReview" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-sm cursor-pointer">
+                                    Kirim Ulasan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    @else
+                    <div class="p-3 text-center text-xs text-ink-400 bg-ink-50 dark:bg-white/5 rounded-xl">
+                        <a href="{{ route('customer.login') }}" class="text-up-primary font-bold hover:underline">Masuk ke akun Anda</a> untuk memberikan ulasan produk.
+                    </div>
+                    @endauth
+                </div>
             </div>
         </div>
 

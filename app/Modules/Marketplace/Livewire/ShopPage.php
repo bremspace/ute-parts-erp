@@ -2,6 +2,7 @@
 
 namespace App\Modules\Marketplace\Livewire;
 
+use App\Modules\Marketplace\Models\WebReview;
 use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Services\PricingService;
@@ -57,6 +58,15 @@ class ShopPage extends Component
     public ?string $selectedGadgetModel = null;
 
     public int $qty = 1;
+
+    // Review submission state (pada detail produk)
+    public int $reviewRating = 5;
+
+    public string $reviewJudul = '';
+
+    public string $reviewIsi = '';
+
+    public bool $reviewSuccess = false;
 
     /**
      * [B-15a] Memo per-instance untuk {@see getStokSummaryProperty()}.
@@ -452,10 +462,54 @@ class ShopPage extends Component
         }
     }
 
+    public function submitReview(): void
+    {
+        if (! auth('customer')->check()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Silakan login terlebih dahulu untuk menulis ulasan.']);
+
+            return;
+        }
+
+        $this->validate([
+            'reviewRating' => 'required|integer|min:1|max:5',
+            'reviewJudul' => 'nullable|string|max:150',
+            'reviewIsi' => 'required|string|min:5|max:1000',
+        ]);
+
+        $produk = $this->productDetail;
+        if (! $produk) {
+            return;
+        }
+
+        WebReview::create([
+            'pelanggan_id' => auth('customer')->id(),
+            'produk_id' => $produk->id,
+            'tipe_ulasan' => 'produk',
+            'rating' => $this->reviewRating,
+            'judul_ulasan' => $this->reviewJudul ?: null,
+            'isi_ulasan' => $this->reviewIsi,
+            'is_approved' => false, // Moderasi
+            'is_verified_purchase' => true,
+        ]);
+
+        $this->reviewJudul = '';
+        $this->reviewIsi = '';
+        $this->reviewSuccess = true;
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Ulasan Anda berhasil dikirim dan menunggu verifikasi tim kami.',
+        ]);
+    }
+
     public function render()
     {
         if ($this->slug) {
             $webService = app(WebKonsumenService::class);
+            $reviews = WebReview::with('pelanggan')
+                ->where('produk_id', $this->productDetail?->id)
+                ->where('is_approved', true)
+                ->latest()
+                ->get();
 
             return view('modules.marketplace.livewire.shop-detail', [
                 'produk' => $this->productDetail,
@@ -465,6 +519,7 @@ class ShopPage extends Component
                 'stokTotal' => $this->stokTotal,
                 'selectedGadgetModel' => $this->selectedGadgetModel,
                 'webConfig' => $webService->getAll(),
+                'reviews' => $reviews,
             ])->layout('layouts.marketplace', ['title' => $this->productDetail?->nama ?? 'Produk']);
         }
 
