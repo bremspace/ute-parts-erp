@@ -10,133 +10,80 @@ echo.
 
 cd /d "%~dp0"
 
-:: 1. Deteksi PHP Binary (System PATH, Tools Lokal, Laragon, XAMPP)
-:: Wajib PHP >= 8.4 (Rekomendasi PHP 8.5+) untuk performa maksimal
+:: 1. Deteksi PHP Binary
+:: Wajib PHP >= 8.4 (Disarankan PHP 8.5+) untuk Laravel 13 & Symfony 8
 set "PHP_BIN="
 
-:: Periksa apakah tools\php lokal sudah ada dan versinya >= 8.4
+:: Cek tools\php lokal jika sudah ada
 if exist "%~dp0tools\php\php.exe" (
     "%~dp0tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
     if not errorlevel 1 (
         set "PHP_BIN=%~dp0tools\php\php.exe"
-    ) else (
-        echo [INFO] PHP portable di tools\php terdeteksi versi lama (^< 8.4). Menyiapkan pembaruan ke PHP 8.5...
-        rd /s /q "%~dp0tools\php" 2>nul
+        goto :PHP_READY
     )
+    echo [INFO] PHP di tools\php versi lama. Membersihkan untuk update ke PHP 8.5...
+    rd /s /q "%~dp0tools\php" 2>nul
 )
 
-:: Periksa Laragon PHP 8.5 lalu 8.4
-if "!PHP_BIN!"=="" (
-    if exist "C:\laragon\bin\php\php-8.5*\php.exe" (
-        for /d %%D in (C:\laragon\bin\php\php-8.5*) do (
-            if "!PHP_BIN!"=="" set "PHP_BIN=%%D\php.exe"
-        )
-    )
-)
-if "!PHP_BIN!"=="" (
-    if exist "C:\laragon\bin\php\php-8.4*\php.exe" (
-        for /d %%D in (C:\laragon\bin\php\php-8.4*) do (
-            if "!PHP_BIN!"=="" set "PHP_BIN=%%D\php.exe"
+:: Cek Laragon PHP 8.5
+if exist "C:\laragon\bin\php\php-8.5*" (
+    for /d %%D in ("C:\laragon\bin\php\php-8.5*") do (
+        if exist "%%~D\php.exe" (
+            set "PHP_BIN=%%~D\php.exe"
+            goto :PHP_READY
         )
     )
 )
 
-:: Periksa system PATH php
-if "!PHP_BIN!"=="" (
-    where php >nul 2>nul
-    if %errorlevel% equ 0 (
-        php -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
-        if not errorlevel 1 (
-            set "PHP_BIN=php"
-        ) else (
-            echo [WARN] PHP di system PATH versinya ^< 8.4. Laravel 13 memerlukan PHP ^>= 8.4 (disarankan 8.5+).
+:: Cek Laragon PHP 8.4
+if exist "C:\laragon\bin\php\php-8.4*" (
+    for /d %%D in ("C:\laragon\bin\php\php-8.4*") do (
+        if exist "%%~D\php.exe" (
+            set "PHP_BIN=%%~D\php.exe"
+            goto :PHP_READY
         )
     )
 )
 
-:: Periksa XAMPP / path standar lain
-if "!PHP_BIN!"=="" (
-    if exist "C:\xampp\php\php.exe" (
-        "C:\xampp\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
-        if not errorlevel 1 set "PHP_BIN=C:\xampp\php\php.exe"
+:: Cek PHP di System PATH
+where php >nul 2>nul
+if not errorlevel 1 (
+    php -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
+    if not errorlevel 1 (
+        set "PHP_BIN=php"
+        goto :PHP_READY
+    )
+    echo [WARN] PHP di system PATH versinya kurang dari 8.4. Laravel 13 memerlukan PHP 8.4+.
+)
+
+:: Cek XAMPP PHP
+if exist "C:\xampp\php\php.exe" (
+    "C:\xampp\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
+    if not errorlevel 1 (
+        set "PHP_BIN=C:\xampp\php\php.exe"
+        goto :PHP_READY
     )
 )
 
-:: 2. Auto-Install Visual C++ Redistributable & PHP 8.5 Portable jika belum ada
-if "!PHP_BIN!"=="" (
-    echo [INFO] PHP ^>= 8.4/8.5 belum terpasang. Menjalankan penyiapan otomatis zero-dependency...
-    
-    if not exist "%~dp0tools" mkdir "%~dp0tools"
-    
-    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-        "$ErrorActionPreference = 'Stop';" ^
-        "Write-Host 'Memeriksa Microsoft Visual C++ 2015-2022 Redistributable (vcredist)...';" ^
-        "$hasVc = (Test-Path \"$env:SystemRoot\System32\vcruntime140.dll\") -and (Test-Path \"$env:SystemRoot\System32\msvcp140.dll\");" ^
-        "if (-not $hasVc) {" ^
-        "  Write-Host 'Mengunduh & memasang Microsoft Visual C++ Redistributable resmi...';" ^
-        "  $vcUrl = 'https://aka.ms/vs/17/release/vc_redist.x64.exe';" ^
-        "  $vcFile = Join-Path $pwd 'tools\vc_redist.x64.exe';" ^
-        "  try {" ^
-        "    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
-        "    Invoke-WebRequest -Uri $vcUrl -OutFile $vcFile -TimeoutSec 60;" ^
-        "    Start-Process -FilePath $vcFile -ArgumentList '/install', '/passive', '/norestart' -Wait;" ^
-        "    Remove-Item -Path $vcFile -Force -ErrorAction SilentlyContinue;" ^
-        "    Write-Host 'Microsoft Visual C++ Redistributable berhasil dipasang.';" ^
-        "  } catch {" ^
-        "    Write-Warning ('Gagal instal vcredist otomatis: ' + $_.Exception.Message);" ^
-        "  }" ^
-        "};" ^
-        "Write-Host 'Mengunduh PHP Portable 8.5 resmi dari windows.php.net...';" ^
-        "$zipPath = Join-Path $pwd 'tools\php.zip';" ^
-        "$destDir = Join-Path $pwd 'tools\php';" ^
-        "$urls = @(" ^
-        "  'https://windows.php.net/downloads/releases/php-8.5.12-1-Win32-vs17-x64.zip'," ^
-        "  'https://windows.php.net/downloads/releases/php-8.4.27-1-Win32-vs17-x64.zip'," ^
-        "  'https://windows.php.net/downloads/releases/archives/php-8.4.27-1-Win32-vs17-x64.zip'" ^
-        ");" ^
-        "$downloaded = $false;" ^
-        "foreach ($u in $urls) {" ^
-        "  try {" ^
-        "    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;" ^
-        "    Invoke-WebRequest -Uri $u -OutFile $zipPath -TimeoutSec 90;" ^
-        "    if ((Get-Item $zipPath).Length -gt 1000000) { $downloaded = $true; break }" ^
-        "  } catch {}" ^
-        "};" ^
-        "if ($downloaded) {" ^
-        "  Write-Host 'Mengekstrak PHP 8.5...';" ^
-        "  Expand-Archive -Path $zipPath -DestinationPath $destDir -Force;" ^
-        "  Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue;" ^
-        "  $iniDev = Join-Path $destDir 'php.ini-development';" ^
-        "  $iniTarget = Join-Path $destDir 'php.ini';" ^
-        "  if (Test-Path $iniDev) {" ^
-        "    $c = Get-Content $iniDev -Raw;" ^
-        "    $c = $c -replace ';extension_dir = \"ext\"', 'extension_dir = \"ext\"';" ^
-        "    $c = $c -replace ';extension=curl', 'extension=curl';" ^
-        "    $c = $c -replace ';extension=fileinfo', 'extension=fileinfo';" ^
-        "    $c = $c -replace ';extension=gd', 'extension=gd';" ^
-        "    $c = $c -replace ';extension=mbstring', 'extension=mbstring';" ^
-        "    $c = $c -replace ';extension=openssl', 'extension=openssl';" ^
-        "    $c = $c -replace ';extension=pdo_mysql', 'extension=pdo_mysql';" ^
-        "    $c = $c -replace ';extension=pdo_sqlite', 'extension=pdo_sqlite';" ^
-        "    $c = $c -replace ';extension=sqlite3', 'extension=sqlite3';" ^
-        "    $c = $c -replace ';extension=intl', 'extension=intl';" ^
-        "    $c = $c -replace ';extension=zip', 'extension=zip';" ^
-        "    $c = $c -replace ';extension=bcmath', 'extension=bcmath';" ^
-        "    Set-Content -Path $iniTarget -Value $c;" ^
-        "  }" ^
-        "  Write-Host 'PHP Portable 8.5 siap digunakan.';" ^
-        "} else {" ^
-        "  Write-Warning 'Gagal mengunduh otomatis. Silakan pasang Laragon (PHP 8.5/8.4) atau XAMPP.';" ^
-        "}"
-        
-    if exist "%~dp0tools\php\php.exe" (
-        set "PHP_BIN=%~dp0tools\php\php.exe"
-    )
+:: 2. Auto-Install Visual C++ & PHP 8.5 Portable (Zero-Dependency)
+echo [INFO] PHP minimal 8.4/8.5 belum terpasang di sistem.
+echo [INFO] Menjalankan penyiapan otomatis PHP 8.5 Portable...
+if not exist "%~dp0tools" mkdir "%~dp0tools" 2>nul
+
+if exist "%~dp0scripts\setup-windows-php.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\setup-windows-php.ps1"
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $z = Join-Path $pwd 'tools\php.zip'; Invoke-WebRequest -Uri 'https://windows.php.net/downloads/releases/php-8.5.12-1-Win32-vs17-x64.zip' -OutFile $z -TimeoutSec 120; Expand-Archive -Path $z -DestinationPath (Join-Path $pwd 'tools\php') -Force; Remove-Item $z -Force -ErrorAction SilentlyContinue"
 )
 
+if exist "%~dp0tools\php\php.exe" (
+    set "PHP_BIN=%~dp0tools\php\php.exe"
+)
+
+:PHP_READY
 if "%PHP_BIN%"=="" (
-    echo [ERROR] PHP ^>= 8.4 tidak berhasil disiapkan secara otomatis.
-    echo Silakan install PHP ^>= 8.4 atau pasang Laragon dengan PHP 8.4 lalu jalankan kembali file ini.
+    echo [ERROR] PHP minimal 8.4 tidak berhasil disiapkan secara otomatis.
+    echo Pasang Laragon dengan PHP 8.4/8.5 atau unduh PHP 8.5 lalu jalankan kembali file ini.
     echo.
     pause
     exit /b 1
@@ -153,39 +100,39 @@ if not exist "storage\app\public" mkdir "storage\app\public" 2>nul
 if not exist "bootstrap\cache" mkdir "bootstrap\cache" 2>nul
 if not exist "database" mkdir "database" 2>nul
 
-:: 4. Deteksi & Auto-Download Composer
-set "COMPOSER_CMD="
+:: 4. Deteksi & Siapkan Composer
+set "COMPOSER_RUN="
 where composer >nul 2>nul
-if %errorlevel% equ 0 (
-    set "COMPOSER_CMD=composer"
+if not errorlevel 1 (
+    set "COMPOSER_RUN=composer"
 ) else (
     if not exist "composer.phar" (
         echo [INFO] Mengunduh composer.phar resmi via PowerShell...
-        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri https://getcomposer.org/composer-stable.phar -OutFile composer.phar" 2>nul
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri https://getcomposer.org/composer-stable.phar -OutFile composer.phar" 2>nul
     )
     if exist "composer.phar" (
-        set "COMPOSER_CMD="%PHP_BIN%" composer.phar"
+        set COMPOSER_RUN="%PHP_BIN%" composer.phar
     )
 )
 
 :: 5. Auto-Fix Dependensi Vendor
 if not exist "vendor\autoload.php" (
-    if not "%COMPOSER_CMD%"=="" (
+    if not "%COMPOSER_RUN%"=="" (
         echo [INFO] Menjalankan composer install untuk melengkapi dependensi vendor...
-        %COMPOSER_CMD% install --no-interaction --prefer-dist --optimize-autoloader
+        %COMPOSER_RUN% install --no-interaction --prefer-dist --optimize-autoloader
         if not exist "vendor\autoload.php" (
             echo [WARN] Fallback composer install dengan toleransi platform requirements...
-            %COMPOSER_CMD% install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter
+            %COMPOSER_RUN% install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter
         )
         if not exist "vendor\autoload.php" (
-            %COMPOSER_CMD% install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
+            %COMPOSER_RUN% install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
         )
     ) else (
         echo [WARN] Composer belum terpasang. Dependensi dapat dilengkapi via GUI Installer.
     )
 )
 
-:: 6. Konfigurasi Port 1741 (Unik ^& Jarang Dipakai)
+:: 6. Konfigurasi Port 1741 (Unik & Jarang Dipakai)
 set "PORT=1741"
 netstat -ano | findstr /r /c:":%PORT% " >nul 2>nul
 if not errorlevel 1 (
@@ -210,9 +157,9 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address" /c:"Al
 )
 
 :: Cek & sesuaikan bind-address MySQL di Laragon / XAMPP agar bisa diakses LAN secara otomatis
-powershell -Command "Get-ChildItem -Path 'C:\laragon\bin\mysql\*\my.ini', 'C:\xampp\mysql\bin\my.ini' -ErrorAction SilentlyContinue | ForEach-Object { (Get-Content $_.FullName) -replace 'bind-address\s*=\s*127\.0\.0\.1', 'bind-address = 0.0.0.0' | Set-Content $_.FullName }" >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path 'C:\laragon\bin\mysql\*\my.ini', 'C:\xampp\mysql\bin\my.ini' -ErrorAction SilentlyContinue | ForEach-Object { (Get-Content $_.FullName) -replace 'bind-address\s*=\s*127\.0\.0\.1', 'bind-address = 0.0.0.0' | Set-Content $_.FullName }" >nul 2>nul
 
-:: Opsional: Daftarkan port di Windows Defender Firewall agar bisa diakses perangkat lain (Port 1741 & 3306)
+:: Buka port di Windows Defender Firewall (Port 1741 & 3306)
 netsh advfirewall firewall add rule name="Ute Parts ERP (Port %PORT%)" dir=in action=allow protocol=TCP localport=%PORT% >nul 2>nul
 netsh advfirewall firewall add rule name="Ute Parts MySQL LAN (Port 3306)" dir=in action=allow protocol=TCP localport=3306 >nul 2>nul
 
@@ -233,7 +180,7 @@ echo    - Dari HP / iPhone / iPad : %NETWORK_URL%
 echo ----------------------------------------------------------------------
 echo    Petunjuk Multi-Client Satu Database:
 echo    - Komputer Pusat / Server : Pilih 'Mode Server' di Web Installer.
-echo    - Komputer Kasir / Client : Pilih 'Mode Client' -> 'Auto-Scan Server'.
+echo    - Komputer Kasir / Client : Pilih 'Mode Client' lalu 'Auto-Scan Server'.
 echo ======================================================================
 echo    Tutup jendela ini jika ingin mematikan server.
 echo.
