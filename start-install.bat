@@ -190,10 +190,20 @@ if errorlevel 1 (
 netsh advfirewall firewall add rule name="ERP POS System (Port %PORT%)" dir=in action=allow protocol=TCP localport=%PORT% >nul 2>nul
 netsh advfirewall firewall add rule name="ERP MySQL LAN (Port 3306)" dir=in action=allow protocol=TCP localport=3306 >nul 2>nul
 
-set "LOCAL_URL=http://localhost:%PORT%/install.php"
+set "TARGET_PATH=/install.php"
+if exist "%~dp0storage\installed.lock" (
+    set "TARGET_PATH=/app/login"
+) else if exist "%~dp0.env" (
+    findstr /m /c:"APP_KEY=base64:" "%~dp0.env" >nul 2>nul
+    if not errorlevel 1 (
+        set "TARGET_PATH=/app/login"
+    )
+)
+
+set "LOCAL_URL=http://localhost:%PORT%!TARGET_PATH!"
 set "NETWORK_URL="
 if not "%LAN_IP%"=="" (
-    set "NETWORK_URL=http://%LAN_IP%:%PORT%/install.php"
+    set "NETWORK_URL=http://%LAN_IP%:%PORT%!TARGET_PATH!"
 )
 
 echo [OK] Port aktif: %PORT%

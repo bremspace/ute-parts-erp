@@ -20,14 +20,23 @@ declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
-// Deteksi jika sistem sudah terinstall (.env sudah memiliki APP_KEY & DB_DATABASE)
+// Deteksi jika sistem sudah terinstall
 $envFile = __DIR__.'/../.env';
-$isInstalled = false;
-if (file_exists($envFile)) {
-    $envContent = (string) file_get_contents($envFile);
-    if (preg_match('/^APP_KEY=base64:.+/m', $envContent) && preg_match('/^DB_DATABASE=.+/m', $envContent)) {
+$lockFile = __DIR__.'/../storage/installed.lock';
+$isInstalled = file_exists($lockFile);
+if (! $isInstalled && file_exists($envFile)) {
+    $envContent = (string) @file_get_contents($envFile);
+    $hasKey = preg_match('/^APP_KEY=.+/m', $envContent) && ! preg_match('/^APP_KEY=\s*$/m', $envContent);
+    $hasDb = preg_match('/^DB_DATABASE=.+/m', $envContent) || preg_match('/^DB_CONNECTION=sqlite/m', $envContent);
+    if ($hasKey && $hasDb) {
         $isInstalled = true;
     }
+}
+
+// Jika sistem sudah terinstall dan halaman install.php dibuka via browser (GET tanpa ?reconfigure=1), langsung alihkan ke login
+if ($isInstalled && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && empty($_GET['reconfigure'])) {
+    header('Location: /app/login');
+    exit;
 }
 
 // =============================================================================
@@ -868,10 +877,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                     $waToken = trim($_POST['wa_token'] ?? '');
                     $gitSecret = trim($_POST['git_secret'] ?? bin2hex(random_bytes(16)));
 
+                    $existingKey = '';
+                    if (file_exists($baseDir.'/.env')) {
+                        $currEnv = (string) @file_get_contents($baseDir.'/.env');
+                        if (preg_match('/^APP_KEY=(.+)$/m', $currEnv, $km) && ! empty(trim($km[1]))) {
+                            $existingKey = trim($km[1]);
+                        }
+                    }
+                    $appKey = ! empty($existingKey) ? $existingKey : 'base64:'.base64_encode(random_bytes(32));
+
                     $envTemplate = <<<EOF
 APP_NAME="{$appName}"
 APP_ENV=production
-APP_KEY=
+APP_KEY={$appKey}
 APP_DEBUG=false
 APP_URL={$appUrl}
 APP_LOCALE=id
@@ -939,22 +957,20 @@ EOF;
                     break;
 
                 case 'key_generate':
-                    $res = runCommand("{$phpBin} artisan key:generate --force");
-                    if ($res['status'] !== 0) {
-                        $envPath = $baseDir.'/.env';
-                        if (file_exists($envPath)) {
-                            $envTxt = (string) file_get_contents($envPath);
-                            if (preg_match('/^APP_KEY=(.*)$/m', $envTxt, $m) && empty(trim($m[1]))) {
-                                $newKey = 'base64:'.base64_encode(random_bytes(32));
+                    $envPath = $baseDir.'/.env';
+                    if (file_exists($envPath)) {
+                        $envTxt = (string) file_get_contents($envPath);
+                        if (! preg_match('/^APP_KEY=base64:.+/m', $envTxt)) {
+                            $newKey = 'base64:'.base64_encode(random_bytes(32));
+                            if (preg_match('/^APP_KEY=.*$/m', $envTxt)) {
                                 $envTxt = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY='.$newKey, $envTxt);
-                                file_put_contents($envPath, $envTxt);
-                                echo json_encode(['success' => true, 'message' => 'Application key berhasil di-generate (via Direct Generator).']);
-                                break;
+                            } else {
+                                $envTxt .= "\nAPP_KEY=".$newKey."\n";
                             }
+                            file_put_contents($envPath, $envTxt);
                         }
-                        throw new RuntimeException($res['output']);
                     }
-                    echo json_encode(['success' => true, 'message' => 'Application key berhasil di-generate.']);
+                    echo json_encode(['success' => true, 'message' => 'Application key berhasil diverifikasi & aktif.']);
                     break;
 
                 case 'migrate':
@@ -1022,16 +1038,24 @@ EOF;
                         }
                     }
                     runCommand("{$phpBin} artisan view:cache");
+                    @file_put_contents($baseDir.'/storage/installed.lock', json_encode([
+                        'installed_at' => date('Y-m-d H:i:s'),
+                        'app_role' => $_POST['app_role'] ?? 'server',
+                    ]));
                     echo json_encode(['success' => true, 'message' => 'Cache aplikasi berhasil dibersihkan & template Blade siap produksi.']);
                     break;
 
                 case 'setup_ai_dev':
+                    @file_put_contents($baseDir.'/storage/installed.lock', json_encode([
+                        'installed_at' => date('Y-m-d H:i:s'),
+                        'app_role' => $_POST['app_role'] ?? 'server',
+                    ]));
                     $installAi = ! empty($_POST['install_ai_stack']);
                     if ($installAi && file_exists($baseDir.'/deploy/setup-ai-dev-stack.sh')) {
                         $resAi = runCommand("bash {$baseDir}/deploy/setup-ai-dev-stack.sh");
                         echo json_encode(['success' => true, 'message' => 'AI Stack (OpenCode + 9router + MCP) berhasil diaktifkan.']);
                     } else {
-                        echo json_encode(['success' => true, 'message' => 'AI Stack dilewati.']);
+                        echo json_encode(['success' => true, 'message' => 'Setup sistem selesai & AI Stack dilewati.']);
                     }
                     break;
 

@@ -5,16 +5,25 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-// Auto-redirect ke installer jika vendor/ atau .env belum ada atau belum dikonfigurasi
+// Auto-redirect ke installer HANYA jika instalasi belum pernah dijalankan
 $envFile = __DIR__.'/../.env';
-$needsInstall = ! file_exists(__DIR__.'/../vendor/autoload.php') || ! file_exists($envFile);
-if (! $needsInstall && file_exists($envFile)) {
-    $envContent = (string) @file_get_contents($envFile);
-    if (! preg_match('/^APP_KEY=base64:.+/m', $envContent) || ! preg_match('/^DB_DATABASE=.+/m', $envContent)) {
-        $needsInstall = true;
+$lockFile = __DIR__.'/../storage/installed.lock';
+
+$isInstalled = file_exists($lockFile);
+if (! $isInstalled) {
+    $hasVendor = file_exists(__DIR__.'/../vendor/autoload.php');
+    $hasEnv = file_exists($envFile);
+    if ($hasVendor && $hasEnv) {
+        $envContent = (string) @file_get_contents($envFile);
+        $hasKey = preg_match('/^APP_KEY=.+/m', $envContent) && ! preg_match('/^APP_KEY=\s*$/m', $envContent);
+        $hasDb = preg_match('/^DB_DATABASE=.+/m', $envContent) || preg_match('/^DB_CONNECTION=sqlite/m', $envContent);
+        if ($hasKey && $hasDb) {
+            $isInstalled = true;
+        }
     }
 }
-if ($needsInstall && file_exists(__DIR__.'/install.php')) {
+
+if (! $isInstalled && file_exists(__DIR__.'/install.php')) {
     header('Location: /install.php');
     exit;
 }

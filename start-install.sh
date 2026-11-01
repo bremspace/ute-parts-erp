@@ -243,10 +243,17 @@ if command -v ufw >/dev/null 2>&1; then
     fi
 fi
 
-LOCAL_URL="http://localhost:${PORT}/install.php"
+TARGET_PATH="/install.php"
+if [ -f "storage/installed.lock" ]; then
+    TARGET_PATH="/app/login"
+elif [ -f ".env" ] && grep -q "APP_KEY=base64:" ".env" 2>/dev/null; then
+    TARGET_PATH="/app/login"
+fi
+
+LOCAL_URL="http://localhost:${PORT}${TARGET_PATH}"
 NETWORK_URL=""
 if [ -n "$LAN_IP" ]; then
-    NETWORK_URL="http://${LAN_IP}:${PORT}/install.php"
+    NETWORK_URL="http://${LAN_IP}:${PORT}${TARGET_PATH}"
 fi
 
 # 10. Buka Web Browser Otomatis
