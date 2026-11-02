@@ -824,7 +824,7 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
         ->name('pengaturan.tab')
         ->whereIn('tab', [
             'users', 'role', 'cabang', 'master-produk', 'master_produk', 'export-import', 'export_import',
-            'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan',
+            'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan', 'jaringan',
         ])
         ->middleware('permission:pengaturan.manage|user.view');
 

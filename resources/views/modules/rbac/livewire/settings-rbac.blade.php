@@ -38,6 +38,7 @@
             { id: 'coa', label: 'Chart of Accounts (COA)', subModul: 'sistem', tab: 'master', subTab: null, icon: '📊', group: 'Sistem & Keuangan', desc: 'Bagan akun buku besar akuntansi, debit, kredit, klasifikasi aset/beban', keywords: 'coa akun akuntansi buku besar jurnal debit kredit kas bank' },
             { id: 'database', label: 'Basis Data & Backup Sistem', subModul: 'sistem', tab: 'database', subTab: null, icon: '💾', group: 'Sistem & Keuangan', desc: 'Backup snapshot SQL, optimasi database, riwayat pencadangan data', keywords: 'database basis data backup restore dump sql download arsip cadangan' },
             { id: 'cache', label: 'Clear Cache Server & Optimasi', subModul: 'sistem', tab: 'database', subTab: null, icon: '⚡', group: 'Sistem & Keuangan', desc: 'Bersihkan cache aplikasi, view, route, config, dan OPcache server', keywords: 'cache clear cache server optimasi bersihkan cache flush ram' },
+            { id: 'jaringan', label: 'Akses Jaringan & Domain Online', subModul: 'sistem', tab: 'jaringan', subTab: null, icon: '🌐', group: 'Sistem & Keuangan', desc: 'Upgrade server lokal ke mode online internet via Cloudflare Tunnel atau domain sendiri', keywords: 'jaringan network domain online internet cloudflare tunnel lokal lan url ip wifi' },
             { id: 'keamanan_2fa', label: 'Keamanan Akun & 2FA (Two-Factor)', subModul: 'sistem', tab: 'keamanan', subTab: null, icon: '🛡️', group: 'Sistem & Keuangan', desc: 'Verifikasi login dua langkah via Google Authenticator, secret key & kode cadangan', keywords: 'keamanan 2fa two factor totp autentikasi login otp google authenticator password' },
             { id: 'keamanan_sesi', label: 'Manajemen Sesi Perangkat & Login', subModul: 'sistem', tab: 'keamanan', subTab: null, icon: '💻', group: 'Sistem & Keuangan', desc: 'Pantau daftar login aktif, alamat IP, browser dan revoke sesi jarak jauh', keywords: 'sesi login perangkat device ip browser revoke logout aktif user' }
         ],
@@ -433,6 +434,12 @@
                         class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'database' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         💾 Basis Data & Backup
+                    </button>
+                    <button
+                        wire:click="$set('activeTab', 'jaringan')"
+                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'jaringan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        🌐 Jaringan &amp; Domain Online
                     </button>
                     @endif
                     @can('lihat-audit-log')
@@ -4247,6 +4254,270 @@
                 </div>
             </div>
         </div>
+    </div>
+    @endif
+
+    @if($activeTab === 'jaringan' && isSuperAdminOrOwner())
+    <div class="space-y-6">
+        <!-- Header Section -->
+        <div class="glass-panel p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl p-2.5 rounded-2xl bg-up-primary/10 text-up-primary border border-up-primary/20">🌐</span>
+                <div>
+                    <h2 class="text-sm sm:text-base font-bold text-ink-900 dark:text-white">Akses Jaringan &amp; Domain Online</h2>
+                    <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Atur apakah server lokal beroperasi hanya di LAN (offline) atau online dapat diakses dari mana saja.</p>
+                </div>
+            </div>
+            <button
+                type="button"
+                wire:click="refreshNetworkStatus"
+                class="px-3.5 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-xs font-bold text-ink-700 dark:text-ink-200 transition flex items-center gap-1.5 cursor-pointer"
+            >
+                <span wire:loading.remove wire:target="refreshNetworkStatus">🔄 Refresh Status</span>
+                <span wire:loading wire:target="refreshNetworkStatus" class="animate-spin">🌀 Memeriksa...</span>
+            </button>
+        </div>
+
+        @if($networkFeedback)
+        <div class="p-4 rounded-2xl border text-xs font-medium flex items-center justify-between gap-3 {{ $networkFeedbackType === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300' }}">
+            <div class="flex items-center gap-2">
+                <span>{{ $networkFeedbackType === 'success' ? '✔' : '⚠️' }}</span>
+                <span>{{ $networkFeedback }}</span>
+            </div>
+            <button type="button" wire:click="$set('networkFeedback', null)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+        </div>
+        @endif
+
+        <!-- Status Ringkasan Jaringan -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Card 1: Mode Aktif -->
+            <div class="glass-panel p-4.5 rounded-2xl border border-black/10 dark:border-white/10 space-y-2">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-ink-400">Mode Operasional</div>
+                <div class="flex items-center gap-2">
+                    @if(!empty($networkStatus['is_online']))
+                        <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span class="text-sm font-bold text-emerald-400">Full Online</span>
+                    @else
+                        <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+                        <span class="text-sm font-bold text-amber-400">Hanya LAN (Lokal)</span>
+                    @endif
+                </div>
+                <div class="text-[11px] text-ink-500 dark:text-ink-400">
+                    {{ !empty($networkStatus['is_online']) ? 'Dapat diakses lewat internet' : 'Hanya perangkat di Wi-Fi / kabel toko' }}
+                </div>
+            </div>
+
+            <!-- Card 2: URL Akses -->
+            <div class="glass-panel p-4.5 rounded-2xl border border-black/10 dark:border-white/10 space-y-2">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-ink-400">URL Aplikasi Aktif</div>
+                <div class="text-xs font-mono font-bold text-ink-900 dark:text-white truncate">
+                    <a href="{{ $networkStatus['app_url'] ?? '#' }}" target="_blank" class="hover:text-up-primary underline">
+                        {{ $networkStatus['app_url'] ?? 'http://localhost:1741' }}
+                    </a>
+                </div>
+                <div class="text-[11px] text-ink-500 dark:text-ink-400 truncate">
+                    Domain: <span class="font-mono text-ink-300">{{ $networkStatus['current_domain'] ?? 'localhost' }}</span>
+                </div>
+            </div>
+
+            <!-- Card 3: IP Lokal LAN -->
+            <div class="glass-panel p-4.5 rounded-2xl border border-black/10 dark:border-white/10 space-y-2">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-ink-400">IP Jaringan Lokal (LAN)</div>
+                <div class="text-xs font-mono font-bold text-ink-900 dark:text-white">
+                    {{ $networkStatus['lan_ip'] ?? '127.0.0.1' }}:{{ $networkStatus['server_port'] ?? 1741 }}
+                </div>
+                <div class="text-[11px] text-ink-500 dark:text-ink-400">
+                    Alamat host perangkat server di router toko
+                </div>
+            </div>
+
+            <!-- Card 4: Cloudflare Daemon -->
+            <div class="glass-panel p-4.5 rounded-2xl border border-black/10 dark:border-white/10 space-y-2">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-ink-400">Cloudflare Tunnel Agent</div>
+                <div class="flex items-center gap-1.5 text-xs font-bold">
+                    @if(!empty($networkStatus['cloudflared_installed']))
+                        <span class="text-emerald-400 font-mono text-[11px]">✓ Terpasang</span>
+                        @if(!empty($networkStatus['cloudflared_running']))
+                            <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px]">Aktif</span>
+                        @endif
+                    @else
+                        <span class="text-ink-400 font-mono text-[11px]">Belum Ada</span>
+                    @endif
+                </div>
+                <div class="text-[10px] text-ink-500 dark:text-ink-400 truncate font-mono">
+                    {{ !empty($networkStatus['cloudflared_version']) ? $networkStatus['cloudflared_version'] : 'Binary: cloudflared' }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Section: Form Upgrade ke Online -->
+        <div class="glass-panel p-6 rounded-3xl border border-black/10 dark:border-white/10 space-y-5">
+            <div class="border-b border-black/5 dark:border-white/5 pb-3">
+                <h3 class="text-sm font-bold text-ink-900 dark:text-white flex items-center gap-2">
+                    <span>🚀</span>
+                    <span>Upgrade Server Lokal Menjadi Full Online</span>
+                </h3>
+                <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
+                    Hubungkan instalasi lokal Anda ke domain sendiri agar kasir, teknisi, atau owner dapat mengakses sistem dari luar toko.
+                </p>
+            </div>
+
+            <form wire:submit.prevent="simpanUpgradeOnline" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Input Domain -->
+                    <div>
+                        <label class="block text-xs font-bold text-ink-700 dark:text-ink-200 mb-1">
+                            Domain / Subdomain Milik Anda <span class="text-up-red">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            wire:model="networkConfig.domain"
+                            placeholder="Contoh: pos.tokoberkah.com atau erp.namatoko.id"
+                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                        />
+                        <p class="text-[11px] text-ink-400 mt-1">Masukkan tanpa http:// atau https:// (otomatis menggunakan HTTPS).</p>
+                        @error('networkConfig.domain')
+                            <p class="text-[11px] text-up-red mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Metode Koneksi -->
+                    <div>
+                        <label class="block text-xs font-bold text-ink-700 dark:text-ink-200 mb-1">
+                            Metode Akses Online <span class="text-up-red">*</span>
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs transition {{ ($networkConfig['method'] ?? 'cloudflare') === 'cloudflare' ? 'border-indigo-500 bg-indigo-500/10 text-white font-bold' : 'border-white/10 text-ink-400' }}">
+                                <input type="radio" wire:model.live="networkConfig.method" value="cloudflare" class="text-indigo-600 focus:ring-0">
+                                <span>Cloudflare Tunnel</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs transition {{ ($networkConfig['method'] ?? '') === 'direct' ? 'border-indigo-500 bg-indigo-500/10 text-white font-bold' : 'border-white/10 text-ink-400' }}">
+                                <input type="radio" wire:model.live="networkConfig.method" value="direct" class="text-indigo-600 focus:ring-0">
+                                <span>Direct IP / Nginx</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                @if(($networkConfig['method'] ?? 'cloudflare') === 'cloudflare')
+                <!-- Box Cloudflare Tunnel -->
+                <div class="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 space-y-3">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <div class="font-bold text-xs text-indigo-300 flex items-center gap-1.5">
+                                <span>🛡️</span>
+                                <span>Keamanan Maksimal: Port Database Tetap 100% Terkunci</span>
+                            </div>
+                            <div class="text-[11px] text-ink-400 mt-1 leading-relaxed">
+                                Cloudflare Tunnel (Zero Trust) menghubungkan server lokal ke internet secara terenkripsi <strong>tanpa membuka port modem/router</strong>, bebas dari risiko ransomware &amp; serangan scan port database MySQL.
+                            </div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold shrink-0">Gratis &amp; Aman</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-ink-200 mb-1">
+                            Token Cloudflare Tunnel (Opsional jika sudah setup manual di terminal)
+                        </label>
+                        <input
+                            type="password"
+                            wire:model="networkConfig.tunnel_token"
+                            placeholder="eyJhIjoi..."
+                            class="w-full px-3.5 py-2 rounded-xl glass-input text-xs font-mono"
+                        />
+                        <p class="text-[10px] text-ink-400 mt-1">
+                            Didapatkan dari Cloudflare Dashboard &gt; Zero Trust &gt; Networks &gt; Tunnels.
+                        </p>
+                    </div>
+                </div>
+                @else
+                <!-- Box Direct IP -->
+                <div class="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-2">
+                    <div class="font-bold text-xs text-amber-300 flex items-center gap-1.5">
+                        <span>ℹ️</span>
+                        <span>Konfigurasi DNS A-Record Manual</span>
+                    </div>
+                    <p class="text-[11px] text-ink-400 leading-relaxed">
+                        Pastikan DNS A-Record domain Anda telah diarahkan ke IP Publik server ini, dan web server (Nginx/Apache) telah dikonfigurasi dengan reverse proxy ke port aplikasi lokal.
+                    </p>
+                </div>
+                @endif
+
+                <div class="flex items-center justify-between pt-2">
+                    <div class="text-[11px] text-ink-400">
+                        File panduan lengkap tersedia di <code class="text-indigo-400 font-mono">PANDUAN-DOMAIN-LOKAL-KE-INTERNET.md</code>
+                    </div>
+                    <button
+                        type="submit"
+                        class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/20 transition flex items-center gap-2 cursor-pointer"
+                    >
+                        <span wire:loading.remove wire:target="simpanUpgradeOnline">Aktifkan Mode Online</span>
+                        <span wire:loading wire:target="simpanUpgradeOnline" class="animate-spin">🌀 Menyimpan...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Section: Panduan 4 Langkah Cloudflare Tunnel -->
+        <div class="glass-panel p-6 rounded-3xl border border-black/10 dark:border-white/10 space-y-4">
+            <h3 class="text-sm font-bold text-ink-900 dark:text-white flex items-center gap-2">
+                <span>📖</span>
+                <span>Panduan 4 Menit: Setup Cloudflare Tunnel untuk Domain Sendiri</span>
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                <div class="p-3.5 rounded-xl bg-black/5 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-1.5">
+                    <div class="font-bold text-indigo-400">1. Daftar Cloudflare</div>
+                    <p class="text-[11px] text-ink-400 leading-relaxed">
+                        Daftar gratis di <a href="https://dash.cloudflare.com" target="_blank" class="text-indigo-300 underline">dash.cloudflare.com</a> dan arahkan Nameserver domain Anda ke Cloudflare.
+                    </p>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-black/5 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-1.5">
+                    <div class="font-bold text-indigo-400">2. Buat Tunnel</div>
+                    <p class="text-[11px] text-ink-400 leading-relaxed">
+                        Masuk menu <strong>Zero Trust &gt; Networks &gt; Tunnels</strong>, klik <em>Create a Tunnel</em> &gt; pilih <em>Cloudflared</em>.
+                    </p>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-black/5 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-1.5">
+                    <div class="font-bold text-indigo-400">3. Hubungkan Hostname</div>
+                    <p class="text-[11px] text-ink-400 leading-relaxed">
+                        Di tab <strong>Public Hostname</strong>: isi Subdomain (misal <code class="text-white">pos</code>), Service: <code class="text-white">HTTP</code>, URL: <code class="text-white">localhost:1741</code>.
+                    </p>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-black/5 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-1.5">
+                    <div class="font-bold text-indigo-400">4. Tempel Token</div>
+                    <p class="text-[11px] text-ink-400 leading-relaxed">
+                        Salin Token Tunnel dari Cloudflare, masukkan ke formulir di atas, lalu klik <strong>Aktifkan Mode Online</strong>.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        @if(!empty($networkStatus['is_online']))
+        <!-- Section: Downgrade / Kembalikan ke Mode LAN -->
+        <div class="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="space-y-1">
+                <div class="font-bold text-xs text-amber-300 flex items-center gap-1.5">
+                    <span>⚠️</span>
+                    <span>Kembalikan Server ke Mode Jaringan Lokal (LAN Offline)</span>
+                </div>
+                <p class="text-[11px] text-ink-400 leading-relaxed">
+                    Jika Anda ingin menonaktifkan akses internet dan mengembalikan sistem hanya untuk kasir di toko lokal.
+                </p>
+            </div>
+            <button
+                type="button"
+                wire:click="kembalikanKeLan"
+                wire:confirm="Apakah Anda yakin ingin mengembalikan server ke Mode Offline / LAN Lokal?"
+                class="px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30 transition shrink-0 cursor-pointer"
+            >
+                Kembalikan ke Mode LAN Saja
+            </button>
+        </div>
+        @endif
     </div>
     @endif
 

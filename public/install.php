@@ -778,7 +778,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                 case 'write_env':
                     $appRole = trim($_POST['app_role'] ?? 'server');
                     $appName = addslashes(trim($_POST['app_name'] ?? 'ERP POS System'));
-                    $appUrl = rtrim(trim($_POST['app_url'] ?? 'http://localhost:1741'), '/');
+                    $networkMode = trim($_POST['network_mode'] ?? 'lan');
+                    $customDomain = trim($_POST['custom_domain'] ?? '');
+                    $tunnelToken = trim($_POST['tunnel_token'] ?? '');
+
+                    if ($networkMode === 'online' && ! empty($customDomain)) {
+                        $cleanDomain = preg_replace('#^https?://#', '', rtrim($customDomain, '/'));
+                        $appUrl = 'https://'.$cleanDomain;
+                    } else {
+                        $appUrl = rtrim(trim($_POST['app_url'] ?? 'http://localhost:1741'), '/');
+                    }
+
+                    if (! empty($tunnelToken) && runCommand('which cloudflared')['status'] === 0) {
+                        @runCommand("sudo cloudflared service install {$tunnelToken} 2>/dev/null || cloudflared service install {$tunnelToken} 2>/dev/null");
+                        @runCommand('sudo systemctl start cloudflared 2>/dev/null || systemctl start cloudflared 2>/dev/null');
+                    }
+
                     $dbDriver = trim($_POST['db_driver'] ?? 'mysql');
 
                     if ($dbDriver === 'sqlite') {
@@ -835,6 +850,8 @@ APP_URL={$appUrl}
 APP_LOCALE=id
 APP_FALLBACK_LOCALE=en
 APP_ROLE={$appRole}
+NETWORK_MODE={$networkMode}
+CLOUDFLARE_TUNNEL_TOKEN={$tunnelToken}
 
 LOG_CHANNEL=stack
 LOG_STACK=single
@@ -1470,6 +1487,62 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
             </div>
 
             <div class="space-y-4 text-xs">
+                <!-- Mode Akses Jaringan: LAN vs Online -->
+                <div class="space-y-2">
+                    <label class="block font-bold text-slate-300 text-xs">Pilihan Mode Akses Jaringan Server</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label id="label-network-lan" class="flex items-start gap-3 p-3.5 rounded-xl border border-indigo-500/50 bg-indigo-500/10 cursor-pointer transition">
+                            <input type="radio" name="network_mode_choice" value="lan" checked onchange="toggleNetworkMode('lan')" class="mt-0.5 text-indigo-600 focus:ring-0">
+                            <div>
+                                <div class="font-bold text-white text-xs flex items-center gap-1.5">
+                                    <span>🏠</span> <span>Hanya LAN / Offline (Satu Ruangan / Toko)</span>
+                                </div>
+                                <div class="text-[11px] text-slate-400 mt-0.5">Operasional murni dalam toko fisik via Wi-Fi/kabel LAN. Port database 3306 terkunci 127.0.0.1.</div>
+                            </div>
+                        </label>
+                        <label id="label-network-online" class="flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/5 cursor-pointer transition">
+                            <input type="radio" name="network_mode_choice" value="online" onchange="toggleNetworkMode('online')" class="mt-0.5 text-indigo-600 focus:ring-0">
+                            <div>
+                                <div class="font-bold text-white text-xs flex items-center gap-1.5">
+                                    <span>🌐</span> <span>Full Online (Domain Sendiri / Cloudflare Tunnel)</span>
+                                </div>
+                                <div class="text-[11px] text-slate-400 mt-0.5">Bisa dibuka dari mana saja lewat internet. Direkomendasikan via Cloudflare Tunnel agar aman bebas buka port.</div>
+                            </div>
+                        </label>
+                    </div>
+                    <input type="hidden" id="network_mode" value="lan">
+                </div>
+
+                <!-- Online Domain Configuration Panel (Hidden saat mode LAN) -->
+                <div id="panel-network-online" class="hidden p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="font-bold text-indigo-300 text-xs flex items-center gap-1.5">
+                            <span>🔗</span> <span>Setup Pointing Domain Online</span>
+                        </div>
+                        <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">Cloudflare Tunnel (Aman &amp; Gratis)</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-300 mb-1">Nama Domain / Subdomain</label>
+                            <input type="text" id="custom_domain" placeholder="Contoh: pos.tokoberkah.com" oninput="updateOnlineUrlPreview()" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-[11px] focus:border-indigo-500 outline-none">
+                            <p class="text-[10px] text-slate-400 mt-0.5">Akan otomatis memakai protokol HTTPS.</p>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-300 mb-1">Token Cloudflare Tunnel (Opsional)</label>
+                            <input type="password" id="tunnel_token" placeholder="eyJhIjoi..." class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-[11px] focus:border-indigo-500 outline-none">
+                            <p class="text-[10px] text-slate-400 mt-0.5">Dari Zero Trust Cloudflare &gt; Networks &gt; Tunnels.</p>
+                        </div>
+                    </div>
+
+                    <div class="p-2.5 rounded-lg bg-black/30 text-[10px] text-slate-300 flex items-start gap-2">
+                        <span>💡</span>
+                        <span>
+                            <strong>Petunjuk:</strong> Di dashboard Cloudflare Zero Trust, buat tunnel dan arahkan Public Hostname ke <code class="text-indigo-300 font-mono">HTTP localhost:1741</code>. Jika belum punya sekarang, Anda tetap bisa mulai dengan mode LAN dan mengaktifkannya nanti di <strong>Pengaturan &gt; Jaringan &amp; Domain Online</strong>.
+                        </span>
+                    </div>
+                </div>
+
                 <!-- App & Domain -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -1477,7 +1550,7 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                         <input type="text" id="app_name" value="ERP POS System" placeholder="Contoh: Toko Berkah POS" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
                     </div>
                     <div>
-                        <label class="block font-bold text-slate-300 mb-1">Public URL / Domain / IP</label>
+                        <label class="block font-bold text-slate-300 mb-1">Target URL Aplikasi (APP_URL)</label>
                         <input type="text" id="app_url" value="<?= htmlspecialchars($detectedUrl) ?>" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
                     </div>
                 </div>
@@ -1910,6 +1983,36 @@ function toggleAppRole(role) {
     }
 }
 
+function toggleNetworkMode(mode) {
+    document.getElementById('network_mode').value = mode;
+    const labelLan = document.getElementById('label-network-lan');
+    const labelOnline = document.getElementById('label-network-online');
+    const panelOnline = document.getElementById('panel-network-online');
+    const defaultDetected = <?= json_encode($detectedUrl) ?>;
+
+    if (mode === 'online') {
+        labelLan.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/5 cursor-pointer transition';
+        labelOnline.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-indigo-500/50 bg-indigo-500/10 cursor-pointer transition';
+        panelOnline.classList.remove('hidden');
+        updateOnlineUrlPreview();
+    } else {
+        labelOnline.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-white/10 bg-white/5 cursor-pointer transition';
+        labelLan.className = 'flex items-start gap-3 p-3.5 rounded-xl border border-indigo-500/50 bg-indigo-500/10 cursor-pointer transition';
+        panelOnline.classList.add('hidden');
+        document.getElementById('app_url').value = defaultDetected;
+        document.getElementById('webhook_url_preview').value = defaultDetected + '/webhook/git-deploy';
+    }
+}
+
+function updateOnlineUrlPreview() {
+    const raw = (document.getElementById('custom_domain').value || '').trim();
+    const clean = raw.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+    const defaultDetected = <?= json_encode($detectedUrl) ?>;
+    const targetUrl = clean ? ('https://' + clean) : defaultDetected;
+    document.getElementById('app_url').value = targetUrl;
+    document.getElementById('webhook_url_preview').value = targetUrl + '/webhook/git-deploy';
+}
+
 async function scanLanServers() {
     const loading = document.getElementById('scan-lan-loading');
     const results = document.getElementById('scan-lan-results');
@@ -2081,6 +2184,9 @@ async function startExecution() {
         formData.append('app_role', appRole);
         formData.append('app_name', document.getElementById('app_name').value);
         formData.append('app_url', document.getElementById('app_url').value);
+        formData.append('network_mode', document.getElementById('network_mode').value);
+        formData.append('custom_domain', document.getElementById('custom_domain') ? document.getElementById('custom_domain').value : '');
+        formData.append('tunnel_token', document.getElementById('tunnel_token') ? document.getElementById('tunnel_token').value : '');
         formData.append('db_driver', document.getElementById('db_driver').value);
         formData.append('db_sqlite_path', document.getElementById('db_sqlite_path').value);
         formData.append('db_host', document.getElementById('db_host').value);
@@ -2094,7 +2200,8 @@ async function startExecution() {
         formData.append('biteship_key', document.getElementById('biteship_key').value);
         formData.append('wa_token', document.getElementById('wa_token').value);
         formData.append('git_secret', document.getElementById('git_secret').value);
-        if (document.getElementById('install_ai_stack').checked) {
+        const aiEl = document.getElementById('install_ai_stack');
+        if (aiEl && (aiEl.checked || aiEl.value === '1')) {
             formData.append('install_ai_stack', '1');
         }
 

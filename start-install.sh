@@ -254,6 +254,14 @@ if [ -n "$LAN_IP" ]; then
     NETWORK_URL="http://${LAN_IP}:${PORT}${TARGET_PATH}"
 fi
 
+ONLINE_URL=""
+if [ -f ".env" ]; then
+    PARSED_APP_URL=$(grep -E "^APP_URL=" ".env" 2>/dev/null | cut -d= -f2- | tr -d '\"' | tr -d "'" | tr -d '\r' || true)
+    if [ -n "$PARSED_APP_URL" ] && [[ "$PARSED_APP_URL" =~ ^https?:// ]] && ! [[ "$PARSED_APP_URL" =~ localhost|127\.0\.0\.1 ]]; then
+        ONLINE_URL="${PARSED_APP_URL}${TARGET_PATH}"
+    fi
+fi
+
 # 10. Buka Web Browser Otomatis
 if command -v xdg-open >/dev/null 2>&1; then
     xdg-open "$LOCAL_URL" >/dev/null 2>&1 &
@@ -280,8 +288,13 @@ echo "   - Dari Komputer Ini       : $LOCAL_URL"
 if [ -n "$NETWORK_URL" ]; then
 echo "   - Dari HP/iPhone/iPad/LAN : $NETWORK_URL"
 fi
+if [ -n "$ONLINE_URL" ]; then
+echo "   - Akses Internet (Online) : $ONLINE_URL"
+fi
 echo "   - PID Proses Server       : $SERVER_PID"
 echo "----------------------------------------------------------------------"
+echo "   [INFO] Untuk upgrade ke Full Online dengan domain sendiri, buka:"
+echo "          Menu Pengaturan > Sistem > Jaringan & Domain Online"
 echo "   [INFO] Server tetap aktif melayani meskipun terminal ini ditutup."
 echo "   [INFO] Untuk menghentikan server, jalankan: ./stop-server.sh"
 echo "======================================================================"

@@ -219,6 +219,17 @@ set "NETWORK_URL="
 if not "%LAN_IP%"=="" (
     set "NETWORK_URL=http://%LAN_IP%:%PORT%!TARGET_PATH!"
 )
+set "ONLINE_URL="
+if exist "%~dp0.env" (
+    for /f "tokens=1,2 delims==" %%A in ('findstr /b "APP_URL=" "%~dp0.env"') do (
+        set "RAW_APP_URL=%%B"
+        set "RAW_APP_URL=!RAW_APP_URL:"=!"
+        echo !RAW_APP_URL! | findstr /v "localhost 127.0.0.1" >nul 2>nul
+        if not errorlevel 1 (
+            set "ONLINE_URL=!RAW_APP_URL!!TARGET_PATH!"
+        )
+    )
+)
 
 echo [OK] Port aktif: %PORT%
 echo.
@@ -227,6 +238,9 @@ echo    Server ERP ^& POS Berhasil Dijalankan!
 echo    - Dari Komputer Ini       : %LOCAL_URL%
 if not "%NETWORK_URL%"=="" (
 echo    - Dari HP / iPhone / iPad : %NETWORK_URL%
+)
+if not "!ONLINE_URL!"=="" (
+echo    - Akses Internet (Online) : !ONLINE_URL!
 )
 echo ----------------------------------------------------------------------
 echo    Petunjuk Multi-Client Satu Database:
@@ -256,7 +270,12 @@ echo    - Dari Komputer Ini       : %LOCAL_URL%
 if not "%NETWORK_URL%"=="" (
 echo    - Dari HP / iPhone / iPad : %NETWORK_URL%
 )
+if not "!ONLINE_URL!"=="" (
+echo    - Akses Internet (Online) : !ONLINE_URL!
+)
 echo ----------------------------------------------------------------------
+echo    [INFO] Untuk upgrade ke Full Online dengan domain sendiri, buka:
+echo           Menu Pengaturan ^> Sistem ^> Jaringan ^& Domain Online
 echo    [INFO] Server tetap aktif di background meskipun terminal ini ditutup!
 echo    [INFO] Untuk menghentikan server, jalankan: stop-server.bat
 echo ======================================================================

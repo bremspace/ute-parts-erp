@@ -14,6 +14,7 @@ use App\Modules\Pos\Services\QrisService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Services\DatabaseManagementService;
+use App\Modules\Rbac\Services\NetworkManagementService;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Wms\Exports\AtributProdukExport;
@@ -70,10 +71,25 @@ class SettingsRbac extends Component
 
     public const VALID_TABS = [
         'users', 'role', 'cabang', 'master_produk', 'master-produk', 'export_import', 'export-import',
-        'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan',
+        'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan', 'jaringan',
     ];
 
-    public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak, printer, database, qris
+    public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak, printer, database, qris, jaringan
+
+    // Konfigurasi Akses Jaringan & Domain Online (Cloudflare Tunnel / LAN)
+    public array $networkConfig = [
+        'mode' => 'lan',
+        'domain' => '',
+        'method' => 'cloudflare',
+        'tunnel_token' => '',
+        'custom_lan_url' => '',
+    ];
+
+    public array $networkStatus = [];
+
+    public ?string $networkFeedback = null;
+
+    public ?string $networkFeedbackType = null;
 
     // Konfigurasi QRIS Toko (Upload & Dinamis EMVCo)
     public array $qrisForm = [
@@ -257,6 +273,8 @@ class SettingsRbac extends Component
                 $this->activeTab = 'master_produk';
             } elseif ($tabParam === 'export-import') {
                 $this->activeTab = 'export_import';
+            } elseif (in_array($tabParam, ['jaringan', 'network', 'domain'], true)) {
+                $this->activeTab = 'jaringan';
             } elseif (in_array($tabParam, self::VALID_TABS, true)) {
                 $this->activeTab = $tabParam;
             }
@@ -297,6 +315,7 @@ class SettingsRbac extends Component
         $this->loadPajakConfig();
         $this->loadPrinterConfig();
         $this->loadIntegrasiConfig();
+        $this->loadNetworkConfig();
     }
 
     public function switchTab(string $tab): void
@@ -307,6 +326,7 @@ class SettingsRbac extends Component
             'akses' => 'users',
             'katalog', 'master-produk' => 'master_produk',
             'export-import' => 'export_import',
+            'jaringan', 'network', 'domain' => 'jaringan',
             default => $tab,
         };
 
@@ -3675,6 +3695,74 @@ class SettingsRbac extends Component
     public function setAtributActivePreviewTab(string $tab): void
     {
         $this->atributActivePreviewTab = $tab;
+    }
+
+    public function loadNetworkConfig(?NetworkManagementService $service = null): void
+    {
+        $service = $service ?: app(NetworkManagementService::class);
+        $this->networkStatus = $service->getStatus();
+        $this->networkConfig['mode'] = $this->networkStatus['network_mode'];
+        $this->networkConfig['domain'] = $this->networkStatus['is_online'] ? $this->networkStatus['current_domain'] : '';
+        $this->networkConfig['tunnel_token'] = $this->networkStatus['tunnel_token'];
+        $this->networkConfig['custom_lan_url'] = 'http://'.($this->networkStatus['lan_ip'] ?: 'localhost').':1741';
+    }
+
+    public function simpanUpgradeOnline(NetworkManagementService $service): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah pengaturan jaringan server.')) {
+            return;
+        }
+
+        $this->validate([
+            'networkConfig.domain' => 'required|string|min:4|max:255',
+            'networkConfig.method' => 'required|in:cloudflare,direct',
+            'networkConfig.tunnel_token' => 'nullable|string|max:500',
+        ], [
+            'networkConfig.domain.required' => 'Nama domain / subdomain wajib diisi.',
+            'networkConfig.domain.min' => 'Domain minimal 4 karakter.',
+        ]);
+
+        $result = $service->upgradeToOnline(
+            domain: $this->networkConfig['domain'],
+            method: $this->networkConfig['method'],
+            tunnelToken: $this->networkConfig['tunnel_token'] ?: null
+        );
+
+        $this->networkFeedbackType = $result['success'] ? 'success' : 'error';
+        $this->networkFeedback = $result['message'];
+
+        $this->loadNetworkConfig($service);
+        $this->dispatch('alert', [
+            'type' => $result['success'] ? 'success' : 'error',
+            'message' => $result['message'],
+        ]);
+    }
+
+    public function kembalikanKeLan(NetworkManagementService $service): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah pengaturan jaringan server.')) {
+            return;
+        }
+
+        $result = $service->revertToLan($this->networkConfig['custom_lan_url'] ?: null);
+
+        $this->networkFeedbackType = $result['success'] ? 'success' : 'error';
+        $this->networkFeedback = $result['message'];
+
+        $this->loadNetworkConfig($service);
+        $this->dispatch('alert', [
+            'type' => $result['success'] ? 'success' : 'error',
+            'message' => $result['message'],
+        ]);
+    }
+
+    public function refreshNetworkStatus(NetworkManagementService $service): void
+    {
+        $this->loadNetworkConfig($service);
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Status jaringan server berhasil dimuat ulang.',
+        ]);
     }
 
     public function render()
