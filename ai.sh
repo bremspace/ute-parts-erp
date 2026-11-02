@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Ute Parts ERP — OpenCode & AI Assistant Launcher (9router + OMO-Slim + MCP)
+# ERP & POS System — OpenCode & AI Assistant Launcher (9router + OMO-Slim + MCP)
 # Menjalankan 9router di background jika belum aktif, lalu membuka OpenCode
 # dengan plugin oh-my-opencode-slim, skills, dan codebase-memory-mcp siap pakai.
 # ==============================================================================

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Ute Parts ERP — AI Development & Maintenance Stack Setup (Silent Engine)
+# ERP & POS System — AI Development & Maintenance Stack Setup (Silent Engine)
 # Installs & Configures:
 #   1. OpenCode CLI (opencode)
 #   2. 9router (Local AI Model Proxy & Router on port 20128)

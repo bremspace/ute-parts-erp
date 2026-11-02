@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UTE PARTS ERP & POS — STANDALONE INTERACTIVE VPS INSTALLER (TUI)
+# ERP & POS SYSTEM — STANDALONE INTERACTIVE VPS INSTALLER (TUI)
 # Platform: Ubuntu 22.04 / 24.04 LTS (Fresh / Blank VPS or Existing Server)
 # Stack   : Nginx + PHP 8.4-FPM + MySQL 8.0 + Supervisor + Composer + Node.js
 # ==============================================================================
@@ -22,7 +22,7 @@ C_BG_BLUE="\033[44m"
 # Header UI Helper
 clear 2>/dev/null || true
 echo -e "${C_CYAN}╔══════════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-echo -e "${C_CYAN}║${C_RESET}      ${C_BOLD}${C_WHITE}UTE PARTS ERP & POS — STANDALONE INTERACTIVE VPS INSTALLER${C_RESET}      ${C_CYAN}║${C_RESET}"
+echo -e "${C_CYAN}║${C_RESET}      ${C_BOLD}${C_WHITE}ERP & POS SYSTEM — STANDALONE INTERACTIVE VPS INSTALLER${C_RESET}      ${C_CYAN}║${C_RESET}"
 echo -e "${C_CYAN}║${C_RESET}   ${C_DIM}Instalasi Otomatis Universal untuk Fresh / Blank VPS Ubuntu Linux${C_RESET}        ${C_CYAN}║${C_RESET}"
 echo -e "${C_CYAN}╚══════════════════════════════════════════════════════════════════════════════╝${C_RESET}"
 echo ""
@@ -74,8 +74,8 @@ DOMAIN="$(echo "$DOMAIN" | tr -d ' ' | tr '[:upper:]' '[:lower:]')"
 # Step 2: Nama Aplikasi & Mode
 echo ""
 echo -e "${C_BOLD}${C_WHITE}[2/6] Nama Toko / Usaha${C_RESET}"
-read -rp "      Nama Aplikasi [Ute Parts ERP]: " INPUT_APP_NAME
-APP_NAME="${INPUT_APP_NAME:-Ute Parts ERP}"
+read -rp "      Nama Aplikasi [ERP & POS System]: " INPUT_APP_NAME
+APP_NAME="${INPUT_APP_NAME:-ERP & POS System}"
 
 echo ""
 echo -e "${C_BOLD}${C_WHITE}[3/6] Mode Fitur Aplikasi${C_RESET}"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# EMERGENCY DATABASE RESTORE — UTE PARTS ERP
+# EMERGENCY DATABASE RESTORE — ERP & POS SYSTEM
 # Jalankan ini jika database hilang/rusak dan tidak ada akses ke UI maupun OpenCode.
 # Penggunaan: sudo bash emergency-restore.sh
 # ==============================================================================
