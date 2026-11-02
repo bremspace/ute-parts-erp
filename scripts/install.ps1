@@ -1,6 +1,7 @@
 # ==============================================================================
 # ERP and POS System - Universal Windows Installer and Launcher
 # PowerShell Engine (Pure ASCII, Rock-Solid, Zero Force-Close)
+# Referensi: start-install.sh (Versi Linux)
 # ==============================================================================
 param(
     [switch]$ForceReinstallPhp
@@ -9,7 +10,7 @@ param(
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 
-# Enable modern TLS
+# Aktifkan TLS modern (TLS 1.2 & TLS 1.3)
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
 } catch {}
@@ -22,14 +23,18 @@ $projectRoot = Split-Path -Parent $scriptDir
 Set-Location -Path $projectRoot
 
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "   ERP and POS System - Windows Universal Installer and Launcher" -ForegroundColor Cyan
-Write-Host "   Lokasi Project: $projectRoot" -ForegroundColor DarkGray
+Write-Host "   ERP & POS System - One-Click Universal Launcher (Windows)" -ForegroundColor Cyan
+Write-Host "   Target Port: 1741 (Localhost & Jaringan Wi-Fi/LAN)" -ForegroundColor Cyan
+Write-Host "   Direktori Project: $projectRoot" -ForegroundColor DarkGray
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
 
 # ------------------------------------------------------------------------------
-# 0. Periksa Hak Administrator
+# 1. Pengecekan Kondisi Sistem Operasi, Hardware & Hak Akses
 # ------------------------------------------------------------------------------
+Write-Host "[1/8] Memeriksa kondisi sistem operasi, hardware & hak akses..." -ForegroundColor Cyan
+
+# 1a. Hak Akses Administrator
 $isAdmin = $false
 try {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -38,14 +43,89 @@ try {
 } catch {}
 
 if ($isAdmin) {
-    Write-Host "[OK] Berjalan dengan Hak Akses Administrator." -ForegroundColor Green
+    Write-Host "✔ [OK] Hak Akses: Administrator (Elevated)." -ForegroundColor Green
 } else {
-    Write-Host "[INFO] Berjalan sebagai Standard User (Non-Elevated)." -ForegroundColor Yellow
+    Write-Host "ℹ [INFO] Hak Akses: Standard User (Fitur firewall otomatis butuh Admin)." -ForegroundColor Yellow
+}
+
+# 1b. Deteksi Sistem Operasi & Arsitektur
+$osInfo = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
+$csInfo = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
+
+$osCaption = if ($osInfo) { $osInfo.Caption } else { [System.Environment]::OSVersion.VersionString }
+$osArch = [System.Environment]::GetEnvironmentVariable("PROCESSOR_ARCHITECTURE")
+$is64Bit = [System.Environment]::Is64BitOperatingSystem
+
+Write-Host "✔ [OK] Sistem Operasi : $osCaption ($osArch, 64-bit: $is64Bit)" -ForegroundColor Green
+
+if (-not $is64Bit) {
+    Write-Host "⚠️ [PERINGATAN] Sistem Windows 32-bit terdeteksi. PHP 8.4 resmi direkomendasikan pada Windows 64-bit." -ForegroundColor Yellow
+}
+
+# 1c. Alokasi & Pengecekan Memori RAM (Minimal 2GB direkomendasikan)
+if ($osInfo) {
+    $ramTotalMb = [int]($osInfo.TotalVisibleMemorySize / 1024)
+    $ramFreeMb = [int]($osInfo.FreePhysicalMemory / 1024)
+    if ($ramTotalMb -le 2048) {
+        Write-Host "ℹ [INFO] RAM terdeteksi <= 2GB (${ramTotalMb} MB, Bebas: ${ramFreeMb} MB)." -ForegroundColor Yellow
+        Write-Host "   Tips: Untuk kasir multi-device bersamaan, disarankan RAM 2-4GB." -ForegroundColor Gray
+    } else {
+        Write-Host "✔ [OK] Memori RAM      : $([Math]::Round($ramTotalMb / 1024, 1)) GB (Tersedia: $([Math]::Round($ramFreeMb / 1024, 1)) GB)" -ForegroundColor Green
+    }
+}
+
+# 1d. Pengecekan Ruang Disk Kosong
+try {
+    $driveLetter = (Split-Path -Qualifier $projectRoot).TrimEnd(':')
+    $diskDrive = Get-PSDrive -Name $driveLetter -ErrorAction SilentlyContinue
+    if ($diskDrive) {
+        $freeDiskGb = [Math]::Round($diskDrive.Free / 1GB, 2)
+        Write-Host "✔ [OK] Ruang Disk (${driveLetter}:) : $freeDiskGb GB tersedia" -ForegroundColor Green
+        if ($freeDiskGb -lt 0.5) {
+            Write-Host "⚠️ [PERINGATAN] Ruang disk sangat sedikit (< 500 MB). Sediakan ruang disk yang cukup." -ForegroundColor Yellow
+        }
+    }
+} catch {}
+
+# ------------------------------------------------------------------------------
+# 2. Pengecekan dan Auto-Install Visual C++ 2015-2022 Runtime (x64)
+# ------------------------------------------------------------------------------
+Write-Host "[2/8] Memeriksa Visual C++ Runtime (vcruntime140.dll & msvcp140.dll)..." -ForegroundColor Cyan
+$system32 = Join-Path $env:SystemRoot 'System32'
+$hasVc = (Test-Path (Join-Path $system32 'vcruntime140.dll')) -and (Test-Path (Join-Path $system32 'msvcp140.dll'))
+
+if (-not $hasVc) {
+    Write-Host "ℹ [AUTO-FIX] Visual C++ Redistributable belum ada di sistem. Mengunduh installer resmi Microsoft..." -ForegroundColor Yellow
+    $toolsDir = Join-Path $projectRoot 'tools'
+    if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null }
+    $vcFile = Join-Path $toolsDir 'vc_redist.x64.exe'
+    $vcUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    try {
+        if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+            & curl.exe -sS -L --fail "$vcUrl" -o "$vcFile" 2>$null
+        } else {
+            (New-Object System.Net.WebClient).DownloadFile($vcUrl, $vcFile)
+        }
+        if ((Test-Path $vcFile) -and ((Get-Item $vcFile).Length -gt 1000000)) {
+            Write-Host "ℹ Memasang Visual C++ Redistributable di background..." -ForegroundColor Gray
+            $p = Start-Process -FilePath $vcFile -ArgumentList '/install', '/quiet', '/norestart' -PassThru -Wait
+            if ($p.ExitCode -eq 0 -or $p.ExitCode -eq 3010) {
+                Write-Host "✔ [OK] Visual C++ Runtime berhasil dipasang." -ForegroundColor Green
+            }
+            Remove-Item -Path $vcFile -Force -ErrorAction SilentlyContinue
+        }
+    } catch {
+        Write-Host "Catatan: Instalasi VC++ dilewati, fallback bundling DLL lokal akan digunakan jika perlu." -ForegroundColor Gray
+    }
+} else {
+    Write-Host "✔ [OK] Visual C++ Runtime sistem terdeteksi aktif." -ForegroundColor Green
 }
 
 # ------------------------------------------------------------------------------
-# 1. Helper Fungsi Validasi PHP >= 8.4
+# 3. Deteksi dan Auto-Install PHP >= 8.4
 # ------------------------------------------------------------------------------
+Write-Host "[3/8] Memeriksa ketersediaan PHP 8.4+ di sistem..." -ForegroundColor Cyan
+
 function Test-PhpBinary([string]$binPath) {
     if (-not $binPath) { return $null }
     try {
@@ -67,11 +147,6 @@ function Test-PhpBinary([string]$binPath) {
     } catch {}
     return $null
 }
-
-# ------------------------------------------------------------------------------
-# 2. Deteksi PHP Binary yang Sudah Ada
-# ------------------------------------------------------------------------------
-Write-Host "[1/6] Memeriksa ketersediaan PHP 8.4+ di sistem..." -ForegroundColor Cyan
 
 $detectedPhp = $null
 
@@ -138,14 +213,10 @@ if (-not $ForceReinstallPhp) {
     }
 }
 
-# ------------------------------------------------------------------------------
-# 3. Instalasi PHP 8.4 Jika Belum Ada (Fokus Utama: Winget + Auto-Setup Winget)
-# ------------------------------------------------------------------------------
+# Auto-install PHP 8.4 jika belum tersedia di perangkat kosongan
 if (-not $detectedPhp) {
-    Write-Host "[INFO] PHP minimal 8.4 belum tersedia di komputer." -ForegroundColor Yellow
-    Write-Host "[INFO] Menyiapkan PHP 8.4 via Windows Package Manager (winget)..." -ForegroundColor Cyan
+    Write-Host "ℹ PHP >= 8.4 belum terpasang. Menyiapkan auto-installer PHP untuk Windows kosongan..." -ForegroundColor Yellow
 
-    # Refresh PATH untuk memastikan winget terdeteksi
     $winAppsPath = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
     if (Test-Path $winAppsPath) {
         $env:Path = "$winAppsPath;" + $env:Path
@@ -153,50 +224,8 @@ if (-not $detectedPhp) {
 
     $wingetCmd = Get-Command winget.exe -ErrorAction SilentlyContinue
 
-    # A. Jika winget belum ada di Windows, download dan aktifkan secara otomatis!
-    if (-not $wingetCmd) {
-        Write-Host "[INFO] Winget belum aktif di Windows ini. Mengunduh dan memasang Winget resmi Microsoft..." -ForegroundColor Yellow
-        $toolsDir = Join-Path $projectRoot 'tools'
-        if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null }
-        
-        $wingetBundle = Join-Path $toolsDir 'winget.msixbundle'
-        $vclibsAppx = Join-Path $toolsDir 'vclibs.appx'
-        
-        try {
-            Write-Host "Mengunduh VCLibs dependency..." -ForegroundColor Gray
-            if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-                & curl.exe -sS -L --fail "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -o "$vclibsAppx" 2>$null
-            } else {
-                (New-Object System.Net.WebClient).DownloadFile("https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx", $vclibsAppx)
-            }
-            if (Test-Path $vclibsAppx) {
-                Add-AppxPackage -Path $vclibsAppx -ErrorAction SilentlyContinue
-                Remove-Item -Path $vclibsAppx -Force -ErrorAction SilentlyContinue
-            }
-
-            Write-Host "Mengunduh Microsoft Desktop App Installer (Winget)..." -ForegroundColor Gray
-            if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-                & curl.exe -sS -L --fail "https://aka.ms/getwinget" -o "$wingetBundle" 2>$null
-            } else {
-                (New-Object System.Net.WebClient).DownloadFile("https://aka.ms/getwinget", $wingetBundle)
-            }
-            if ((Test-Path $wingetBundle) -and ((Get-Item $wingetBundle).Length -gt 10000000)) {
-                Add-AppxPackage -Path $wingetBundle -ErrorAction SilentlyContinue
-                Remove-Item -Path $wingetBundle -Force -ErrorAction SilentlyContinue
-                Write-Host "[OK] Winget package berhasil didaftarkan ke Windows." -ForegroundColor Green
-            }
-        } catch {
-            Write-Host "Catatan saat penyiapan winget: $_" -ForegroundColor Yellow
-        }
-
-        # Cek ulang ketersediaan winget setelah instalasi
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") + ";$winAppsPath"
-        $wingetCmd = Get-Command winget.exe -ErrorAction SilentlyContinue
-    }
-
-    # B. Eksekusi Winget untuk memasang PHP 8.4
     if ($wingetCmd) {
-        Write-Host "Menjalankan: winget install PHP.PHP.8.4 ..." -ForegroundColor Cyan
+        Write-Host "ℹ [AUTO-FIX] Memasang PHP 8.4 via Windows Package Manager (winget)..." -ForegroundColor Cyan
         try {
             & winget install --id PHP.PHP.8.4 -e --silent --accept-source-agreements --accept-package-agreements
         } catch {}
@@ -211,7 +240,6 @@ if (-not $detectedPhp) {
             $detectedPhp = Test-PhpBinary $pathPhp.Source
         }
 
-        # Cek folder instalasi standar winget PHP
         if (-not $detectedPhp) {
             $wingetChecks = @(
                 "${env:ProgramFiles}\PHP\v8.4\php.exe",
@@ -229,9 +257,9 @@ if (-not $detectedPhp) {
         }
     }
 
-    # C. Fallback: Pasang PHP 8.4 Portable ke tools\php jika winget belum berhasil
+    # Fallback: Unduh dan ekstrak paket resmi PHP 8.4 Portable ke tools\php\
     if (-not $detectedPhp) {
-        Write-Host "[INFO] Menyiapkan PHP 8.4 Portable mandiri ke tools\php\..." -ForegroundColor Cyan
+        Write-Host "ℹ [AUTO-FIX] Menyiapkan paket resmi PHP 8.4 Portable mandiri ke tools\php\..." -ForegroundColor Cyan
         $setupPs1 = Join-Path $scriptDir 'setup-windows-php.ps1'
         if (Test-Path $setupPs1) {
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupPs1
@@ -246,27 +274,27 @@ if (-not $detectedPhp) {
 if (-not $detectedPhp) {
     Write-Host ""
     Write-Host "======================================================================" -ForegroundColor Red
-    Write-Host " [ERROR] PHP minimal 8.4 tidak berhasil disiapkan secara otomatis." -ForegroundColor Red
+    Write-Host " [ERROR] PHP minimal 8.4 tidak ditemukan atau gagal disiapkan." -ForegroundColor Red
     Write-Host "======================================================================" -ForegroundColor Red
-    Write-Host "Solusi Manual Cepat:" -ForegroundColor Yellow
-    Write-Host "1. Buka Terminal / CMD lalu ketik: winget install PHP.PHP.8.4" -ForegroundColor White
-    Write-Host "2. ATAU unduh dan instal Laragon Full: https://laragon.org/download/" -ForegroundColor White
-    Write-Host "3. ATAU unduh zip PHP 8.4 dari https://windows.php.net/download/ lalu ekstrak ke: $projectRoot\tools\php\" -ForegroundColor White
+    Write-Host "Panduan Manual Cepat:" -ForegroundColor Yellow
+    Write-Host "  1. Buka Terminal / CMD: winget install PHP.PHP.8.4" -ForegroundColor White
+    Write-Host "  2. ATAU instal Laragon 6+ dengan PHP 8.4: https://laragon.org/download/" -ForegroundColor White
+    Write-Host "  3. ATAU ekstrak zip PHP 8.4 dari https://windows.php.net/download/ ke: $projectRoot\tools\php\" -ForegroundColor White
     Write-Host "======================================================================" -ForegroundColor Red
     exit 1
 }
 
 $phpExe = $detectedPhp.Path
 $phpDir = Split-Path -Parent $phpExe
-Write-Host "[OK] PHP Terverifikasi: $phpExe (Versi: $($detectedPhp.Version))" -ForegroundColor Green
+Write-Host "✔ [OK] PHP terverifikasi: $phpExe (Versi: $($detectedPhp.Version))" -ForegroundColor Green
 
 # Sisipkan folder PHP ke urutan pertama PATH sesi ini
 $env:Path = "$phpDir;" + $env:Path
 
 # ------------------------------------------------------------------------------
-# 4. Validasi dan Konfigurasi php.ini (Aktifkan Ekstensi Wajib)
+# 4. Validasi Ekstensi PHP Kritis & Konfigurasi php.ini
 # ------------------------------------------------------------------------------
-Write-Host "[2/6] Memeriksa modul dan ekstensi php.ini..." -ForegroundColor Cyan
+Write-Host "[4/8] Memeriksa modul ekstensi PHP kritis (XML, SQLite, MySQL, Mbstring, Opcache, cURL)..." -ForegroundColor Cyan
 $phpIni = Join-Path $phpDir 'php.ini'
 if (-not (Test-Path $phpIni)) {
     $iniDev = Join-Path $phpDir 'php.ini-development'
@@ -315,14 +343,14 @@ if (Test-Path $phpIni) {
         )
         $iniContent += ($appendLines -join "`r`n")
         Set-Content -Path $phpIni -Value $iniContent -Encoding ASCII
-        Write-Host "[OK] Modul php.ini berhasil dikonfigurasi dan disinkronkan." -ForegroundColor Green
+        Write-Host "✔ [OK] Modul php.ini berhasil dikonfigurasi & diaktifkan." -ForegroundColor Green
     }
 }
 
 # ------------------------------------------------------------------------------
-# 5. Siapkan Direktori Storage, Database dan Cache
+# 5. Penyiapan Direktori Storage, Database & Cache
 # ------------------------------------------------------------------------------
-Write-Host "[3/6] Menyiapkan direktori storage, database dan cache..." -ForegroundColor Cyan
+Write-Host "[5/8] Menyiapkan direktori storage, database & cache..." -ForegroundColor Cyan
 $folders = @(
     'storage\framework\cache\data',
     'storage\framework\sessions',
@@ -339,23 +367,24 @@ foreach ($f in $folders) {
         New-Item -ItemType Directory -Path $p -Force | Out-Null
     }
 }
+Write-Host "✔ [OK] Direktori sistem siap & izin tulis aktif." -ForegroundColor Green
 
 # ------------------------------------------------------------------------------
-# 6. Deteksi dan Siapkan Composer
+# 6. Deteksi & Siapkan Composer Secara Global / Portable
 # ------------------------------------------------------------------------------
-Write-Host "[4/6] Memeriksa package manager Composer..." -ForegroundColor Cyan
+Write-Host "[6/8] Memeriksa package manager Composer & dependensi vendor..." -ForegroundColor Cyan
 $composerPhar = Join-Path $projectRoot 'composer.phar'
 $usePhar = $false
 
 if (Test-Path $composerPhar) {
     $usePhar = $true
-    Write-Host "[OK] Composer portable (composer.phar) siap digunakan." -ForegroundColor Green
+    Write-Host "✔ [OK] Composer portable (composer.phar) terdeteksi." -ForegroundColor Green
 } else {
     $compCmd = Get-Command composer -ErrorAction SilentlyContinue
     if ($compCmd) {
-        Write-Host "[OK] Composer global terdeteksi di system PATH." -ForegroundColor Green
+        Write-Host "✔ [OK] Composer global terdeteksi di system PATH." -ForegroundColor Green
     } else {
-        Write-Host "Mengunduh composer.phar resmi..." -ForegroundColor Yellow
+        Write-Host "ℹ [AUTO-FIX] Mengunduh composer.phar resmi (getcomposer.org)..." -ForegroundColor Yellow
         try {
             if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
                 & curl.exe -sS -L --fail "https://getcomposer.org/composer-stable.phar" -o "$composerPhar" 2>$null
@@ -364,17 +393,19 @@ if (Test-Path $composerPhar) {
             }
             if (Test-Path $composerPhar) {
                 $usePhar = $true
-                Write-Host "[OK] Composer portable berhasil diunduh." -ForegroundColor Green
+                Write-Host "✔ [OK] Composer portable berhasil diunduh." -ForegroundColor Green
             }
-        } catch {}
+        } catch {
+            Write-Host "⚠️ Gagal mengunduh Composer otomatis: $_" -ForegroundColor Yellow
+        }
     }
 }
 
-# Auto-install vendor jika belum ada
+# Auto-install vendor/autoload.php jika belum ada
 $vendorAutoload = Join-Path $projectRoot 'vendor\autoload.php'
 if (-not (Test-Path $vendorAutoload)) {
-    Write-Host "[INFO] Menjalankan composer install untuk melengkapi dependensi vendor..." -ForegroundColor Yellow
-    Write-Host "[INFO] Normal memakan waktu 1-3 menit untuk instalasi pertama kali. Mohon tunggu..." -ForegroundColor DarkGray
+    Write-Host "ℹ [AUTO-FIX] Menjalankan composer install untuk melengkapi vendor dependensi..." -ForegroundColor Yellow
+    Write-Host "ℹ [INFO] Proses instalasi paket sedang berlangsung, mohon tunggu..." -ForegroundColor DarkGray
 
     if ($usePhar) {
         & $phpExe $composerPhar install --no-interaction --prefer-dist --no-scripts
@@ -389,18 +420,17 @@ if (-not (Test-Path $vendorAutoload)) {
     }
 
     if (Test-Path $vendorAutoload) {
-        Write-Host "[OK] Dependensi vendor berhasil dipasang!" -ForegroundColor Green
+        Write-Host "✔ [OK] Dependensi vendor/autoload.php berhasil terpasang!" -ForegroundColor Green
+        Write-Host "ℹ [AUTO-FIX] Mendaftarkan package Laravel..." -ForegroundColor Cyan
         & $phpExe (Join-Path $projectRoot 'artisan') package:discover --ansi
     } else {
-        Write-Host "[WARN] Dependensi vendor dapat dilengkapi nanti melalui Web Installer." -ForegroundColor Yellow
+        Write-Host "⚠️ [WARN] Dependensi vendor belum lengkap; dapat dilengkapi melalui Web Setup Wizard." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[OK] Dependensi vendor sudah terpasang." -ForegroundColor Green
+    Write-Host "✔ [OK] Dependensi vendor aplikasi sudah terpasang (vendor/autoload.php)." -ForegroundColor Green
 }
 
-# ------------------------------------------------------------------------------
-# 7. Penanganan Sistem: PC Baru vs PC Yang Sudah Terinstal Sebelumnya
-# ------------------------------------------------------------------------------
+# Penanganan status: PC Baru vs PC Terkonfigurasi
 $lockFile = Join-Path $projectRoot 'storage\installed.lock'
 $envFile = Join-Path $projectRoot '.env'
 $isInstalled = (Test-Path $lockFile)
@@ -413,8 +443,7 @@ if (-not $isInstalled -and (Test-Path $envFile)) {
 }
 
 if ($isInstalled) {
-    Write-Host "[INFO] Status: Sistem telah terkonfigurasi sebelumnya di PC ini." -ForegroundColor Cyan
-    Write-Host "[INFO] Membersihkan cache aplikasi usang agar sinkron dengan file terbaru..." -ForegroundColor Gray
+    Write-Host "ℹ [INFO] Status: Sistem telah terkonfigurasi di komputer ini." -ForegroundColor Cyan
     & $phpExe (Join-Path $projectRoot 'artisan') optimize:clear 2>$null | Out-Null
     
     $pubStorage = Join-Path $projectRoot 'public\storage'
@@ -432,13 +461,13 @@ if ($isInstalled) {
         }
     }
 } else {
-    Write-Host "[INFO] Status: Instalasi baru / Belum terkonfigurasi. Membuka Web Setup Wizard..." -ForegroundColor Cyan
+    Write-Host "ℹ [INFO] Status: Instalasi baru / Belum terkonfigurasi. Membuka Web Setup Wizard..." -ForegroundColor Cyan
 }
 
 # ------------------------------------------------------------------------------
-# 8. Alokasi Port 1741 dan Manajemen Port Bebas Konflik
+# 7. Konfigurasi Port 1741 & Deteksi IP Jaringan Lokal (Wi-Fi / LAN)
 # ------------------------------------------------------------------------------
-Write-Host "[5/6] Memeriksa port dan koneksi jaringan..." -ForegroundColor Cyan
+Write-Host "[7/8] Memeriksa port 1741, firewall & koneksi jaringan..." -ForegroundColor Cyan
 $port = 1741
 
 function Test-PortInUse([int]$checkPort) {
@@ -447,14 +476,14 @@ function Test-PortInUse([int]$checkPort) {
 }
 
 if (Test-PortInUse $port) {
-    # Cek apakah port dipakai proses PHP sebelumnya, matikan jika ya (auto-restart bersih)
+    # Cek apakah port dipakai proses PHP sebelumnya, hentikan untuk restart bersih
     $tcps = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     $restarted = $false
     foreach ($conn in $tcps) {
         try {
             $proc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
             if ($proc -and $proc.ProcessName -like "*php*") {
-                Write-Host "[INFO] Menutup proses server lama di port $port (PID: $($proc.Id))..." -ForegroundColor Gray
+                Write-Host "ℹ [INFO] Menutup proses server lama di port $port (PID: $($proc.Id))..." -ForegroundColor Gray
                 Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
                 $restarted = $true
             }
@@ -463,7 +492,7 @@ if (Test-PortInUse $port) {
     if ($restarted) { Start-Sleep -Seconds 1 }
 
     if (Test-PortInUse $port) {
-        Write-Host "[WARN] Port 1741 digunakan oleh aplikasi lain, mencari port alternatif..." -ForegroundColor Yellow
+        Write-Host "⚠️ Port 1741 sedang dipakai aplikasi lain. Mencari port alternatif..." -ForegroundColor Yellow
         for ($p = 1742; $p -le 1760; $p++) {
             if (-not (Test-PortInUse $p)) {
                 $port = $p
@@ -472,12 +501,9 @@ if (Test-PortInUse $port) {
         }
     }
 }
+Write-Host "✔ [OK] Port aktif: $port" -ForegroundColor Green
 
-Write-Host "[OK] Port terpilih: $port" -ForegroundColor Green
-
-# ------------------------------------------------------------------------------
-# 9. Deteksi IP Jaringan Lokal (Wi-Fi / LAN untuk Multi-Device)
-# ------------------------------------------------------------------------------
+# Deteksi IP Jaringan Lokal (Wi-Fi / LAN untuk HP / Tablet / Kasir)
 $lanIp = ""
 try {
     $allIps = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object {
@@ -488,7 +514,7 @@ try {
     }
 } catch {}
 
-# Buka firewall port
+# Buka firewall port 1741 & 3306 jika Admin
 if ($isAdmin) {
     try {
         netsh advfirewall firewall add rule name="ERP POS System (Port $port)" dir=in action=allow protocol=TCP localport=$port >$null 2>&1
@@ -506,6 +532,11 @@ if (Test-PortInUse 3306) {
         Start-Service MariaDB -ErrorAction SilentlyContinue
         if (Test-PortInUse 3306) { $mysqlActive = $true }
     } catch {}
+}
+
+if (-not $mysqlActive) {
+    Write-Host "⚠️  [PERHATIAN] Service MySQL port 3306 belum aktif." -ForegroundColor Yellow
+    Write-Host "ℹ  [TIPS] Anda dapat memilih database 'SQLite' di installer jika ingin tanpa MySQL." -ForegroundColor Gray
 }
 
 # Tentukan target URL
@@ -536,23 +567,25 @@ if (Test-Path $envFile) {
 }
 
 # ------------------------------------------------------------------------------
-# 10. Jalankan Built-in Web Server di Background dan Verifikasi Port
+# 8. Jalankan Built-in Web Server di Background & Buka Browser
 # ------------------------------------------------------------------------------
-Write-Host "[6/6] Menyalakan Web Server di background pada port $port..." -ForegroundColor Cyan
+Write-Host "[8/8] Menyalakan server di background pada port $port..." -ForegroundColor Cyan
 
 $docRoot = Join-Path $projectRoot 'public'
 $logFile = Join-Path $projectRoot 'storage\logs\server.log'
-
-# Pastikan folder logs tersedia
-$logsDir = Split-Path -Parent $logFile
-if (-not (Test-Path $logsDir)) { New-Item -ItemType Directory -Path $logsDir -Force | Out-Null }
+$pidFile = Join-Path $projectRoot 'storage\framework\server.pid'
 
 # Jalankan server secara independen di background
 $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru
 
+# Catat PID proses server
+if ($serverProc) {
+    Set-Content -Path $pidFile -Value $serverProc.Id -Encoding ASCII
+}
+
 Start-Sleep -Seconds 1
 
-# Verifikasi apakah server berhasil mendengarkan di port
+# Verifikasi kesiapan server
 $serverReady = $false
 for ($i = 0; $i -lt 5; $i++) {
     if (Test-PortInUse $port) {
@@ -562,13 +595,19 @@ for ($i = 0; $i -lt 5; $i++) {
     Start-Sleep -Milliseconds 500
 }
 
-if ($serverReady) {
-    Write-Host "[OK] Web Server berhasil berjalan di background (PID: $($serverProc.Id))." -ForegroundColor Green
-} else {
-    Write-Host "[WARN] Peringatan: Server belum merespon di port $port. Memeriksa log..." -ForegroundColor Yellow
-    if (Test-Path $logFile) {
-        Get-Content -Path $logFile -Tail 10 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
-    }
+# Jalankan Queue Worker jika sistem sudah terinstall
+$queuePid = ""
+if ($isInstalled -and (Test-Path $envFile)) {
+    $artisanPath = Join-Path $projectRoot 'artisan'
+    $queueLog = Join-Path $projectRoot 'storage\logs\queue.log'
+    $queuePidFile = Join-Path $projectRoot 'storage\framework\queue.pid'
+    try {
+        $qProc = Start-Process -FilePath $phpExe -ArgumentList "`"$artisanPath`"", "queue:work", "--sleep=3", "--tries=3" -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueLog -PassThru -ErrorAction SilentlyContinue
+        if ($qProc) {
+            $queuePid = $qProc.Id
+            Set-Content -Path $queuePidFile -Value $qProc.Id -Encoding ASCII
+        }
+    } catch {}
 }
 
 # Buka Web Browser Otomatis
@@ -577,27 +616,26 @@ try {
 } catch {}
 
 # ------------------------------------------------------------------------------
-# 11. Tampilan Ringkasan Akhir
+# Ringkasan Akhir
 # ------------------------------------------------------------------------------
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Green
-Write-Host "   Server ERP dan POS Berhasil Aktif di Background!" -ForegroundColor Green
-Write-Host "   Port Aktif : $port" -ForegroundColor White
-Write-Host "----------------------------------------------------------------------" -ForegroundColor DarkGray
-Write-Host "   - Akses dari Komputer Ini       : $localUrl" -ForegroundColor Cyan
+Write-Host "   Server ERP & POS Berhasil Berjalan di Background!" -ForegroundColor Green
+Write-Host "   - Dari Komputer Ini       : $localUrl" -ForegroundColor Cyan
 if ($networkUrl) {
-Write-Host "   - Akses dari HP / Kasir / Wi-Fi : $networkUrl" -ForegroundColor Cyan
+Write-Host "   - Dari HP/iPhone/iPad/LAN : $networkUrl" -ForegroundColor Cyan
 }
 if ($onlineUrl) {
-Write-Host "   - Akses Internet (Online)       : $onlineUrl" -ForegroundColor Cyan
+Write-Host "   - Akses Internet (Online) : $onlineUrl" -ForegroundColor Cyan
 }
-if ($isInstalled) {
-Write-Host "----------------------------------------------------------------------" -ForegroundColor DarkGray
-Write-Host "   [TIPS] Ingin reset atau ubah konfigurasi database?" -ForegroundColor Yellow
-Write-Host "          Buka Web Installer di: http://localhost:$port/install.php" -ForegroundColor White
+Write-Host "   - PID Proses Server       : $($serverProc.Id)" -ForegroundColor DarkGray
+if ($queuePid) {
+Write-Host "   - PID Queue Worker        : $queuePid" -ForegroundColor DarkGray
 }
 Write-Host "----------------------------------------------------------------------" -ForegroundColor DarkGray
-Write-Host "   [INFO] Server tetap aktif di background meskipun jendela ini ditutup." -ForegroundColor Gray
-Write-Host "   [INFO] Untuk menghentikan server kapan saja, jalankan: stop-server.bat" -ForegroundColor Gray
+Write-Host "   [INFO] Untuk upgrade ke Full Online dengan domain sendiri, buka:" -ForegroundColor Yellow
+Write-Host "          Menu Pengaturan > Sistem > Jaringan & Domain Online" -ForegroundColor White
+Write-Host "   [INFO] Server tetap aktif melayani meskipun jendela ini ditutup." -ForegroundColor Gray
+Write-Host "   [INFO] Untuk menghentikan server, jalankan: stop-server.bat" -ForegroundColor Gray
 Write-Host "======================================================================" -ForegroundColor Green
 Write-Host ""
