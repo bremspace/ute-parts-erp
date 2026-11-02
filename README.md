@@ -267,21 +267,11 @@ Cukup ekstrak file ZIP proyek, lalu klik file launcher sesuai sistem operasi And
 ---
 
 ### 2. Standalone VPS / Server Ubuntu (Nginx + PHP 8.4 + Supervisor)
-Jalankan satu baris perintah sebagai `root` di VPS / server lokal Ubuntu 22.04 / 24.04:
+Jalankan satu baris perintah interaktif (TUI Wizard) sebagai `root` di VPS kosong / server lokal Ubuntu 22.04 / 24.04:
 ```bash
-sudo bash install-standalone.sh yourdomain.com
-# atau menggunakan IP Publik langsung:
-# sudo bash install-standalone.sh 103.xxx.xxx.xxx
+sudo bash start-install-vps.sh
 ```
-*Skrip otomatis mengonfigurasi swap 2GB, Nginx, PHP 8.4-FPM, MySQL, Supervisor queue worker, cron, build asset, dan SSL Let's Encrypt.*
-
----
-
-### 3. VPS dengan CyberPanel / OpenLiteSpeed
-Jika server menggunakan CyberPanel:
-```bash
-sudo bash install-ute.sh yourdomain.com
-```
+*TUI interaktif akan memandu pengisian Domain/IP, nama aplikasi, mode fitur, kredensial database terisolasi (127.0.0.1), akun Super Admin pertama, swap anti-OOM, Nginx, PHP 8.4-FPM, Supervisor worker, cron, dan SSL Let's Encrypt secara otomatis tanpa perlu membuka nano.*
 
 ---
 
