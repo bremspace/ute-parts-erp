@@ -62,16 +62,18 @@ echo [INFO] Menyiapkan PHP portable di folder tools...
 if not exist "%~dp0tools" mkdir "%~dp0tools" 2>nul
 if exist "%~dp0scripts\setup-windows-php.ps1" (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\setup-windows-php.ps1"
-) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $z = Join-Path $pwd 'tools\php.zip'; $d = Join-Path $pwd 'tools\php'; New-Item -ItemType Directory -Path $d -Force | Out-Null; (New-Object System.Net.WebClient).DownloadFile('https://downloads.php.net/~windows/releases/latest/php-8.4-Win32-vs17-x64-latest.zip', $z); Expand-Archive -Path $z -DestinationPath $d -Force; Remove-Item $z -Force -ErrorAction SilentlyContinue" 2>nul
 )
 if exist "%~dp0tools\php\php.exe" (
-    set "PHP_BIN=%~dp0tools\php\php.exe"
+    "%~dp0tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
+    if not errorlevel 1 (
+        set "PHP_BIN=%~dp0tools\php\php.exe"
+    )
 )
 
 :PHP_READY
 if "%PHP_BIN%"=="" (
-    echo [ERROR] PHP minimal 8.4 belum terpasang. Pastikan koneksi internet aktif.
+    echo [ERROR] PHP minimal 8.4 belum terpasang atau gagal dieksekusi.
+    echo Jalankan start-install.bat untuk memeriksa instalasi sistem.
     pause
     exit /b 1
 )

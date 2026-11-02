@@ -12,18 +12,16 @@ echo.
 cd /d "%~dp0"
 
 :: 1. Deteksi PHP Binary
-:: Wajib PHP >= 8.4 (Disarankan PHP 8.5+) untuk Laravel 13 & Symfony 8
+:: Wajib PHP >= 8.4 untuk Laravel 13 & Symfony 8
 set "PHP_BIN="
 
-:: Cek tools\php lokal jika sudah ada
+:: Cek tools\php lokal jika sudah ada dan berfungsi
 if exist "%~dp0tools\php\php.exe" (
     "%~dp0tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
     if not errorlevel 1 (
         set "PHP_BIN=%~dp0tools\php\php.exe"
         goto :PHP_READY
     )
-    echo [INFO] PHP di tools\php versi lama. Membersihkan untuk update ke PHP 8.5...
-    rd /s /q "%~dp0tools\php" 2>nul
 )
 
 :: Cek Laragon PHP 8.5
@@ -66,18 +64,23 @@ if exist "C:\xampp\php\php.exe" (
     )
 )
 
-:: 2. Auto-Install Visual C++ & PHP 8.4/8.5 Portable (Zero-Dependency)
-echo [INFO] PHP minimal 8.4 belum terpasang. Menyiapkan PHP portable otomatis...
+:: 2. Auto-Install Visual C++ & PHP 8.4 Portable (Zero-Dependency)
+echo [INFO] Menyiapkan PHP 8.4 Portable dan dependensi sistem...
 if not exist "%~dp0tools" mkdir "%~dp0tools" 2>nul
 
 if exist "%~dp0scripts\setup-windows-php.ps1" (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\setup-windows-php.ps1"
-) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $z = Join-Path $pwd 'tools\php.zip'; $d = Join-Path $pwd 'tools\php'; New-Item -ItemType Directory -Path $d -Force | Out-Null; (New-Object System.Net.WebClient).DownloadFile('https://downloads.php.net/~windows/releases/latest/php-8.4-Win32-vs17-x64-latest.zip', $z); Expand-Archive -Path $z -DestinationPath $d -Force; Remove-Item $z -Force -ErrorAction SilentlyContinue"
 )
 
 if exist "%~dp0tools\php\php.exe" (
-    set "PHP_BIN=%~dp0tools\php\php.exe"
+    "%~dp0tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
+    if not errorlevel 1 (
+        set "PHP_BIN=%~dp0tools\php\php.exe"
+        goto :PHP_READY
+    ) else (
+        echo [WARN] File php.exe ditemukan namun gagal dieksekusi:
+        "%~dp0tools\php\php.exe" -v
+    )
 )
 
 :PHP_READY
