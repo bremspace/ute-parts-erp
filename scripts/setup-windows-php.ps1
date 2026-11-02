@@ -1,10 +1,13 @@
 # ==============================================================================
-# ERP & POS System - Windows PHP 8.4/8.5 & VC++ Portable Auto-Installer
+# ERP & POS System - Windows PHP 8.4 Portable & VC++ Auto-Installer
 # ==============================================================================
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
 $projectRoot = Split-Path -Parent $scriptDir
 $toolsDir = Join-Path $projectRoot 'tools'
 $destDir = Join-Path $toolsDir 'php'
@@ -26,9 +29,9 @@ if (-not $hasVc) {
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-            & curl.exe -s -L $vcUrl -o $vcFile
+            & curl.exe -sS -L --fail "$vcUrl" -o "$vcFile" 2>$null
         } else {
-            Invoke-WebRequest -Uri $vcUrl -OutFile $vcFile -TimeoutSec 120
+            (New-Object System.Net.WebClient).DownloadFile($vcUrl, $vcFile)
         }
         if (Test-Path $vcFile) {
             Start-Process -FilePath $vcFile -ArgumentList '/install', '/passive', '/norestart' -Wait
@@ -36,69 +39,61 @@ if (-not $hasVc) {
             Write-Host "✔ Visual C++ Redistributable terpasang." -ForegroundColor Green
         }
     } catch {
-        # Abaikan jika user bukan administrator atau gagal otomatis
+        # Abaikan jika izin administrator tidak tersedia atau gagal pasif
     }
 } else {
     Write-Host "✔ Visual C++ Redistributable sudah aktif." -ForegroundColor Green
 }
 
-# 2. Unduh PHP Portable Resmi (Langsung dari mirror downloads.php.net tanpa trial & error berulang)
-Write-Host "[2/3] Mengunduh paket PHP Portable Windows resmi..." -ForegroundColor Cyan
+# 2. Unduh PHP Portable Resmi (PHP 8.4 x64 Thread Safe)
+Write-Host "[2/3] Mengunduh paket PHP 8.4 Windows resmi..." -ForegroundColor Cyan
 
-# Ambil URL rilis terbaru secara cerdas via releases.json jika memungkinkan, atau URL direct
-$directUrls = @(
-    "https://downloads.php.net/~windows/releases/php-8.4.27-1-Win32-vs17-x64.zip",
-    "https://downloads.php.net/~windows/releases/php-8.5.12-1-Win32-vs17-x64.zip",
-    "https://downloads.php.net/~windows/releases/php-8.4.27-1-nts-Win32-vs17-x64.zip"
+$urls = @(
+    "https://downloads.php.net/~windows/releases/latest/php-8.4-Win32-vs17-x64-latest.zip",
+    "https://downloads.php.net/~windows/releases/php-8.4.27-1-Win32-vs17-x64.zip"
 )
 
-$downloadUrl = ""
-try {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $releasesJson = Invoke-RestMethod -Uri "https://downloads.php.net/~windows/releases/releases.json" -TimeoutSec 15
-    if ($releasesJson.'8.4'.'ts-vs17-x64'.zip.path) {
-        $downloadUrl = "https://downloads.php.net/~windows/releases/" + $releasesJson.'8.4'.'ts-vs17-x64'.zip.path
-    } elseif ($releasesJson.'8.5'.'ts-vs17-x64'.zip.path) {
-        $downloadUrl = "https://downloads.php.net/~windows/releases/" + $releasesJson.'8.5'.'ts-vs17-x64'.zip.path
-    }
-} catch {
-    # Fallback ke direct list
-}
+function Get-PhpPackage([string]$url, [string]$target) {
+    Write-Host "Mengunduh dari: $url ..." -ForegroundColor Gray
+    
+    # Prioritas 1: System.Net.WebClient (Standar .NET, native Windows, tanpa isu stderr)
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+        $wc.DownloadFile($url, $target)
+        if ((Test-Path $target) -and ((Get-Item $target).Length -gt 5000000)) {
+            return $true
+        }
+    } catch {}
 
-if (-not $downloadUrl) {
-    $downloadUrl = $directUrls[0]
+    # Prioritas 2: curl.exe bawaan Windows 10/11 (-sS silent tanpa stderr progress bar)
+    try {
+        if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+            & curl.exe -sS -L --fail "$url" -o "$target" 2>$null
+            if ((Test-Path $target) -and ((Get-Item $target).Length -gt 5000000)) {
+                return $true
+            }
+        }
+    } catch {}
+
+    # Prioritas 3: Invoke-WebRequest
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $url -OutFile $target -UseBasicParsing -TimeoutSec 180
+        if ((Test-Path $target) -and ((Get-Item $target).Length -gt 5000000)) {
+            return $true
+        }
+    } catch {}
+
+    return $false
 }
 
 $downloaded = $false
-try {
-    Write-Host "Mengunduh PHP dari sumber resmi: $downloadUrl" -ForegroundColor Gray
-    if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-        & curl.exe -L -# -o $zipPath $downloadUrl
-    } else {
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath -TimeoutSec 180
-    }
-    if ((Test-Path $zipPath) -and ((Get-Item $zipPath).Length -gt 5000000)) {
+foreach ($u in $urls) {
+    if (Get-PhpPackage -url $u -target $zipPath) {
         $downloaded = $true
-    }
-} catch {
-    # Fallback ke cadangan
-}
-
-if (-not $downloaded) {
-    foreach ($fb in $directUrls) {
-        if ($fb -eq $downloadUrl) { continue }
-        try {
-            Write-Host "Mencoba mirror cadangan: $fb" -ForegroundColor Gray
-            if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-                & curl.exe -L -# -o $zipPath $fb
-            } else {
-                Invoke-WebRequest -Uri $fb -OutFile $zipPath -TimeoutSec 180
-            }
-            if ((Test-Path $zipPath) -and ((Get-Item $zipPath).Length -gt 5000000)) {
-                $downloaded = $true
-                break
-            }
-        } catch {}
+        break
     }
 }
 
@@ -109,9 +104,17 @@ if (-not $downloaded) {
 
 # 3. Ekstrak & Konfigurasi Ekstensi Wajib di php.ini
 Write-Host "[3/3] Mengekstrak & mengaktifkan modul database serta ekstensi PHP..." -ForegroundColor Cyan
+
+# Hentikan proses php lama jika masih ada
+Get-Process -Name php -ErrorAction SilentlyContinue | Where-Object {
+    try { $_.Path -like "*$destDir*" } catch { $false }
+} | Stop-Process -Force -ErrorAction SilentlyContinue
+
 if (Test-Path $destDir) {
     Remove-Item -Path $destDir -Recurse -Force -ErrorAction SilentlyContinue
 }
+New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+
 Expand-Archive -Path $zipPath -DestinationPath $destDir -Force
 Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
 
@@ -124,20 +127,28 @@ if (Test-Path $iniDev) {
     $c = $c -replace ';extension=curl', 'extension=curl'
     $c = $c -replace ';extension=fileinfo', 'extension=fileinfo'
     $c = $c -replace ';extension=gd', 'extension=gd'
+    $c = $c -replace ';extension=intl', 'extension=intl'
     $c = $c -replace ';extension=mbstring', 'extension=mbstring'
+    $c = $c -replace ';extension=mysqli', 'extension=mysqli'
     $c = $c -replace ';extension=openssl', 'extension=openssl'
     $c = $c -replace ';extension=pdo_mysql', 'extension=pdo_mysql'
     $c = $c -replace ';extension=pdo_sqlite', 'extension=pdo_sqlite'
     $c = $c -replace ';extension=sqlite3', 'extension=sqlite3'
-    $c = $c -replace ';extension=intl', 'extension=intl'
     $c = $c -replace ';extension=zip', 'extension=zip'
-    $c = $c -replace ';extension=bcmath', 'extension=bcmath'
     $c = $c -replace ';zend_extension=opcache', 'zend_extension=opcache'
-    if ($c -notmatch '(?m)^\s*zend_extension\s*=\s*opcache') {
-        $c += "`r`nzend_extension=opcache`r`nopcache.enable=1`r`nopcache.enable_cli=1`r`nopcache.memory_consumption=128`r`n"
+
+    if ($c -notmatch '(?m)^\s*opcache\.enable\s*=\s*1') {
+        $c += "`r`n[opcache]`r`nzend_extension=opcache`r`nopcache.enable=1`r`nopcache.enable_cli=1`r`nopcache.memory_consumption=128`r`n"
     }
-    Set-Content -Path $iniTarget -Value $c
+    Set-Content -Path $iniTarget -Value $c -Encoding UTF8
 }
 
-Write-Host "✔ PHP Portable siap digunakan!" -ForegroundColor Green
-exit 0
+$phpExe = Join-Path $destDir 'php.exe'
+if (Test-Path $phpExe) {
+    $ver = & $phpExe -r "echo PHP_VERSION;" 2>$null
+    Write-Host "✔ PHP Portable ($ver) siap digunakan!" -ForegroundColor Green
+    exit 0
+} else {
+    Write-Host "❌ File php.exe tidak ditemukan di $destDir" -ForegroundColor Red
+    exit 1
+}
