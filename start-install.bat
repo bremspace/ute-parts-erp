@@ -66,15 +66,14 @@ if exist "C:\xampp\php\php.exe" (
     )
 )
 
-:: 2. Auto-Install Visual C++ & PHP 8.5 Portable (Zero-Dependency)
-echo [INFO] PHP minimal 8.4/8.5 belum terpasang di sistem.
-echo [INFO] Menjalankan penyiapan otomatis PHP 8.5 Portable...
+:: 2. Auto-Install Visual C++ & PHP 8.4/8.5 Portable (Zero-Dependency)
+echo [INFO] PHP minimal 8.4 belum terpasang. Menyiapkan PHP portable otomatis...
 if not exist "%~dp0tools" mkdir "%~dp0tools" 2>nul
 
 if exist "%~dp0scripts\setup-windows-php.ps1" (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\setup-windows-php.ps1"
 ) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $z = Join-Path $pwd 'tools\php.zip'; Invoke-WebRequest -Uri 'https://windows.php.net/downloads/releases/php-8.5.12-1-Win32-vs17-x64.zip' -OutFile $z -TimeoutSec 120; Expand-Archive -Path $z -DestinationPath (Join-Path $pwd 'tools\php') -Force; Remove-Item $z -Force -ErrorAction SilentlyContinue"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $z = Join-Path $pwd 'tools\php.zip'; Invoke-WebRequest -Uri 'https://downloads.php.net/~windows/releases/php-8.4.27-1-Win32-vs17-x64.zip' -OutFile $z -TimeoutSec 180; Expand-Archive -Path $z -DestinationPath (Join-Path $pwd 'tools\php') -Force; Remove-Item $z -Force -ErrorAction SilentlyContinue"
 )
 
 if exist "%~dp0tools\php\php.exe" (
@@ -84,7 +83,7 @@ if exist "%~dp0tools\php\php.exe" (
 :PHP_READY
 if "%PHP_BIN%"=="" (
     echo [ERROR] PHP minimal 8.4 tidak berhasil disiapkan secara otomatis.
-    echo Pasang Laragon dengan PHP 8.4/8.5 atau unduh PHP 8.5 lalu jalankan kembali file ini.
+    echo Pastikan komputer terhubung ke internet lalu jalankan kembali file ini.
     echo.
     pause
     exit /b 1

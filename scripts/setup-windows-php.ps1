@@ -1,7 +1,8 @@
 # ==============================================================================
-# ERP & POS System - Windows PHP 8.5 & VC++ Portable Auto-Installer
+# ERP & POS System - Windows PHP 8.4/8.5 & VC++ Portable Auto-Installer
 # ==============================================================================
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
@@ -15,57 +16,99 @@ if (-not (Test-Path $toolsDir)) {
 }
 
 # 1. Periksa Microsoft Visual C++ 2015-2022 Redistributable (vcruntime140.dll & msvcp140.dll)
-Write-Host "[1/3] Memeriksa Microsoft Visual C++ Redistributable (vcredist)..." -ForegroundColor Cyan
+Write-Host "[1/3] Memeriksa dependensi sistem Visual C++..." -ForegroundColor Cyan
 $system32 = Join-Path $env:SystemRoot 'System32'
 $hasVc = (Test-Path (Join-Path $system32 'vcruntime140.dll')) -and (Test-Path (Join-Path $system32 'msvcp140.dll'))
 
 if (-not $hasVc) {
-    Write-Host "Mengunduh & memasang Microsoft Visual C++ 2015-2022 Redistributable..." -ForegroundColor Yellow
+    Write-Host "Mengunduh & memasang Visual C++ Redistributable (sekali saja)..." -ForegroundColor Yellow
     $vcUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $vcUrl -OutFile $vcFile -TimeoutSec 90
-        Start-Process -FilePath $vcFile -ArgumentList '/install', '/passive', '/norestart' -Wait
-        Remove-Item -Path $vcFile -Force -ErrorAction SilentlyContinue
-        Write-Host "Visual C++ Redistributable berhasil dipasang." -ForegroundColor Green
-    } catch {
-        Write-Warning "Gagal memasang Visual C++ otomatis: $($_.Exception.Message)"
-    }
-} else {
-    Write-Host "Visual C++ Redistributable sudah terpasang." -ForegroundColor Green
-}
-
-# 2. Unduh PHP Portable (prioritaskan 8.5, fallback 8.4)
-Write-Host "[2/3] Mengunduh PHP Portable 8.5 resmi dari windows.php.net..." -ForegroundColor Cyan
-$urls = @(
-    "https://windows.php.net/downloads/releases/php-8.5.12-1-Win32-vs17-x64.zip",
-    "https://windows.php.net/downloads/releases/php-8.4.27-1-Win32-vs17-x64.zip",
-    "https://windows.php.net/downloads/releases/archives/php-8.4.27-1-Win32-vs17-x64.zip",
-    "https://windows.php.net/downloads/releases/archives/php-8.5.12-1-Win32-vs17-x64.zip"
-)
-
-$downloaded = $false
-foreach ($u in $urls) {
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Write-Host "Mencoba: $u"
-        Invoke-WebRequest -Uri $u -OutFile $zipPath -TimeoutSec 120
-        if ((Get-Item $zipPath).Length -gt 1000000) {
-            $downloaded = $true
-            break
+        if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+            & curl.exe -s -L $vcUrl -o $vcFile
+        } else {
+            Invoke-WebRequest -Uri $vcUrl -OutFile $vcFile -TimeoutSec 120
+        }
+        if (Test-Path $vcFile) {
+            Start-Process -FilePath $vcFile -ArgumentList '/install', '/passive', '/norestart' -Wait
+            Remove-Item -Path $vcFile -Force -ErrorAction SilentlyContinue
+            Write-Host "✔ Visual C++ Redistributable terpasang." -ForegroundColor Green
         }
     } catch {
-        # Coba url berikutnya
+        # Abaikan jika user bukan administrator atau gagal otomatis
+    }
+} else {
+    Write-Host "✔ Visual C++ Redistributable sudah aktif." -ForegroundColor Green
+}
+
+# 2. Unduh PHP Portable Resmi (Langsung dari mirror downloads.php.net tanpa trial & error berulang)
+Write-Host "[2/3] Mengunduh paket PHP Portable Windows resmi..." -ForegroundColor Cyan
+
+# Ambil URL rilis terbaru secara cerdas via releases.json jika memungkinkan, atau URL direct
+$directUrls = @(
+    "https://downloads.php.net/~windows/releases/php-8.4.27-1-Win32-vs17-x64.zip",
+    "https://downloads.php.net/~windows/releases/php-8.5.12-1-Win32-vs17-x64.zip",
+    "https://downloads.php.net/~windows/releases/php-8.4.27-1-nts-Win32-vs17-x64.zip"
+)
+
+$downloadUrl = ""
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $releasesJson = Invoke-RestMethod -Uri "https://downloads.php.net/~windows/releases/releases.json" -TimeoutSec 15
+    if ($releasesJson.'8.4'.'ts-vs17-x64'.zip.path) {
+        $downloadUrl = "https://downloads.php.net/~windows/releases/" + $releasesJson.'8.4'.'ts-vs17-x64'.zip.path
+    } elseif ($releasesJson.'8.5'.'ts-vs17-x64'.zip.path) {
+        $downloadUrl = "https://downloads.php.net/~windows/releases/" + $releasesJson.'8.5'.'ts-vs17-x64'.zip.path
+    }
+} catch {
+    # Fallback ke direct list
+}
+
+if (-not $downloadUrl) {
+    $downloadUrl = $directUrls[0]
+}
+
+$downloaded = $false
+try {
+    Write-Host "Mengunduh PHP dari sumber resmi: $downloadUrl" -ForegroundColor Gray
+    if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+        & curl.exe -L -# -o $zipPath $downloadUrl
+    } else {
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath -TimeoutSec 180
+    }
+    if ((Test-Path $zipPath) -and ((Get-Item $zipPath).Length -gt 5000000)) {
+        $downloaded = $true
+    }
+} catch {
+    # Fallback ke cadangan
+}
+
+if (-not $downloaded) {
+    foreach ($fb in $directUrls) {
+        if ($fb -eq $downloadUrl) { continue }
+        try {
+            Write-Host "Mencoba mirror cadangan: $fb" -ForegroundColor Gray
+            if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+                & curl.exe -L -# -o $zipPath $fb
+            } else {
+                Invoke-WebRequest -Uri $fb -OutFile $zipPath -TimeoutSec 180
+            }
+            if ((Test-Path $zipPath) -and ((Get-Item $zipPath).Length -gt 5000000)) {
+                $downloaded = $true
+                break
+            }
+        } catch {}
     }
 }
 
 if (-not $downloaded) {
-    Write-Warning "Gagal mengunduh PHP otomatis dari windows.php.net. Silakan gunakan Laragon atau install PHP manual."
+    Write-Host "❌ Gagal mengunduh PHP otomatis. Pastikan koneksi internet aktif." -ForegroundColor Red
     exit 1
 }
 
-# 3. Ekstrak & Konfigurasi php.ini
-Write-Host "[3/3] Mengekstrak dan mengonfigurasi ekstensi PHP..." -ForegroundColor Cyan
+# 3. Ekstrak & Konfigurasi Ekstensi Wajib di php.ini
+Write-Host "[3/3] Mengekstrak & mengaktifkan modul database serta ekstensi PHP..." -ForegroundColor Cyan
 if (Test-Path $destDir) {
     Remove-Item -Path $destDir -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -96,5 +139,5 @@ if (Test-Path $iniDev) {
     Set-Content -Path $iniTarget -Value $c
 }
 
-Write-Host "PHP Portable siap di: $destDir\php.exe" -ForegroundColor Green
+Write-Host "✔ PHP Portable siap digunakan!" -ForegroundColor Green
 exit 0

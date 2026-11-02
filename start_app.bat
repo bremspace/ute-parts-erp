@@ -60,14 +60,18 @@ if exist "C:\xampp\php\php.exe" (
 :: Auto-Download PHP Portable jika belum ada sama sekali
 echo [INFO] Menyiapkan PHP portable di folder tools...
 if not exist "%~dp0tools" mkdir "%~dp0tools" 2>nul
-powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $z = Join-Path $pwd 'tools\php.zip'; Invoke-WebRequest -Uri 'https://windows.php.net/downloads/releases/php-8.5.12-1-Win32-vs17-x64.zip' -OutFile $z -TimeoutSec 120; Expand-Archive -Path $z -DestinationPath (Join-Path $pwd 'tools\php') -Force; Remove-Item $z -Force -ErrorAction SilentlyContinue" 2>nul
+if exist "%~dp0scripts\setup-windows-php.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\setup-windows-php.ps1"
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $z = Join-Path $pwd 'tools\php.zip'; Invoke-WebRequest -Uri 'https://downloads.php.net/~windows/releases/php-8.4.27-1-Win32-vs17-x64.zip' -OutFile $z -TimeoutSec 180; Expand-Archive -Path $z -DestinationPath (Join-Path $pwd 'tools\php') -Force; Remove-Item $z -Force -ErrorAction SilentlyContinue" 2>nul
+)
 if exist "%~dp0tools\php\php.exe" (
     set "PHP_BIN=%~dp0tools\php\php.exe"
 )
 
 :PHP_READY
 if "%PHP_BIN%"=="" (
-    echo [ERROR] PHP minimal 8.4 belum terpasang. Pasang PHP 8.4+ atau Laragon terlebih dahulu.
+    echo [ERROR] PHP minimal 8.4 belum terpasang. Pastikan koneksi internet aktif.
     pause
     exit /b 1
 )
