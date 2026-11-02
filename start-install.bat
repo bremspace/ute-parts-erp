@@ -1,12 +1,12 @@
 @echo off
 setlocal
 chcp 65001 >nul 2>nul
-title ERP & POS System - Universal One-Click Launcher (Port 1741)
+title "ERP dan POS System - Universal One-Click Launcher (Port 1741)"
 cd /d "%~dp0"
 
 echo ======================================================================
-echo    ERP & POS System - Universal Local & Network Launcher
-echo    Port Default: 1741 (Akses Lokal & Jaringan Wi-Fi/LAN/HP/iOS/Kasir)
+echo    ERP dan POS System - Universal Local dan Network Launcher
+echo    Port Default: 1741 (Akses Lokal dan Jaringan Wi-Fi/LAN/HP/iOS/Kasir)
 echo ======================================================================
 echo.
 
