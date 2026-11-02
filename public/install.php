@@ -70,10 +70,22 @@ function getComposerCommand(): string
     $baseDir = dirname(__DIR__);
     $phpBin = getPhpBinary();
 
-    if (runCommand('which composer')['status'] === 0) {
+    // 1. Cek global binary composer di PATH
+    $whichCmd = (PHP_OS_FAMILY === 'Windows') ? 'where composer' : 'which composer';
+    if (runCommand($whichCmd)['status'] === 0) {
         return 'composer';
     }
 
+    // 2. Cek path standar global Linux
+    if (file_exists('/usr/local/bin/composer') && is_executable('/usr/local/bin/composer')) {
+        return '/usr/local/bin/composer';
+    }
+
+    if (file_exists('/usr/bin/composer') && is_executable('/usr/bin/composer')) {
+        return '/usr/bin/composer';
+    }
+
+    // 3. Cek composer.phar lokal project
     if (file_exists($baseDir.'/composer.phar')) {
         return $phpBin.' '.escapeshellarg($baseDir.'/composer.phar');
     }
@@ -91,10 +103,18 @@ function downloadComposerPhar(): bool
         return true;
     }
 
-    // Coba via curl CLI
+    // Coba pasang global ke /usr/local/bin/composer jika izin sudo/root tersedia
+    $canSudo = runCommand('sudo -n true 2>/dev/null')['status'] === 0;
+    $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
+
+    // Coba unduh via curl CLI
     $curlRes = runCommand("curl -sS -L https://getcomposer.org/composer-stable.phar -o {$pharFile}");
     if ($curlRes['status'] === 0 && file_exists($pharFile) && filesize($pharFile) > 1000000) {
         @chmod($pharFile, 0755);
+        if ($isRoot || $canSudo) {
+            $pfx = $isRoot ? '' : 'sudo ';
+            runCommand("{$pfx}cp {$pharFile} /usr/local/bin/composer && {$pfx}chmod 755 /usr/local/bin/composer");
+        }
 
         return true;
     }
@@ -112,6 +132,10 @@ function downloadComposerPhar(): bool
             fclose($fp);
             if (file_exists($pharFile) && filesize($pharFile) > 1000000) {
                 @chmod($pharFile, 0755);
+                if ($isRoot || $canSudo) {
+                    $pfx = $isRoot ? '' : 'sudo ';
+                    runCommand("{$pfx}cp {$pharFile} /usr/local/bin/composer && {$pfx}chmod 755 /usr/local/bin/composer");
+                }
 
                 return true;
             }
@@ -123,6 +147,10 @@ function downloadComposerPhar(): bool
     runCommand("cd {$baseDir} && curl -sS https://getcomposer.org/installer | {$phpBin} -- --install-dir={$baseDir} --filename=composer.phar");
     if (file_exists($pharFile) && filesize($pharFile) > 1000000) {
         @chmod($pharFile, 0755);
+        if ($isRoot || $canSudo) {
+            $pfx = $isRoot ? '' : 'sudo ';
+            runCommand("{$pfx}cp {$pharFile} /usr/local/bin/composer && {$pfx}chmod 755 /usr/local/bin/composer");
+        }
 
         return true;
     }
@@ -532,10 +560,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
             case 'composer':
                 $composerCmd = getComposerCommand();
                 if (empty($composerCmd)) {
-                    $logs[] = 'Mengunduh binary Composer (composer.phar) portabel...';
+                    $logs[] = 'Composer belum terdeteksi. Mengunduh & menyiapkan Composer...';
                     if (downloadComposerPhar()) {
                         $composerCmd = getComposerCommand();
-                        $logs[] = 'Composer binary (composer.phar) berhasil disiapkan.';
+                        $logs[] = 'Composer binary berhasil disiapkan: '.$composerCmd;
                     } else {
                         $logs[] = 'Gagal mengunduh composer.phar. Silakan pasang Composer secara manual.';
                     }
@@ -547,12 +575,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
             case 'vendor':
                 $composerCmd = getComposerCommand();
                 if (empty($composerCmd)) {
+                    $logs[] = 'Composer belum ada. Mengunduh composer terlebih dahulu...';
                     downloadComposerPhar();
                     $composerCmd = getComposerCommand();
                 }
                 if (! file_exists($baseDir.'/vendor/autoload.php')) {
                     if (! empty($composerCmd)) {
-                        $logs[] = 'Menjalankan composer install... (mohon tunggu sebentar)';
+                        $logs[] = 'Menjalankan composer install... (mengunduh dependensi Laravel & library, mohon tunggu)';
                         $compRes = runComposerInstallWithFallback($baseDir, $composerCmd);
                         if ($compRes['status'] === 0) {
                             if (! empty($compRes['fallback'])) {
@@ -562,10 +591,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                                 $logs[] = 'Dependensi vendor Composer berhasil diinstal lengkap!';
                             }
                         } else {
-                            $logs[] = 'Composer install: '.substr($compRes['output'], -250);
+                            $logs[] = 'Composer install menghasilkan kode status: '.$compRes['status'];
+                            if (! empty($compRes['output'])) {
+                                $logs[] = 'Rincian error: '.substr($compRes['output'], -400);
+                            }
                         }
                     } else {
-                        $logs[] = 'Composer tidak ditemukan untuk menginstal vendor.';
+                        $logs[] = 'Composer tidak ditemukan untuk menginstal vendor. Silakan pasang Composer secara global di sistem.';
                     }
                 } else {
                     $logs[] = 'Dependensi vendor Composer sudah lengkap (vendor/autoload.php terverifikasi).';

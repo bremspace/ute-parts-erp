@@ -153,41 +153,64 @@ echo "ℹ [AUTO-FIX] Menyiapkan direktori storage, database & izin tulis..."
 mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache storage/app/public database
 chmod -R 775 storage bootstrap/cache database 2>/dev/null || chmod -R 777 storage bootstrap/cache database 2>/dev/null || true
 
-# 6. Deteksi & Siapkan Composer
+# 6. Deteksi & Siapkan Composer Secara Global Sistem
 COMPOSER_CMD=""
 if command -v composer >/dev/null 2>&1; then
     COMPOSER_CMD="composer"
-elif [ -f "./composer.phar" ]; then
-    COMPOSER_CMD="$PHP_BIN ./composer.phar"
+    echo "✔ [OK] Composer global terdeteksi: $(which composer) ($("$COMPOSER_CMD" --version 2>/dev/null | head -n 1))"
+elif [ -f "/usr/local/bin/composer" ] && [ -x "/usr/local/bin/composer" ]; then
+    COMPOSER_CMD="/usr/local/bin/composer"
+    echo "✔ [OK] Composer global terdeteksi di /usr/local/bin/composer"
 else
-    echo "ℹ [AUTO-FIX] Mengunduh composer.phar resmi..."
+    echo "ℹ [AUTO-FIX] Memasang Composer secara global ke sistem (/usr/local/bin/composer)..."
+    TMP_PHAR="/tmp/composer-setup.phar"
     if command -v curl >/dev/null 2>&1; then
-        curl -sS -L https://getcomposer.org/composer-stable.phar -o ./composer.phar || true
+        curl -sS -L https://getcomposer.org/composer-stable.phar -o "$TMP_PHAR" || true
     fi
-    if [ ! -f "./composer.phar" ] && command -v curl >/dev/null 2>&1; then
-        curl -sS https://getcomposer.org/installer | "$PHP_BIN" -- --install-dir=. --filename=composer.phar || true
+    if [ ! -f "$TMP_PHAR" ] || [ ! -s "$TMP_PHAR" ]; then
+        if command -v curl >/dev/null 2>&1; then
+            curl -sS https://getcomposer.org/installer | "$PHP_BIN" -- --install-dir=/tmp --filename=composer-setup.phar || true
+        fi
     fi
-    if [ -f "./composer.phar" ]; then
-        chmod +x ./composer.phar
-        COMPOSER_CMD="$PHP_BIN ./composer.phar"
+
+    if [ -f "$TMP_PHAR" ] && [ -s "$TMP_PHAR" ]; then
+        chmod +x "$TMP_PHAR"
+        if sudo cp "$TMP_PHAR" /usr/local/bin/composer 2>/dev/null && sudo chmod 755 /usr/local/bin/composer 2>/dev/null; then
+            COMPOSER_CMD="composer"
+            echo "✔ [OK] Composer berhasil dipasang secara global di /usr/local/bin/composer"
+        elif cp "$TMP_PHAR" ./composer.phar 2>/dev/null; then
+            chmod +x ./composer.phar
+            COMPOSER_CMD="$PHP_BIN ./composer.phar"
+            echo "✔ [OK] Composer disiapkan lokal di ./composer.phar (Izin sudo tidak tersedia)"
+        fi
+        rm -f "$TMP_PHAR"
+    else
+        echo "⚠️ [WARN] Gagal mengunduh Composer otomatis. Dependensi dapat dipasang via antarmuka installer."
     fi
 fi
 
 # 7. Instalasi Dependensi Vendor jika belum ada
 if [ ! -f "vendor/autoload.php" ]; then
     if [ -n "$COMPOSER_CMD" ]; then
-        echo "ℹ [AUTO-FIX] Menjalankan composer install untuk melengkapi vendor..."
+        echo "ℹ [AUTO-FIX] Menjalankan composer install untuk melengkapi vendor dependensi..."
+        echo "ℹ [INFO] Proses instalasi paket sedang berlangsung, mohon tunggu..."
+        
         $COMPOSER_CMD install --no-interaction --prefer-dist --no-scripts || \
         $COMPOSER_CMD install --no-interaction --prefer-dist --no-scripts --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter || \
         $COMPOSER_CMD install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs || true
 
         if [ -f "vendor/autoload.php" ]; then
+            echo "✔ [OK] Dependensi vendor/autoload.php berhasil terpasang!"
             echo "ℹ [AUTO-FIX] Mendaftarkan package Laravel..."
             "$PHP_BIN" artisan package:discover --ansi || true
+        else
+            echo "❌ [GAGAL] Dependensi vendor belum lengkap terpasang."
         fi
     else
         echo "⚠️ [WARN] Composer belum tersedia. Dependensi dapat dilengkapi via wizard GUI."
     fi
+else
+    echo "✔ [OK] Dependensi vendor aplikasi sudah terpasang (vendor/autoload.php)"
 fi
 
 # 7b. Otomatisasi Hak Akses MySQL & Bind-Address LAN (Untuk Komputer Server Induk)

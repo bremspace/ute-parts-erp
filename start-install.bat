@@ -101,18 +101,21 @@ if not exist "storage\app\public" mkdir "storage\app\public" 2>nul
 if not exist "bootstrap\cache" mkdir "bootstrap\cache" 2>nul
 if not exist "database" mkdir "database" 2>nul
 
-:: 4. Deteksi & Siapkan Composer
+:: 4. Deteksi & Siapkan Composer Secara Global Sistem
 set "COMPOSER_RUN="
 where composer >nul 2>nul
 if not errorlevel 1 (
     set "COMPOSER_RUN=composer"
+    echo [OK] Composer global terdeteksi di system PATH.
 ) else (
+    echo [INFO] Composer belum ada di system PATH. Memeriksa composer lokal / global...
     if not exist "composer.phar" (
         echo [INFO] Mengunduh composer.phar resmi via PowerShell...
         powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri https://getcomposer.org/composer-stable.phar -OutFile composer.phar" 2>nul
     )
     if exist "composer.phar" (
         set COMPOSER_RUN="%PHP_BIN%" composer.phar
+        echo [OK] Composer portable siap digunakan.
     )
 )
 
@@ -131,12 +134,17 @@ if not exist "vendor\autoload.php" (
             %COMPOSER_RUN% install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
         )
         if exist "vendor\autoload.php" (
+            echo [OK] Dependensi vendor berhasil dipasang!
             echo [INFO] Mendaftarkan package Laravel...
             "%PHP_BIN%" artisan package:discover --ansi
+        ) else (
+            echo [GAGAL] Dependensi vendor belum berhasil dilengkapi.
         )
     ) else (
         echo [WARN] Composer belum terpasang. Dependensi dapat dilengkapi via GUI Installer.
     )
+) else (
+    echo [OK] Dependensi vendor aplikasi sudah terpasang.
 )
 
 :: 6. Konfigurasi Port 1741 (Unik & Jarang Dipakai)
