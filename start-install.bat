@@ -1,71 +1,71 @@
 @echo off
-chcp 65001 >nul
-setlocal enabledelayedexpansion
-title ERP ^& POS System - Universal One-Click Launcher (Port 1741)
+setlocal EnableExtensions EnableDelayedExpansion
+chcp 65001 >nul 2>nul
+title ERP & POS System - Universal One-Click Launcher (Port 1741)
 
 echo ======================================================================
-echo    ERP ^& POS System - Universal Local Launcher
-echo    Port Default: 1741 (Akses Lokal ^& Jaringan Wi-Fi/LAN/HP/iOS)
+echo    ERP & POS System - Universal Local Launcher
+echo    Port Default: 1741 (Akses Lokal & Jaringan Wi-Fi/LAN/HP/iOS)
 echo ======================================================================
 echo.
 
 cd /d "%~dp0"
 
-:: 1. Deteksi PHP Binary
-:: Wajib PHP >= 8.4 untuk Laravel 13 & Symfony 8
+:: -----------------------------------------------------------------------------
+:: 1. Deteksi PHP Binary (PHP >= 8.4)
+:: -----------------------------------------------------------------------------
 set "PHP_BIN="
 
-:: Cek tools\php lokal jika sudah ada dan berfungsi
+:: A. Cek tools\php lokal jika sudah siap
 if exist "%~dp0tools\php\php.exe" (
     "%~dp0tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
     if not errorlevel 1 (
         set "PHP_BIN=%~dp0tools\php\php.exe"
-        goto :PHP_READY
+        goto :PHP_CHECK_DONE
     )
 )
 
-:: Cek Laragon PHP 8.5
+:: B. Cek Laragon PHP 8.5
 if exist "C:\laragon\bin\php\php-8.5*" (
     for /d %%D in ("C:\laragon\bin\php\php-8.5*") do (
         if exist "%%~D\php.exe" (
             set "PHP_BIN=%%~D\php.exe"
-            goto :PHP_READY
+            goto :PHP_CHECK_DONE
         )
     )
 )
 
-:: Cek Laragon PHP 8.4
+:: C. Cek Laragon PHP 8.4
 if exist "C:\laragon\bin\php\php-8.4*" (
     for /d %%D in ("C:\laragon\bin\php\php-8.4*") do (
         if exist "%%~D\php.exe" (
             set "PHP_BIN=%%~D\php.exe"
-            goto :PHP_READY
+            goto :PHP_CHECK_DONE
         )
     )
 )
 
-:: Cek PHP di System PATH
+:: D. Cek System PATH
 where php >nul 2>nul
 if not errorlevel 1 (
     php -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
     if not errorlevel 1 (
         set "PHP_BIN=php"
-        goto :PHP_READY
+        goto :PHP_CHECK_DONE
     )
-    echo [WARN] PHP di system PATH versinya kurang dari 8.4. Laravel 13 memerlukan PHP 8.4+.
 )
 
-:: Cek XAMPP PHP
+:: E. Cek XAMPP PHP
 if exist "C:\xampp\php\php.exe" (
     "C:\xampp\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
     if not errorlevel 1 (
         set "PHP_BIN=C:\xampp\php\php.exe"
-        goto :PHP_READY
+        goto :PHP_CHECK_DONE
     )
 )
 
-:: 2. Auto-Install Visual C++ & PHP 8.4 Portable (Zero-Dependency)
-echo [INFO] Menyiapkan PHP 8.4 Portable dan dependensi sistem...
+:: F. Auto-Setup PHP 8.4 Portable jika belum ada di PC
+echo [INFO] Menyiapkan PHP 8.4 Portable dan dependensi runtime Windows...
 if not exist "%~dp0tools" mkdir "%~dp0tools" 2>nul
 
 if exist "%~dp0scripts\setup-windows-php.ps1" (
@@ -76,17 +76,17 @@ if exist "%~dp0tools\php\php.exe" (
     "%~dp0tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
     if not errorlevel 1 (
         set "PHP_BIN=%~dp0tools\php\php.exe"
-        goto :PHP_READY
+        goto :PHP_CHECK_DONE
     ) else (
-        echo [WARN] File php.exe ditemukan namun gagal dieksekusi:
+        echo [WARN] php.exe ditemukan di tools\php namun gagal dieksekusi.
         "%~dp0tools\php\php.exe" -v
     )
 )
 
-:PHP_READY
+:PHP_CHECK_DONE
 if "%PHP_BIN%"=="" (
     echo [ERROR] PHP minimal 8.4 tidak berhasil disiapkan secara otomatis.
-    echo Pastikan komputer terhubung ke internet lalu jalankan kembali file ini.
+    echo Pastikan komputer terhubung ke internet lalu jalankan kembali start-install.bat.
     echo.
     pause
     exit /b 1
@@ -94,7 +94,9 @@ if "%PHP_BIN%"=="" (
 
 echo [OK] PHP terdeteksi: %PHP_BIN%
 
-:: 3. Auto-Fix Direktori Storage, Database & Cache
+:: -----------------------------------------------------------------------------
+:: 2. Auto-Fix Direktori Storage, Database & Cache
+:: -----------------------------------------------------------------------------
 if not exist "storage\framework\cache\data" mkdir "storage\framework\cache\data" 2>nul
 if not exist "storage\framework\sessions" mkdir "storage\framework\sessions" 2>nul
 if not exist "storage\framework\views" mkdir "storage\framework\views" 2>nul
@@ -103,53 +105,68 @@ if not exist "storage\app\public" mkdir "storage\app\public" 2>nul
 if not exist "bootstrap\cache" mkdir "bootstrap\cache" 2>nul
 if not exist "database" mkdir "database" 2>nul
 
-:: 4. Deteksi & Siapkan Composer Secara Global Sistem
-set "COMPOSER_RUN="
+:: -----------------------------------------------------------------------------
+:: 3. Deteksi & Siapkan Composer
+:: -----------------------------------------------------------------------------
+set "COMPOSER_IS_GLOBAL=0"
 where composer >nul 2>nul
 if not errorlevel 1 (
-    set "COMPOSER_RUN=composer"
+    set "COMPOSER_IS_GLOBAL=1"
     echo [OK] Composer global terdeteksi di system PATH.
 ) else (
-    echo [INFO] Composer belum ada di system PATH. Memeriksa composer lokal / global...
+    echo [INFO] Composer belum ada di system PATH. Memeriksa composer.phar...
     if not exist "composer.phar" (
         echo [INFO] Mengunduh composer.phar resmi via PowerShell...
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri https://getcomposer.org/composer-stable.phar -OutFile composer.phar" 2>nul
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('https://getcomposer.org/composer-stable.phar', 'composer.phar')" 2>nul
     )
     if exist "composer.phar" (
-        set COMPOSER_RUN="%PHP_BIN%" composer.phar
-        echo [OK] Composer portable siap digunakan.
+        echo [OK] Composer portable (composer.phar) siap digunakan.
     )
 )
 
-:: 5. Auto-Fix Dependensi Vendor
+:: -----------------------------------------------------------------------------
+:: 4. Auto-Fix Dependensi Vendor
+:: -----------------------------------------------------------------------------
 if not exist "vendor\autoload.php" (
-    if not "%COMPOSER_RUN%"=="" (
-        echo [INFO] Menjalankan composer install untuk melengkapi dependensi vendor...
-        echo [INFO] Catatan Windows: 'Generating optimized autoload files' memindai 11.000+ file kelas.
-        echo [INFO] Normal memakan waktu 1-3 menit karena scanning NTFS ^& antivirus. Mohon tunggu...
-        %COMPOSER_RUN% install --no-interaction --prefer-dist --no-scripts
+    echo [INFO] Menjalankan composer install untuk melengkapi dependensi vendor...
+    echo [INFO] Normal memakan waktu 1-3 menit karena scanning file. Mohon tunggu...
+    
+    if "%COMPOSER_IS_GLOBAL%"=="1" (
+        call composer install --no-interaction --prefer-dist --no-scripts
         if not exist "vendor\autoload.php" (
             echo [WARN] Fallback composer install dengan toleransi platform requirements...
-            %COMPOSER_RUN% install --no-interaction --prefer-dist --no-scripts --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter
+            call composer install --no-interaction --prefer-dist --no-scripts --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter
         )
         if not exist "vendor\autoload.php" (
-            %COMPOSER_RUN% install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
+            call composer install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
         )
-        if exist "vendor\autoload.php" (
-            echo [OK] Dependensi vendor berhasil dipasang!
-            echo [INFO] Mendaftarkan package Laravel...
-            "%PHP_BIN%" artisan package:discover --ansi
-        ) else (
-            echo [GAGAL] Dependensi vendor belum berhasil dilengkapi.
+    ) else if exist "composer.phar" (
+        "%PHP_BIN%" composer.phar install --no-interaction --prefer-dist --no-scripts
+        if not exist "vendor\autoload.php" (
+            echo [WARN] Fallback composer install dengan toleransi platform requirements...
+            "%PHP_BIN%" composer.phar install --no-interaction --prefer-dist --no-scripts --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter
+        )
+        if not exist "vendor\autoload.php" (
+            "%PHP_BIN%" composer.phar install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
         )
     ) else (
-        echo [WARN] Composer belum terpasang. Dependensi dapat dilengkapi via GUI Installer.
+        echo [WARN] Composer belum tersedia. Dependensi dapat dilengkapi via GUI Installer.
+    )
+
+    if exist "vendor\autoload.php" (
+        echo [OK] Dependensi vendor berhasil dipasang.
+        echo [INFO] Mendaftarkan package Laravel...
+        "%PHP_BIN%" artisan package:discover --ansi
+    ) else (
+        echo [INFO] Dependensi vendor dapat dilengkapi nanti melalui Web Installer.
     )
 ) else (
     echo [OK] Dependensi vendor aplikasi sudah terpasang.
 )
 
-:: 6. Konfigurasi Port 1741 (Unik & Jarang Dipakai)
+:: -----------------------------------------------------------------------------
+:: 5. Konfigurasi Port 1741
+:: -----------------------------------------------------------------------------
 set "PORT=1741"
 netstat -ano | findstr /r /c:":%PORT% " >nul 2>nul
 if not errorlevel 1 (
@@ -164,7 +181,9 @@ if not errorlevel 1 (
 )
 :PORT_FOUND
 
-:: 7. Deteksi IP Jaringan Lokal (IPv4 LAN/Wi-Fi)
+:: -----------------------------------------------------------------------------
+:: 6. Deteksi IP Jaringan Lokal (IPv4 LAN/Wi-Fi)
+:: -----------------------------------------------------------------------------
 set "LAN_IP="
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address" /c:"Alamat IPv4"') do (
     if not defined LAN_IP (
@@ -244,7 +263,7 @@ if exist "%~dp0.env" (
 echo [OK] Port aktif: %PORT%
 echo.
 echo ======================================================================
-echo    Server ERP ^& POS Berhasil Dijalankan!
+echo    Server ERP ^& POS Berhasil Dijalankan
 echo    - Dari Komputer Ini       : %LOCAL_URL%
 if not "%NETWORK_URL%"=="" (
 echo    - Dari HP / iPhone / iPad : %NETWORK_URL%
@@ -260,22 +279,28 @@ echo ======================================================================
 echo    Tutup jendela ini jika ingin mematikan server.
 echo.
 
-:: 8. Jalankan Built-in Web Server di Background (Tetap aktif walau CMD ditutup)
+:: -----------------------------------------------------------------------------
+:: 7. Jalankan Built-in Web Server di Background
+:: -----------------------------------------------------------------------------
 echo [INFO] Menyalakan server di background pada port %PORT%...
 wscript.exe "%~dp0scripts\run-server-background.vbs" "%PHP_BIN%" "%PORT%" "%~dp0public"
 timeout /t 1 /nobreak >nul 2>nul
 
-:: 9. Buka Browser Otomatis
+:: -----------------------------------------------------------------------------
+:: 8. Buka Browser Otomatis
+:: -----------------------------------------------------------------------------
 start "" "%LOCAL_URL%"
 
-:: 10. Persiapan AI Stack di Background jika Node.js tersedia (Silent)
+:: -----------------------------------------------------------------------------
+:: 9. Persiapan AI Stack di Background jika Node.js tersedia
+:: -----------------------------------------------------------------------------
 where node >nul 2>nul
 if not errorlevel 1 (
     start "" /b npm install -g 9router codebase-memory-mcp oh-my-opencode --no-fund --no-audit >nul 2>nul
 )
 
 echo ======================================================================
-echo    Server ERP ^& POS Berhasil Aktif di Background!
+echo    Server ERP ^& POS Berhasil Aktif di Background
 echo    - Dari Komputer Ini       : %LOCAL_URL%
 if not "%NETWORK_URL%"=="" (
 echo    - Dari HP / iPhone / iPad : %NETWORK_URL%
@@ -284,9 +309,7 @@ if not "!ONLINE_URL!"=="" (
 echo    - Akses Internet (Online) : !ONLINE_URL!
 )
 echo ----------------------------------------------------------------------
-echo    [INFO] Untuk upgrade ke Full Online dengan domain sendiri, buka:
-echo           Menu Pengaturan ^> Sistem ^> Jaringan ^& Domain Online
-echo    [INFO] Server tetap aktif di background meskipun terminal ini ditutup!
+echo    [INFO] Server tetap aktif di background meskipun terminal ini ditutup.
 echo    [INFO] Untuk menghentikan server, jalankan: stop-server.bat
 echo ======================================================================
 echo.
