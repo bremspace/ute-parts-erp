@@ -1,25 +1,32 @@
 @echo off
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 title ERP & POS System - Stop Server
 
 echo ======================================================================
-echo    ERP & POS System - Penghenti Background Server (Port 1741)
+echo    ERP & POS System - Penghenti Background Server (Port 1741-1760)
 echo ======================================================================
 echo.
 
 set "STOPPED=0"
-for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr :1741 ^| findstr LISTENING') do (
-    taskkill /f /pid %%a >nul 2>nul
-    set "STOPPED=1"
+
+:: 1. Hentikan proses yang mendengarkan di rentang port 1741-1760
+for /l %%P in (1741,1,1760) do (
+    for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr /r /c:":%%P " ^| findstr LISTENING') do (
+        taskkill /f /pid %%a >nul 2>nul
+        set "STOPPED=1"
+        echo [OK] Menghentikan proses server pada port %%P (PID %%a).
+    )
 )
 
-:: Hentikan queue worker jika ada
-wmic process where "name='php.exe' and CommandLine like '%%queue:work%%'" call terminate >nul 2>nul
+:: 2. Hentikan queue worker atau built-in server PHP aplikasi
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" 2>$null | Where-Object { \$_.CommandLine -like '*queue:work*' -or \$_.CommandLine -like '*-S 0.0.0.0:174*' -or \$_.CommandLine -like '*-S 0.0.0.0:175*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Host ('[OK] Menghentikan background PHP worker PID: ' + \$_.ProcessId) }" 2>nul
 
 if "%STOPPED%"=="1" (
+    echo.
     echo [OK] Web Server & Layanan ERP & POS berhasil dihentikan.
 ) else (
-    echo [INFO] Tidak ada server ERP & POS yang sedang berjalan di port 1741.
+    echo [INFO] Tidak ada server ERP & POS yang sedang berjalan di port 1741-1760.
 )
 
 echo.

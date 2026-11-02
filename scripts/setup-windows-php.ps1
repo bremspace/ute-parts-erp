@@ -62,7 +62,10 @@ Write-Host "[2/4] Mengunduh paket resmi PHP 8.4 Windows x64..." -ForegroundColor
 
 $urls = @(
     "https://downloads.php.net/~windows/releases/latest/php-8.4-Win32-vs17-x64-latest.zip",
-    "https://downloads.php.net/~windows/releases/php-8.4.27-1-Win32-vs17-x64.zip"
+    "https://windows.php.net/downloads/releases/latest/php-8.4-Win32-vs17-x64-latest.zip",
+    "https://downloads.php.net/~windows/releases/archives/php-8.4.3-Win32-vs17-x64.zip",
+    "https://downloads.php.net/~windows/releases/archives/php-8.4.2-Win32-vs17-x64.zip",
+    "https://downloads.php.net/~windows/releases/archives/php-8.4.1-Win32-vs17-x64.zip"
 )
 
 function Get-PhpPackage([string]$url, [string]$target) {
@@ -237,8 +240,23 @@ if (Test-Path $iniDev) {
 ;; ==============================================================================
 [ErpPos]
 extension_dir = "$extPathFormatted"
+extension=curl
+extension=fileinfo
+extension=gd
+extension=intl
+extension=mbstring
+extension=mysqli
+extension=openssl
+extension=pdo_mysql
+extension=pdo_sqlite
+extension=sqlite3
+extension=zip
+extension=bcmath
+extension=exif
 memory_limit = 512M
 max_execution_time = 300
+post_max_size = 64M
+upload_max_filesize = 64M
 date.timezone = Asia/Jakarta
 opcache.enable = 1
 opcache.enable_cli = 1
