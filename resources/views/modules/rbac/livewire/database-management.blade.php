@@ -47,128 +47,41 @@
         </div>
     </div>
 
-    @if(auth()->user()?->hasRole('super-admin'))
-    <!-- Card Konfigurasi Koneksi Database (.env) Khusus Super Admin -->
-    <x-prism.glass-card class="p-5" title="Konfigurasi Koneksi Basis Data (.env)" subtitle="Disesuaikan khusus akun Super Admin untuk mengatur engine MySQL atau SQLite lokal">
+    <!-- Card Status Koneksi Basis Data Aktif (Terkunci & Aman) -->
+    <x-prism.glass-card class="p-5" title="Koneksi Basis Data Aktif" subtitle="Status driver, host, dan database yang digunakan oleh sistem">
         <div class="space-y-4">
-            <div>
-                <label class="block text-xs font-semibold text-ink-300 mb-1.5">Pilih Engine Database</label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label class="flex items-start gap-2.5 p-3 rounded-xl border {{ $dbDriver === 'mysql' ? 'border-up-primary/50 bg-up-primary/10 text-white shadow-sm shadow-up-primary/10' : 'border-white/10 bg-white/[0.02] text-ink-300 hover:bg-white/[0.04]' }} cursor-pointer transition">
-                        <input type="radio" wire:model.live="dbDriver" value="mysql" class="mt-0.5 text-up-primary focus:ring-0">
-                        <div>
-                            <div class="font-bold text-xs">MySQL / MariaDB</div>
-                            <div class="text-[11px] text-ink-400 mt-0.5">Rekomendasi multi-kasir, produksi &amp; volume transaksi tinggi</div>
-                        </div>
-                    </label>
-
-                    <label class="flex items-start gap-2.5 p-3 rounded-xl border {{ $dbDriver === 'sqlite' ? 'border-up-primary/50 bg-up-primary/10 text-white shadow-sm shadow-up-primary/10' : 'border-white/10 bg-white/[0.02] text-ink-300 hover:bg-white/[0.04]' }} cursor-pointer transition">
-                        <input type="radio" wire:model.live="dbDriver" value="sqlite" class="mt-0.5 text-up-primary focus:ring-0">
-                        <div>
-                            <div class="font-bold text-xs">SQLite (Zero-Config Standalone)</div>
-                            <div class="text-[11px] text-ink-400 mt-0.5">Instan &amp; praktis untuk perangkat lokal tanpa perlu server MySQL terpisah</div>
-                        </div>
-                    </label>
+            <!-- Grid Status Info -->
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Database Engine</span>
+                    <div class="font-mono font-bold text-white uppercase">{{ $dbDriver }}</div>
+                </div>
+                <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Host &amp; Port</span>
+                    <div class="font-mono font-bold text-white truncate">{{ $dbDriver === 'sqlite' ? 'Lokal File' : $dbHost.':'.$dbPort }}</div>
+                </div>
+                <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Nama Database</span>
+                    <div class="font-mono font-bold text-up-mint truncate">{{ $dbDatabase }}</div>
+                </div>
+                <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Status Koneksi</span>
+                    <div class="flex items-center gap-1.5 font-bold {{ ($health['status'] ?? '') === 'healthy' ? 'text-up-mint' : 'text-up-red' }}">
+                        <span class="w-2 h-2 rounded-full {{ ($health['status'] ?? '') === 'healthy' ? 'bg-up-mint' : 'bg-up-red' }}"></span>
+                        {{ ($health['status'] ?? '') === 'healthy' ? 'Terhubung Normal' : 'Ada Masalah' }}
+                    </div>
                 </div>
             </div>
 
-            @if($dbDriver === 'sqlite')
-                <div>
-                    <label class="block text-xs font-semibold text-ink-300 mb-1">Path Berkas Database SQLite</label>
-                    <input type="text" wire:model="dbSqlitePath" class="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white font-mono focus:border-up-primary focus:ring-0">
-                    <span class="text-[11px] text-ink-400">Path relatif terhadap root aplikasi (contoh: database/database.sqlite). Berkas akan dibuat otomatis jika belum ada.</span>
+            <!-- Security Notice -->
+            <div class="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/20 flex items-start gap-3">
+                <span class="text-lg">🔒</span>
+                <div class="text-[11px] text-ink-400 leading-relaxed">
+                    <span class="font-bold text-slate-200">Kredensial Terkunci (Security Hardened):</span> Pengaturan username dan password database hanya dilakukan saat instalasi awal (<code class="text-indigo-400 font-mono">public/install.php</code>). Untuk mengubah koneksi database, ubah langsung berkas <code class="text-indigo-400 font-mono">.env</code> pada direktori server guna mencegah pencurian kredensial melalui browser.
                 </div>
-            @else
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                        <label class="block font-semibold text-ink-300 mb-1">Database Host</label>
-                        <input type="text" wire:model="dbHost" class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white font-mono focus:border-up-primary focus:ring-0">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-ink-300 mb-1">Port</label>
-                        <input type="text" wire:model="dbPort" class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white font-mono focus:border-up-primary focus:ring-0">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-ink-300 mb-1">Nama Database</label>
-                        <input type="text" wire:model="dbDatabase" class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white font-mono focus:border-up-primary focus:ring-0">
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-ink-300 mb-1">Username MySQL</label>
-                        <input type="text" wire:model="dbUsername" class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white font-mono focus:border-up-primary focus:ring-0">
-                    </div>
-                    <div class="sm:col-span-2">
-                        <label class="block font-semibold text-ink-300 mb-1">Password MySQL</label>
-                        <input type="password" wire:model="dbPassword" placeholder="Kosongkan jika tanpa password" class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white font-mono focus:border-up-primary focus:ring-0">
-                    </div>
-                </div>
-
-                <!-- Auto-Scan Server di Jaringan LAN -->
-                <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
-                    <div class="flex items-center justify-between flex-wrap gap-2">
-                        <div>
-                            <span class="text-xs font-bold text-white flex items-center gap-1.5">
-                                <span>🔍</span> Auto-Scan Server MySQL di Jaringan LAN
-                            </span>
-                            <p class="text-[11px] text-ink-400 mt-0.5">
-                                Cari komputer server induk di Wi-Fi / kabel LAN yang sama secara otomatis tanpa perlu cek IP manual.
-                            </p>
-                        </div>
-                        <button type="button" wire:click="scanLanDatabase" wire:loading.attr="disabled"
-                            class="px-3.5 py-1.5 rounded-xl bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
-                            <span wire:loading.remove wire:target="scanLanDatabase">Pindai LAN Sekarang</span>
-                            <span wire:loading wire:target="scanLanDatabase">Memindai Subnet...</span>
-                        </button>
-                    </div>
-
-                    @if(!empty($discoveredLanServers))
-                        <div class="space-y-1.5 pt-1">
-                            <div class="text-[11px] font-semibold text-ink-300">Server yang Terdeteksi di LAN:</div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                @foreach($discoveredLanServers as $srv)
-                                    <div class="p-2.5 rounded-xl bg-black/40 border border-white/10 flex items-center justify-between gap-2">
-                                        <div class="min-w-0">
-                                            <div class="font-mono text-xs font-bold text-up-mint">{{ $srv['ip'] }}:{{ $srv['port'] }}</div>
-                                            <div class="text-[10px] text-ink-400 truncate">{{ $srv['type'] }}</div>
-                                        </div>
-                                        <button type="button" wire:click="selectLanServer('{{ $srv['ip'] }}', {{ $srv['port'] }})"
-                                            class="px-2.5 py-1 rounded-lg bg-up-mint/20 hover:bg-up-mint/30 text-up-mint border border-up-mint/30 text-[11px] font-bold transition shrink-0 cursor-pointer">
-                                            Gunakan Ini
-                                        </button>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-                </div>
-            @endif
-
-            @if($dbTestMessage)
-                <div class="p-3 rounded-xl text-xs font-mono {{ $dbTestStatus === 'success' ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : 'bg-up-red/15 text-up-red border border-up-red/30' }}">
-                    {{ $dbTestMessage }}
-                </div>
-            @endif
-
-            <div class="flex items-center justify-between pt-2 border-t border-white/5">
-                <button type="button" wire:click="testDbConnection" wire:loading.attr="disabled"
-                    class="px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-bold text-ink-200 transition flex items-center gap-1.5 cursor-pointer">
-                    <span>⚡</span>
-                    <span wire:loading.remove wire:target="testDbConnection">Uji Coba Koneksi Database</span>
-                    <span wire:loading wire:target="testDbConnection">Menguji Koneksi...</span>
-                </button>
-
-                <button type="button" wire:click="saveDatabaseConfig" wire:loading.attr="disabled"
-                    wire:confirm="Simpan setelan koneksi ini ke berkas .env? Konfigurasi database akan langsung diperbarui."
-                    class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-bold shadow-md transition flex items-center gap-1.5 cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
-                    </svg>
-                    <span wire:loading.remove wire:target="saveDatabaseConfig">Simpan ke .env</span>
-                    <span wire:loading wire:target="saveDatabaseConfig">Menyimpan...</span>
-                </button>
             </div>
         </div>
     </x-prism.glass-card>
-    @endif
 
     <!-- Quick Action: Backup Sekarang & Upload Restore -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">

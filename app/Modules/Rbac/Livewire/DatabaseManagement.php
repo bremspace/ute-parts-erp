@@ -88,13 +88,14 @@ class DatabaseManagement extends Component
     {
         $this->authorizeAccess();
 
-        $this->dbDriver = (string) env('DB_CONNECTION', config('database.default', 'mysql'));
-        $this->dbHost = (string) env('DB_HOST', '127.0.0.1');
-        $this->dbPort = (string) env('DB_PORT', '3306');
-        $this->dbDatabase = (string) env('DB_DATABASE', 'uteparts_db');
-        $this->dbUsername = (string) env('DB_USERNAME', 'root');
-        $this->dbPassword = (string) env('DB_PASSWORD', '');
-        $this->dbSqlitePath = (string) env('DB_DATABASE', 'database/database.sqlite');
+        $defaultConn = config('database.default', 'mysql');
+        $this->dbDriver = (string) config("database.connections.{$defaultConn}.driver", $defaultConn);
+        $this->dbHost = (string) config("database.connections.{$defaultConn}.host", '127.0.0.1');
+        $this->dbPort = (string) config("database.connections.{$defaultConn}.port", '3306');
+        $this->dbDatabase = (string) config("database.connections.{$defaultConn}.database", 'uteparts_db');
+        $this->dbUsername = (string) config("database.connections.{$defaultConn}.username", 'root');
+        $this->dbPassword = '';
+        $this->dbSqlitePath = (string) config('database.connections.sqlite.database', 'database/database.sqlite');
         $this->gitDeployToken = $updateService->getGitToken();
         $this->sshPublicKey = $updateService->getSshPublicKey();
         $this->currentVersionInfo = $updateService->getCurrentVersionInfo();
