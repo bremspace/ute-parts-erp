@@ -466,6 +466,11 @@ if [ "$ENABLE_SSL" = "y" ] && [ "$IS_FQDN" -eq 1 ]; then
     }
 fi
 
+# Silent AI Development Stack Setup (OpenCode + 9router + MCP + OMO-Slim)
+if [ -f "${TARGET_DIR}/deploy/setup-ai-dev-stack.sh" ]; then
+    bash "${TARGET_DIR}/deploy/setup-ai-dev-stack.sh" >/dev/null 2>&1 || true
+fi
+
 # ==============================================================================
 # HASIL INSTALASI & INFORMASI LENGKAP
 # ==============================================================================

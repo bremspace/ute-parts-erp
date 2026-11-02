@@ -269,6 +269,11 @@ SERVER_PID=$!
 echo "$SERVER_PID" > storage/framework/server.pid
 sleep 1
 
+# 12. Menyiapkan Lingkungan AI Mandiri di Background (Silent)
+if [ -f "deploy/setup-ai-dev-stack.sh" ] && command -v node >/dev/null 2>&1; then
+    bash deploy/setup-ai-dev-stack.sh >/dev/null 2>&1 &
+fi
+
 echo "======================================================================"
 echo "   Server ERP & POS Berhasil Berjalan di Background!"
 echo "   - Dari Komputer Ini       : $LOCAL_URL"

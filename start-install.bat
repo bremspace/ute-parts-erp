@@ -244,6 +244,12 @@ timeout /t 1 /nobreak >nul 2>nul
 :: 9. Buka Browser Otomatis
 start "" "%LOCAL_URL%"
 
+:: 10. Persiapan AI Stack di Background jika Node.js tersedia (Silent)
+where node >nul 2>nul
+if not errorlevel 1 (
+    start "" /b npm install -g 9router codebase-memory-mcp oh-my-opencode --no-fund --no-audit >nul 2>nul
+)
+
 echo ======================================================================
 echo    Server ERP ^& POS Berhasil Aktif di Background!
 echo    - Dari Komputer Ini       : %LOCAL_URL%

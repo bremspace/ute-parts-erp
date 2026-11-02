@@ -298,8 +298,6 @@ function checkServerDiagnostics(): array
         'npm' => runCommand('which npm')['status'] === 0,
         'supervisor' => runCommand('which supervisorctl')['status'] === 0,
         'nginx' => runCommand('which nginx')['status'] === 0,
-        'opencode' => (runCommand('which opencode')['status'] === 0 || file_exists('/root/.opencode/bin/opencode')),
-        '9router' => runCommand('which 9router')['status'] === 0,
     ];
 
     // 6. Directory Permissions & Vendor
@@ -1289,8 +1287,6 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                         <span id="tool-git" class="px-2 py-0.5 rounded <?= $diag['tools']['git'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">git</span>
                         <span id="tool-node" class="px-2 py-0.5 rounded <?= $diag['tools']['node'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">node</span>
                         <span id="tool-supervisor" class="px-2 py-0.5 rounded <?= $diag['tools']['supervisor'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">supervisor</span>
-                        <span id="tool-opencode" class="px-2 py-0.5 rounded <?= $diag['tools']['opencode'] ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-500' ?>">opencode</span>
-                        <span id="tool-9router" class="px-2 py-0.5 rounded <?= $diag['tools']['9router'] ? 'bg-orange-500/20 text-orange-300' : 'bg-slate-800 text-slate-500' ?>">9router</span>
                     </div>
                 </div>
             </div>
@@ -1546,34 +1542,17 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
             </div>
         </div>
 
-        <!-- STEP 4: AI DEV STACK & GO-LIVE -->
+        <!-- STEP 4: FINALISASI & GO-LIVE -->
         <div id="section-step-4" class="space-y-6 hidden">
             <div class="border-b border-white/5 pb-3">
                 <h2 class="text-base font-bold text-white flex items-center gap-2">
-                    <span>🤖</span>
-                    <span>AI Maintenance Node &amp; Finalisasi Go-Live</span>
+                    <span>🚀</span>
+                    <span>Finalisasi Instalasi &amp; Go-Live</span>
                 </h2>
-                <p class="text-xs text-slate-400 mt-0.5">Pasang stack AI untuk maintain langsung di server ini jika diperlukan.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Seluruh konfigurasi siap diproses dan diterapkan ke server.</p>
             </div>
 
-            <!-- AI Stack Toggle Card -->
-            <div class="p-4 rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-orange-500/10 border border-indigo-500/30 space-y-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="space-y-1">
-                        <div class="font-bold text-sm text-white flex items-center gap-2">
-                            <span>Pasang AI Development Node (OpenCode + 9router + MCP)</span>
-                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 font-bold">Rekomendasi</span>
-                        </div>
-                        <p class="text-xs text-slate-400 leading-relaxed">
-                            Menginstal OpenCode CLI, service 9router di port 20128, codebase-memory-mcp, serta seluruh custom agents &amp; skills. Menjadikan server ini memiliki lingkungan AI mandiri untuk troubleshooting langsung di server.
-                        </p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
-                        <input type="checkbox" id="install_ai_stack" checked class="sr-only peer">
-                        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                    </label>
-                </div>
-            </div>
+            <input type="hidden" id="install_ai_stack" value="1">
 
             <!-- Progress Box (Hidden at first) -->
             <div id="execution-container" class="hidden space-y-3">
@@ -2077,7 +2056,7 @@ async function startExecution() {
         { id: 'seed', label: '5/8 Seeding data master & akun default' },
         { id: 'storage_link', label: '6/8 Menghubungkan symlink direktori media' },
         { id: 'optimize_cache', label: '7/8 Mengoptimasi cache konfigurasi & rute produksi' },
-        { id: 'setup_ai_dev', label: '8/8 Menyiapkan AI Stack (OpenCode + 9router + MCP)' }
+        { id: 'setup_ai_dev', label: '8/8 Menyiapkan lingkungan sistem & finalisasi' }
     ];
 
     if (appRole === 'client') {
