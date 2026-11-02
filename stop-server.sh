@@ -12,15 +12,31 @@ echo ""
 
 STOPPED=0
 
+# Hentikan Web Server
 if [ -f "$PID_FILE" ]; then
     PID=$(cat "$PID_FILE" 2>/dev/null || true)
     if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
         kill "$PID" 2>/dev/null || true
-        echo "✔ [OK] Server (PID: $PID) berhasil dihentikan."
+        echo "✔ [OK] Web Server (PID: $PID) berhasil dihentikan."
         STOPPED=1
     fi
     rm -f "$PID_FILE"
 fi
+
+# Hentikan Background Queue Worker
+QUEUE_PID_FILE="storage/framework/queue.pid"
+if [ -f "$QUEUE_PID_FILE" ]; then
+    QPID=$(cat "$QUEUE_PID_FILE" 2>/dev/null || true)
+    if [ -n "$QPID" ] && kill -0 "$QPID" 2>/dev/null; then
+        kill "$QPID" 2>/dev/null || true
+        echo "✔ [OK] Queue Worker (PID: $QPID) berhasil dihentikan."
+        STOPPED=1
+    fi
+    rm -f "$QUEUE_PID_FILE"
+fi
+
+# Pastikan proses queue:work lain dihentikan
+pkill -f "artisan queue:work" 2>/dev/null || true
 
 if command -v fuser >/dev/null 2>&1; then
     if fuser "${PORT}/tcp" >/dev/null 2>&1; then

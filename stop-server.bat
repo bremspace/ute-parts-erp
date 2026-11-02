@@ -13,10 +13,13 @@ for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr :1741 ^| findstr LISTE
     set "STOPPED=1"
 )
 
+:: Hentikan queue worker jika ada
+wmic process where "name='php.exe' and CommandLine like '%%queue:work%%'" call terminate >nul 2>nul
+
 if "%STOPPED%"=="1" (
-    echo [OK] Server ERP & POS di port 1741 berhasil dihentikan.
+    echo [OK] Web Server & Layanan ERP & POS berhasil dihentikan.
 ) else (
-    echo [INFO] Tidak ada proses server ERP & POS yang sedang berjalan di port 1741.
+    echo [INFO] Tidak ada server ERP & POS yang sedang berjalan di port 1741.
 )
 
 echo.
