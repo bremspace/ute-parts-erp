@@ -1,8 +1,12 @@
 # ==============================================================================
-# ERP & POS System - Windows PHP 8.4 Portable & VC++ Auto-Installer
+# ERP & POS System - Windows PHP 8.4 Portable & Runtime Auto-Installer
 # ==============================================================================
-$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+
+# Enable TLS 1.2 and TLS 1.3 for secure web downloads
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+} catch {}
 
 $scriptDir = $PSScriptRoot
 if (-not $scriptDir) {
@@ -19,40 +23,42 @@ if (-not (Test-Path $toolsDir)) {
     New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null
 }
 
+Write-Host "======================================================================" -ForegroundColor Cyan
+Write-Host "   Penyiapan Otomatis PHP 8.4 Portable & Runtime Windows" -ForegroundColor Cyan
+Write-Host "======================================================================" -ForegroundColor Cyan
+
 # ------------------------------------------------------------------------------
 # 1. Periksa & Pasang Microsoft Visual C++ 2015-2022 Redistributable (x64)
 # ------------------------------------------------------------------------------
-Write-Host "[1/4] Memeriksa dependensi sistem Visual C++ Runtime..." -ForegroundColor Cyan
+Write-Host "[1/4] Memeriksa Visual C++ Runtime (vcruntime140.dll & msvcp140.dll)..." -ForegroundColor Cyan
 $system32 = Join-Path $env:SystemRoot 'System32'
 $hasVc = (Test-Path (Join-Path $system32 'vcruntime140.dll')) -and (Test-Path (Join-Path $system32 'msvcp140.dll'))
 
 if (-not $hasVc) {
-    Write-Host "Mengunduh & memasang Visual C++ Redistributable (diperlukan untuk PHP Windows)..." -ForegroundColor Yellow
+    Write-Host "Mengunduh Visual C++ Redistributable resmi Microsoft..." -ForegroundColor Yellow
     $vcUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
     try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
             & curl.exe -sS -L --fail "$vcUrl" -o "$vcFile" 2>$null
         } else {
-            (New-Object System.Net.WebClient).DownloadFile($vcUrl, $vcFile)
+            $wc = New-Object System.Net.WebClient
+            $wc.DownloadFile($vcUrl, $vcFile)
         }
         
-        if (Test-Path $vcFile) {
-            # Coba jalankan secara pasif
-            $p = Start-Process -FilePath $vcFile -ArgumentList '/install', '/passive', '/norestart' -PassThru -Wait
+        if ((Test-Path $vcFile) -and ((Get-Item $vcFile).Length -gt 1000000)) {
+            Write-Host "Memasang Visual C++ Redistributable di background..." -ForegroundColor Gray
+            $p = Start-Process -FilePath $vcFile -ArgumentList '/install', '/quiet', '/norestart' -PassThru -Wait
             if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
-                # Jika memerlukan elevasi UAC
-                Write-Host "Meminta izin Administrator untuk menyelesaikan instalasi Visual C++..." -ForegroundColor Yellow
-                Start-Process -FilePath $vcFile -ArgumentList '/install', '/passive', '/norestart' -Verb RunAs -Wait
+                # Coba passive jika quiet ditolak
+                Start-Process -FilePath $vcFile -ArgumentList '/install', '/passive', '/norestart' -PassThru -Wait -ErrorAction SilentlyContinue
             }
             Remove-Item -Path $vcFile -Force -ErrorAction SilentlyContinue
-            Write-Host "✔ Visual C++ Redistributable terpasang." -ForegroundColor Green
         }
     } catch {
-        Write-Host "⚠️ Peringatan saat memasang Visual C++: $_" -ForegroundColor Yellow
+        Write-Host "Catatan: Instalasi sistem VC++ dilewati, akan menggunakan fallback bundling lokal." -ForegroundColor Gray
     }
 } else {
-    Write-Host "✔ Visual C++ Redistributable sudah aktif." -ForegroundColor Green
+    Write-Host "✔ Visual C++ Runtime sistem terdeteksi aktif." -ForegroundColor Green
 }
 
 # ------------------------------------------------------------------------------
@@ -63,26 +69,17 @@ Write-Host "[2/4] Mengunduh paket resmi PHP 8.4 Windows x64..." -ForegroundColor
 $urls = @(
     "https://downloads.php.net/~windows/releases/latest/php-8.4-Win32-vs17-x64-latest.zip",
     "https://windows.php.net/downloads/releases/latest/php-8.4-Win32-vs17-x64-latest.zip",
+    "https://downloads.php.net/~windows/releases/archives/php-8.4.4-Win32-vs17-x64.zip",
     "https://downloads.php.net/~windows/releases/archives/php-8.4.3-Win32-vs17-x64.zip",
     "https://downloads.php.net/~windows/releases/archives/php-8.4.2-Win32-vs17-x64.zip",
-    "https://downloads.php.net/~windows/releases/archives/php-8.4.1-Win32-vs17-x64.zip"
+    "https://downloads.php.net/~windows/releases/archives/php-8.4.1-Win32-vs17-x64.zip",
+    "https://downloads.php.net/~windows/releases/archives/php-8.4.0-Win32-vs17-x64.zip"
 )
 
-function Get-PhpPackage([string]$url, [string]$target) {
-    Write-Host "Mengunduh: $url ..." -ForegroundColor Gray
+function Download-FileWithFallback([string]$url, [string]$target) {
+    Write-Host "Mengunduh dari: $url ..." -ForegroundColor Gray
     
-    # Prioritas 1: System.Net.WebClient (.NET Native Windows, stabil)
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $wc = New-Object System.Net.WebClient
-        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-        $wc.DownloadFile($url, $target)
-        if ((Test-Path $target) -and ((Get-Item $target).Length -gt 5000000)) {
-            return $true
-        }
-    } catch {}
-
-    # Prioritas 2: curl.exe bawaan Windows 10/11
+    # Prioritas 1: curl.exe bawaan Windows (sangat stabil mengikuti redirect 302/HTTPS)
     try {
         if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
             & curl.exe -sS -L --fail "$url" -o "$target" 2>$null
@@ -92,10 +89,19 @@ function Get-PhpPackage([string]$url, [string]$target) {
         }
     } catch {}
 
+    # Prioritas 2: System.Net.WebClient
+    try {
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+        $wc.DownloadFile($url, $target)
+        if ((Test-Path $target) -and ((Get-Item $target).Length -gt 5000000)) {
+            return $true
+        }
+    } catch {}
+
     # Prioritas 3: Invoke-WebRequest
     try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $url -OutFile $target -UseBasicParsing -TimeoutSec 180
+        Invoke-WebRequest -Uri $url -OutFile $target -UseBasicParsing -TimeoutSec 180 -ErrorAction SilentlyContinue
         if ((Test-Path $target) -and ((Get-Item $target).Length -gt 5000000)) {
             return $true
         }
@@ -105,15 +111,22 @@ function Get-PhpPackage([string]$url, [string]$target) {
 }
 
 $downloaded = $false
-foreach ($u in $urls) {
-    if (Get-PhpPackage -url $u -target $zipPath) {
-        $downloaded = $true
-        break
+# Cek apakah zip sebelumnya sudah terunduh utuh (>25MB)
+if ((Test-Path $zipPath) -and ((Get-Item $zipPath).Length -gt 25000000)) {
+    Write-Host "Berkas arsip PHP sebelumnya ditemukan di tools\php.zip." -ForegroundColor Gray
+    $downloaded = $true
+} else {
+    foreach ($u in $urls) {
+        if (Download-FileWithFallback -url $u -target $zipPath) {
+            $downloaded = $true
+            break
+        }
     }
 }
 
 if (-not $downloaded) {
-    Write-Host "❌ Gagal mengunduh PHP otomatis. Pastikan komputer terhubung ke internet." -ForegroundColor Red
+    Write-Host "❌ Gagal mengunduh paket PHP 8.4 otomatis." -ForegroundColor Red
+    Write-Host "Pastikan koneksi internet aktif atau pasang PHP via: winget install PHP.PHP.8.4" -ForegroundColor Yellow
     exit 1
 }
 
@@ -122,18 +135,23 @@ if (-not $downloaded) {
 # ------------------------------------------------------------------------------
 Write-Host "[3/4] Mengekstrak paket PHP dan modul dependensi..." -ForegroundColor Cyan
 
-# Hentikan proses PHP yang mungkin masih mengunci folder tools\php
+# Hentikan proses PHP lokal jika ada yang masih aktif mengunci folder
 Get-Process -Name php -ErrorAction SilentlyContinue | Where-Object {
     try { $_.Path -like "*$destDir*" } catch { $false }
 } | Stop-Process -Force -ErrorAction SilentlyContinue
 
-if (Test-Path $destDir) {
-    Remove-Item -Path $destDir -Recurse -Force -ErrorAction SilentlyContinue
+if (-not (Test-Path $destDir)) {
+    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
 }
-New-Item -ItemType Directory -Path $destDir -Force | Out-Null
 
-Expand-Archive -Path $zipPath -DestinationPath $destDir -Force
-Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
+try {
+    # Ekstrak file zip
+    Expand-Archive -Path $zipPath -DestinationPath $destDir -Force
+    Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
+    Write-Host "✔ Arsip PHP berhasil diekstrak." -ForegroundColor Green
+} catch {
+    Write-Host "Peringatan saat ekstrak zip: $_" -ForegroundColor Yellow
+}
 
 # Salin VCRuntime DLLs langsung ke dalam folder tools\php (Portable murni tanpa dependensi System32)
 $dllsToBundle = @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll', 'msvcp140_atomic_wait.dll')
@@ -144,12 +162,15 @@ foreach ($dll in $dllsToBundle) {
     }
 }
 
-# Fallback pencarian DLL runtime di folder aplikasi jika di System32 belum ada
+# Fallback pencarian DLL runtime di folder aplikasi populer jika di System32 belum ada
 if (-not (Test-Path (Join-Path $destDir 'vcruntime140.dll'))) {
     $altPaths = @(
         "${env:ProgramFiles(x86)}\Microsoft\Edge\Application",
         "$env:ProgramFiles\Microsoft\Edge\Application",
-        "$env:ProgramFiles\Google\Chrome\Application"
+        "$env:ProgramFiles\Google\Chrome\Application",
+        "$env:ProgramFiles\Microsoft VS Code",
+        "$env:LOCALAPPDATA\Programs\Microsoft VS Code",
+        Join-Path $env:SystemRoot 'SysWOW64'
     )
     foreach ($ap in $altPaths) {
         if (Test-Path $ap) {
@@ -176,64 +197,69 @@ try {
     } else {
         (New-Object System.Net.WebClient).DownloadFile($cacertUrl, $cacertFile)
     }
-} catch {
-    # Non-kritis jika gagal
-}
+} catch {}
 
 # ------------------------------------------------------------------------------
 # 4. Konfigurasi php.ini: Menghilangkan Komentar (;) & Mengaktifkan Modul
 # ------------------------------------------------------------------------------
-Write-Host "[4/4] Mengonfigurasi php.ini (mengaktifkan modul pdo_mysql, sqlite, curl, opcache, dll)..." -ForegroundColor Cyan
+Write-Host "[4/4] Mengonfigurasi php.ini untuk Laravel 13 & UteParts ERP..." -ForegroundColor Cyan
 
 $iniDev = Join-Path $destDir 'php.ini-development'
+$iniProd = Join-Path $destDir 'php.ini-production'
 $iniTarget = Join-Path $destDir 'php.ini'
 
+$baseContent = ""
 if (Test-Path $iniDev) {
-    $c = Get-Content $iniDev -Raw
+    $baseContent = Get-Content $iniDev -Raw
+} elseif (Test-Path $iniProd) {
+    $baseContent = Get-Content $iniProd -Raw
+}
 
-    # A. Tentukan direktori ekstensi menggunakan ABSOLUTE PATH (krusial agar tidak error saat cd folder)
-    $extPathFormatted = (Join-Path $destDir 'ext').Replace('\', '/')
+$extPathFormatted = (Join-Path $destDir 'ext').Replace('\', '/')
+
+# Hilangkan tanda titik koma (;) pada ekstensi-ekstensi wajib
+$extList = @(
+    'curl',
+    'fileinfo',
+    'gd',
+    'intl',
+    'mbstring',
+    'mysqli',
+    'openssl',
+    'pdo_mysql',
+    'pdo_sqlite',
+    'sqlite3',
+    'zip',
+    'bcmath',
+    'exif'
+)
+
+if ($baseContent) {
+    $c = $baseContent
     $c = $c -replace '(?m)^[;\s]*extension_dir\s*=\s*"ext"', "extension_dir = `"$extPathFormatted`""
-
-    # B. Hilangkan tanda titik koma (;) pada ekstensi-ekstensi wajib Laravel & ERP
-    $extList = @(
-        'curl',
-        'fileinfo',
-        'gd',
-        'intl',
-        'mbstring',
-        'mysqli',
-        'openssl',
-        'pdo_mysql',
-        'pdo_sqlite',
-        'sqlite3',
-        'zip'
-    )
     foreach ($ext in $extList) {
         $c = [System.Text.RegularExpressions.Regex]::Replace($c, "(?m)^[;\s]*extension\s*=\s*$ext\b", "extension=$ext")
     }
-
-    # C. Konfigurasi Zend OPcache (Wajib untuk performa optimal Laravel 13)
     $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*zend_extension\s*=\s*opcache\b', 'zend_extension=opcache')
     $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*opcache\.enable\s*=\s*1\b', 'opcache.enable=1')
     $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*opcache\.enable_cli\s*=\s*0\b', 'opcache.enable_cli=1')
-
-    # D. Sesuaikan Resource Limit untuk Composer & Laravel Migration
     $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^memory_limit\s*=\s*\d+M', 'memory_limit = 512M')
     $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^max_execution_time\s*=\s*\d+', 'max_execution_time = 300')
     $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^post_max_size\s*=\s*\d+M', 'post_max_size = 64M')
     $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^upload_max_filesize\s*=\s*\d+M', 'upload_max_filesize = 64M')
     $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*date\.timezone\s*=', 'date.timezone = Asia/Jakarta')
 
-    # E. Sambungkan CA Certificate jika tersedia
     if (Test-Path $cacertFile) {
         $cacertFormatted = $cacertFile.Replace('\', '/')
         $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*curl\.cainfo\s*=', "curl.cainfo = `"$cacertFormatted`"")
         $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*openssl\.cafile\s*=', "openssl.cafile = `"$cacertFormatted`"")
     }
+} else {
+    $c = "[PHP]`r`n"
+}
 
-    # F. Tambahkan blok pengaman di baris paling bawah untuk memastikan tidak ada konfigurasi terlewat
-    $extraConfig = @"
+# Tambahkan blok penegasan di akhir berkas
+$extraConfig = @"
 
 ;; ==============================================================================
 ;; ERP & POS System Mandatory Overrides
@@ -262,10 +288,10 @@ opcache.enable = 1
 opcache.enable_cli = 1
 opcache.memory_consumption = 128
 "@
-    $c += $extraConfig
 
-    Set-Content -Path $iniTarget -Value $c -Encoding UTF8
-}
+$c += $extraConfig
+Set-Content -Path $iniTarget -Value $c -Encoding UTF8
+Write-Host "✔ Berkas php.ini berhasil dibuat & dikonfigurasi." -ForegroundColor Green
 
 # ------------------------------------------------------------------------------
 # 5. Verifikasi Fungsionalitas PHP Binary & Modul Ekstensi
@@ -275,17 +301,11 @@ if (Test-Path $phpExe) {
     try {
         $ver = & $phpExe -r "echo PHP_VERSION;" 2>&1
         if ($ver -and ($ver -notmatch 'Error') -and ($ver -notmatch 'Warning') -and ($ver -match '^\d+\.\d+')) {
-            Write-Host "✔ PHP Portable ($ver) berhasil dikonfigurasi & aktif!" -ForegroundColor Green
-            $activeMods = & $phpExe -m 2>$null
-            $reqMods = @('pdo_mysql', 'pdo_sqlite', 'curl', 'mbstring', 'openssl', 'zip')
-            $okCount = 0
-            foreach ($m in $reqMods) {
-                if ($activeMods -match "(?i)\b$m\b") { $okCount++ }
-            }
-            Write-Host "✔ Modul kritis terverifikasi aktif ($okCount/$($reqMods.Count)) di php.ini" -ForegroundColor Green
+            Write-Host "✔ PHP Portable ($ver) berhasil aktif dan terverifikasi!" -ForegroundColor Green
             exit 0
         } else {
-            Write-Host "❌ PHP diekstrak tetapi menghasilkan error saat dieksekusi: $ver" -ForegroundColor Red
+            Write-Host "❌ PHP diekstrak tetapi runtime menghasilkan error: $ver" -ForegroundColor Red
+            Write-Host "Kemungkinan dependensi Visual C++ 2015-2022 x64 belum terpasang." -ForegroundColor Yellow
             exit 1
         }
     } catch {

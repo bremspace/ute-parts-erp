@@ -2,7 +2,9 @@
 ' ERP & POS System - Background Server Runner (No Console Window)
 ' Berjalan di background Windows secara independen tanpa jendela CMD
 ' ==============================================================================
-Dim objShell, objFSO, phpBin, port, docRoot, logFile, cmd
+Option Explicit
+Dim objShell, objFSO, phpBin, port, docRoot, logFile, cmd, baseDir, logsDir
+
 If WScript.Arguments.Count < 3 Then
     WScript.Quit 1
 End If
@@ -12,7 +14,6 @@ port = WScript.Arguments(1)
 docRoot = WScript.Arguments(2)
 
 Set objFSO = CreateObject("Scripting.FileSystemObject")
-Dim baseDir
 baseDir = objFSO.GetParentFolderName(docRoot)
 
 If WScript.Arguments.Count >= 4 Then
@@ -21,8 +22,6 @@ Else
     logFile = baseDir & "\storage\logs\server.log"
 End If
 
-' Pastikan direktori log tersedia
-Dim logsDir
 logsDir = baseDir & "\storage\logs"
 If Not objFSO.FolderExists(logsDir) Then
     On Error Resume Next
@@ -34,6 +33,7 @@ If Not objFSO.FolderExists(logsDir) Then
 End If
 
 Set objShell = CreateObject("WScript.Shell")
-cmd = "%comspec% /c """"" & phpBin & """ -S 0.0.0.0:" & port & " -t """ & docRoot & """ >> """ & logFile & """ 2>&1"""
+' Gunakan format cmd.exe /c standar dengan tanda kutip aman
+cmd = "%comspec% /c """ & phpBin & " -S 0.0.0.0:" & port & " -t """ & docRoot & """ >> """ & logFile & """ 2>&1"""
 ' 0 = Hidden window, False = Async/non-blocking
 objShell.Run cmd, 0, False
