@@ -14,7 +14,7 @@ namespace Scripts\License;
  */
 final class HardwareIdentifier
 {
-    private const SALT = 'UTEPARTS_HWID_V1_2026';
+    private const SALT = 'BREMSPACE_HWID_V1_2026';
 
     /**
      * Dapatkan Hardware Fingerprint unik terenkripsi (Hash SHA-256)
@@ -28,7 +28,7 @@ final class HardwareIdentifier
 
     /**
      * Format Machine Challenge Code yang ramah pengguna untuk dikirim via WhatsApp
-     * Format: UTE-XXXX-YYYY-ZZZZ (12 karakter alfanumerik)
+     * Format: BREM-XXXX-YYYY-ZZZZ (12 karakter alfanumerik)
      */
     public static function getChallengeCode(): string
     {
@@ -37,7 +37,7 @@ final class HardwareIdentifier
         $p2 = substr($hash, 4, 4);
         $p3 = substr($hash, 8, 4);
 
-        return "UTE-{$p1}-{$p2}-{$p3}";
+        return "BREM-{$p1}-{$p2}-{$p3}";
     }
 
     /**

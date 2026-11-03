@@ -1,7 +1,7 @@
 ======================================================================
-     PANDUAN LENGKAP INSTALASI & PENGGUNAAN UTEPARTS ERP & POS
+     PANDUAN LENGKAP INSTALASI & PENGGUNAAN BREMSPACE ERP & POS
 ======================================================================
-Terima kasih telah memilih UteParts ERP & POS System!
+Terima kasih telah memilih Bremspace ERP & POS System!
 Aplikasi ini dirancang untuk bekerja secara mandiri (Localhost & Wi-Fi),
 cepat, aman, dan dapat diakses dari komputer kasir, laptop, tablet,
 hingga smartphone (Android & iPhone/iPad).
@@ -11,23 +11,31 @@ Ikuti langkah mudah di bawah ini untuk memulai:
 ----------------------------------------------------------------------
 1. LANGKAH INSTALASI DI KOMPUTER WINDOWS (PC / LAPTOP KASIR)
 ----------------------------------------------------------------------
-Prasyarat: Pastikan aplikasi "Docker Desktop" sudah terpasang & aktif.
-(Jika belum punya Docker, unduh gratis di: https://www.docker.com/products/docker-desktop/)
+Prasyarat: Komputer Windows 10 atau Windows 11 (64-bit).
+(Sistem installer akan otomatis mengaktifkan WSL2/Docker tanpa biaya lisensi).
 
 Cara Menjalankan:
-1. Ekstrak seluruh isi file ZIP ini ke folder komputer Anda (misal di C:\UteParts).
-2. Klik ganda file: "start-install.bat" (atau "start-install.sh" untuk Linux).
+1. Ekstrak seluruh isi file ZIP ini ke folder komputer Anda (misal di C:\Bremspace).
+2. Klik ganda file: "start-install.bat".
 3. Jendela instalasi akan terbuka dan memeriksa kondisi sistem Anda secara otomatis.
-4. Anda akan melihat "Kode Mesin (Challenge Code)", contoh: UTE-XXXX-YYYY-ZZZZ.
+4. Anda akan melihat "Kode Mesin (Challenge Code)", contoh: BREM-XXXX-YYYY-ZZZZ.
 5. Klik tautan WhatsApp yang muncul di layar untuk mengirim kode tersebut ke 
-   Developer/Customer Service resmi guna mendapatkan "Kode Aktivasi".
+   Developer Bremspace resmi guna mendapatkan "Kode Aktivasi".
 6. Tempelkan (paste) Kode Aktivasi yang Anda terima, lalu tekan Enter.
 7. Aplikasi dan database lokal akan menyala otomatis di latar belakang!
 8. Browser Anda akan terbuka otomatis ke alamat:
    http://localhost:1741
 
 ----------------------------------------------------------------------
-2. LANGKAH INSTALASI DI SMARTPHONE ANDROID (VIA TERMUX - TANPA ROOT)
+2. LANGKAH INSTALASI DI LINUX / VPS CLOUD SERVER
+----------------------------------------------------------------------
+1. Ekstrak file dan buka terminal di folder aplikasi.
+2. Jalankan perintah:
+   chmod +x start-install.sh && ./start-install.sh
+3. Masukkan Kode Aktivasi yang diberikan oleh Developer Bremspace.
+
+----------------------------------------------------------------------
+3. LANGKAH INSTALASI DI SMARTPHONE ANDROID (VIA TERMUX - TANPA ROOT)
 ----------------------------------------------------------------------
 Khusus untuk Anda yang ingin menjadikan HP Android sebagai server kasir mandiri:
 1. Pasang aplikasi "Termux" dari F-Droid (bukan Play Store lama).
@@ -38,7 +46,7 @@ Khusus untuk Anda yang ingin menjadikan HP Android sebagai server kasir mandiri:
 5. Browser Google Chrome di HP Anda akan langsung membuka aplikasi di port 1741.
 
 ----------------------------------------------------------------------
-3. CARA MENGAKSES DARI BANYAK PERANGKAT (KASIR, HP, IPHONE, IPAD)
+4. CARA MENGAKSES DARI BANYAK PERANGKAT (KASIR, HP, IPHONE, IPAD)
 ----------------------------------------------------------------------
 Aplikasi ini sudah mendukung Multi-Device di jaringan Wi-Fi toko yang sama:
 1. Pastikan komputer server dan HP/iPad kasir terhubung ke Wi-Fi yang sama.
@@ -49,18 +57,18 @@ Aplikasi ini sudah mendukung Multi-Device di jaringan Wi-Fi toko yang sama:
    agar aplikasi tampil layar penuh layaknya aplikasi native tanpa bar browser!
 
 ----------------------------------------------------------------------
-4. PENGATURAN AWAL SISTEM (SETUP WIZARD)
+5. PENGATURAN AWAL SISTEM (SETUP WIZARD)
 ----------------------------------------------------------------------
 Saat pertama kali membuka aplikasi:
 1. Anda akan diarahkan ke halaman Setup Wizard (install.php).
 2. Pilih database: 
    - Pilih "SQLite" untuk setup instan tanpa repot (Sangat Direkomendasikan).
-   - Atau pilih "MySQL" jika Anda ingin menggunakan database MySQL server.
+   - Atau pilih "MySQL" untuk kapasitas transaksi data enterprise skala besar.
 3. Masukkan nama toko Anda dan buat password akun Administrator.
 4. Klik "Selesai & Jalankan Sistem". Aplikasi siap digunakan untuk transaksi kasir!
 
 ----------------------------------------------------------------------
-5. CARA MENGHENTIKAN ATAU MEMULAI ULANG APLIKASI
+6. CARA MENGHENTIKAN ATAU MEMULAI ULANG APLIKASI
 ----------------------------------------------------------------------
 - Untuk Mematikan Server : Klik ganda file "stop-server.bat"
 - Untuk Menyalakan Kembali: Klik ganda file "start-install.bat" (server langsung aktif tanpa perlu aktivasi ulang).
@@ -68,6 +76,6 @@ Saat pertama kali membuka aplikasi:
 ----------------------------------------------------------------------
 BUTUH BANTUAN TEKNIS?
 ----------------------------------------------------------------------
-Hubungi tim dukungan kami melalui kontak WhatsApp yang tertera saat instalasi.
-Selamat berbisnis dengan UteParts ERP & POS!
+Hubungi tim dukungan resmi Bremspace melalui kontak WhatsApp yang tertera saat instalasi.
+Selamat berbisnis dengan Bremspace ERP & POS!
 ======================================================================

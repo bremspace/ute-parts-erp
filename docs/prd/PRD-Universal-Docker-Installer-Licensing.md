@@ -1,14 +1,15 @@
 # Product Requirement Document (PRD)
-## Universal Multi-Platform Installer, Offline Hardware-Locked Licensing & Auto-Updater (Windows, Linux, VPS, Android Termux — Zero-Server Cost & Production Ready)
+## Universal Multi-Platform Installer, Offline Hardware-Locked Licensing & Auto-Updater (Windows WSL2/Docker, Linux, VPS, Android Termux — Zero-Server Cost & Production Ready)
 
-- **ID Dokumen**: `PRD-INSTALLER-UNIVERSAL-05`
-- **Versi**: 5.0.0
-- **Status**: Ready for Implementation
+- **ID Dokumen**: `PRD-INSTALLER-UNIVERSAL-06`
+- **Versi**: 6.0.0
+- **Status**: Phase 1 Done, Phase 2 In-Progress
+- **Developer Brand**: **Bremspace** (White-Label ERP & POS System)
 - **Target Runtime**: PHP 8.5+ (Docker Alpine/Debian base) & PHP 8.4/8.5 (Termux Native/PRoot)
 - **Target Platform**: 
-  1. PC Windows 10/11 (Localhost / LAN Kasir via Docker)
-  2. Linux Desktop & Server (Ubuntu, Debian, Arch via Docker)
-  3. VPS Cloud (Ubuntu, Debian, AlmaLinux via Docker)
+  1. PC Windows 10/11 (WSL2 Docker Engine Native — 100% Free/No License Risk, Docker Desktop Fallback)
+  2. Linux Desktop & Server (Ubuntu, Debian, Arch via Docker Engine)
+  3. VPS Cloud (Ubuntu, Debian, AlmaLinux via Docker Engine)
   4. Android Smartphone / Tablet Kasir (via Termux Standalone Non-Root)
   5. Multi-Device Client (iOS, iPad, Android, POS Terminal via Web Browser PWA)
 
@@ -16,56 +17,84 @@
 
 ## 1. Executive Summary & Visi Produk
 
-### 1.1 Latar Belakang
-Aplikasi ERP & POS UteParts dibangun di atas Laravel 13, Livewire 3, dan Tailwind 4. Distribusi komersial memerlukan sistem yang melindungi hak cipta pengembang, tidak membutuhkan biaya server lisensi, mudah diinstal oleh orang awam melalui file ZIP, dan tetap mendukung pembaruan kode otomatis (CI/CD) dari repositori privat.
+### 1.1 Latar Belakang & White-Label Brand
+Aplikasi ini dikembangkan di bawah brand pengembang **Bremspace**. Seluruh dokumen, installer, antarmuka perizinan, dan pesan sistem menggunakan identitas *Bremspace ERP & POS System* tanpa menggunakan merek dagang klien sebelumnya.
 
 ### 1.2 Ketentuan Kunci
-1. **Developer Zero-Server Cost**: Menggunakan enkripsi offline berbasis Hardware ID + Google Authenticator (TOTP RFC 6238).
-2. **Setup 2FA Developer**: Tool developer menyertakan generator QR Code otomatis untuk pairing instan ke aplikasi Google Authenticator sekali seumur hidup.
-3. **Dokumentasi Ramah Klien**: Di dalam paket ZIP klien disediakan `PANDUAN_INSTALASI.txt` dalam bahasa non-teknis.
-4. **Aman dari Duplikasi**: 1 Kunci Aktivasi hanya berlaku untuk 1 motherboard/hardware mesin.
+1. **Windows Docker WSL2 Native (Bebas Biaya Lisensi Docker Desktop)**:
+   - Menggunakan fitur resmi Windows 10/11: **WSL2 (Windows Subsystem for Linux)**.
+   - Memasang Docker Engine open-source gratis di dalam WSL2 secara otomatis tanpa mewajibkan klien mengunduh Docker Desktop (menghilangkan risiko biaya lisensi komersial Docker Inc. dan menghemat ~2GB RAM).
+   - Deteksi otomatis: Jika klien sudah memiliki Docker Desktop aktif, sistem langsung memanfaatkannya sebagai fallback.
+2. **Developer Zero-Server Cost**: Kriptografi offline berbasis Hardware ID + 2FA Google Authenticator (TOTP RFC 6238).
+3. **Dokumentasi Ramah Klien**: `PANDUAN_INSTALASI.txt` dalam bahasa non-teknis dengan identitas brand Bremspace.
+4. **Aman dari Duplikasi**: 1 Kunci Aktivasi hanya berlaku untuk 1 hardware mesin.
 5. **Private Repo & Auto-Update**: Klien dapat melakukan update otomatis dari repositori privat menggunakan GitHub Read-Only Token tanpa akses tulis ke akun developer.
 
 ---
 
-## 2. Pendaftaran Awal 2FA Developer (Google Authenticator Setup)
+## 2. Arsitektur Docker Windows: WSL2 Docker Engine vs Fallback
 
-### 2.1 Alur Pairing Sekali Seumur Hidup
-1. Developer membuka file `tools/license/developer-keygen.html` di browser HP atau laptop.
-2. Tool menyediakan tab khusus: **"Setup 2FA Developer"**.
-3. Layar menampilkan:
-   - **QR Code Interaktif** berstandar `otpauth://totp/UteParts-Licensing?...`.
-   - **Secret Seed Base32** (kode teks cadangan).
-4. Developer membuka aplikasi **Google Authenticator** di smartphone:
-   - Tekan icon `+` $\rightarrow$ pilih *"Scan a QR code"*.
-   - Arahkan kamera ke layar. Akun `UteParts ERP Licensing` langsung terdaftar dan mulai menghasilkan 6-digit angka setiap 30 detik.
-5. Secret Seed ini disimpan secara persisten di `localStorage` browser developer (dan dapat di-backup).
+```
+[ Klien Menjalankan start-install.bat di Windows ]
+                      │
+                      ▼
+        Apakah Docker Desktop Aktif?
+               /              \
+        (Ya)  /                \ (Tidak)
+             ▼                  ▼
+    Gunakan Docker Desktop   Apakah WSL2 sudah aktif?
+                             /               \
+                       (Ya) /                 \ (Tidak)
+                           ▼                   ▼
+                Pasang Docker Engine     Aktifkan WSL2 via `wsl --install --no-distribution`
+                di Ubuntu WSL2 internal  Instruksikan 1x restart jika diperlukan
+                           │
+                           ▼
+             Jalankan `docker compose up -d` via WSL
+```
 
 ---
 
-## 3. Alur Monetisasi & Distribusi: WhatsApp Handshake (Challenge-Response)
+## 3. Spesifikasi Arsitektur Docker (Fase 2)
+
+### 3.1 Layanan Kontainer (`compose.yaml`)
+1. **`app` (PHP 8.5+ Alpine)**:
+   - Base Image: `php:8.5-alpine` (multi-stage build ultra-ringan).
+   - Modul wajib: `pdo_mysql`, `pdo_sqlite`, `intl`, `mbstring`, `gd`, `zip`, `opcache`, `bcmath`, `fileinfo`, `curl`.
+   - OPcache diaktifkan penuh, memory limit 512M.
+2. **`web` (Nginx Alpine)**:
+   - Port default: `1741:1741` (Akses lokal & multi-device LAN).
+   - Port web publik: `80:80` dan `443:443` (untuk server VPS online).
+3. **`db` (MySQL 8.4 LTS Local Container)**:
+   - Image: `mysql:8.4` (atau `mariadb:lts`).
+   - Persistensi data: Volume host `./docker/data/mysql:/var/lib/mysql`. Data aman tersimpan di folder lokal host.
+   - Opsi SQLite lokal: `./database/database.sqlite` (untuk mesin dengan RAM < 2GB).
+4. **`queue` (Background Worker)**:
+   - Menjalankan `php artisan queue:work --sleep=3 --tries=3` di container terpisah.
+
+---
+
+## 4. Alur Monetisasi & Distribusi: WhatsApp Handshake (Challenge-Response)
 
 ```
 [ Klien Menerima File ZIP & Ekstrak ]
   1. Membaca `PANDUAN_INSTALASI.txt`.
   2. Menjalankan installer:
-     - Windows : start-install.bat
+     - Windows : start-install.bat (Auto-WSL2 Docker / Standalone)
      - Linux   : ./install-docker.sh
      - Android : ./install-termux.sh
   3. Skrip membaca Hardware Fingerprint (Motherboard UUID / Machine ID).
   4. Terminal menampilkan "Machine Challenge Code" & link WhatsApp otomatis:
-     Contoh: `UTE-9B8A-7C12-88EF`
-     Link: https://wa.me/<NO_DEV>?text=Aktivasi+ERP+Kode:+UTE-9B8A-7C12-88EF
+     Contoh: `BREM-9B8A-7C12-88EF`
+     Link: https://wa.me/<NO_DEV>?text=Aktivasi+Bremspace+ERP+Kode:+BREM-9B8A-7C12-88EF
            │
            │ (Klien kirim pesan WhatsApp ke Developer)
            ▼
-[ Developer di Smartphone / Laptop Sendiri (Offline) ]
-  1. Menerima chat berisi `UTE-9B8A-7C12-88EF`.
-  2. Buka icon PWA "UteParts Keygen" di layar utama HP developer.
-  3. Masukkan:
-     - Machine Challenge Code klien
-     - 6-digit angka dari Google Authenticator saat itu
-  4. Klik "Generate Activation Key" $\rightarrow$ menghasilkan: `ACT-4921-8830-BC88-99A1`.
+[ Developer Bremspace di Smartphone / Laptop Sendiri (Offline) ]
+  1. Menerima chat berisi `BREM-9B8A-7C12-88EF`.
+  2. Buka icon PWA "Bremspace Keygen" di layar utama HP developer.
+  3. Masukkan Challenge Code klien + 6-digit angka dari Google Authenticator.
+  4. Klik "Generate Activation Key" -> menghasilkan `ACT-4921-8830-BC88-99A1`.
   5. Kirim balik kunci ke WhatsApp klien.
            │
            │ (Kirim via WhatsApp)
@@ -74,61 +103,17 @@ Aplikasi ERP & POS UteParts dibangun di atas Laravel 13, Livewire 3, dan Tailwin
   6. Klien menempelkan kunci `ACT-4921-...` ke terminal.
   7. Installer memverifikasi integritas kunci secara lokal terhadap hardware.
   8. Jika cocok: Tersimpan di `storage/license.key` dan server langsung aktif di port 1741.
-  9. Jika file dipindahkan ke PC lain: Hardware tidak cocok $\rightarrow$ sistem terkunci otomatis.
 ```
 
 ---
 
-## 4. Paket Rilis Klien & Berkas Panduan (PANDUAN_INSTALASI.txt)
+## 5. Rencana Fase & Status Eksekusi
 
-Di dalam file ZIP rilis yang diunduh klien:
-```
-UteParts-ERP-Release.zip
-├── PANDUAN_INSTALASI.txt              # Buku panduan bahasa Indonesia ramah orang awam
-├── start-install.bat                  # 1-Klik Launcher Windows
-├── start-install.sh                   # 1-Klik Launcher Linux / VPS
-├── start-termux.sh                    # 1-Klik Launcher Android Termux
-├── compose.yaml                       # Konfigurasi container Docker
-├── Dockerfile                         # Engine runtime PHP 8.5+ Alpine
-├── docker/                            # Nginx & PHP configurations
-├── scripts/license/                   # Modul pemeriksa lisensi hardware
-└── app, resources, public, routes     # Source code aplikasi (tanpa .git sensitif)
-```
-
----
-
-## 5. Spesifikasi Teknis Platform
-
-| Platform | Runtime | Database | Karakteristik |
-|---|---|---|---|
-| **Windows 10/11** | Docker Desktop (PHP 8.5+ Alpine) | MySQL Container / SQLite | Setup terpandu WSL2, auto-restart port 1741 |
-| **Linux Desktop/Server** | Docker Engine (PHP 8.5+ Alpine) | MySQL Container / SQLite | Auto-install 100% via get.docker.com |
-| **VPS Cloud** | Docker Engine (PHP 8.5+ Alpine) | MySQL Container / SQLite | Auto-swap 2GB untuk VPS 1GB RAM, auto SSL |
-| **Android Smartphone** | Termux Standalone (PHP 8.4/8.5) | SQLite Lokal | Non-root, hemat memori, auto-launch Chrome |
-| **Client Devices (iOS/Tab)** | Web Browser (PWA) | Menginduk ke Server | Add to Home Screen, tanpa instalasi engine |
-
----
-
-## 6. Auto-Update CI/CD Berbasis GitHub Read-Only Token
-
-- Aplikasi dilengkapi modul `SystemUpdater`:
-  1. Terhubung ke GitHub API privat menggunakan Fine-Grained Token (Read-Only).
-  2. Mengecek apakah ada commit / rilis baru di cabang `main`.
-  3. Klien mengklik tombol **"Perbarui Sistem"** di antarmuka web.
-  4. Lisensi diverifikasi ulang $\rightarrow$ kode ditarik $\rightarrow$ `artisan migrate --force` $\rightarrow$ `optimize:clear`.
-  5. Data transaksi, pengaturan toko, dan lisensi tidak tertimpa.
-
----
-
-## 7. Rencana Deliverables Fase 1 (Siap Dikerjakan)
-
-1. **`tools/license/developer-keygen.html`**:
-   - Single-file PWA offline dengan antarmuka elegan.
-   - Tab 1: Setup 2FA Google Authenticator (Generate QR Code & Secret Seed).
-   - Tab 2: Generator Lisensi (Input Machine ID + Input 6-Digit Google Auth $\rightarrow$ Output Activation Key).
-2. **`scripts/license/HardwareIdentifier.php`**:
-   - Ekstraktor identitas hardware unik (Motherboard UUID di Windows, Machine-ID di Linux, Android ID di Termux).
-3. **`scripts/license/LicenseVerifier.php`**:
-   - Validator kriptografis offline di komputer klien.
-4. **`PANDUAN_INSTALASI.txt`**:
-   - Panduan instalasi bahasa Indonesia non-teknis yang siap disertakan dalam paket ZIP klien.
+| Fase | Fokus | Status |
+|---|---|---|
+| **Fase 1** | Modul Lisensi Offline, Hardware Identifier, & PWA Developer Keygen | **SELESAI (Verified)** |
+| **Fase 2** | Docker Engine Core (PHP 8.5+ Alpine, Nginx, MySQL Lokal, Compose, Entrypoint) | **SEKARANG DIEKSEKUSI** |
+| **Fase 3** | Installer Multi-OS (Windows WSL2 Auto-Setup, Linux, VPS) | Berikutnya |
+| **Fase 4** | Android Standalone (Termux Non-Root + SQLite) | Berikutnya |
+| **Fase 5** | Auto-Updater GitHub CI/CD (Fine-Grained Read-Only Token) | Berikutnya |
+| **Fase 6** | Web Setup Wizard & Testing Akhir | Berikutnya |

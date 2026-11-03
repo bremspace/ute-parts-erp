@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UteParts Developer License Generator (Offline 2FA)</title>
+    <title>Bremspace Developer License Generator (Offline 2FA)</title>
     <!-- Tailwind CSS (Offline-safe fallback or CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Standalone QR Code Generator Library -->
@@ -21,9 +21,9 @@
         <div class="text-center space-y-2 border-b border-slate-700/60 pb-5">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold tracking-wide uppercase">
                 <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
-                Developer Mode &bull; 100% Offline
+                Bremspace Developer Mode &bull; 100% Offline
             </div>
-            <h1 class="text-2xl font-bold tracking-tight text-white">UteParts License Generator</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-white">Bremspace License Generator</h1>
             <p class="text-xs text-slate-400">Pembangkit Kunci Lisensi Klien Berbasis Hardware & 2FA Google Authenticator</p>
         </div>
 
@@ -43,7 +43,7 @@
                 <label class="block text-xs font-medium text-slate-300 mb-1">
                     Machine Challenge Code dari Klien (via WhatsApp)
                 </label>
-                <input type="text" id="inputChallenge" placeholder="Contoh: UTE-9B8A-7C12-88EF" 
+                <input type="text" id="inputChallenge" placeholder="Contoh: BREM-9B8A-7C12-88EF" 
                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono tracking-wider uppercase">
                 <p class="text-[11px] text-slate-400 mt-1">Salin kode yang dikirim oleh klien saat menjalankan installer.</p>
             </div>
@@ -109,22 +109,22 @@
             <ol class="text-xs text-slate-400 space-y-1.5 list-decimal list-inside bg-slate-900/50 p-3 rounded-lg border border-slate-800">
                 <li>Buka aplikasi <strong>Google Authenticator</strong> di HP Anda.</li>
                 <li>Tekan tombol <strong>+</strong> lalu pilih <strong>Scan a QR code</strong>.</li>
-                <li>Arahkan kamera ke QR code di atas hingga muncul akun <strong>UteParts ERP Licensing</strong>.</li>
+                <li>Arahkan kamera ke QR code di atas hingga muncul akun <strong>Bremspace ERP Licensing</strong>.</li>
                 <li>Simpan halaman ini (Add to Home Screen) agar tidak hilang.</li>
             </ol>
         </div>
 
         <!-- Footer -->
         <div class="text-center pt-2 border-t border-slate-800 text-[11px] text-slate-500">
-            Kriptografi: HMAC-SHA256 &bull; Hardware Binding V1 &bull; UteParts ERP & POS
+            Kriptografi: HMAC-SHA256 &bull; Hardware Binding V1 &bull; Bremspace ERP & POS
         </div>
 
     </div>
 
     <!-- Script Logika Kriptografi Offline & TOTP -->
     <script>
-        const PUBLIC_SALT = "UTEPARTS_LICENSE_SECURITY_ENGINE_V1";
-        const STORAGE_KEY_SECRET = "uteparts_developer_secret_seed";
+        const PUBLIC_SALT = "BREMSPACE_LICENSE_SECURITY_ENGINE_V1";
+        const STORAGE_KEY_SECRET = "bremspace_developer_secret_seed";
         let activeSecret = localStorage.getItem(STORAGE_KEY_SECRET) || "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
 
         function switchTab(tab) {
@@ -146,7 +146,7 @@
             document.getElementById('secretKeyText').value = activeSecret;
             const container = document.getElementById("qrcode");
             container.innerHTML = "";
-            const uri = `otpauth://totp/UteParts-ERP-Licensing:Developer?secret=${activeSecret}&issuer=UteParts`;
+            const uri = `otpauth://totp/Bremspace-ERP-Licensing:Developer?secret=${activeSecret}&issuer=Bremspace`;
             new QRCode(container, {
                 text: uri,
                 width: 180,
@@ -250,8 +250,8 @@
             const challenge = document.getElementById('inputChallenge').value.trim().toUpperCase();
             const totp = document.getElementById('inputTotp').value.trim();
 
-            if (!challenge.startsWith('UTE-') || challenge.length < 14) {
-                alert("Format Challenge Code salah! Harus berformat seperti: UTE-XXXX-YYYY-ZZZZ");
+            if (!challenge.startsWith('BREM-') || challenge.length < 15) {
+                alert("Format Challenge Code salah! Harus berformat seperti: BREM-XXXX-YYYY-ZZZZ");
                 return;
             }
 
@@ -282,7 +282,7 @@
         function copyWhatsAppReply() {
             const challenge = document.getElementById('inputChallenge').value.trim().toUpperCase();
             const key = document.getElementById('outputKey').innerText;
-            const reply = `Halo! Terima kasih atas pembelian lisensi UteParts ERP & POS.\n\nBerikut Kode Aktivasi resmi untuk perangkat Anda:\nKode Mesin: ${challenge}\nKode Aktivasi: ${key}\n\nSilakan salin Kode Aktivasi di atas dan tempelkan pada jendela instalasi perangkat Anda.`;
+            const reply = `Halo! Terima kasih atas pembelian lisensi Bremspace ERP & POS.\n\nBerikut Kode Aktivasi resmi untuk perangkat Anda:\nKode Mesin: ${challenge}\nKode Aktivasi: ${key}\n\nSilakan salin Kode Aktivasi di atas dan tempelkan pada jendela instalasi perangkat Anda.`;
             navigator.clipboard.writeText(reply);
             alert("Format balasan pesan WhatsApp berhasil disalin!");
         }

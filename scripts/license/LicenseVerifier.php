@@ -19,7 +19,7 @@ final class LicenseVerifier
     /**
      * Master Verification Salt (Kunci publik verifikasi internal aplikasi)
      */
-    public const PUBLIC_SALT = 'UTEPARTS_LICENSE_SECURITY_ENGINE_V1';
+    public const PUBLIC_SALT = 'BREMSPACE_LICENSE_SECURITY_ENGINE_V1';
 
     /**
      * Jalur berkas lisensi di storage
