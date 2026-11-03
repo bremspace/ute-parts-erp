@@ -17,7 +17,25 @@ if errorlevel 1 (
     )
 )
 
-echo [INFO] Memeriksa lisensi & pembaruan sistem di GitHub...
+echo [INFO] Memeriksa lisensi & pembaruan sistem...
+
+:: 1. Jika berjalan dengan Docker
+if exist "%~dp0compose.yaml" (
+    where docker >nul 2>nul
+    if not errorlevel 1 (
+        echo [INFO] Mengunduh pembaruan kontainer Docker Bremspace...
+        docker compose pull
+        docker compose up -d
+        docker compose exec -T app php artisan migrate --force
+        docker compose exec -T app php artisan optimize:clear
+        echo [OK] Kontainer Docker berhasil diperbarui ke versi terbaru!
+        echo.
+        echo ======================================================================
+        echo Pembaruan sistem selesai. Tekan tombol apa saja untuk keluar...
+        pause >nul
+        exit /b 0
+    )
+)
 
 "%PHP_BIN%" -r ^
 "require_once 'scripts/updater/SystemUpdater.php'; ^

@@ -7,7 +7,7 @@
 services:
   # 1. Aplikasi Core PHP 8.5+ (Pre-Built Image dari GitHub Registry)
   app:
-    image: ghcr.io/bremspace/bremspace-erp:latest
+    image: ghcr.io/bremspace/ute-parts-erp:latest
     container_name: bremspace-erp-app
     restart: unless-stopped
     environment:
@@ -56,7 +56,7 @@ services:
 
   # 4. Background Queue Worker (Headless)
   queue:
-    image: ghcr.io/bremspace/bremspace-erp:latest
+    image: ghcr.io/bremspace/ute-parts-erp:latest
     container_name: bremspace-erp-queue
     restart: unless-stopped
     command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3"]

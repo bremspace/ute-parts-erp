@@ -7,7 +7,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: bremspace/bremspace-erp
+  # Repositori aktual: bremspace/ute-parts-erp -> ghcr.io/bremspace/ute-parts-erp
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
