@@ -101,40 +101,23 @@ final class HardwareIdentifier
 
     private static function getLinuxIdentifier(): string
     {
-        $parts = [];
-
-        // A. /etc/machine-id atau /var/lib/dbus/machine-id
+        // 1. /etc/machine-id (Canonical machine ID on all systemd Linux)
         if (file_exists('/etc/machine-id')) {
             $id = trim((string) @file_get_contents('/etc/machine-id'));
             if (! empty($id)) {
-                $parts[] = $id;
+                return $id;
             }
-        } elseif (file_exists('/var/lib/dbus/machine-id')) {
+        }
+
+        // 2. /var/lib/dbus/machine-id (Fallback on D-Bus systems)
+        if (file_exists('/var/lib/dbus/machine-id')) {
             $id = trim((string) @file_get_contents('/var/lib/dbus/machine-id'));
             if (! empty($id)) {
-                $parts[] = $id;
+                return $id;
             }
         }
 
-        // B. DMI Product UUID (Jika ada hak baca / VPS)
-        if (file_exists('/sys/class/dmi/id/product_uuid')) {
-            $uuid = trim((string) @file_get_contents('/sys/class/dmi/id/product_uuid'));
-            if (! empty($uuid)) {
-                $parts[] = $uuid;
-            }
-        }
-
-        // C. Root Disk UUID via blkid / lsblk
-        $diskUuid = shell_exec('lsblk -no UUID $(df / | tail -n 1 | awk \'{print $1}\') 2>/dev/null');
-        if ($diskUuid && trim($diskUuid) !== '') {
-            $parts[] = trim($diskUuid);
-        }
-
-        if (empty($parts)) {
-            $parts[] = gethostname() ?: 'LINUX-GENERIC';
-        }
-
-        return implode('|', $parts);
+        return gethostname() ?: 'LINUX-GENERIC';
     }
 
     private static function getAndroidIdentifier(): string
