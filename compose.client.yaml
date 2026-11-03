@@ -1,0 +1,75 @@
+# ==============================================================================
+# Bremspace ERP & POS System — Client Production Stack
+# Brand: Bremspace
+# Mode: Model B (Pre-Built Protected Container Image)
+# ==============================================================================
+
+services:
+  # 1. Aplikasi Core PHP 8.5+ (Pre-Built Image dari GitHub Registry)
+  app:
+    image: ghcr.io/bremspace/bremspace-erp:latest
+    container_name: bremspace-erp-app
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Jakarta
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./database:/var/www/html/database
+    networks:
+      - bremspace-network
+    depends_on:
+      - db
+
+  # 2. Web Server Nginx (Port 1741 & Web Publik)
+  web:
+    image: nginx:1.27-alpine
+    container_name: bremspace-erp-web
+    restart: unless-stopped
+    ports:
+      - "1741:1741"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - bremspace-network
+    depends_on:
+      - app
+
+  # 3. Database MySQL 8.4 LTS Lokal (Persistent Volume di Komputer Klien)
+  db:
+    image: mysql:8.4
+    container_name: bremspace-erp-db
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-bremspace_root_secret}
+      MYSQL_DATABASE: ${DB_DATABASE:-bremspace_erp}
+      MYSQL_USER: ${DB_USERNAME:-bremspace}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-bremspace_secret}
+    volumes:
+      - ./docker/data/mysql:/var/lib/mysql
+    networks:
+      - bremspace-network
+
+  # 4. Background Queue Worker (Headless)
+  queue:
+    image: ghcr.io/bremspace/bremspace-erp:latest
+    container_name: bremspace-erp-queue
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3"]
+    environment:
+      - TZ=Asia/Jakarta
+    volumes:
+      - ./storage:/var/www/html/storage
+    networks:
+      - bremspace-network
+    depends_on:
+      - app
+      - db
+
+networks:
+  bremspace-network:
+    driver: bridge

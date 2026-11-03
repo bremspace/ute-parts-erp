@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Bremspace ERP & POS System — Client Release Packager
-# Menghasilkan berkas Bremspace-ERP-Release.zip yang bersih & aman untuk klien
+# Bremspace ERP & POS System — Thin Client Bootstrapper Packager (Model B)
+# Menghasilkan berkas Bremspace-ERP-Installer.zip ukuran ultra-ringan (~1 MB)
+# 100% Bebas dari Source Code PHP mentah (Aman dari pembajakan/intip kode)
 # ==============================================================================
 set -e
 
@@ -9,40 +10,48 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
-RELEASE_ZIP="Bremspace-ERP-Release.zip"
-TMP_DIR="/tmp/bremspace_release_build"
+RELEASE_ZIP="Bremspace-ERP-Installer.zip"
+TMP_DIR="/tmp/bremspace_thin_release"
 
 echo "======================================================================"
-echo "   Membangun Paket Rilis Klien: $RELEASE_ZIP"
+echo "   Membangun Paket Rilis Thin Client (Model B): $RELEASE_ZIP"
 echo "======================================================================"
 
-# 1. Bersihkan build sementara lama
+# 1. Bersihkan build lama
 rm -rf "$TMP_DIR" "$RELEASE_ZIP"
 mkdir -p "$TMP_DIR"
 
-# 2. Salin seluruh proyek ke direktori staging
-echo "ℹ Menyalin berkas aplikasi..."
-rsync -av --quiet ./ "$TMP_DIR/" \
-    --exclude='.git' \
-    --exclude='.github' \
-    --exclude='tools/license/developer-keygen.html' \
-    --exclude='storage/license.key' \
-    --exclude='storage/installed.lock' \
-    --exclude='storage/logs/*.log' \
-    --exclude='storage/framework/cache/data/*' \
-    --exclude='storage/framework/sessions/*' \
-    --exclude='storage/framework/views/*' \
-    --exclude='docker/data/mysql/*' \
-    --exclude='node_modules' \
-    --exclude='.env' \
-    --exclude="$RELEASE_ZIP"
+# 2. Salin HANYA file installer & konfigurasi runtime (TANPA SOURCE CODE PHP)
+echo "ℹ Menyiapkan berkas bootstrapper..."
 
-# 3. Pastikan template .env.example tersedia sebagai acuan awal
-if [ -f ".env.example" ] && [ ! -f "$TMP_DIR/.env" ]; then
-    cp .env.example "$TMP_DIR/.env.example"
-fi
+cp PANDUAN_INSTALASI.txt "$TMP_DIR/"
+cp start-install.bat "$TMP_DIR/"
+cp start-install.sh "$TMP_DIR/"
+cp start-termux.sh "$TMP_DIR/"
+cp update-system.bat "$TMP_DIR/"
+cp update-system.sh "$TMP_DIR/"
+cp stop-server.bat "$TMP_DIR/"
+cp stop-server.sh "$TMP_DIR/"
 
-# 4. Pastikan direktori kosong yang diperlukan tetap ada
+# Gunakan compose.client.yaml sebagai compose.yaml di klien (Image pre-built)
+cp compose.client.yaml "$TMP_DIR/compose.yaml"
+
+# Salin skrip pembantu & konfigurasi docker
+mkdir -p "$TMP_DIR/scripts/license" "$TMP_DIR/scripts/updater" "$TMP_DIR/docker/nginx"
+cp scripts/install-docker.ps1 "$TMP_DIR/scripts/"
+cp scripts/install-docker.sh "$TMP_DIR/scripts/"
+cp scripts/install-termux.sh "$TMP_DIR/scripts/"
+cp scripts/setup-windows-php.ps1 "$TMP_DIR/scripts/"
+cp scripts/run-server-background.vbs "$TMP_DIR/scripts/"
+cp scripts/run-command-background.vbs "$TMP_DIR/scripts/"
+
+cp scripts/license/HardwareIdentifier.php "$TMP_DIR/scripts/license/"
+cp scripts/license/LicenseVerifier.php "$TMP_DIR/scripts/license/"
+cp scripts/updater/SystemUpdater.php "$TMP_DIR/scripts/updater/"
+
+cp docker/nginx/default.conf "$TMP_DIR/docker/nginx/"
+
+# 3. Siapkan struktur folder kosong
 mkdir -p "$TMP_DIR/storage/framework/cache/data"
 mkdir -p "$TMP_DIR/storage/framework/sessions"
 mkdir -p "$TMP_DIR/storage/framework/views"
@@ -52,24 +61,26 @@ mkdir -p "$TMP_DIR/bootstrap/cache"
 mkdir -p "$TMP_DIR/database"
 mkdir -p "$TMP_DIR/docker/data/mysql"
 
-# 5. Buat berkas ZIP menggunakan zip command
-echo "ℹ Mengompresi menjadi $RELEASE_ZIP..."
+# 4. Kompresi menjadi ZIP
+echo "ℹ Mengompresi berkas installer..."
 cd "$TMP_DIR"
 zip -r -q "$PROJECT_ROOT/$RELEASE_ZIP" .
 
-# 6. Bersihkan direktori staging
+# 5. Bersihkan direktori staging
 rm -rf "$TMP_DIR"
 cd "$PROJECT_ROOT"
 
 ZIP_SIZE=$(du -h "$RELEASE_ZIP" | awk '{print $1}')
 echo ""
 echo "======================================================================"
-echo "✔ [SUKSES] Paket rilis klien berhasil dibuat!"
+echo "✔ [SUKSES] Paket Thin Installer Klien (Model B) Berhasil Dibuat!"
 echo "   Nama Berkas : $RELEASE_ZIP"
-echo "   Ukuran      : $ZIP_SIZE"
+echo "   Ukuran      : $ZIP_SIZE (Sangat Ringan!)"
 echo "   Lokasi      : $PROJECT_ROOT/$RELEASE_ZIP"
 echo "----------------------------------------------------------------------"
-echo "   Berkas $RELEASE_ZIP ini yang Anda kirimkan ke Klien."
-echo "   (File developer-keygen.html dan .git otomatis dikecualikan/aman)."
+echo "   KEUNGGULAN MODEL B:"
+echo "   1. 100% Bebas dari Source Code PHP mentah (Aman dari Pembajakan)."
+echo "   2. Klien hanya butuh download ~1 MB."
+echo "   3. Docker otomatis mengunduh image container terenkripsi saat diinstal."
 echo "======================================================================"
 echo ""
