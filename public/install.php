@@ -1070,7 +1070,7 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ERP &amp; POS System — Setup Wizard &amp; Server Installer</title>
+    <title>Bremspace ERP &amp; POS System — Setup Wizard &amp; Server Installer</title>
     <script>
         // Pastikan Tailwind CDN mengenali dark mode sebelum CSS di-compile
         window.tailwind = {
@@ -1682,7 +1682,7 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                 </div>
                 <div class="p-3 rounded-xl bg-black/40 border border-white/10 max-w-sm mx-auto text-left font-mono text-xs space-y-1">
                     <div class="text-[10px] text-slate-400 uppercase font-sans font-bold">Akun Bawaan Super Admin:</div>
-                    <div>Email: <strong class="text-white">superadmin@uteparts.id</strong> <span class="text-[10px] text-slate-400">(dapat disesuaikan di profil)</span></div>
+                    <div>Email: <strong class="text-white">superadmin@bremspace.id</strong> <span class="text-[10px] text-slate-400">(dapat disesuaikan di profil)</span></div>
                     <div>Pass : <strong class="text-white">Password123!</strong></div>
                 </div>
                 <div>
