@@ -14,9 +14,12 @@ services:
       - TZ=Asia/Jakarta
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
+      - BREMSPACE_HOST_CHALLENGE=${BREMSPACE_HOST_CHALLENGE:-}
     volumes:
       - ./storage:/var/www/html/storage
       - ./database:/var/www/html/database
+      - ./.env:/var/www/html/.env
+      - bremspace-public:/var/www/html/public
     networks:
       - bremspace-network
     depends_on:
@@ -33,6 +36,8 @@ services:
       - "443:443"
     volumes:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - bremspace-public:/var/www/html/public:ro
+      - ./storage/app/public:/var/www/html/public/storage:ro
     networks:
       - bremspace-network
     depends_on:
@@ -62,13 +67,18 @@ services:
     command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3"]
     environment:
       - TZ=Asia/Jakarta
+      - BREMSPACE_HOST_CHALLENGE=${BREMSPACE_HOST_CHALLENGE:-}
     volumes:
       - ./storage:/var/www/html/storage
+      - ./.env:/var/www/html/.env
     networks:
       - bremspace-network
     depends_on:
       - app
       - db
+
+volumes:
+  bremspace-public:
 
 networks:
   bremspace-network:

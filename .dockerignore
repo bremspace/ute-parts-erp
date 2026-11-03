@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+docker/data/mysql
+storage/license.key
+storage/installed.lock
+storage/logs/*.log
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+.env
+tools/license/developer-keygen.html
+Bremspace-ERP-Installer.zip
+Bremspace-ERP-Release.zip

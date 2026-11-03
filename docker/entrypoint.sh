@@ -6,7 +6,44 @@ set -e
 
 cd /var/www/html
 
-# 1. Pastikan struktur direktori storage & izin tulis siap
+# 1. Pastikan file .env ada dan terkonfigurasi
+if [ ! -f ".env" ]; then
+    if [ -f ".env.example" ]; then
+        cp .env.example .env
+    else
+        cat << 'EOF' > .env
+APP_NAME="Bremspace ERP"
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_URL=http://localhost:1741
+
+DB_CONNECTION=mysql
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=bremspace_erp
+DB_USERNAME=bremspace
+DB_PASSWORD=bremspace_secret
+
+SESSION_DRIVER=database
+CACHE_STORE=database
+QUEUE_CONNECTION=database
+EOF
+    fi
+fi
+
+# Pastikan APP_KEY terisi
+if grep -q "^APP_KEY=$" .env 2>/dev/null || ! grep -q "^APP_KEY=" .env 2>/dev/null; then
+    php artisan key:generate --force 2>/dev/null || true
+fi
+
+# 2. Sinkronkan asset public terbaru dari public_template jika volume public dimount
+if [ -d "/var/www/html/public_template" ]; then
+    mkdir -p public/build
+    cp -ru /var/www/html/public_template/* public/ 2>/dev/null || true
+fi
+
+# 3. Pastikan struktur direktori storage & izin tulis siap
 mkdir -p \
     storage/framework/cache/data \
     storage/framework/sessions \
@@ -20,20 +57,20 @@ mkdir -p \
 chmod -R 775 storage bootstrap/cache database 2>/dev/null || true
 chown -R www-data:www-data storage bootstrap/cache database 2>/dev/null || true
 
-# 2. Pastikan file database SQLite ada jika mode SQLite dipilih
+# 4. Pastikan file database SQLite ada jika mode SQLite dipilih
 if [ -f ".env" ] && grep -q "DB_CONNECTION=sqlite" .env; then
     touch database/database.sqlite
     chmod 664 database/database.sqlite 2>/dev/null || true
     chown www-data:www-data database/database.sqlite 2>/dev/null || true
 fi
 
-# 3. Buat symlink storage publik jika belum ada
+# 5. Buat symlink storage publik jika belum ada
 if [ ! -L "public/storage" ] && [ ! -d "public/storage" ]; then
     php artisan storage:link 2>/dev/null || true
 fi
 
-# 4. Auto-discover packages Laravel
+# 6. Auto-discover packages Laravel
 php artisan package:discover --ansi 2>/dev/null || true
 
-# 5. Jalankan perintah container utama (CMD)
+# 7. Jalankan perintah container utama (CMD)
 exec "$@"

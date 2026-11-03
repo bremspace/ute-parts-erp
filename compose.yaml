@@ -17,6 +17,7 @@ services:
       - TZ=Asia/Jakarta
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
+      - BREMSPACE_HOST_CHALLENGE=${BREMSPACE_HOST_CHALLENGE:-}
     volumes:
       - .:/var/www/html
       - ./storage:/var/www/html/storage

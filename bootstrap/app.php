@@ -2,6 +2,7 @@
 
 use App\Console\Commands\SidImportRaw;
 use App\Http\Middleware\EnsureCabangSelected;
+use App\Http\Middleware\EnsureLicenseValid;
 use App\Http\Middleware\EnsureSetupCompleted;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\SecurityHeaders;
@@ -87,6 +88,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Set dynamic asset URL based on request host (IP vs domain)
         $middleware->web(prepend: [SetAssetUrl::class]);
+
+        // Enforcement Lisensi Hardware Mesin (Anti-Duplikasi Aplikasi)
+        $middleware->web(prepend: [EnsureLicenseValid::class]);
 
         // Apply security headers to all responses
         $middleware->web(append: [SecurityHeaders::class]);

@@ -10,6 +10,16 @@ echo.
 
 set "STOPPED=0"
 
+rem 0. Hentikan kontainer Docker jika Docker Compose aktif
+if exist "%~dp0compose.yaml" (
+    where docker >nul 2>nul
+    if not errorlevel 1 (
+        echo [INFO] Menghentikan kontainer Docker Bremspace...
+        docker compose down >nul 2>nul
+        set "STOPPED=1"
+    )
+)
+
 rem 1. Hentikan proses via PID file jika ada
 if exist "%~dp0storage\framework\server.pid" (
     set /p SERVER_PID=<"%~dp0storage\framework\server.pid"

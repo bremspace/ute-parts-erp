@@ -51,6 +51,10 @@ cp scripts/updater/SystemUpdater.php "$TMP_DIR/scripts/updater/"
 
 cp docker/nginx/default.conf "$TMP_DIR/docker/nginx/"
 
+if [ -f ".env.example" ]; then
+    cp .env.example "$TMP_DIR/.env.example"
+fi
+
 # 3. Siapkan struktur folder kosong
 mkdir -p "$TMP_DIR/storage/framework/cache/data"
 mkdir -p "$TMP_DIR/storage/framework/sessions"

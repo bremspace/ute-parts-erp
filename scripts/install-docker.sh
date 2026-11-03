@@ -208,6 +208,16 @@ fi
 mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache database docker/data/mysql
 chmod -R 775 storage bootstrap/cache database 2>/dev/null || true
 
+# Pastikan file .env tersedia untuk mount volume Docker
+if [ ! -f ".env" ]; then
+    if [ -f ".env.example" ]; then
+        cp .env.example .env
+    else
+        touch .env
+    fi
+fi
+export BREMSPACE_HOST_CHALLENGE="$CHALLENGE_CODE"
+
 # ------------------------------------------------------------------------------
 # 5b. Autentikasi GitHub Container Registry (GHCR) Otomatis
 # ------------------------------------------------------------------------------

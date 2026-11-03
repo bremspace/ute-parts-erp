@@ -111,7 +111,8 @@ $isLicensed = $false
 # Helper kalkulasi signature
 function Get-MachineChallengeCode {
     $systemProduct = Get-CimInstance -ClassName Win32_ComputerSystemProduct -ErrorAction SilentlyContinue
-    $uuid = if ($systemProduct) { $systemProduct.UUID } else { $env:COMPUTERNAME }
+    $rawUuid = if ($systemProduct -and $systemProduct.UUID) { $systemProduct.UUID } else { $env:COMPUTERNAME }
+    $uuid = ($rawUuid -replace '[^A-Za-z0-9\-]', '')
     $salt = "BREMSPACE_HWID_V1_2026"
     
     $hasher = [System.Security.Cryptography.SHA256]::Create()
@@ -218,6 +219,18 @@ foreach ($f in $folders) {
     if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
 }
 
+# Pastikan file .env tersedia untuk mount volume Docker
+$envFile = Join-Path $projectRoot '.env'
+$envExample = Join-Path $projectRoot '.env.example'
+if (-not (Test-Path $envFile)) {
+    if (Test-Path $envExample) {
+        Copy-Item $envExample $envFile
+    } else {
+        New-Item -ItemType File -Path $envFile -Force | Out-Null
+    }
+}
+$env:BREMSPACE_HOST_CHALLENGE = $challengeCode
+
 # ------------------------------------------------------------------------------
 # 5. Jalankan Docker Compose Stack
 # ------------------------------------------------------------------------------
@@ -253,9 +266,9 @@ if ($dockerMode -eq "DOCKER_CLI") {
     # Jalankan compose via WSL2
     $wslPath = $projectRoot.Replace('\', '/').Replace('C:', '/mnt/c').Replace('c:', '/mnt/c')
     if ($hasBuild) {
-        & wsl.exe -e sh -c "cd '$wslPath' && sudo docker compose up -d --build"
+        & wsl.exe -e sh -c "cd '$wslPath' && export BREMSPACE_HOST_CHALLENGE='$challengeCode' && sudo -E docker compose up -d --build"
     } else {
-        & wsl.exe -e sh -c "cd '$wslPath' && echo '$ghPat' | sudo docker login ghcr.io -u bremspace --password-stdin 2>/dev/null; sudo docker compose pull app queue; sudo docker compose up -d"
+        & wsl.exe -e sh -c "cd '$wslPath' && export BREMSPACE_HOST_CHALLENGE='$challengeCode' && echo '$ghPat' | sudo docker login ghcr.io -u bremspace --password-stdin 2>/dev/null; sudo -E docker compose pull app queue; sudo -E docker compose up -d"
     }
 } else {
     Write-Host "⚠️ Docker belum siap sepenuhnya. Menjalankan fallback PHP runtime lokal..." -ForegroundColor Yellow

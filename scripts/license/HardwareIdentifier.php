@@ -27,11 +27,26 @@ final class HardwareIdentifier
     }
 
     /**
+     * Deteksi apakah aplikasi berjalan di dalam kontainer Docker
+     */
+    public static function isDocker(): bool
+    {
+        return file_exists('/.dockerenv') ||
+               file_exists('/run/.containerenv') ||
+               (file_exists('/proc/1/cgroup') && str_contains((string) @file_get_contents('/proc/1/cgroup'), 'docker'));
+    }
+
+    /**
      * Format Machine Challenge Code yang ramah pengguna untuk dikirim via WhatsApp
      * Format: BREM-XXXX-YYYY-ZZZZ (12 karakter alfanumerik)
      */
     public static function getChallengeCode(): string
     {
+        // Jika berjalan di dalam kontainer Docker dan terdapat binding challenge host resmi
+        if (self::isDocker() && ! empty(getenv('BREMSPACE_HOST_CHALLENGE'))) {
+            return (string) getenv('BREMSPACE_HOST_CHALLENGE');
+        }
+
         $hash = strtoupper(self::getMachineHash());
         $p1 = substr($hash, 0, 4);
         $p2 = substr($hash, 4, 4);
@@ -70,9 +85,6 @@ final class HardwareIdentifier
 
     private static function getWindowsIdentifier(): string
     {
-        $parts = [];
-
-        // A. Motherboard / System UUID via PowerShell / WMIC
         $uuid = shell_exec('powershell -NoProfile -Command "(Get-CimInstance -ClassName Win32_ComputerSystemProduct).UUID" 2>$null');
         if (! $uuid) {
             $uuid = shell_exec('wmic csproduct get uuid 2>nul');
@@ -80,31 +92,11 @@ final class HardwareIdentifier
         if ($uuid) {
             $cleaned = preg_replace('/[^A-Za-z0-9\-]/', '', $uuid);
             if (! empty($cleaned) && ! str_contains(strtolower($cleaned), 'uuid')) {
-                $parts[] = $cleaned;
+                return $cleaned;
             }
         }
 
-        // B. Serial Number BIOS / Motherboard
-        $serial = shell_exec('powershell -NoProfile -Command "(Get-CimInstance -ClassName Win32_BIOS).SerialNumber" 2>$null');
-        if ($serial) {
-            $cleaned = preg_replace('/[^A-Za-z0-9\-]/', '', $serial);
-            if (! empty($cleaned)) {
-                $parts[] = $cleaned;
-            }
-        }
-
-        // C. System Drive Volume Serial Number
-        $vol = shell_exec('vol C: 2>nul');
-        if ($vol && preg_match('/([0-9A-Fa-f]{4}-[0-9A-Fa-f]{4})/', $vol, $m)) {
-            $parts[] = $m[1];
-        }
-
-        if (empty($parts)) {
-            // Fallback: CPU Processor ID / Machine Name
-            $parts[] = gethostname() ?: 'WIN-GENERIC';
-        }
-
-        return implode('|', $parts);
+        return gethostname() ?: 'WIN-GENERIC';
     }
 
     private static function getLinuxIdentifier(): string

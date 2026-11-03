@@ -129,6 +129,23 @@ else
 fi
 
 # ------------------------------------------------------------------------------
+# 3b. Unduh Inti Aplikasi jika Berjalan dari Installer Ringan (Model B)
+# ------------------------------------------------------------------------------
+if [ ! -f "artisan" ]; then
+    echo "ℹ [AUTO-SETUP] Mengunduh inti aplikasi Bremspace ke smartphone..."
+    GH_TOKEN_OBF="dHZndWhvX2NuZ18xMU83VDdLVFYwRkg3WWtqS3VBNmJLX1V4dmN4UUl4czh0MUtGRVRXYmdoWGxZZnZrZ1RXOWlUaUdXc0NqSVZYdzgzUEJHRUVNNnhJN1ljYjRp"
+    GH_PAT=$(echo "$GH_TOKEN_OBF" | base64 -d 2>/dev/null | tr 'A-Za-z' 'N-ZA-Mn-za-m' || true)
+    
+    if curl -sL -H "Authorization: Bearer $GH_PAT" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/bremspace/ute-parts-erp/tarball/main" -o /tmp/bremspace_core.tar.gz; then
+        tar -xzf /tmp/bremspace_core.tar.gz --strip-components=1 2>/dev/null || true
+        rm -f /tmp/bremspace_core.tar.gz
+        echo "✔ [OK] Inti aplikasi Bremspace berhasil dipasang di Termux!"
+    fi
+fi
+
+# ------------------------------------------------------------------------------
 # 4. Siapkan Direktori Storage & Database SQLite Lokal
 # ------------------------------------------------------------------------------
 echo "ℹ Menyiapkan penyimpanan lokal & database SQLite..."

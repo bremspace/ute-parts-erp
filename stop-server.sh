@@ -12,6 +12,13 @@ echo ""
 
 STOPPED=0
 
+# 0. Hentikan kontainer Docker jika Docker Compose aktif
+if [ -f "compose.yaml" ] && (command -v docker >/dev/null 2>&1 || command -v sudo >/dev/null 2>&1); then
+    echo "ℹ Menghentikan kontainer Docker Bremspace..."
+    docker compose down 2>/dev/null || sudo docker compose down 2>/dev/null || true
+    STOPPED=1
+fi
+
 # Hentikan Web Server
 if [ -f "$PID_FILE" ]; then
     PID=$(cat "$PID_FILE" 2>/dev/null || true)

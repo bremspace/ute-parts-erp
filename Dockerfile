@@ -61,6 +61,12 @@ COPY docker/php/php.ini /usr/local/etc/php/conf.d/99-bremspace.ini
 # Copy application source code
 COPY . /var/www/html
 
+# Install Composer dependencies (production optimized)
+RUN composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+
+# Backup public assets to template directory for volume sync
+RUN cp -r public /var/www/html/public_template
+
 # Prepare storage directories, database & cache permissions
 RUN mkdir -p \
     storage/framework/cache/data \
