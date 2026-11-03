@@ -461,10 +461,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                     break;
                 }
 
-                // 1. Coba aktifkan di php.ini jika ada & writable (terutama Windows / Laragon / XAMPP)
+                // 1. Coba aktifkan di php.ini jika ada & writable (terutama Windows / Laragon / XAMPP / Native)
                 if ($iniFile && is_file($iniFile) && is_writable($iniFile)) {
                     $content = (string) file_get_contents($iniFile);
                     $modified = false;
+
+                    // Pastikan extension_dir aktif di Windows jika belum
+                    if ($isWindows) {
+                        if (preg_match('/^[;\s]*extension_dir\s*=\s*"ext"/mi', $content)) {
+                            $content = preg_replace('/^[;\s]*extension_dir\s*=\s*"ext"/mi', 'extension_dir = "ext"', $content);
+                            $modified = true;
+                            $logs[] = "Mengaktifkan direktif 'extension_dir = \"ext\"' di php.ini.";
+                        }
+                    }
+
                     foreach ($missing as $e) {
                         if ($e === 'opcache') {
                             $pattern = '/^[;\s]*zend_extension\s*=\s*(php_)?opcache(\.dll)?/mi';
@@ -485,6 +495,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                             $content = preg_replace($pattern, 'extension='.$e, $content);
                             $modified = true;
                             $logs[] = "Mengaktifkan baris 'extension={$e}' di php.ini.";
+                        } elseif (! preg_match('/(?m)^extension\s*=\s*'.preg_quote($e, '/').'\b/', $content)) {
+                            // Jika baris ekstensi belum ada, tambahkan di bawah section [PHP]
+                            if (preg_match('/(?m)^\[PHP\]/', $content)) {
+                                $content = preg_replace('/(?m)^\[PHP\]/', "[PHP]\nextension={$e}", $content, 1);
+                            } else {
+                                $content .= "\nextension={$e}\n";
+                            }
+                            $modified = true;
+                            $logs[] = "Menambahkan baris 'extension={$e}' ke php.ini.";
                         }
                     }
                     if ($modified) {
@@ -497,8 +516,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                     }
                 }
 
-                // 2. Panduan & Perintah berdasarkan OS
-                if ($isWindows) {
+                // 2. Panduan & Perintah otomatis berdasarkan OS (Windows, Android Termux, Linux Debian/Ubuntu, RHEL/CentOS, macOS)
+                $isTermux = (getenv('PREFIX') && str_contains(getenv('PREFIX'), 'com.termux'))
+                    || file_exists('/data/data/com.termux')
+                    || is_dir('/data/data/com.termux/files/usr');
+
+                if ($isTermux) {
+                    $manualCmd = 'pkg update -y && pkg install -y php php-sqlite curl git openssl';
+                    $logs[] = 'Lingkungan Android Termux terdeteksi (Non-Root).';
+                    $pkgRes = runCommand($manualCmd.' 2>&1');
+                    if ($pkgRes['status'] === 0) {
+                        $restartNeeded = true;
+                        $logs[] = 'Paket PHP & SQLite berhasil dipasang/diperbarui di Termux! Harap jalankan ulang ./start-termux.sh.';
+                    } else {
+                        $logs[] = 'Menjalankan di Termux: '.$manualCmd;
+                    }
+                } elseif ($isWindows) {
                     if (! empty($missing) && ! $restartNeeded) {
                         $manualCmd = 'powershell -ExecutionPolicy Bypass -File scripts\setup-windows-php.ps1';
                         $logs[] = 'Di Windows, ekstensi belum aktif di php.ini. Jalankan setup-windows-php.ps1 atau buka file '.$iniPath.' dan hilangkan tanda titik koma (;) pada baris ekstensi.';
@@ -512,6 +545,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                     $pkgList = [];
                     $extPkgMap = [
                         'pdo_mysql' => "php{$majorMinor}-mysql",
+                        'pdo_sqlite' => "php{$majorMinor}-sqlite3",
+                        'sqlite3' => "php{$majorMinor}-sqlite3",
                         'dom' => "php{$majorMinor}-xml",
                         'xml' => "php{$majorMinor}-xml",
                         'simplexml' => "php{$majorMinor}-xml",
@@ -522,6 +557,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                         'zip' => "php{$majorMinor}-zip",
                         'intl' => "php{$majorMinor}-intl",
                         'bcmath' => "php{$majorMinor}-bcmath",
+                        'fileinfo' => "php{$majorMinor}-common",
                         'opcache' => "php{$majorMinor}-opcache",
                         'tokenizer' => "php{$majorMinor}-common",
                         'ctype' => "php{$majorMinor}-common",
@@ -531,7 +567,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                             $pkgList[] = $extPkgMap[$m];
                         }
                     }
-                    // Tambahkan php-imagick sebagai paket rekomendasi jika di Linux
                     if (! extension_loaded('imagick')) {
                         $pkgList[] = "php{$majorMinor}-imagick";
                     }
@@ -553,6 +588,25 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                         } else {
                             $logs[] = 'Ekstensi memerlukan izin root di terminal: '.$manualCmd;
                         }
+                    }
+                } elseif (runCommand('which dnf')['status'] === 0 || runCommand('which yum')['status'] === 0) {
+                    // Linux RHEL / Rocky / Alma / Fedora
+                    $pkgManager = (runCommand('which dnf')['status'] === 0) ? 'dnf' : 'yum';
+                    $manualCmd = "sudo {$pkgManager} install -y php-mysqlnd php-pdo php-gd php-mbstring php-xml php-curl php-zip php-intl php-bcmath php-opcache unzip";
+                    $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
+                    $canSudo = runCommand('sudo -n true 2>/dev/null')['status'] === 0;
+
+                    if ($isRoot || $canSudo) {
+                        $pfx = $isRoot ? '' : 'sudo ';
+                        $dnfRes = runCommand("{$pfx}{$pkgManager} install -y php-mysqlnd php-pdo php-gd php-mbstring php-xml php-curl php-zip php-intl php-bcmath php-opcache unzip 2>&1");
+                        if ($dnfRes['status'] === 0) {
+                            $restartNeeded = true;
+                            $logs[] = "Paket ekstensi berhasil dipasang via {$pkgManager}! Harap restart server PHP.";
+                        } else {
+                            $logs[] = "Gagal otomatis via {$pkgManager}: ".$dnfRes['output'];
+                        }
+                    } else {
+                        $logs[] = 'Ekstensi memerlukan izin root di terminal: '.$manualCmd;
                     }
                 }
                 break;

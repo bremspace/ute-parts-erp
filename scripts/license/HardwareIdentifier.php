@@ -124,16 +124,26 @@ final class HardwareIdentifier
     {
         $parts = [];
 
-        // A. Android Secure ID via Termux command
-        $androidId = shell_exec('settings get secure android_id 2>/dev/null');
-        if ($androidId && trim($androidId) !== '' && trim($androidId) !== 'null') {
-            $parts[] = trim($androidId);
+        // A. Android Secure ID via Termux command (jika diizinkan)
+        $androidId = @shell_exec('settings get secure android_id 2>/dev/null');
+        if ($androidId && is_string($androidId)) {
+            $cleanId = trim($androidId);
+            if ($cleanId !== '' && $cleanId !== 'null' && ! stripos($cleanId, 'exception') && ! stripos($cleanId, 'denied') && ! stripos($cleanId, 'permission') && strlen($cleanId) < 64) {
+                $parts[] = $cleanId;
+            }
         }
 
-        // B. Getprop system fingerprint / serial
-        $fingerprint = shell_exec('getprop ro.build.fingerprint 2>/dev/null');
-        if ($fingerprint && trim($fingerprint) !== '') {
+        // B. Getprop system fingerprint & serial (selalu terbaca oleh non-root)
+        $fingerprint = @shell_exec('getprop ro.build.fingerprint 2>/dev/null');
+        if ($fingerprint && is_string($fingerprint) && trim($fingerprint) !== '') {
             $parts[] = trim($fingerprint);
+        } else {
+            $model = trim((string) @shell_exec('getprop ro.product.model 2>/dev/null'));
+            $brand = trim((string) @shell_exec('getprop ro.product.brand 2>/dev/null'));
+            $device = trim((string) @shell_exec('getprop ro.product.device 2>/dev/null'));
+            if ($model || $brand) {
+                $parts[] = "{$brand}:{$model}:{$device}";
+            }
         }
 
         if (empty($parts)) {

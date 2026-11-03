@@ -17,28 +17,34 @@ if errorlevel 1 (
         set "POWERSHELL_BIN=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
     ) else (
         echo [ERROR] Windows PowerShell tidak ditemukan di sistem ini.
-        pause
+        echo.
+        echo ======================================================================
+        echo Tekan tombol apa saja untuk menutup jendela ini...
+        pause >nul
         exit /b 1
     )
 )
 
-:: 2. Prioritaskan Docker Engine (WSL2 Native / Desktop)
+:: 2. Prioritaskan Docker Engine (WSL2 Native / Desktop) dengan Fallback Lokal
 if exist "%~dp0scripts\install-docker.ps1" (
     "%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install-docker.ps1" %*
 ) else (
-    :: Fallback ke installer PHP lokal
     "%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install.ps1" %*
 )
 
 set "EXIT_CODE=%ERRORLEVEL%"
+
+echo.
+echo ======================================================================
 if %EXIT_CODE% neq 0 (
-    echo.
-    echo ======================================================================
-    echo [ERROR] Eksekusi installer selesai dengan kode: %EXIT_CODE%
-    echo Silakan periksa pesan di atas untuk detail kendala.
-    echo ======================================================================
-    echo Tekan tombol apa saja untuk menutup jendela ini...
-    pause >nul
+    echo [INFO] Inisialisasi selesai dengan status kode: %EXIT_CODE%
+    echo Silakan periksa pesan di atas jika terdapat kendala instalasi.
+) else (
+    echo [SUKSES] Seluruh tahapan peluncur sistem Bremspace berhasil diproses!
+    echo Jendela ini dapat dibiarkan terbuka atau diminimize selama server berjalan.
 )
+echo ======================================================================
+echo Tekan tombol apa saja untuk menutup jendela ini...
+pause >nul
 
 exit /b %EXIT_CODE%

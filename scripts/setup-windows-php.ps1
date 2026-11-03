@@ -192,7 +192,7 @@ try {
 # ------------------------------------------------------------------------------
 # 4. Konfigurasi php.ini: Menghilangkan Komentar (;) dan Mengaktifkan Modul
 # ------------------------------------------------------------------------------
-Write-Host "[4/4] Mengonfigurasi php.ini untuk Laravel 13 dan UteParts ERP..." -ForegroundColor Cyan
+Write-Host "[4/4] Mengonfigurasi php.ini untuk Laravel 13 dan Bremspace ERP..." -ForegroundColor Cyan
 
 $iniDev = Join-Path $destDir 'php.ini-development'
 $iniProd = Join-Path $destDir 'php.ini-production'
@@ -226,16 +226,17 @@ $extList = @(
 if ($baseContent) {
     $c = $baseContent
     $c = $c -replace '(?m)^[;\s]*extension_dir\s*=\s*"ext"', "extension_dir = `"$extPathFormatted`""
+    $c = $c -replace '(?m)^[;\s]*extension_dir\s*=\s*"./"', "extension_dir = `"$extPathFormatted`""
     foreach ($ext in $extList) {
-        $c = [System.Text.RegularExpressions.Regex]::Replace($c, "(?m)^[;\s]*extension\s*=\s*$ext\b", "extension=$ext")
+        $c = [System.Text.RegularExpressions.Regex]::Replace($c, "(?m)^[;\s]*extension\s*=\s*(php_)?$ext(\.dll)?\b", "extension=$ext")
     }
-    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*zend_extension\s*=\s*opcache\b', 'zend_extension=opcache')
-    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*opcache\.enable\s*=\s*1\b', 'opcache.enable=1')
-    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*opcache\.enable_cli\s*=\s*0\b', 'opcache.enable_cli=1')
-    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^memory_limit\s*=\s*\d+M', 'memory_limit = 512M')
-    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^max_execution_time\s*=\s*\d+', 'max_execution_time = 300')
-    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^post_max_size\s*=\s*\d+M', 'post_max_size = 64M')
-    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^upload_max_filesize\s*=\s*\d+M', 'upload_max_filesize = 64M')
+    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*zend_extension\s*=\s*(php_)?opcache(\.dll)?\b', 'zend_extension=opcache')
+    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*opcache\.enable\s*=\s*\d\b', 'opcache.enable=1')
+    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*opcache\.enable_cli\s*=\s*\d\b', 'opcache.enable_cli=1')
+    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*memory_limit\s*=\s*\d+M', 'memory_limit = 512M')
+    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*max_execution_time\s*=\s*\d+', 'max_execution_time = 300')
+    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*post_max_size\s*=\s*\d+M', 'post_max_size = 64M')
+    $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*upload_max_filesize\s*=\s*\d+M', 'upload_max_filesize = 64M')
     $c = [System.Text.RegularExpressions.Regex]::Replace($c, '(?m)^[;\s]*date\.timezone\s*=', 'date.timezone = Asia/Jakarta')
 
     if (Test-Path $cacertFile) {
@@ -247,12 +248,12 @@ if ($baseContent) {
     $c = "[PHP]`r`n"
 }
 
+# Pastikan semua ekstensi wajib terpasang di bawah [PHP]
 $appendLines = @(
     "",
     ";; ==============================================================================",
-    ";; ERP and POS System Mandatory Overrides",
+    ";; Bremspace ERP Mandatory Extensions and Performance",
     ";; ==============================================================================",
-    "[ErpPos]",
     "extension_dir = `"$extPathFormatted`"",
     "extension=curl",
     "extension=fileinfo",
@@ -267,6 +268,7 @@ $appendLines = @(
     "extension=zip",
     "extension=bcmath",
     "extension=exif",
+    "zend_extension=opcache",
     "memory_limit = 512M",
     "max_execution_time = 300",
     "post_max_size = 64M",
@@ -290,6 +292,16 @@ if (Test-Path $phpExe) {
         $ver = & $phpExe -r "echo PHP_VERSION;" 2>&1
         if ($ver -and ($ver -notmatch 'Error') -and ($ver -notmatch 'Warning') -and ($ver -match '^\d+\.\d+')) {
             Write-Host "[OK] PHP Portable ($ver) berhasil aktif dan terverifikasi!" -ForegroundColor Green
+            # Log modul yang terpasang
+            $mods = & $phpExe -m 2>&1
+            $critical = @('pdo_mysql', 'pdo_sqlite', 'curl', 'mbstring', 'openssl', 'fileinfo')
+            foreach ($m in $critical) {
+                if ($mods -match "\b$m\b") {
+                    Write-Host "  -> Ekstensi [$m] aktif." -ForegroundColor Green
+                } else {
+                    Write-Host "  -> Ekstensi [$m] belum terdeteksi di php -m" -ForegroundColor Yellow
+                }
+            }
             exit 0
         } else {
             Write-Host "[ERROR] PHP diekstrak tetapi runtime menghasilkan error: $ver" -ForegroundColor Red

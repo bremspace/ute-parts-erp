@@ -1,7 +1,7 @@
 # ==============================================================================
 # Bremspace ERP dan POS System - Windows Universal Docker Installer and Launcher
 # Brand: Bremspace
-# Strategi: WSL2 Docker Engine Native (Bebas Biaya Lisensi) + Docker Desktop Fallback
+# Strategi: WSL2 Docker Engine Native + Docker Desktop + Fallback PHP Runtime Lokal
 # ==============================================================================
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
@@ -14,7 +14,7 @@ $projectRoot = Split-Path -Parent $scriptDir
 Set-Location -Path $projectRoot
 
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "   Bremspace ERP dan POS System - Windows Docker Universal Launcher" -ForegroundColor Cyan
+Write-Host "   Bremspace ERP dan POS System - Windows Universal Launcher" -ForegroundColor Cyan
 Write-Host "   Target Port: 1741 (Localhost dan Jaringan Wi-Fi/LAN)" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
@@ -30,74 +30,72 @@ try {
 } catch {}
 
 if ($isAdmin) {
-    Write-Host "[OK] Berjalan dengan Hak Akses Administrator." -ForegroundColor Green
+    Write-Host "[OK] Hak Akses: Administrator (Elevated)." -ForegroundColor Green
 } else {
-    Write-Host "[INFO] Berjalan sebagai Standard User." -ForegroundColor Yellow
+    Write-Host "[INFO] Hak Akses: Standard User." -ForegroundColor Yellow
 }
 
 # ------------------------------------------------------------------------------
 # 2. Deteksi Engine Docker (Docker Desktop vs WSL2 Native)
 # ------------------------------------------------------------------------------
-Write-Host "[1/5] Memeriksa engine Docker di Windows..." -ForegroundColor Cyan
+Write-Host "[1/5] Memeriksa ketersediaan engine Docker di Windows..." -ForegroundColor Cyan
 
 $dockerCmd = Get-Command docker.exe -ErrorAction SilentlyContinue
 $dockerMode = "NONE"
 
-# A. Cek apakah Docker Desktop sudah ada dan daemon merespon
+# A. Cek apakah Docker CLI / Docker Desktop terpasang
 if ($dockerCmd) {
-    $info = & docker.exe info 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        $dockerMode = "DOCKER_CLI"
-        Write-Host "[OK] Docker daemon aktif dan siap digunakan." -ForegroundColor Green
-    } else {
-        # Coba jalankan Docker Desktop jika terpasang
-        $ddPath = "${env:ProgramFiles}\Docker\Docker\Docker Desktop.exe"
-        if (Test-Path $ddPath) {
-            Write-Host "[INFO] Menyalakan Docker Desktop di background..." -ForegroundColor Yellow
-            Start-Process -FilePath $ddPath -WindowStyle Hidden
-            for ($i = 0; $i -lt 15; $i++) {
-                Start-Sleep -Seconds 2
-                $test = & docker.exe info 2>&1
-                if ($LASTEXITCODE -eq 0) {
-                    $dockerMode = "DOCKER_CLI"
-                    Write-Host "[OK] Docker Desktop berhasil tersambung." -ForegroundColor Green
-                    break
+    try {
+        $info = & docker.exe info 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $dockerMode = "DOCKER_CLI"
+            Write-Host "[OK] Docker Engine aktif dan siap digunakan." -ForegroundColor Green
+        } else {
+            # Coba jalankan Docker Desktop jika terpasang
+            $ddPath = "${env:ProgramFiles}\Docker\Docker\Docker Desktop.exe"
+            if (Test-Path $ddPath) {
+                Write-Host "[INFO] Menyalakan Docker Desktop di background..." -ForegroundColor Yellow
+                Start-Process -FilePath $ddPath -WindowStyle Hidden -ErrorAction SilentlyContinue
+                for ($i = 0; $i -lt 15; $i++) {
+                    Start-Sleep -Seconds 2
+                    $test = & docker.exe info 2>&1
+                    if ($LASTEXITCODE -eq 0) {
+                        $dockerMode = "DOCKER_CLI"
+                        Write-Host "[OK] Docker Desktop berhasil tersambung." -ForegroundColor Green
+                        break
+                    }
                 }
             }
         }
+    } catch {
+        Write-Host "[INFO] Docker CLI terdeteksi namun daemon belum aktif." -ForegroundColor Yellow
     }
 }
 
-# B. Jika Docker Desktop tidak ada, gunakan WSL2 Docker Engine (Bebas Biaya Lisensi)
+# B. Jika Docker Desktop tidak aktif, periksa fitur WSL2 Windows
 if ($dockerMode -eq "NONE") {
-    Write-Host "[INFO] Docker Desktop tidak terdeteksi. Memeriksa fitur WSL2 Windows..." -ForegroundColor Cyan
+    Write-Host "[INFO] Docker Desktop tidak terdeteksi. Memeriksa fitur WSL2..." -ForegroundColor Cyan
     $wslCmd = Get-Command wsl.exe -ErrorAction SilentlyContinue
     
     if ($wslCmd) {
-        # Cek apakah WSL2 sudah terpasang
-        $wslList = & wsl.exe --list --quiet 2>&1
-        if ($LASTEXITCODE -eq 0 -and $wslList) {
-            Write-Host "[OK] WSL2 Windows terdeteksi aktif." -ForegroundColor Green
-            # Periksa docker di dalam WSL
-            $wslDocker = & wsl.exe -e sh -c "command -v docker" 2>&1
-            if ($LASTEXITCODE -eq 0 -and $wslDocker) {
-                $dockerMode = "WSL2"
-                Write-Host "[OK] Docker Engine di dalam WSL2 siap digunakan." -ForegroundColor Green
-            } else {
-                Write-Host "[AUTO-FIX] Memasang Docker Engine di dalam distro WSL2..." -ForegroundColor Yellow
-                & wsl.exe -e sh -c "curl -fsSL https://get.docker.com | sh; sudo service docker start" 2>$null
-                $dockerMode = "WSL2"
+        try {
+            $wslList = & wsl.exe --list --quiet 2>&1
+            if ($LASTEXITCODE -eq 0 -and $wslList) {
+                Write-Host "[OK] WSL2 Windows terdeteksi aktif." -ForegroundColor Green
+                $wslDocker = & wsl.exe -e sh -c "command -v docker" 2>&1
+                if ($LASTEXITCODE -eq 0 -and $wslDocker) {
+                    $dockerMode = "WSL2"
+                    Write-Host "[OK] Docker Engine di dalam WSL2 siap digunakan." -ForegroundColor Green
+                }
             }
-        } else {
-            Write-Host "[AUTO-FIX] Menyiapkan WSL2 otomatis untuk Windows..." -ForegroundColor Yellow
-            if ($isAdmin) {
-                & wsl.exe --install --no-distribution
-                Write-Host "[OK] Komponen WSL2 berhasil didaftarkan ke Windows." -ForegroundColor Green
-            } else {
-                Write-Host "[WARN] Untuk mengaktifkan WSL2 otomatis tanpa Docker Desktop, jalankan file ini sebagai Administrator." -ForegroundColor Yellow
-            }
-        }
+        } catch {}
     }
+}
+
+if ($dockerMode -ne "NONE") {
+    Write-Host "[OK] Mode Operasi: $dockerMode" -ForegroundColor Green
+} else {
+    Write-Host "[INFO] Docker tidak aktif. Sistem akan menggunakan Fallback PHP Runtime Lokal." -ForegroundColor Yellow
 }
 
 # ------------------------------------------------------------------------------
@@ -108,7 +106,6 @@ Write-Host "[2/5] Memeriksa lisensi perangkat Bremspace..." -ForegroundColor Cya
 $licenseFile = Join-Path $projectRoot 'storage\license.key'
 $isLicensed = $false
 
-# Helper kalkulasi signature
 function Get-MachineChallengeCode {
     $systemProduct = Get-CimInstance -ClassName Win32_ComputerSystemProduct -ErrorAction SilentlyContinue
     $rawUuid = if ($systemProduct -and $systemProduct.UUID) { $systemProduct.UUID } else { $env:COMPUTERNAME }
@@ -200,7 +197,7 @@ if (-not $isLicensed) {
 }
 
 # ------------------------------------------------------------------------------
-# 4. Siapkan Direktori Storage dan Data MySQL
+# 4. Siapkan Direktori Penyimpanan Lokal
 # ------------------------------------------------------------------------------
 Write-Host "[3/5] Menyiapkan volume penyimpanan lokal..." -ForegroundColor Cyan
 $folders = @(
@@ -219,7 +216,6 @@ foreach ($f in $folders) {
     if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
 }
 
-# Pastikan file .env tersedia untuk mount volume Docker
 $envFile = Join-Path $projectRoot '.env'
 $envExample = Join-Path $projectRoot '.env.example'
 if (-not (Test-Path $envFile)) {
@@ -231,12 +227,27 @@ if (-not (Test-Path $envFile)) {
 }
 $env:BREMSPACE_HOST_CHALLENGE = $challengeCode
 
-# ------------------------------------------------------------------------------
-# 5. Jalankan Docker Compose Stack
-# ------------------------------------------------------------------------------
-Write-Host "[4/5] Menyalakan kontainer Bremspace ERP dan POS (Port 1741)..." -ForegroundColor Cyan
+# Helper verifikasi koneksi port TCP
+function Test-PortListening([int]$p) {
+    try {
+        $client = New-Object System.Net.Sockets.TcpClient
+        $iar = $client.BeginConnect("127.0.0.1", $p, $null, $null)
+        $ready = $iar.AsyncWaitHandle.WaitOne(1000, $false)
+        if ($ready -and $client.Connected) {
+            $client.EndConnect($iar)
+            $client.Close()
+            return $true
+        }
+        $client.Close()
+    } catch {}
+    return $false
+}
 
-# Login ke GHCR otomatis jika token tersedia
+# ------------------------------------------------------------------------------
+# 5. Jalankan Service Stack (Docker atau Fallback Lokal)
+# ------------------------------------------------------------------------------
+Write-Host "[4/5] Menyalakan server Bremspace ERP dan POS (Port 1741)..." -ForegroundColor Cyan
+
 $ghTokenObf = "dHZndWhvX2NuZ18xMU83VDdLVFYwRkg3WWtqS3VBNmJLX1V4dmN4UUl4czh0MUtGRVRXYmdoWGxZZnZrZ1RXOWlUaUdXc0NqSVZYdzgzUEJHRUVNNnhJN1ljYjRp"
 $ghPat = ""
 try {
@@ -249,32 +260,115 @@ try {
         elseif ($c -ge 97 -and $c -le 122) { $chars[$i] = [char](((($c - 97) + 13) % 26) + 97) }
     }
     $ghPat = -join $chars
-    if ($dockerMode -eq "DOCKER_CLI") {
-        $ghPat | & docker.exe login ghcr.io -u bremspace --password-stdin 2>$null
-    }
 } catch {}
 
-$hasBuild = (Test-Path "Dockerfile") -and ((Get-Content "compose.yaml" -Raw -ErrorAction SilentlyContinue) -match "build:")
+$serverStarted = $false
 
 if ($dockerMode -eq "DOCKER_CLI") {
-    if ($hasBuild) {
-        & docker.exe compose up -d --build
-    } else {
-        & docker.exe compose pull app queue 2>$null
-        & docker.exe compose up -d
+    try {
+        if ($ghPat) {
+            $ghPat | & docker.exe login ghcr.io -u bremspace --password-stdin 2>$null
+        }
+        $hasBuild = (Test-Path "Dockerfile") -and ((Get-Content "compose.yaml" -Raw -ErrorAction SilentlyContinue) -match "build:")
+        if ($hasBuild) {
+            & docker.exe compose up -d --build
+        } else {
+            & docker.exe compose pull app queue 2>$null
+            & docker.exe compose up -d
+        }
+
+        # Tunggu container siap
+        Write-Host "[INFO] Menunggu kontainer siap di port 1741..." -ForegroundColor Yellow
+        for ($s = 0; $s -lt 10; $s++) {
+            Start-Sleep -Seconds 1
+            if (Test-PortListening 1741) {
+                $serverStarted = $true
+                Write-Host "[OK] Kontainer Docker Bremspace aktif melayani di port 1741." -ForegroundColor Green
+                break
+            }
+        }
+    } catch {
+        Write-Host "[WARN] Kendala saat menjalankan Docker Compose: $_" -ForegroundColor Yellow
     }
 } elseif ($dockerMode -eq "WSL2") {
-    # Jalankan compose via WSL2
-    $wslPath = $projectRoot.Replace('\', '/').Replace('C:', '/mnt/c').Replace('c:', '/mnt/c')
-    if ($hasBuild) {
-        & wsl.exe -e sh -c "cd '$wslPath'; export BREMSPACE_HOST_CHALLENGE='$challengeCode'; sudo -E docker compose up -d --build"
-    } else {
-        & wsl.exe -e sh -c "cd '$wslPath'; export BREMSPACE_HOST_CHALLENGE='$challengeCode'; echo '$ghPat' | sudo docker login ghcr.io -u bremspace --password-stdin 2>/dev/null; sudo -E docker compose pull app queue; sudo -E docker compose up -d"
+    try {
+        $wslPath = $projectRoot.Replace('\', '/').Replace('C:', '/mnt/c').Replace('c:', '/mnt/c')
+        $hasBuild = (Test-Path "Dockerfile") -and ((Get-Content "compose.yaml" -Raw -ErrorAction SilentlyContinue) -match "build:")
+        if ($hasBuild) {
+            & wsl.exe -e sh -c "cd '$wslPath'; export BREMSPACE_HOST_CHALLENGE='$challengeCode'; sudo -E docker compose up -d --build"
+        } else {
+            & wsl.exe -e sh -c "cd '$wslPath'; export BREMSPACE_HOST_CHALLENGE='$challengeCode'; echo '$ghPat' | sudo docker login ghcr.io -u bremspace --password-stdin 2>/dev/null; sudo -E docker compose pull app queue; sudo -E docker compose up -d"
+        }
+
+        for ($s = 0; $s -lt 10; $s++) {
+            Start-Sleep -Seconds 1
+            if (Test-PortListening 1741) {
+                $serverStarted = $true
+                Write-Host "[OK] Docker Engine WSL2 aktif melayani di port 1741." -ForegroundColor Green
+                break
+            }
+        }
+    } catch {
+        Write-Host "[WARN] Kendala saat menjalankan Docker via WSL2: $_" -ForegroundColor Yellow
     }
-} else {
-    Write-Host "[WARN] Docker belum siap sepenuhnya. Menjalankan fallback PHP runtime lokal..." -ForegroundColor Yellow
-    # Fallback to local PHP if docker is not installed
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scriptDir 'setup-windows-php.ps1')
+}
+
+# Jika Docker gagal atau tidak ada, jalankan Fallback PHP Runtime Lokal
+if (-not $serverStarted) {
+    Write-Host "[INFO] Mengaktifkan Fallback Runtime PHP Lokal Mandiri..." -ForegroundColor Yellow
+    
+    # 1. Pastikan PHP Portable 8.4 terpasang
+    $setupPhpScript = Join-Path $scriptDir 'setup-windows-php.ps1'
+    if (Test-Path $setupPhpScript) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupPhpScript
+    }
+
+    # Cari php.exe
+    $phpExe = "php.exe"
+    $localPhp = Join-Path $projectRoot 'tools\php\php.exe'
+    if (Test-Path $localPhp) {
+        $phpExe = $localPhp
+    }
+
+    # 2. Jika kode inti belum ada (Model B Installer Tipis), unduh langsung dari repo
+    if (-not (Test-Path (Join-Path $projectRoot 'artisan'))) {
+        Write-Host "[INFO] Mengunduh berkas inti aplikasi Bremspace ke direktori lokal..." -ForegroundColor Cyan
+        try {
+            $tarUrl = "https://api.github.com/repos/bremspace/ute-parts-erp/tarball/main"
+            $tempTar = Join-Path $env:TEMP 'bremspace_core.tar.gz'
+            
+            $headers = @{
+                "User-Agent" = "Bremspace-Installer"
+                "Accept" = "application/vnd.github.v3+json"
+            }
+            if ($ghPat) {
+                $headers["Authorization"] = "Bearer $ghPat"
+            }
+            
+            Invoke-RestMethod -Uri $tarUrl -Headers $headers -OutFile $tempTar
+            if (Test-Path $tempTar) {
+                tar -xzf $tempTar --strip-components=1 -C $projectRoot 2>$null
+                Remove-Item -Path $tempTar -Force -ErrorAction SilentlyContinue
+                Write-Host "[OK] Berkas inti aplikasi berhasil diunduh dan dipasang!" -ForegroundColor Green
+            }
+        } catch {
+            Write-Host "[WARN] Gagal mengunduh berkas inti otomatis via GitHub API: $_" -ForegroundColor Yellow
+        }
+    }
+
+    # 3. Jalankan server background PHP lokal di port 1741
+    $docRoot = Join-Path $projectRoot 'public'
+    $logFile = Join-Path $projectRoot 'storage\logs\server.log'
+    $pidFile = Join-Path $projectRoot 'storage\framework\server.pid'
+
+    if (Test-Path $docRoot) {
+        $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:1741", "-t", "`"$docRoot`"" -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru -ErrorAction SilentlyContinue
+        if ($serverProc) {
+            Set-Content -Path $pidFile -Value $serverProc.Id -Encoding ASCII
+            Write-Host "[OK] Server PHP Lokal berhasil dinyalakan (PID: $($serverProc.Id))." -ForegroundColor Green
+            $serverStarted = $true
+        }
+    }
 }
 
 # ------------------------------------------------------------------------------

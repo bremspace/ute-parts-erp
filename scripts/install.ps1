@@ -312,13 +312,19 @@ if (Test-Path $phpIni) {
     $iniContent = Get-Content -Path $phpIni -Raw
     $extDir = (Join-Path $phpDir 'ext').Replace('\', '/')
     
-    if ($iniContent -notmatch "(?m)^\[ErpPos\]") {
+    if ($iniContent -notmatch "Bremspace ERP Extensions") {
+        $extList = @('curl','fileinfo','gd','intl','mbstring','mysqli','openssl','pdo_mysql','pdo_sqlite','sqlite3','zip','bcmath','exif')
+        $iniContent = $iniContent -replace '(?m)^[;\s]*extension_dir\s*=\s*"ext"', "extension_dir = `"$extDir`""
+        foreach ($ext in $extList) {
+            $iniContent = [System.Text.RegularExpressions.Regex]::Replace($iniContent, "(?m)^[;\s]*extension\s*=\s*(php_)?$ext(\.dll)?\b", "extension=$ext")
+        }
+        $iniContent = [System.Text.RegularExpressions.Regex]::Replace($iniContent, '(?m)^[;\s]*zend_extension\s*=\s*(php_)?opcache(\.dll)?\b', 'zend_extension=opcache')
+
         $appendLines = @(
             "",
             ";; ==============================================================================",
-            ";; ERP and POS System Extensions and Performance",
+            ";; Bremspace ERP Extensions and Performance Overrides",
             ";; ==============================================================================",
-            "[ErpPos]",
             "extension_dir = `"$extDir`"",
             "extension=curl",
             "extension=fileinfo",
@@ -333,6 +339,7 @@ if (Test-Path $phpIni) {
             "extension=zip",
             "extension=bcmath",
             "extension=exif",
+            "zend_extension=opcache",
             "memory_limit = 512M",
             "max_execution_time = 300",
             "post_max_size = 64M",
@@ -343,7 +350,7 @@ if (Test-Path $phpIni) {
         )
         $iniContent += ($appendLines -join "`r`n")
         Set-Content -Path $phpIni -Value $iniContent -Encoding ASCII
-        Write-Host " [OK] Modul php.ini berhasil dikonfigurasi & diaktifkan." -ForegroundColor Green
+        Write-Host " [OK] Modul php.ini berhasil dikonfigurasi dan diaktifkan." -ForegroundColor Green
     }
 }
 

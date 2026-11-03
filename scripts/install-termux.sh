@@ -42,11 +42,23 @@ fi
 
 if [ -n "$MISSING_PKGS" ]; then
     echo "ℹ [AUTO-FIX] Memasang dependensi di Termux:$MISSING_PKGS..."
-    pkg update -y || apt-get update -y || true
-    pkg install -y php php-sqlite curl git openssl || apt-get install -y php php-sqlite3 curl git openssl || true
+    pkg update -y 2>/dev/null || apt-get update -y 2>/dev/null || true
+    pkg install -y php php-sqlite curl git openssl 2>/dev/null || apt-get install -y php php-sqlite3 curl git openssl 2>/dev/null || true
 fi
 
 PHP_BIN="$(command -v php || echo "php")"
+
+# Pastikan modul php.ini Termux mengaktifkan SQLite dan memori cukup
+TERMUX_PHP_INI="${PREFIX:-/data/data/com.termux/files/usr}/etc/php.ini"
+if [ -f "$TERMUX_PHP_INI" ]; then
+    sed -i 's/^[;\s]*extension=pdo_sqlite/extension=pdo_sqlite/' "$TERMUX_PHP_INI" 2>/dev/null || true
+    sed -i 's/^[;\s]*extension=sqlite3/extension=sqlite3/' "$TERMUX_PHP_INI" 2>/dev/null || true
+    sed -i 's/^[;\s]*extension=curl/extension=curl/' "$TERMUX_PHP_INI" 2>/dev/null || true
+    sed -i 's/^[;\s]*extension=mbstring/extension=mbstring/' "$TERMUX_PHP_INI" 2>/dev/null || true
+    sed -i 's/^[;\s]*extension=fileinfo/extension=fileinfo/' "$TERMUX_PHP_INI" 2>/dev/null || true
+    sed -i 's/^memory_limit = .*/memory_limit = 256M/' "$TERMUX_PHP_INI" 2>/dev/null || true
+fi
+
 echo "✔ [OK] Runtime PHP: $($PHP_BIN -v | head -n 1)"
 
 # ------------------------------------------------------------------------------
