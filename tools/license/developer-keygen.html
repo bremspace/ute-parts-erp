@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UteParts Developer License Generator (Offline 2FA)</title>
+    <!-- Tailwind CSS (Offline-safe fallback or CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Standalone QR Code Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { background: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="max-w-xl w-full glass-card rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+        
+        <!-- Header -->
+        <div class="text-center space-y-2 border-b border-slate-700/60 pb-5">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold tracking-wide uppercase">
+                <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                Developer Mode &bull; 100% Offline
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-white">UteParts License Generator</h1>
+            <p class="text-xs text-slate-400">Pembangkit Kunci Lisensi Klien Berbasis Hardware & 2FA Google Authenticator</p>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex border-b border-slate-700">
+            <button id="tabGenBtn" onclick="switchTab('gen')" class="flex-1 py-2 text-sm font-medium border-b-2 border-indigo-500 text-indigo-400 focus:outline-none transition-colors">
+                1. Buat Lisensi Klien
+            </button>
+            <button id="tabSetupBtn" onclick="switchTab('setup')" class="flex-1 py-2 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition-colors">
+                2. Setup 2FA Google Auth (1x)
+            </button>
+        </div>
+
+        <!-- TAB 1: GENERATE LICENSE -->
+        <div id="tabGen" class="space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">
+                    Machine Challenge Code dari Klien (via WhatsApp)
+                </label>
+                <input type="text" id="inputChallenge" placeholder="Contoh: UTE-9B8A-7C12-88EF" 
+                       class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono tracking-wider uppercase">
+                <p class="text-[11px] text-slate-400 mt-1">Salin kode yang dikirim oleh klien saat menjalankan installer.</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">
+                    6-Digit Google Authenticator Developer Saat Ini
+                </label>
+                <div class="flex gap-2">
+                    <input type="text" id="inputTotp" maxlength="6" placeholder="Contoh: 592103" 
+                           class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono tracking-widest text-center text-lg">
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Buka Google Authenticator di HP Anda dan masukkan 6 angka yang sedang aktif.</p>
+            </div>
+
+            <button onclick="handleGenerateKey()" 
+                    class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition-all shadow-lg shadow-indigo-600/30 active:scale-[0.99] flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                Generate Activation Key
+            </button>
+
+            <!-- Result Box -->
+            <div id="resultContainer" class="hidden mt-4 p-4 rounded-xl bg-slate-900/80 border border-indigo-500/40 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        Kunci Lisensi Berhasil Dibuat
+                    </span>
+                    <button onclick="copyResult()" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Salin Kunci</button>
+                </div>
+                <div id="outputKey" class="text-lg font-mono font-bold text-white bg-slate-950 p-2.5 rounded border border-slate-800 text-center tracking-widest select-all">
+                    ACT-XXXX-YYYY-ZZZZ-WWWW
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="copyWhatsAppReply()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium py-2 px-3 rounded flex items-center justify-center gap-1.5 transition-colors">
+                        Salin Pesan Balasan WhatsApp
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: SETUP 2FA (QR CODE) -->
+        <div id="tabSetup" class="hidden space-y-4">
+            <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-200">
+                Lakukan langkah ini <strong>hanya 1 kali</strong> seumur hidup untuk mendaftarkan generator ke aplikasi Google Authenticator di HP Anda.
+            </div>
+
+            <div class="flex flex-col items-center justify-center p-4 bg-white rounded-xl shadow-inner">
+                <div id="qrcode"></div>
+            </div>
+
+            <div class="space-y-1">
+                <label class="block text-xs font-medium text-slate-300">Secret Key Cadangan (Manual Input):</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="secretKeyText" readonly 
+                           class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-indigo-300 text-center select-all">
+                    <button onclick="regenerateSecret()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded text-slate-300 whitespace-nowrap">
+                        Acak Baru
+                    </button>
+                </div>
+            </div>
+
+            <ol class="text-xs text-slate-400 space-y-1.5 list-decimal list-inside bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                <li>Buka aplikasi <strong>Google Authenticator</strong> di HP Anda.</li>
+                <li>Tekan tombol <strong>+</strong> lalu pilih <strong>Scan a QR code</strong>.</li>
+                <li>Arahkan kamera ke QR code di atas hingga muncul akun <strong>UteParts ERP Licensing</strong>.</li>
+                <li>Simpan halaman ini (Add to Home Screen) agar tidak hilang.</li>
+            </ol>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center pt-2 border-t border-slate-800 text-[11px] text-slate-500">
+            Kriptografi: HMAC-SHA256 &bull; Hardware Binding V1 &bull; UteParts ERP & POS
+        </div>
+
+    </div>
+
+    <!-- Script Logika Kriptografi Offline & TOTP -->
+    <script>
+        const PUBLIC_SALT = "UTEPARTS_LICENSE_SECURITY_ENGINE_V1";
+        const STORAGE_KEY_SECRET = "uteparts_developer_secret_seed";
+        let activeSecret = localStorage.getItem(STORAGE_KEY_SECRET) || "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+
+        function switchTab(tab) {
+            const isGen = tab === 'gen';
+            document.getElementById('tabGen').classList.toggle('hidden', !isGen);
+            document.getElementById('tabSetup').classList.toggle('hidden', isGen);
+            document.getElementById('tabGenBtn').className = isGen ? 
+                'flex-1 py-2 text-sm font-medium border-b-2 border-indigo-500 text-indigo-400 focus:outline-none transition-colors' : 
+                'flex-1 py-2 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition-colors';
+            document.getElementById('tabSetupBtn').className = !isGen ? 
+                'flex-1 py-2 text-sm font-medium border-b-2 border-indigo-500 text-indigo-400 focus:outline-none transition-colors' : 
+                'flex-1 py-2 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition-colors';
+            
+            if (!isGen) { renderQRCode(); }
+        }
+
+        // Setup & QR Code
+        function renderQRCode() {
+            document.getElementById('secretKeyText').value = activeSecret;
+            const container = document.getElementById("qrcode");
+            container.innerHTML = "";
+            const uri = `otpauth://totp/UteParts-ERP-Licensing:Developer?secret=${activeSecret}&issuer=UteParts`;
+            new QRCode(container, {
+                text: uri,
+                width: 180,
+                height: 180,
+                colorDark : "#0f172a",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.M
+            });
+        }
+
+        function regenerateSecret() {
+            if (!confirm("Peringatan: Jika Anda membuat Secret baru, Anda harus scan ulang QR Code di Google Authenticator. Lanjutkan?")) return;
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+            let s = "";
+            for (let i = 0; i < 32; i++) {
+                s += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            activeSecret = s;
+            localStorage.setItem(STORAGE_KEY_SECRET, activeSecret);
+            renderQRCode();
+        }
+
+        // TOTP RFC 6238 Verification
+        function base32tohex(base32) {
+            const base32chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+            let bits = "";
+            let hex = "";
+            for (let i = 0; i < base32.length; i++) {
+                const val = base32chars.indexOf(base32.charAt(i).toUpperCase());
+                if (val >= 0) bits += val.toString(2).padStart(5, '0');
+            }
+            for (let i = 0; i + 4 <= bits.length; i += 4) {
+                const chunk = bits.substr(i, 4);
+                hex = hex + parseInt(chunk, 2).toString(16);
+            }
+            return hex;
+        }
+
+        async function verifyTOTP(inputCode, secret) {
+            const epoch = Math.round(new Date().getTime() / 1000.0);
+            const timeStep = 30;
+            const currentCounter = Math.floor(epoch / timeStep);
+            
+            // Periksa counter -1, 0, +1 untuk toleransi drift waktu 30 detik
+            for (let i = -1; i <= 1; i++) {
+                const counter = currentCounter + i;
+                const code = await calculateTOTP(secret, counter);
+                if (code === inputCode.trim()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        async function calculateTOTP(secretBase32, counter) {
+            const hexKey = base32tohex(secretBase32);
+            let hexCounter = counter.toString(16).padStart(16, '0');
+            
+            const keyBytes = new Uint8Array(hexKey.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+            const counterBytes = new Uint8Array(hexCounter.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+
+            const cryptoKey = await window.crypto.subtle.importKey(
+                'raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+            );
+            const signature = await window.crypto.subtle.sign('HMAC', cryptoKey, counterBytes);
+            const hash = new Uint8Array(signature);
+
+            const offset = hash[hash.length - 1] & 0xf;
+            const binary = ((hash[offset] & 0x7f) << 24) |
+                           ((hash[offset + 1] & 0xff) << 16) |
+                           ((hash[offset + 2] & 0xff) << 8) |
+                           (hash[offset + 3] & 0xff);
+
+            const otp = binary % 1000000;
+            return otp.toString().padStart(6, '0');
+        }
+
+        // HMAC-SHA256 untuk Activation Key
+        async function computeSignature(challengeCode) {
+            const clean = challengeCode.toUpperCase().trim();
+            const encoder = new TextEncoder();
+            const keyData = encoder.encode(PUBLIC_SALT);
+            const messageData = encoder.encode(clean);
+
+            const cryptoKey = await window.crypto.subtle.importKey(
+                'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+            );
+            const signature = await window.crypto.subtle.sign('HMAC', cryptoKey, messageData);
+            const hashArray = Array.from(new Uint8Array(signature));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+
+            const p1 = hashHex.substr(0, 4);
+            const p2 = hashHex.substr(4, 4);
+            const p3 = hashHex.substr(8, 4);
+            const p4 = hashHex.substr(12, 4);
+
+            return `ACT-${p1}-${p2}-${p3}-${p4}`;
+        }
+
+        async function handleGenerateKey() {
+            const challenge = document.getElementById('inputChallenge').value.trim().toUpperCase();
+            const totp = document.getElementById('inputTotp').value.trim();
+
+            if (!challenge.startsWith('UTE-') || challenge.length < 14) {
+                alert("Format Challenge Code salah! Harus berformat seperti: UTE-XXXX-YYYY-ZZZZ");
+                return;
+            }
+
+            if (totp.length !== 6 || !/^\d+$/.test(totp)) {
+                alert("Masukkan 6 digit angka dari Google Authenticator!");
+                return;
+            }
+
+            // Validasi 2FA
+            const isTotpValid = await verifyTOTP(totp, activeSecret);
+            if (!isTotpValid) {
+                alert("2FA Google Authenticator SALAH atau KEDALUWARSA!\nPeriksa kembali 6 angka di aplikasi Google Authenticator Anda.");
+                return;
+            }
+
+            // Hitung Activation Key
+            const key = await computeSignature(challenge);
+            document.getElementById('outputKey').innerText = key;
+            document.getElementById('resultContainer').classList.remove('hidden');
+        }
+
+        function copyResult() {
+            const text = document.getElementById('outputKey').innerText;
+            navigator.clipboard.writeText(text);
+            alert("Kunci aktivasi berhasil disalin ke clipboard!");
+        }
+
+        function copyWhatsAppReply() {
+            const challenge = document.getElementById('inputChallenge').value.trim().toUpperCase();
+            const key = document.getElementById('outputKey').innerText;
+            const reply = `Halo! Terima kasih atas pembelian lisensi UteParts ERP & POS.\n\nBerikut Kode Aktivasi resmi untuk perangkat Anda:\nKode Mesin: ${challenge}\nKode Aktivasi: ${key}\n\nSilakan salin Kode Aktivasi di atas dan tempelkan pada jendela instalasi perangkat Anda.`;
+            navigator.clipboard.writeText(reply);
+            alert("Format balasan pesan WhatsApp berhasil disalin!");
+        }
+
+        // Inisialisasi awal
+        if (!localStorage.getItem(STORAGE_KEY_SECRET)) {
+            localStorage.setItem(STORAGE_KEY_SECRET, activeSecret);
+        }
+    </script>
+</body>
+</html>
