@@ -41,6 +41,7 @@ mkdir -p "$TMP_DIR/scripts/license" "$TMP_DIR/scripts/updater" "$TMP_DIR/docker/
 cp scripts/install-docker.ps1 "$TMP_DIR/scripts/"
 cp scripts/install-docker.sh "$TMP_DIR/scripts/"
 cp scripts/install-termux.sh "$TMP_DIR/scripts/"
+cp scripts/install.ps1 "$TMP_DIR/scripts/" 2>/dev/null || true
 cp scripts/setup-windows-php.ps1 "$TMP_DIR/scripts/"
 cp scripts/run-server-background.vbs "$TMP_DIR/scripts/"
 cp scripts/run-command-background.vbs "$TMP_DIR/scripts/"

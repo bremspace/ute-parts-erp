@@ -1,10 +1,9 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-chcp 65001 >nul 2>nul
-title ERP & POS System - Stop Server
+title Bremspace ERP dan POS System - Stop Server
 
 echo ======================================================================
-echo    ERP & POS System - Penghenti Background Server (Port 1741-1760)
+echo    Bremspace ERP dan POS System - Penghenti Server (Port 1741-1760)
 echo ======================================================================
 echo.
 
@@ -59,10 +58,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Pr
 
 if "!STOPPED!"=="1" (
     echo.
-    echo [OK] Web Server & Layanan ERP & POS berhasil dihentikan.
+    echo ======================================================================
+    echo [OK] Seluruh background service server Bremspace berhasil dihentikan.
+    echo ======================================================================
 ) else (
-    echo [INFO] Tidak ada server ERP & POS yang sedang berjalan di port 1741-1760.
+    echo.
+    echo [INFO] Tidak ada instance server Bremspace yang sedang aktif.
 )
 
-echo.
 pause

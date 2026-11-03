@@ -1,12 +1,11 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-chcp 65001 >nul 2>nul
-title Bremspace ERP & POS System - Universal Launcher (Port 1741)
+title Bremspace ERP dan POS System - Universal Launcher (Port 1741)
 cd /d "%~dp0"
 
 echo ======================================================================
-echo    Bremspace ERP & POS System — One-Click Universal Launcher
-echo    Target Port: 1741 (Localhost & Jaringan Wi-Fi/LAN)
+echo    Bremspace ERP dan POS System - One-Click Universal Launcher
+echo    Target Port: 1741 (Localhost dan Jaringan Wi-Fi/LAN)
 echo ======================================================================
 echo.
 

@@ -1,11 +1,10 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-chcp 65001 >nul 2>nul
-title Bremspace ERP & POS System - System Updater
+title Bremspace ERP dan POS System - System Updater
 cd /d "%~dp0"
 
 echo ======================================================================
-echo    Bremspace ERP & POS System — Pembaruan Sistem Otomatis (Updater)
+echo    Bremspace ERP dan POS System - Pembaruan Sistem Otomatis (Updater)
 echo ======================================================================
 echo.
 
@@ -17,7 +16,7 @@ if errorlevel 1 (
     )
 )
 
-echo [INFO] Memeriksa lisensi & pembaruan sistem...
+echo [INFO] Memeriksa lisensi dan pembaruan sistem...
 
 :: 1. Jika berjalan dengan Docker
 if exist "%~dp0compose.yaml" (
@@ -46,7 +45,7 @@ if (!$status['has_update']) { ^
     echo '[OK] Sistem sudah menggunakan versi terbaru.' . PHP_EOL; ^
     exit(0); ^
 } ^
-echo '[INFO] Mengunduh & menerapkan pembaruan...' . PHP_EOL; ^
+echo '[INFO] Mengunduh dan menerapkan pembaruan...' . PHP_EOL; ^
 $res = SystemUpdater::executeUpdate(); ^
 if ($res['success']) { ^
     echo '[OK] Pembaruan berhasil diterapkan!' . PHP_EOL; ^
