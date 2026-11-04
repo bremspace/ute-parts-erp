@@ -159,15 +159,15 @@ class SmartSearchService
         }
         $allKeywords = array_values(array_unique(array_filter($allKeywords, fn ($k) => strlen($k) >= 2)));
 
-        // Pre-fetch matching IDs dari master data (in-memory cached collection untuk kecepatan instan)
-        $allBrands = Cache::remember('smart_search_master_brands', self::FACETED_CACHE_TTL, fn () => Brand::select('id', 'nama')->get());
-        $allKualitas = Cache::remember('smart_search_master_kualitas', self::FACETED_CACHE_TTL, fn () => KualitasProduk::select('id', 'nama')->get());
-        $allKategori = Cache::remember('smart_search_master_kategori', self::FACETED_CACHE_TTL, fn () => KategoriProduk::select('id', 'nama')->get());
-        $allSuppliers = Cache::remember('smart_search_master_suppliers', self::FACETED_CACHE_TTL, fn () => Supplier::select('id', 'nama')->get());
+        // Pre-fetch matching IDs dari master data (in-memory cached array untuk kecepatan instan & serialization-safe)
+        $allBrands = Cache::remember('smart_search_master_brands', self::FACETED_CACHE_TTL, fn () => Brand::select('id', 'nama')->get()->toArray());
+        $allKualitas = Cache::remember('smart_search_master_kualitas', self::FACETED_CACHE_TTL, fn () => KualitasProduk::select('id', 'nama')->get()->toArray());
+        $allKategori = Cache::remember('smart_search_master_kategori', self::FACETED_CACHE_TTL, fn () => KategoriProduk::select('id', 'nama')->get()->toArray());
+        $allSuppliers = Cache::remember('smart_search_master_suppliers', self::FACETED_CACHE_TTL, fn () => Supplier::select('id', 'nama')->get()->toArray());
 
-        $matchingBrandIds = ! empty($allKeywords) ? $allBrands->filter(function ($b) use ($allKeywords) {
+        $matchingBrandIds = ! empty($allKeywords) ? collect($allBrands)->filter(function ($b) use ($allKeywords) {
             foreach ($allKeywords as $kw) {
-                if (stripos($b->nama, $kw) !== false) {
+                if (stripos($b['nama'] ?? '', $kw) !== false) {
                     return true;
                 }
             }
@@ -175,9 +175,9 @@ class SmartSearchService
             return false;
         })->pluck('id')->all() : [];
 
-        $matchingKualitasIds = ! empty($allKeywords) ? $allKualitas->filter(function ($kq) use ($allKeywords) {
+        $matchingKualitasIds = ! empty($allKeywords) ? collect($allKualitas)->filter(function ($kq) use ($allKeywords) {
             foreach ($allKeywords as $kw) {
-                if (stripos($kq->nama, $kw) !== false) {
+                if (stripos($kq['nama'] ?? '', $kw) !== false) {
                     return true;
                 }
             }
@@ -185,9 +185,9 @@ class SmartSearchService
             return false;
         })->pluck('id')->all() : [];
 
-        $matchingKategoriIds = ! empty($allKeywords) ? $allKategori->filter(function ($cq) use ($allKeywords) {
+        $matchingKategoriIds = ! empty($allKeywords) ? collect($allKategori)->filter(function ($cq) use ($allKeywords) {
             foreach ($allKeywords as $kw) {
-                if (stripos($cq->nama, $kw) !== false) {
+                if (stripos($cq['nama'] ?? '', $kw) !== false) {
                     return true;
                 }
             }
@@ -195,9 +195,9 @@ class SmartSearchService
             return false;
         })->pluck('id')->all() : [];
 
-        $matchingSupplierIds = ! empty($allKeywords) ? $allSuppliers->filter(function ($sq) use ($allKeywords) {
+        $matchingSupplierIds = ! empty($allKeywords) ? collect($allSuppliers)->filter(function ($sq) use ($allKeywords) {
             foreach ($allKeywords as $kw) {
-                if (stripos($sq->nama, $kw) !== false) {
+                if (stripos($sq['nama'] ?? '', $kw) !== false) {
                     return true;
                 }
             }

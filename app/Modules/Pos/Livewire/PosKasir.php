@@ -18,6 +18,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\HargaFleksibelService;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PembayaranPesananOnlineService;
+use App\Modules\Pos\Services\PosCheckoutService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Pos\Services\QrisService;
 use App\Modules\Pos\Services\TransaksiVoidService;
@@ -44,6 +45,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
@@ -2515,6 +2517,10 @@ class PosKasir extends Component
                     ];
                 }, $this->cart);
 
+                $pelangganSaatTransaksi = $this->selectedCustomerId ? Pelanggan::with('tierMembership')->find($this->selectedCustomerId) : null;
+                $namaTierTransaksi = $pelangganSaatTransaksi?->tierMembership?->nama;
+                $tipeKonsumenTransaksi = $pelangganSaatTransaksi ? app(PelangganService::class)->tipeKonsumen($pelangganSaatTransaksi) : 'retail';
+
                 $transaksi = app(PosCheckoutService::class)->checkout([
                     'cabang_id' => $cabangId,
                     'kasir_id' => auth()->id() ?? 1,
@@ -2545,10 +2551,8 @@ class PosKasir extends Component
                     'catatan_garansi' => $this->catatanGaransi ?: null,
                 ], $itemsPayload);
 
-                $pelangganModel = $this->selectedCustomerId ? Pelanggan::with('tierMembership')->find($this->selectedCustomerId) : null;
-                $saldoPoin = $pelangganModel?->poin_loyalty ?? 0;
-                $tipeKonsumen = $pelangganModel ? app(PelangganService::class)->tipeKonsumen($pelangganModel) : 'retail';
-                $namaTierTransaksi = $pelangganModel?->tierMembership?->nama;
+                $pelangganModel = $this->selectedCustomerId ? Pelanggan::find($this->selectedCustomerId) : null;
+                $saldoPoin = $pelangganModel?->poin_loyalty ?? ($pelangganSaatTransaksi?->poin_loyalty ?? 0);
 
                 $itemsReceipt = array_map(function ($it) {
                     $hargaDasar = (float) ($it['harga_dasar'] ?? $it['harga']);
@@ -2628,6 +2632,7 @@ class PosKasir extends Component
             $this->clearCart();
             $this->checkKasSesi();
         } catch (\Exception $e) {
+            Log::error('PosKasir::processTransaction exception: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memproses transaksi: '.$e->getMessage()]);
         }
     }

@@ -588,12 +588,12 @@ class ServisService
      */
     public function resolveHargaPartDefault(Produk $produk, ?Pelanggan $pelanggan = null, ?SkuVariant $variant = null): array
     {
-        // 1. Jika pelanggan sudah memiliki tier khusus atau reseller/agen, gunakan resolusi CRM pelanggan
-        if ($pelanggan && ($pelanggan->tier_membership_id || $pelanggan->is_reseller || in_array($pelanggan->tipe_konsumen, ['reseller', 'agen'], true))) {
+        // 1. Jika pelanggan ada, gunakan resolusi harga sesuai profil pelanggan (retail / member / reseller / agen)
+        if ($pelanggan) {
             return app(PricingService::class)->resolve($produk, $pelanggan, $variant);
         }
 
-        // 2. Default servis: cari harga reseller via HargaTier
+        // 2. Default part servis tanpa pelanggan spesifik: utamakan tier reseller (jika dikonfigurasi)
         $hargaDasar = $variant && $variant->harga_jual_retail !== null
             ? (float) $variant->harga_jual_retail
             : (float) ($produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
@@ -606,7 +606,6 @@ class ServisService
         }
         $rows = $query->get();
 
-        // Cari baris tipe_konsumen = reseller atau is_reseller = true
         $resellerTier = $rows->first(fn ($r) => $r->tipe_konsumen === 'reseller' || $r->is_reseller === true);
         if ($resellerTier) {
             if ($resellerTier->nominal_tetap !== null && (float) $resellerTier->nominal_tetap > 0) {
@@ -640,12 +639,15 @@ class ServisService
             }
         }
 
-        // Fallback via dummy reseller pelanggan
-        $dummyReseller = new Pelanggan;
-        $dummyReseller->is_reseller = true;
-        $dummyReseller->tipe_konsumen = 'reseller';
-
-        return app(PricingService::class)->resolve($produk, $dummyReseller, $variant);
+        return [
+            'harga' => $hargaDasar,
+            'harga_dasar' => $hargaDasar,
+            'diskon_nominal' => 0.0,
+            'potensi_komisi' => 0.0,
+            'mode_reward' => 'diskon_langsung',
+            'alasan' => 'Harga Retail Standar',
+            'tier' => null,
+        ];
     }
 
     /**
