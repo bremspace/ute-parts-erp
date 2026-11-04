@@ -41,6 +41,47 @@
 
     <title>{{ $title ?? config('app.name', 'Bremspace') }} — {{ $webConfig['hero_headline'] ?? 'Toko Sparepart & Servis' }}</title>
 
+    <!-- SEO Best Practices & Structured Metadata (Shopee & Amazon Model) -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ url()->current() }}">
+    <meta name="description" content="{{ $metaDescription ?? ($webConfig['hero_subheadline'] ?? 'Pusat suku cadang HP & sparepart berkualitas terpercaya. Tersedia LCD, baterai, flexible, dan sparepart handphone terlengkap bergaransi resmi.') }}">
+    <meta name="keywords" content="sparepart hp, lcd touchscreen, baterai handphone, flexible charging, ic power, servis hp, toko sparepart online">
+
+    <!-- OpenGraph Protocol -->
+    <meta property="og:locale" content="id_ID">
+    <meta property="og:site_name" content="{{ config('app.name', 'Bremspace') }}">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ $title ?? config('app.name', 'Bremspace') }}">
+    <meta property="og:description" content="{{ $metaDescription ?? ($webConfig['hero_subheadline'] ?? 'Pusat suku cadang HP & sparepart handphone terlengkap berkualitas OEM & Original bergaransi.') }}">
+    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:image" content="{{ asset('icons/icon-512x512.png') }}">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $title ?? config('app.name', 'Bremspace') }}">
+    <meta name="twitter:description" content="{{ $metaDescription ?? ($webConfig['hero_subheadline'] ?? 'Pusat suku cadang HP & sparepart handphone terlengkap.') }}">
+    <meta name="twitter:image" content="{{ asset('icons/icon-512x512.png') }}">
+
+    <!-- Sitelinks SearchBox Schema (Google SERP Feature) -->
+    <script type="application/ld+json">
+    {!! json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'WebSite',
+        'name' => config('app.name', 'Bremspace'),
+        'url' => url('/'),
+        'potentialAction' => [
+            '@type' => 'SearchAction',
+            'target' => [
+                '@type' => 'EntryPoint',
+                'urlTemplate' => route('shop') . '?q={search_term_string}',
+            ],
+            'query-input' => 'required name=search_term_string',
+        ],
+    ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
+    </script>
+
+    @stack('seo')
+
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
 

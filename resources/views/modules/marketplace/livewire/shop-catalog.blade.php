@@ -1,3 +1,79 @@
+@push('seo')
+    <link rel="canonical" href="{{ route('shop') }}" />
+    <meta name="description" content="Katalog suku cadang dan sparepart handphone terlengkap: LCD Touchscreen, Baterai, Flexible Board, IC Chipset kualitas OEM & Original bergaransi resmi.">
+    <meta name="keywords" content="katalog sparepart hp, lcd touchscreen, baterai handphone, flexible hp, ic power, alat servis hp">
+
+    <!-- OpenGraph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ !empty($activeCategoryName) ? "Katalog {$activeCategoryName} — " : '' }}Katalog Sparepart & Suku Cadang HP — {{ config('app.name', 'Bremspace') }}">
+    <meta property="og:description" content="Temukan ribuan suku cadang HP siap kirim dengan jaminan garansi toko dan harga grosir untuk teknisi & mitra.">
+    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:image" content="{{ asset('icons/icon-512x512.png') }}">
+
+    @php
+        $catalogItemList = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            'name' => !empty($activeCategoryName) ? "Katalog {$activeCategoryName}" : "Katalog Sparepart",
+            'itemListElement' => [],
+        ];
+        foreach ($products as $idx => $p) {
+            $catalogItemList['itemListElement'][] = [
+                '@type' => 'ListItem',
+                'position' => $idx + 1,
+                'url' => route('shop.detail', $p->slug),
+                'name' => $p->nama,
+            ];
+        }
+
+        $catalogBreadcrumbs = [
+            '@context' => 'https://schema.org',
+            '@type' => 'BreadcrumbList',
+            'itemListElement' => [
+                [
+                    '@type' => 'ListItem',
+                    'position' => 1,
+                    'name' => 'Beranda',
+                    'item' => url('/'),
+                ],
+                [
+                    '@type' => 'ListItem',
+                    'position' => 2,
+                    'name' => 'Katalog Sparepart',
+                    'item' => route('shop'),
+                ],
+            ],
+        ];
+        $pos = 3;
+        if (!empty($activeCategoryName)) {
+            $catalogBreadcrumbs['itemListElement'][] = [
+                '@type' => 'ListItem',
+                'position' => $pos++,
+                'name' => $activeCategoryName,
+                'item' => route('shop', ['kategori' => $filterKategori]),
+            ];
+        }
+        if (!empty($filterHpModel)) {
+            $catalogBreadcrumbs['itemListElement'][] = [
+                '@type' => 'ListItem',
+                'position' => $pos++,
+                'name' => $filterHpModel,
+                'item' => route('shop', ['kategori' => $filterKategori, 'hpModel' => $filterHpModel]),
+            ];
+        }
+    @endphp
+
+    <!-- Schema.org ItemList (Catalog) -->
+    <script type="application/ld+json">
+    {!! json_encode($catalogItemList, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
+    </script>
+
+    <!-- Schema.org BreadcrumbList (Catalog) -->
+    <script type="application/ld+json">
+    {!! json_encode($catalogBreadcrumbs, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
+    </script>
+@endpush
+
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12"
      x-data="{
         viewMode: localStorage.getItem('ute-shop-view-mode') || 'grid',
@@ -404,6 +480,111 @@
     @endif
     @endif
 
+    <!-- Breadcrumb & Category/Compatibility Navigation (Shopee & Amazon Architecture) -->
+    <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-xs font-medium text-ink-500 dark:text-ink-400 overflow-x-auto whitespace-nowrap pb-1">
+        <a href="{{ route('shop') }}" class="hover:text-up-primary dark:hover:text-white transition-colors flex items-center gap-1.5 font-semibold">
+            <svg class="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+            <span>Katalog Sparepart</span>
+        </a>
+        @if(!empty($activeCategoryName))
+            <span class="text-ink-300 dark:text-ink-700">/</span>
+            <a href="{{ route('shop', ['kategori' => $filterKategori]) }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-semibold {{ empty($filterHpModel) ? 'text-up-primary' : '' }}">
+                {{ $activeCategoryName }}
+            </a>
+        @endif
+        @if(!empty($filterHpModel))
+            <span class="text-ink-300 dark:text-ink-700">/</span>
+            <span class="text-ink-900 dark:text-white font-bold flex items-center gap-1">
+                <span>{{ !empty($activeCategoryName) ? $activeCategoryName . ' ' : '' }}{{ $filterHpModel }}</span>
+                <button type="button" wire:click="resetSingleFilter('hpModel')" class="hover:text-up-red text-ink-400 text-[10px] ml-1 cursor-pointer" title="Hapus filter model">✕</button>
+            </span>
+        @endif
+        @if(!empty($search))
+            <span class="text-ink-300 dark:text-ink-700">/</span>
+            <span class="text-ink-900 dark:text-white font-medium">Cari "{{ $search }}"</span>
+        @endif
+    </nav>
+
+    <!-- Quick Category Tabs / Pills (Fully clickable, live filtered, & crawlable) -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
+        <button type="button"
+                wire:click="setFilterKategori('')"
+                class="px-4 py-2 rounded-xl font-bold transition-all duration-140 cursor-pointer shrink-0 flex items-center gap-1.5 {{ empty($filterKategori) ? 'bg-up-primary text-white shadow-sm shadow-up-primary/25' : 'bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300 border border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
+            <span>Semua Part</span>
+        </button>
+        @foreach($categories as $cat)
+            @php
+                $cId = is_array($cat) ? ($cat['id'] ?? '') : ($cat->id ?? (is_scalar($cat) ? (string) $cat : ''));
+                $cNama = is_array($cat) ? ($cat['nama'] ?? '') : ($cat->nama ?? (is_scalar($cat) ? (string) $cat : ''));
+                $isCurrent = ($filterKategori == $cId || $filterKategori === $cNama);
+            @endphp
+            @if(!empty($cNama))
+                <button type="button"
+                        wire:click="setFilterKategori('{{ $cId }}')"
+                        class="px-4 py-2 rounded-xl font-bold transition-all duration-140 cursor-pointer shrink-0 flex items-center gap-1.5 {{ $isCurrent ? 'bg-up-primary text-white shadow-sm shadow-up-primary/25 ring-2 ring-up-primary/20' : 'bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300 border border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
+                    <span>{{ $cNama }}</span>
+                </button>
+            @endif
+        @endforeach
+    </div>
+
+    <!-- Active Filter Tags (Quick-Clear Pills) -->
+    @php
+        $hasActiveFilters = !empty($search) || !empty($filterKategori) || !empty($filterBrand) || !empty($filterHpMerk) || !empty($filterHpModel) || !empty($filterKondisi) || !empty($filterKualitas) || !empty($filterStok) || !empty($hargaMax);
+    @endphp
+    @if($hasActiveFilters)
+    <div class="flex items-center gap-1.5 flex-wrap text-xs">
+        <span class="text-ink-400 text-[11px] font-semibold mr-1">Filter Aktif:</span>
+        @if(!empty($search))
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 text-[11px] font-medium">
+                <span>"{{ $search }}"</span>
+                <button type="button" wire:click="resetSingleFilter('search')" class="text-ink-400 hover:text-up-red font-bold cursor-pointer">✕</button>
+            </span>
+        @endif
+        @if(!empty($filterKategori))
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-up-primary/10 text-up-primary border border-up-primary/20 text-[11px] font-semibold">
+                <span>Kategori: {{ $activeCategoryName }}</span>
+                <button type="button" wire:click="resetSingleFilter('kategori')" class="hover:text-up-red font-bold cursor-pointer">✕</button>
+            </span>
+        @endif
+        @if(!empty($filterHpMerk))
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40 text-[11px] font-semibold">
+                <span>Merk: {{ $filterHpMerk }}</span>
+                <button type="button" wire:click="resetSingleFilter('hpMerk')" class="hover:text-up-red font-bold cursor-pointer">✕</button>
+            </span>
+        @endif
+        @if(!empty($filterHpModel))
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-up-primary/10 text-up-primary border border-up-primary/20 text-[11px] font-semibold">
+                <span>Model: {{ $filterHpModel }}</span>
+                <button type="button" wire:click="resetSingleFilter('hpModel')" class="hover:text-up-red font-bold cursor-pointer">✕</button>
+            </span>
+        @endif
+        @if(!empty($filterBrand))
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 text-[11px] font-medium">
+                <span>Brand: {{ $filterBrand }}</span>
+                <button type="button" wire:click="resetSingleFilter('brand')" class="text-ink-400 hover:text-up-red font-bold cursor-pointer">✕</button>
+            </span>
+        @endif
+        @if(!empty($filterKondisi))
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 text-[11px] font-medium">
+                <span class="capitalize">Kondisi: {{ $filterKondisi }}</span>
+                <button type="button" wire:click="resetSingleFilter('kondisi')" class="text-ink-400 hover:text-up-red font-bold cursor-pointer">✕</button>
+            </span>
+        @endif
+        @if(!empty($filterStok))
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 text-[11px] font-medium">
+                <span>Stok: {{ $filterStok === 'tersedia' ? 'Ready' : 'Habis' }}</span>
+                <button type="button" wire:click="resetSingleFilter('stok')" class="text-ink-400 hover:text-up-red font-bold cursor-pointer">✕</button>
+            </span>
+        @endif
+        <button type="button"
+                wire:click="resetAllFilters"
+                class="text-[11px] font-bold text-up-red hover:underline ml-1 cursor-pointer">
+            Reset Semua
+        </button>
+    </div>
+    @endif
+
     <!-- Spotlight Search & Pill Filter System -->
     <section class="space-y-3 sm:space-y-4">
         <!-- Raycast/Spotlight Style Search Bar -->
@@ -772,94 +953,133 @@
                     $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                     $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
                     $thumbImg = $p->thumbnail_url ?: $p->gambar;
+                    $catDisplay = ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? (is_array($p->kategori) ? implode(', ', $p->kategori) : (string) $p->kategori);
+                    $catVal = $p->kategori_id ?: $catDisplay;
+                    $firstModel = ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) ? $p->tipeHps->first()?->model : null;
                 @endphp
-                <a href="{{ route('shop.detail', $p->slug) }}"
-                   class="group bg-white dark:bg-ink-900 rounded-2xl border border-ink-200/80 dark:border-white/[0.08] hover:border-up-primary/40 dark:hover:border-up-primary/50 shadow-sm hover:shadow-md transition-[border-color,box-shadow,transform] duration-140 overflow-hidden flex flex-col active:scale-[0.98] min-w-0 w-full">
-                    <!-- Image canvas -->
-                    <div class="aspect-square w-full bg-ink-50 dark:bg-ink-950 flex items-center justify-center relative overflow-hidden">
-                        @if($thumbImg)
-                            <img src="{{ $thumbImg }}"
-                                 alt="{{ $p->nama }}"
-                                 loading="lazy"
-                                 class="aspect-square w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105"
-                                 onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.classList.remove('hidden');">
+                <div class="group bg-white dark:bg-ink-900 rounded-2xl border border-ink-200/80 dark:border-white/[0.08] hover:border-up-primary/40 dark:hover:border-up-primary/50 shadow-sm hover:shadow-md transition-[border-color,box-shadow,transform] duration-140 overflow-hidden flex flex-col justify-between min-w-0 w-full relative">
+                    <div>
+                        <!-- Image canvas -->
+                        <a href="{{ route('shop.detail', $p->slug) }}" class="block aspect-square w-full bg-ink-50 dark:bg-ink-950 relative overflow-hidden group/img">
+                            @if($thumbImg)
+                                <img src="{{ $thumbImg }}"
+                                     alt="{{ $p->nama }}"
+                                     loading="lazy"
+                                     class="aspect-square w-full h-full object-cover transition-transform duration-200 ease-out group-hover/img:scale-105"
+                                     onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.classList.remove('hidden');">
+                            @endif
+                            <div class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-4 text-center {{ $thumbImg ? 'hidden' : '' }}">
+                                <svg class="w-8 sm:w-10 h-8 sm:h-10 stroke-[1.25]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                                </svg>
+                                <span class="text-[9px] mt-1 font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">{{ config('app.name', 'Bremspace') }}</span>
+                            </div>
+
+                            <!-- Badges top row -->
+                            <div class="absolute top-2 inset-x-2 flex items-center justify-between pointer-events-none overflow-hidden gap-1">
+                                @if((int) ($p->total_terjual ?? 0) > 0)
+                                    <span class="text-[9px] font-bold bg-ink-900/80 dark:bg-white/90 backdrop-blur-md text-amber-300 dark:text-ink-950 px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
+                                        ★ <span class="hidden xs:inline">Terlaris</span>
+                                    </span>
+                                @else
+                                    <span></span>
+                                @endif
+
+                                @if($stok <= 0)
+                                    <span class="text-[9px] font-bold bg-up-red text-white px-2 py-0.5 rounded-full shadow-sm">
+                                        Habis
+                                    </span>
+                                @elseif($price['diskon_nominal'] > 0)
+                                    <span class="text-[9px] font-bold bg-up-accent text-white px-2 py-0.5 rounded-full shadow-sm tabular-nums">
+                                        -{{ number_format($price['diskon_nominal'] / $price['harga_dasar'] * 100, 0) }}%
+                                    </span>
+                                @endif
+                            </div>
+                        </a>
+
+                        <!-- Meta info & pricing -->
+                        <div class="p-3 sm:p-4 space-y-2.5 min-w-0">
+                            <div class="space-y-1 min-w-0">
+                                <div class="flex items-center gap-1.5 flex-wrap overflow-hidden text-[10px] text-ink-500 dark:text-ink-400">
+                                    <button type="button"
+                                            wire:click="setFilterKategori('{{ $catVal }}')"
+                                            class="font-bold uppercase tracking-wider truncate max-w-[100px] hover:text-up-primary transition-colors cursor-pointer"
+                                            title="Filter kategori {{ $catDisplay }}">
+                                        {{ $catDisplay }}
+                                    </button>
+                                    @if($p->kondisi)
+                                        <span>•</span>
+                                        <button type="button"
+                                                wire:click="$set('filterKondisi', '{{ $p->kondisi }}')"
+                                                class="font-semibold uppercase hover:text-up-primary transition-colors cursor-pointer">
+                                            {{ $p->kondisi }}
+                                        </button>
+                                    @endif
+                                </div>
+
+                                <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white line-clamp-2 leading-snug break-words">
+                                    <a href="{{ route('shop.detail', $p->slug) }}" class="hover:text-up-primary transition-colors">
+                                        {{ $p->nama }}
+                                    </a>
+                                </h3>
+
+                                @if($firstModel)
+                                    <button type="button"
+                                            wire:click="setFilterHpModel('{{ $firstModel }}')"
+                                            class="text-[11px] text-up-primary hover:underline font-medium truncate block text-left cursor-pointer"
+                                            title="Filter kompatibilitas {{ $firstModel }}">
+                                        Fit: {{ $p->tipeHps->pluck('model')->take(2)->join(', ') }}
+                                    </button>
+                                @endif
+                            </div>
+
+                            <!-- Price & stock -->
+                            <div class="pt-2 border-t border-ink-100 dark:border-white/[0.06] min-w-0">
+                                @if($price['diskon_nominal'] > 0)
+                                    <span class="block text-[10px] sm:text-xs text-ink-400 line-through tabular-nums truncate">
+                                        Rp {{ number_format($price['harga_dasar'], 0, ',', '.') }}
+                                    </span>
+                                @endif
+                                <div class="text-sm sm:text-base font-bold text-ink-900 dark:text-white tracking-tight tabular-nums truncate">
+                                    Rp {{ number_format($price['harga'], 0, ',', '.') }}
+                                </div>
+
+                                <div class="flex items-center justify-between gap-1 mt-1.5 text-[10px] min-w-0">
+                                    <span class="inline-flex items-center gap-1.5 font-medium truncate {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500 font-semibold' : 'text-up-mint') : 'text-up-red' }}">
+                                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
+                                        <span class="truncate">{{ $stockInfo['label'] }}</span>
+                                    </span>
+                                    @if(($webConfig['show_sold_counter'] ?? true) && (int) ($p->total_terjual ?? 0) > 0)
+                                        <span class="text-ink-400 tabular-nums hidden xs:inline flex-shrink-0">{{ $p->total_terjual }} terjual</span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add-to-Cart Action Button -->
+                    <div class="p-3 sm:p-4 pt-0">
+                        @if($stok > 0)
+                            <button type="button"
+                                    wire:click="addToCart({{ $p->id }})"
+                                    wire:loading.attr="disabled"
+                                    wire:target="addToCart({{ $p->id }})"
+                                    class="w-full py-2 px-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-[transform,background-color] duration-140 active:scale-95 cursor-pointer"
+                                    title="Tambah ke Keranjang">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                <span>+ Keranjang</span>
+                            </button>
+                        @else
+                            <button type="button"
+                                    disabled
+                                    class="w-full py-2 px-3 rounded-xl bg-ink-100 dark:bg-white/5 text-ink-400 font-semibold text-xs flex items-center justify-center gap-1.5 cursor-not-allowed">
+                                <span>Stok Habis</span>
+                            </button>
                         @endif
-                        <div class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-4 text-center {{ $thumbImg ? 'hidden' : '' }}">
-                            <svg class="w-8 sm:w-10 h-8 sm:h-10 stroke-[1.25]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                            </svg>
-                            <span class="text-[9px] mt-1 font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">{{ config('app.name', 'Bremspace') }}</span>
-                        </div>
-
-                        <!-- Badges top row -->
-                        <div class="absolute top-2 inset-x-2 flex items-center justify-between pointer-events-none overflow-hidden gap-1">
-                            @if((int) ($p->total_terjual ?? 0) > 0)
-                                <span class="text-[9px] font-bold bg-ink-900/80 dark:bg-white/90 backdrop-blur-md text-amber-300 dark:text-ink-950 px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
-                                    ★ <span class="hidden xs:inline">Terlaris</span>
-                                </span>
-                            @else
-                                <span></span>
-                            @endif
-
-                            @if($stok <= 0)
-                                <span class="text-[9px] font-bold bg-up-red text-white px-2 py-0.5 rounded-full shadow-sm">
-                                    Habis
-                                </span>
-                            @elseif($price['diskon_nominal'] > 0)
-                                <span class="text-[9px] font-bold bg-up-accent text-white px-2 py-0.5 rounded-full shadow-sm tabular-nums">
-                                    -{{ number_format($price['diskon_nominal'] / $price['harga_dasar'] * 100, 0) }}%
-                                </span>
-                            @endif
-                        </div>
                     </div>
-
-                    <!-- Meta info & pricing -->
-                    <div class="p-3 sm:p-4 flex flex-col flex-1 justify-between gap-2.5 min-w-0">
-                        <div class="space-y-1 min-w-0">
-                            <div class="flex items-center gap-1.5 flex-wrap overflow-hidden text-[10px] text-ink-500 dark:text-ink-400">
-                                <span class="font-bold uppercase tracking-wider truncate max-w-[100px]">
-                                    {{ ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? (is_array($p->kategori) ? implode(', ', $p->kategori) : (string) $p->kategori) }}
-                                </span>
-                                @if($p->kondisi)
-                                    <span>•</span>
-                                    <span class="font-semibold uppercase">{{ $p->kondisi }}</span>
-                                @endif
-                            </div>
-
-                            <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white line-clamp-2 leading-snug group-hover:text-up-primary transition-colors break-words">
-                                {{ $p->nama }}
-                            </h3>
-
-                            @if($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty())
-                                <p class="text-[11px] text-up-primary font-medium truncate">
-                                    Fit: {{ $p->tipeHps->pluck('model')->take(2)->join(', ') }}
-                                </p>
-                            @endif
-                        </div>
-
-                        <!-- Price & stock footer -->
-                        <div class="pt-2 border-t border-ink-100 dark:border-white/[0.06] min-w-0">
-                            @if($price['diskon_nominal'] > 0)
-                                <span class="block text-[10px] sm:text-xs text-ink-400 line-through tabular-nums truncate">
-                                    Rp {{ number_format($price['harga_dasar'], 0, ',', '.') }}
-                                </span>
-                            @endif
-                            <div class="text-sm sm:text-base font-bold text-ink-900 dark:text-white tracking-tight tabular-nums truncate">
-                                Rp {{ number_format($price['harga'], 0, ',', '.') }}
-                            </div>
-
-                            <div class="flex items-center justify-between gap-1 mt-1.5 text-[10px] min-w-0">
-                                <span class="inline-flex items-center gap-1.5 font-medium truncate {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500 font-semibold' : 'text-up-mint') : 'text-up-red' }}">
-                                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                                    <span class="truncate">{{ $stockInfo['label'] }}</span>
-                                </span>
-                                @if(($webConfig['show_sold_counter'] ?? true) && (int) ($p->total_terjual ?? 0) > 0)
-                                    <span class="text-ink-400 tabular-nums hidden xs:inline flex-shrink-0">{{ $p->total_terjual }} terjual</span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                </a>
+                </div>
             @empty
                 <div class="col-span-full py-16 text-center">
                     <p class="text-sm text-ink-500">Tidak ada suku cadang yang cocok dengan kriteria pencarian.</p>
@@ -876,54 +1096,94 @@
                     $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                     $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
                     $thumbImg = $p->thumbnail_url ?: $p->gambar;
+                    $catDisplay = ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? (is_array($p->kategori) ? implode(', ', $p->kategori) : (string) $p->kategori);
+                    $catVal = $p->kategori_id ?: $catDisplay;
+                    $firstModel = ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) ? $p->tipeHps->first()?->model : null;
                 @endphp
-                <a href="{{ route('shop.detail', $p->slug) }}"
-                   class="group bg-white dark:bg-ink-900 rounded-2xl border border-ink-200/80 dark:border-white/[0.08] hover:border-up-primary/40 dark:hover:border-up-primary/50 shadow-sm p-3 sm:p-4 flex items-center justify-between gap-4 transition-[border-color,box-shadow,transform] duration-140 active:scale-[0.99]">
+                <div class="group bg-white dark:bg-ink-900 rounded-2xl border border-ink-200/80 dark:border-white/[0.08] hover:border-up-primary/40 dark:hover:border-up-primary/50 shadow-sm p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 transition-[border-color,box-shadow,transform] duration-140">
                     <div class="flex items-center gap-3.5 min-w-0 flex-1">
-                        <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-ink-50 dark:bg-ink-950 flex-shrink-0 overflow-hidden flex items-center justify-center relative">
+                        <a href="{{ route('shop.detail', $p->slug) }}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-ink-50 dark:bg-ink-950 flex-shrink-0 overflow-hidden flex items-center justify-center relative group/img">
                             @if($thumbImg)
-                                <img src="{{ $thumbImg }}" alt="{{ $p->nama }}" class="w-full h-full object-cover"
+                                <img src="{{ $thumbImg }}" alt="{{ $p->nama }}" class="w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105"
                                      onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                             @endif
                             <span class="text-xs font-bold text-ink-400 items-center justify-center w-full h-full" style="{{ $thumbImg ? 'display:none;' : 'display:flex;' }}">PART</span>
-                        </div>
+                        </a>
                         <div class="min-w-0 flex-1 space-y-1">
                             <div class="flex items-center gap-2 text-[10px] text-ink-500">
-                                <span class="font-bold uppercase tracking-wider">{{ ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? (is_array($p->kategori) ? implode(', ', $p->kategori) : (string) $p->kategori) }}</span>
+                                <button type="button"
+                                        wire:click="setFilterKategori('{{ $catVal }}')"
+                                        class="font-bold uppercase tracking-wider hover:text-up-primary transition-colors cursor-pointer">
+                                    {{ $catDisplay }}
+                                </button>
                                 @if($p->kondisi)
                                     <span>•</span>
-                                    <span class="font-semibold uppercase text-ink-600 dark:text-ink-300">{{ $p->kondisi }}</span>
+                                    <button type="button"
+                                            wire:click="$set('filterKondisi', '{{ $p->kondisi }}')"
+                                            class="font-semibold uppercase text-ink-600 dark:text-ink-300 hover:text-up-primary transition-colors cursor-pointer">
+                                        {{ $p->kondisi }}
+                                    </button>
                                 @endif
                                 @if($p->sku)
                                     <span class="hidden sm:inline font-mono">({{ $p->sku }})</span>
                                 @endif
                             </div>
-                            <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white truncate group-hover:text-up-primary transition-colors">
-                                {{ $p->nama }}
+                            <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white truncate">
+                                <a href="{{ route('shop.detail', $p->slug) }}" class="hover:text-up-primary transition-colors">
+                                    {{ $p->nama }}
+                                </a>
                             </h3>
-                            @if($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty())
-                                <p class="text-[11px] text-up-primary font-medium truncate">
+                            @if($firstModel)
+                                <button type="button"
+                                        wire:click="setFilterHpModel('{{ $firstModel }}')"
+                                        class="text-[11px] text-up-primary hover:underline font-medium truncate block text-left cursor-pointer"
+                                        title="Filter kompatibilitas {{ $firstModel }}">
                                     Kompatibel: {{ $p->tipeHps->pluck('model')->take(3)->join(', ') }}
-                                </p>
+                                </button>
                             @endif
                         </div>
                     </div>
 
-                    <div class="text-right flex-shrink-0 pl-2 space-y-1">
-                        @if($price['diskon_nominal'] > 0)
-                            <span class="block text-[11px] text-ink-400 line-through tabular-nums">
-                                Rp {{ number_format($price['harga_dasar'], 0, ',', '.') }}
-                            </span>
-                        @endif
-                        <div class="text-sm sm:text-base font-bold text-ink-900 dark:text-white tabular-nums">
-                            Rp {{ number_format($price['harga'], 0, ',', '.') }}
+                    <div class="flex items-center sm:flex-col sm:items-end justify-between sm:justify-center flex-shrink-0 pl-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-ink-100 dark:border-white/[0.06] gap-2">
+                        <div class="sm:text-right space-y-0.5">
+                            @if($price['diskon_nominal'] > 0)
+                                <span class="block text-[11px] text-ink-400 line-through tabular-nums">
+                                    Rp {{ number_format($price['harga_dasar'], 0, ',', '.') }}
+                                </span>
+                            @endif
+                            <div class="text-sm sm:text-base font-bold text-ink-900 dark:text-white tabular-nums">
+                                Rp {{ number_format($price['harga'], 0, ',', '.') }}
+                            </div>
+                            <div class="inline-flex items-center gap-1.5 text-[11px] font-semibold {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500' : 'text-up-mint') : 'text-up-red' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
+                                <span>{{ $stockInfo['label'] }}</span>
+                            </div>
                         </div>
-                        <div class="inline-flex items-center gap-1.5 text-[11px] font-semibold {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500' : 'text-up-mint') : 'text-up-red' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                            <span>{{ $stockInfo['label'] }}</span>
+
+                        <!-- Add-to-Cart Action Button -->
+                        <div>
+                            @if($stok > 0)
+                                <button type="button"
+                                        wire:click="addToCart({{ $p->id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="addToCart({{ $p->id }})"
+                                        class="py-1.5 px-3.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-[transform,background-color] duration-140 active:scale-95 cursor-pointer"
+                                        title="Tambah ke Keranjang">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <span>+ Keranjang</span>
+                                </button>
+                            @else
+                                <button type="button"
+                                        disabled
+                                        class="py-1.5 px-3.5 rounded-xl bg-ink-100 dark:bg-white/5 text-ink-400 font-semibold text-xs flex items-center justify-center gap-1.5 cursor-not-allowed">
+                                    <span>Stok Habis</span>
+                                </button>
+                            @endif
                         </div>
                     </div>
-                </a>
+                </div>
             @empty
                 <div class="py-12 text-center text-sm text-ink-500">Tidak ada produk ditemukan.</div>
             @endforelse
@@ -939,26 +1199,34 @@
                         $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                         $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
                     @endphp
-                    <a href="{{ route('shop.detail', $p->slug) }}"
-                       class="px-3.5 py-2.5 flex items-center justify-between gap-3 hover:bg-ink-50 dark:hover:bg-white/[0.03] transition-colors group">
+                    <div class="px-3.5 py-2.5 flex items-center justify-between gap-3 hover:bg-ink-50 dark:hover:bg-white/[0.03] transition-colors group">
                         <div class="min-w-0 flex items-center gap-3">
                             <span class="w-2 h-2 rounded-full flex-shrink-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
                             <div class="truncate">
-                                <span class="text-xs sm:text-sm font-semibold text-ink-900 dark:text-white group-hover:text-up-primary transition-colors">
+                                <a href="{{ route('shop.detail', $p->slug) }}" class="text-xs sm:text-sm font-semibold text-ink-900 dark:text-white group-hover:text-up-primary transition-colors">
                                     {{ $p->nama }}
-                                </span>
+                                </a>
                                 @if($p->sku)
                                     <span class="text-[10px] font-mono text-ink-400 ml-1.5 hidden sm:inline">{{ $p->sku }}</span>
                                 @endif
                             </div>
                         </div>
-                        <div class="flex items-center gap-4 flex-shrink-0 text-right">
+                        <div class="flex items-center gap-3 sm:gap-4 flex-shrink-0 text-right">
                             <span class="text-xs text-ink-500 tabular-nums hidden xs:inline">{{ $stockInfo['label'] }}</span>
                             <span class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white tabular-nums">
                                 Rp {{ number_format($price['harga'], 0, ',', '.') }}
                             </span>
+                            @if($stok > 0)
+                                <button type="button"
+                                        wire:click="addToCart({{ $p->id }})"
+                                        wire:loading.attr="disabled"
+                                        class="p-1.5 rounded-lg bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white transition-colors cursor-pointer"
+                                        title="+ Keranjang">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                </button>
+                            @endif
                         </div>
-                    </a>
+                    </div>
                 @empty
                     <div class="py-8 text-center text-xs text-ink-500">Tidak ada data.</div>
                 @endforelse

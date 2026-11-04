@@ -6,11 +6,13 @@ use App\Modules\Marketplace\Models\WebReview;
 use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Services\SmartSearchService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -31,25 +33,35 @@ class ShopPage extends Component
 
     public ?string $slug = null; // bila ada → halaman detail
 
-    // Catalog filters
+    // Catalog filters with URL binding for clean permalink architecture & SEO
+    #[Url(as: 'q', except: '')]
     public string $search = '';
 
+    #[Url(as: 'kategori', except: '')]
     public string $filterKategori = '';
 
+    #[Url(as: 'kondisi', except: '')]
     public string $filterKondisi = '';
 
+    #[Url(as: 'brand', except: '')]
     public string $filterBrand = '';
 
-    public string $filterHpMerk = ''; // [T-11] filter dari kompatibilitas_hp JSON
+    #[Url(as: 'hpMerk', except: '')]
+    public string $filterHpMerk = '';
 
-    public string $filterHpModel = ''; // [T-11] filter dari kompatibilitas_hp JSON
+    #[Url(as: 'hpModel', except: '')]
+    public string $filterHpModel = '';
 
+    #[Url(as: 'kualitas', except: '')]
     public string $filterKualitas = '';
 
-    public string $filterStok = ''; // '', 'tersedia', 'habis'
+    #[Url(as: 'stok', except: '')]
+    public string $filterStok = '';
 
-    public string $sort = ''; // '', 'terbaru', 'terlaris', 'termurah', 'termahal', 'relevansi'
+    #[Url(as: 'sort', except: '')]
+    public string $sort = '';
 
+    #[Url(as: 'hargaMax', except: null)]
     public ?int $hargaMax = null;
 
     // Detail: pilihan varian & qty
@@ -84,10 +96,93 @@ class ShopPage extends Component
      */
     private ?array $stokSummaryMemo = null;
 
-    public function mount(?string $slug = null)
+    public function mount(?string $slug = null, ?string $kategori = null, ?string $hpModel = null): void
     {
         $this->slug = $slug;
         $this->stokSummaryMemo = null;
+
+        if ($kategori) {
+            $this->filterKategori = $this->resolveKategoriParam($kategori);
+        }
+        if ($hpModel) {
+            $this->filterHpModel = str_replace('-', ' ', urldecode($hpModel));
+        }
+
+        // Support query parameters on direct landing
+        if (request()->has('kategori') && empty($this->filterKategori)) {
+            $this->filterKategori = (string) request()->query('kategori');
+        }
+        if (request()->has('category') && empty($this->filterKategori)) {
+            $this->filterKategori = (string) request()->query('category');
+        }
+        if (request()->has('hpModel') && empty($this->filterHpModel)) {
+            $this->filterHpModel = (string) request()->query('hpModel');
+        }
+        if (request()->has('hpMerk') && empty($this->filterHpMerk)) {
+            $this->filterHpMerk = (string) request()->query('hpMerk');
+        }
+        if (request()->has('brand') && empty($this->filterBrand)) {
+            $this->filterBrand = (string) request()->query('brand');
+        }
+        if (request()->has('q') && empty($this->search)) {
+            $this->search = (string) request()->query('q');
+        }
+        if (request()->has('search') && empty($this->search)) {
+            $this->search = (string) request()->query('search');
+        }
+        if (request()->has('kondisi') && empty($this->filterKondisi)) {
+            $this->filterKondisi = (string) request()->query('kondisi');
+        }
+        if (request()->has('sort') && empty($this->sort)) {
+            $this->sort = (string) request()->query('sort');
+        }
+    }
+
+    protected function resolveKategoriParam(string $kat): string
+    {
+        $kategori = KategoriProduk::where('slug', $kat)
+            ->orWhere('nama', $kat)
+            ->orWhere('id', is_numeric($kat) ? (int) $kat : 0)
+            ->first();
+
+        if ($kategori) {
+            return (string) $kategori->id;
+        }
+
+        return str_replace('-', ' ', urldecode($kat));
+    }
+
+    public function setFilterKategori(string $kategori): void
+    {
+        $this->filterKategori = ($this->filterKategori === $kategori) ? '' : $kategori;
+        $this->resetPage();
+    }
+
+    public function setFilterHpModel(string $model): void
+    {
+        $this->filterHpModel = ($this->filterHpModel === $model) ? '' : $model;
+        $this->resetPage();
+    }
+
+    public function setFilterBrand(string $brand): void
+    {
+        $this->filterBrand = ($this->filterBrand === $brand) ? '' : $brand;
+        $this->resetPage();
+    }
+
+    public function getActiveCategoryNameProperty(): ?string
+    {
+        if (empty($this->filterKategori)) {
+            return null;
+        }
+
+        if (is_numeric($this->filterKategori)) {
+            $cat = KategoriProduk::find($this->filterKategori);
+
+            return $cat?->nama ?? $this->filterKategori;
+        }
+
+        return ucwords(str_replace(['-', '_'], ' ', $this->filterKategori));
     }
 
     public function updatingSearch()
@@ -411,13 +506,25 @@ class ShopPage extends Component
         }
     }
 
-    public function addToCart(?int $produkId = null)
+    public function addToCart(?int $produkId = null, ?int $variantId = null)
     {
-        $produk = $produkId ? Produk::find($produkId) : $this->productDetail;
+        $produk = $produkId ? Produk::with('skuVariants')->find($produkId) : $this->productDetail;
         if (! $produk) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk tidak ditemukan']);
+
             return;
         }
 
+        $activeVariantId = $variantId;
+        if ($produkId) {
+            if ($activeVariantId === null) {
+                $activeVariantId = $produk->skuVariants->where('is_active', true)->first()?->id;
+            }
+        } else {
+            $activeVariantId = $this->selectedVariantId;
+        }
+
+        $itemQty = $produkId ? 1 : max(1, $this->qty);
         $catatan = (! $produkId || ($this->productDetail && $produkId === $this->productDetail->id)) && $this->selectedGadgetModel
             ? "Model: {$this->selectedGadgetModel}"
             : null;
@@ -425,12 +532,12 @@ class ShopPage extends Component
         try {
             app(CartService::class)->isi(
                 $produk->id,
-                $this->selectedVariantId,
-                max(1, $this->qty),
+                $activeVariantId,
+                $itemQty,
                 $catatan
             );
             $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
-            $this->dispatch('alert', ['type' => 'success', 'message' => "{$produk->nama} masuk keranjang"]);
+            $this->dispatch('alert', ['type' => 'success', 'message' => "{$produk->nama} berhasil ditambahkan ke keranjang"]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
@@ -438,10 +545,14 @@ class ShopPage extends Component
 
     public function beliLangsung(?int $produkId = null)
     {
-        $produk = $produkId ? Produk::find($produkId) : $this->productDetail;
+        $produk = $produkId ? Produk::with('skuVariants')->find($produkId) : $this->productDetail;
         if (! $produk) {
             return;
         }
+
+        $activeVariantId = $produkId
+            ? ($produk->skuVariants->where('is_active', true)->first()?->id ?? null)
+            : $this->selectedVariantId;
 
         $catatan = (! $produkId || ($this->productDetail && $produkId === $this->productDetail->id)) && $this->selectedGadgetModel
             ? "Model: {$this->selectedGadgetModel}"
@@ -450,8 +561,8 @@ class ShopPage extends Component
         try {
             app(CartService::class)->isi(
                 $produk->id,
-                $this->selectedVariantId,
-                max(1, $this->qty),
+                $activeVariantId,
+                $produkId ? 1 : max(1, $this->qty),
                 $catatan
             );
             $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
@@ -524,6 +635,7 @@ class ShopPage extends Component
         }
 
         $webService = app(WebKonsumenService::class);
+        $webConfig = $webService->getAll();
 
         return view('modules.marketplace.livewire.shop-catalog', [
             'categories' => $this->categories,
@@ -532,8 +644,17 @@ class ShopPage extends Component
             'hpModelList' => $this->hpModelList,
             'kualitasList' => $this->kualitasList,
             'products' => $this->products,
-            'webConfig' => $webService->getAll(),
+            'webConfig' => $webConfig,
             'webBanners' => $webService->getActiveBanners(),
-        ])->layout('layouts.marketplace', ['title' => 'Katalog Sparepart']);
+            'activeCategoryName' => $this->activeCategoryName,
+            'filterKategori' => $this->filterKategori,
+            'filterHpModel' => $this->filterHpModel,
+            'filterHpMerk' => $this->filterHpMerk,
+            'filterBrand' => $this->filterBrand,
+            'filterKondisi' => $this->filterKondisi,
+            'search' => $this->search,
+        ])->layout('layouts.marketplace', [
+            'title' => $this->activeCategoryName ? "Katalog {$this->activeCategoryName} — ".($webConfig['store_name'] ?? 'Bremspace') : 'Katalog Sparepart — '.($webConfig['store_name'] ?? 'Bremspace'),
+        ]);
     }
 }

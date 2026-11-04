@@ -14,14 +14,145 @@
             </a>
         </div>
     @else
-        <!-- Breadcrumb navigation -->
-        <nav class="flex items-center gap-2 text-xs font-medium text-ink-500 dark:text-ink-400 mb-8 overflow-x-auto whitespace-nowrap pb-1">
-            <a href="{{ route('shop') }}" class="hover:text-ink-900 dark:hover:text-white transition-colors">Katalog Sparepart</a>
-            <span>/</span>
-            <span class="text-ink-400 dark:text-ink-600">
-                {{ $produk->kategoriRelasi ? $produk->kategoriRelasi->nama : (is_array($produk->kategori) ? implode(', ', $produk->kategori) : (string) $produk->kategori) }}
-            </span>
-            <span>/</span>
+        @php
+            $galeri = $produk->galeri_foto;
+            $fotoUtama = $produk->foto_utama ?: $produk->gambar;
+            $catRel = $produk->kategoriRelasi;
+            $catNama = $catRel ? $catRel->nama : (is_array($produk->kategori) ? implode(', ', $produk->kategori) : (string) $produk->kategori);
+            $catParam = $catRel?->id ?: $catNama;
+            
+            // Kompatibilitas model untuk breadcrumb
+            $compatModel = $produk->model_kompatibel ?: ($produk->tipeHps->first()?->model ?? null);
+            if (!$compatModel && preg_match('/(iPhone\s*\d+(\s*(Pro|Plus|Max|Mini))?|Galaxy\s*[A-Z0-9]+|Redmi\s*[A-Z0-9\s]+|Xiaomi\s*[A-Z0-9\s]+)/i', $produk->nama, $matches)) {
+                $compatModel = trim($matches[0]);
+            }
+            $compatLabel = $compatModel ? (str_contains(strtolower($compatModel), strtolower($catNama)) ? $compatModel : "{$catNama} {$compatModel}") : null;
+            $finalPrice = (float) ($hargaInfo['harga'] ?? $produk->harga_jual_retail);
+        @endphp
+
+        @push('seo')
+            <link rel="canonical" href="{{ route('shop.detail', $produk->slug) }}" />
+            <meta name="description" content="{{ \Illuminate\Support\Str::limit(strip_tags($produk->deskripsi ?: "Beli {$produk->nama} berkualitas OEM/Original bergaransi resmi di " . config('app.name', 'Bremspace')), 160) }}">
+            <meta name="keywords" content="{{ $produk->nama }}, {{ $catNama }}, {{ $compatModel }}, sparepart handphone, suku cadang resmi">
+
+            <!-- OpenGraph Protocol -->
+            <meta property="og:type" content="product">
+            <meta property="og:title" content="{{ $produk->nama }} — {{ config('app.name', 'Bremspace') }}">
+            <meta property="og:description" content="{{ \Illuminate\Support\Str::limit(strip_tags($produk->deskripsi ?: "Beli {$produk->nama} harga grosir teknisi bergaransi."), 160) }}">
+            <meta property="og:url" content="{{ route('shop.detail', $produk->slug) }}">
+            <meta property="og:image" content="{{ $fotoUtama ?: asset('icons/icon-512x512.png') }}">
+            <meta property="product:price:amount" content="{{ $finalPrice }}">
+            <meta property="product:price:currency" content="IDR">
+            <meta property="product:availability" content="{{ $stokTotal > 0 ? 'in stock' : 'out of stock' }}">
+
+            <!-- Twitter Card -->
+            <meta name="twitter:card" content="summary_large_image">
+            <meta name="twitter:title" content="{{ $produk->nama }}">
+            <meta name="twitter:description" content="{{ \Illuminate\Support\Str::limit(strip_tags($produk->deskripsi ?: "Beli {$produk->nama}."), 160) }}">
+            <meta name="twitter:image" content="{{ $fotoUtama ?: asset('icons/icon-512x512.png') }}">
+
+            @php
+                $productSchema = [
+                    '@context' => 'https://schema.org/',
+                    '@type' => 'Product',
+                    'name' => $produk->nama,
+                    'image' => [$fotoUtama ?: asset('icons/icon-512x512.png')],
+                    'description' => strip_tags($produk->deskripsi ?: $produk->nama),
+                    'sku' => $produk->sku ?: 'PRD-' . $produk->id,
+                    'mpn' => $produk->kode ?: 'PRD-' . $produk->id,
+                    'brand' => [
+                        '@type' => 'Brand',
+                        'name' => $produk->brand?->nama ?: 'Bremspace Genuine',
+                    ],
+                    'offers' => [
+                        '@type' => 'Offer',
+                        'url' => route('shop.detail', $produk->slug),
+                        'priceCurrency' => 'IDR',
+                        'price' => $finalPrice,
+                        'priceValidUntil' => now()->addYear()->format('Y-m-d'),
+                        'itemCondition' => 'https://schema.org/NewCondition',
+                        'availability' => $stokTotal > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                        'seller' => [
+                            '@type' => 'Organization',
+                            'name' => config('app.name', 'Bremspace'),
+                        ],
+                    ],
+                ];
+                if (isset($reviews) && count($reviews) > 0) {
+                    $productSchema['aggregateRating'] = [
+                        '@type' => 'AggregateRating',
+                        'ratingValue' => number_format($reviews->avg('rating'), 1),
+                        'reviewCount' => count($reviews),
+                    ];
+                }
+
+                $productBreadcrumbs = [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'BreadcrumbList',
+                    'itemListElement' => [
+                        [
+                            '@type' => 'ListItem',
+                            'position' => 1,
+                            'name' => 'Katalog Sparepart',
+                            'item' => route('shop'),
+                        ],
+                    ],
+                ];
+                $bPos = 2;
+                if ($catNama) {
+                    $productBreadcrumbs['itemListElement'][] = [
+                        '@type' => 'ListItem',
+                        'position' => $bPos++,
+                        'name' => $catNama,
+                        'item' => route('shop', ['kategori' => $catParam]),
+                    ];
+                }
+                if ($compatModel && $compatLabel) {
+                    $productBreadcrumbs['itemListElement'][] = [
+                        '@type' => 'ListItem',
+                        'position' => $bPos++,
+                        'name' => $compatLabel,
+                        'item' => route('shop', ['kategori' => $catParam, 'hpModel' => $compatModel]),
+                    ];
+                }
+                $productBreadcrumbs['itemListElement'][] = [
+                    '@type' => 'ListItem',
+                    'position' => $bPos++,
+                    'name' => $produk->nama,
+                    'item' => route('shop.detail', $produk->slug),
+                ];
+            @endphp
+
+            <!-- Schema.org Product Structured Data (Shopee/Amazon Standard) -->
+            <script type="application/ld+json">
+            {!! json_encode($productSchema, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
+            </script>
+
+            <!-- Schema.org BreadcrumbList Structured Data -->
+            <script type="application/ld+json">
+            {!! json_encode($productBreadcrumbs, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
+            </script>
+        @endpush
+
+        <!-- Breadcrumb navigation (Fully clickable & correctly routed) -->
+        <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-xs font-medium text-ink-500 dark:text-ink-400 mb-8 overflow-x-auto whitespace-nowrap pb-1">
+            <a href="{{ route('shop') }}" class="hover:text-up-primary dark:hover:text-white transition-colors flex items-center gap-1.5 font-semibold">
+                <svg class="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                <span>Katalog Sparepart</span>
+            </a>
+            <span class="text-ink-300 dark:text-ink-700">/</span>
+            @if($catNama)
+                <a href="{{ route('shop', ['kategori' => $catParam]) }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-medium">
+                    {{ $catNama }}
+                </a>
+                <span class="text-ink-300 dark:text-ink-700">/</span>
+            @endif
+            @if($compatModel && $compatLabel)
+                <a href="{{ route('shop', ['kategori' => $catParam, 'hpModel' => $compatModel]) }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-medium">
+                    {{ $compatLabel }}
+                </a>
+                <span class="text-ink-300 dark:text-ink-700">/</span>
+            @endif
             <span class="text-ink-900 dark:text-white font-semibold truncate max-w-xs">{{ $produk->nama }}</span>
         </nav>
 
