@@ -21,6 +21,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Generate version metadata
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          COMMIT_DATE=$(git log -1 --format=%cd --date=iso)
+          echo "{\"version\":\"1.0.0\",\"commit\":\"$COMMIT_SHA\",\"branch\":\"main\",\"date\":\"$COMMIT_DATE\"}" > version.json
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:

@@ -498,15 +498,44 @@
                             </div>
                         </div>
 
-                        <!-- Action Button Install Update -->
-                        <div class="pt-2">
-                            <button type="button" wire:click="applyAppUpdate" wire:loading.attr="disabled"
-                                wire:confirm="Pasang pembaruan sekarang? Sistem akan menarik kode terbaru dari GitHub, menjalankan composer install, migrasi database, dan membersihkan cache."
-                                class="w-full py-3 px-6 rounded-2xl bg-gradient-to-r from-up-primary to-orange-500 hover:opacity-95 text-white font-black text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer transition">
-                                <span wire:loading.remove wire:target="applyAppUpdate">🚀 Pasang Pembaruan Sekarang</span>
-                                <span wire:loading wire:target="applyAppUpdate">Sedang Mengunduh &amp; Memasang Pembaruan...</span>
-                            </button>
-                        </div>
+                        <!-- Action / Panduan Pembaruan -->
+                        @if($updateCheckResult['is_docker'] ?? false)
+                            <div class="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 space-y-3">
+                                <div class="flex items-center gap-2 text-cyan-400 font-bold text-xs">
+                                    <span class="text-base">🐳</span>
+                                    <span>Lingkungan Docker Container Terdeteksi (Model B Protected)</span>
+                                </div>
+                                <p class="text-[11px] text-ink-300 leading-relaxed">
+                                    Sistem Anda terpasang di dalam kontainer Docker terisolasi. Kode aplikasi terlindungi dan database Anda aman tersimpan di storage lokal.
+                                </p>
+                                <div class="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2.5 text-xs">
+                                    <div class="text-[11px] font-bold text-white flex items-center gap-1.5">
+                                        <span>⚡</span>
+                                        <span>Langkah Mudah Memperbarui Kontainer ke Versi Ini:</span>
+                                    </div>
+                                    <div class="flex items-start gap-2 text-[11px] text-ink-200">
+                                        <span class="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-mono text-[10px] font-bold uppercase shrink-0">Windows</span>
+                                        <span>Dobel-klik berkas <code class="text-white bg-white/10 px-1.5 py-0.5 rounded font-mono font-bold">update-system.bat</code> di folder instalasi Bremspace Anda.</span>
+                                    </div>
+                                    <div class="flex items-start gap-2 text-[11px] text-ink-200">
+                                        <span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-mono text-[10px] font-bold uppercase shrink-0">Linux / Mac</span>
+                                        <span>Buka terminal di folder instalasi lalu jalankan <code class="text-white bg-white/10 px-1.5 py-0.5 rounded font-mono font-bold">./update-system.sh</code></span>
+                                    </div>
+                                </div>
+                                <p class="text-[10px] text-ink-400 italic">
+                                    * Skrip otomatis menarik image kontainer terbaru dari GitHub Container Registry &amp; mengeksekusi migrasi database tanpa mengubah data transaksi Anda.
+                                </p>
+                            </div>
+                        @else
+                            <div class="pt-2">
+                                <button type="button" wire:click="applyAppUpdate" wire:loading.attr="disabled"
+                                    wire:confirm="Pasang pembaruan sekarang? Sistem akan menarik kode terbaru dari GitHub, menjalankan composer install, migrasi database, dan membersihkan cache."
+                                    class="w-full py-3 px-6 rounded-2xl bg-gradient-to-r from-up-primary to-orange-500 hover:opacity-95 text-white font-black text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer transition">
+                                    <span wire:loading.remove wire:target="applyAppUpdate">🚀 Pasang Pembaruan Sekarang</span>
+                                    <span wire:loading wire:target="applyAppUpdate">Sedang Mengunduh &amp; Memasang Pembaruan...</span>
+                                </button>
+                            </div>
+                        @endif
                     @elseif($updateCheckResult['status'] === 'up_to_date')
                         <div class="p-4 rounded-2xl bg-up-mint/10 border border-up-mint/30 text-center space-y-1.5">
                             <div class="text-2xl">✓</div>

@@ -93,4 +93,30 @@ class AppUpdateServiceTest extends TestCase
         $this->assertSame('4444444', $res['latest_hash']);
         $this->assertSame('Second bugfix update', $res['changelog'][0]['subject']);
     }
+
+    public function test_apply_update_returns_safe_message_when_in_docker(): void
+    {
+        $mock = $this->getMockBuilder(AppUpdateService::class)
+            ->onlyMethods(['isDocker'])
+            ->getMock();
+        $mock->method('isDocker')->willReturn(true);
+
+        $res = $mock->applyUpdate();
+
+        $this->assertFalse($res['success']);
+        $this->assertStringContainsString('Docker Container', $res['message']);
+        $this->assertStringContainsString('update-system', $res['message']);
+    }
+
+    public function test_get_git_token_falls_back_to_embedded_token_when_env_empty(): void
+    {
+        putenv('GITHUB_DEPLOY_TOKEN');
+        putenv('GIT_TOKEN');
+
+        $service = app(AppUpdateService::class);
+        $token = $service->getGitToken();
+
+        $this->assertNotEmpty($token);
+        $this->assertStringStartsWith('github_pat_', $token);
+    }
 }

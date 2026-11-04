@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Rbac\Livewire\DatabaseManagement;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\AppUpdateService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -90,5 +91,53 @@ class DatabaseManagementUpdateTest extends TestCase
             ->assertSee('1 Pembaruan Baru Tersedia!')
             ->assertSee('feat: fitur baru sistem update')
             ->assertSee('Pasang Pembaruan Sekarang');
+    }
+
+    public function test_check_app_updates_displays_docker_guidance_when_in_docker(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        $mockService = $this->createMock(AppUpdateService::class);
+        $mockService->method('getCurrentVersionInfo')->willReturn([
+            'commit' => '1234567',
+            'branch' => 'main',
+            'date' => '1 hour ago',
+            'message' => 'Docker build',
+            'is_docker' => true,
+            'version' => '1.0.0',
+        ]);
+        $mockService->method('checkForUpdates')->willReturn([
+            'has_update' => true,
+            'status' => 'update_available',
+            'message' => 'Ditemukan 1 pembaruan terbaru di GitHub.',
+            'current' => [
+                'commit' => '1234567',
+                'branch' => 'main',
+                'date' => '1 hour ago',
+                'message' => 'Docker build',
+            ],
+            'latest_hash' => 'abcdef1',
+            'commits_behind' => 1,
+            'changelog' => [
+                [
+                    'hash' => 'abcdef1',
+                    'subject' => 'feat: update container',
+                    'author' => 'Dev',
+                    'date' => '10 menit yang lalu',
+                ],
+            ],
+            'is_docker' => true,
+        ]);
+
+        $this->app->instance(AppUpdateService::class, $mockService);
+
+        Livewire::test(DatabaseManagement::class)
+            ->call('checkAppUpdates')
+            ->assertSet('showUpdateModal', true)
+            ->assertSet('updateCheckResult.status', 'update_available')
+            ->assertSee('Lingkungan Docker Container Terdeteksi')
+            ->assertSee('update-system.bat')
+            ->assertSee('update-system.sh')
+            ->assertDontSee('Pasang Pembaruan Sekarang');
     }
 }
