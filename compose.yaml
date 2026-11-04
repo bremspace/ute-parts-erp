@@ -1,5 +1,5 @@
 # ==============================================================================
-# Bremspace ERP & POS System — Universal Docker Compose Stack
+# Bremspace ERP & POS System - Universal Docker Compose Stack
 # Brand: Bremspace
 # Port Default: 1741 (Akses Localhost & Multi-Device LAN)
 # ==============================================================================
@@ -57,7 +57,7 @@ services:
       MYSQL_USER: ${DB_USERNAME:-bremspace}
       MYSQL_PASSWORD: ${DB_PASSWORD:-bremspace_secret}
     volumes:
-      - ./docker/data/mysql:/var/lib/mysql
+      - bremspace-mysql-data:/var/lib/mysql
     networks:
       - bremspace-network
 
@@ -81,6 +81,10 @@ services:
     depends_on:
       - app
       - db
+
+volumes:
+  bremspace-public:
+  bremspace-mysql-data:
 
 networks:
   bremspace-network:

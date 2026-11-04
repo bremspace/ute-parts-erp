@@ -1,5 +1,5 @@
 # ==============================================================================
-# Bremspace ERP & POS System — Client Production Stack
+# Bremspace ERP & POS System - Client Production Stack
 # Brand: Bremspace
 # Mode: Model B (Pre-Built Protected Container Image)
 # ==============================================================================
@@ -55,7 +55,7 @@ services:
       MYSQL_USER: ${DB_USERNAME:-bremspace}
       MYSQL_PASSWORD: ${DB_PASSWORD:-bremspace_secret}
     volumes:
-      - ./docker/data/mysql:/var/lib/mysql
+      - bremspace-mysql-data:/var/lib/mysql
     networks:
       - bremspace-network
 
@@ -79,6 +79,7 @@ services:
 
 volumes:
   bremspace-public:
+  bremspace-mysql-data:
 
 networks:
   bremspace-network:
