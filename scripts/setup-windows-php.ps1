@@ -156,15 +156,14 @@ foreach ($dll in $dllsToBundle) {
 
 if (-not (Test-Path (Join-Path $destDir 'vcruntime140.dll'))) {
     $altPaths = @(
-        "${env:ProgramFiles(x86)}\Microsoft\Edge\Application",
         "$env:ProgramFiles\Microsoft\Edge\Application",
         "$env:ProgramFiles\Google\Chrome\Application",
         "$env:ProgramFiles\Microsoft VS Code",
         "$env:LOCALAPPDATA\Programs\Microsoft VS Code",
-        Join-Path $env:SystemRoot 'SysWOW64'
+        (Join-Path $env:SystemRoot 'SysWOW64')
     )
     foreach ($ap in $altPaths) {
-        if (Test-Path $ap) {
+        if ($ap -and (Test-Path $ap)) {
             $found = Get-ChildItem -Path $ap -Filter "vcruntime140.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($found) {
                 $pDir = $found.DirectoryName
