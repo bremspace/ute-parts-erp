@@ -123,6 +123,7 @@ class KnowledgeBasePage extends Component
 
         // Kategori dinamis yang ada di database
         $kategoriList = WebArticle::published()
+            ->reorder()
             ->distinct()
             ->pluck('kategori')
             ->filter()
@@ -134,6 +135,8 @@ class KnowledgeBasePage extends Component
             'highlightArticle' => $highlightArticle,
             'webConfig' => $webConfig,
             'kategoriList' => $kategoriList,
+            'kategori' => $this->kategori,
+            'search' => $this->search,
         ])->layout('layouts.marketplace', [
             'title' => 'Panduan Teknis & Servis — '.($webConfig['store_name'] ?? config('app.name', 'Pusat Edukasi')),
         ]);

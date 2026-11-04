@@ -255,10 +255,27 @@ class DatabaseManagement extends Component
     public function checkAppUpdates(AppUpdateService $updateService): void
     {
         $this->isCheckingUpdate = true;
-        $this->updateCheckResult = $updateService->checkForUpdates();
-        $this->currentVersionInfo = $updateService->getCurrentVersionInfo();
-        $this->showUpdateModal = true;
-        $this->isCheckingUpdate = false;
+        try {
+            $this->updateCheckResult = $updateService->checkForUpdates();
+            $this->currentVersionInfo = $updateService->getCurrentVersionInfo();
+            $this->showUpdateModal = true;
+        } catch (Throwable $e) {
+            $this->updateCheckResult = [
+                'has_update' => false,
+                'status' => 'error',
+                'message' => 'Gagal mengecek pembaruan: '.$e->getMessage(),
+                'current' => $this->currentVersionInfo ?? $updateService->getCurrentVersionInfo(),
+                'changelog' => [],
+                'commits_behind' => 0,
+            ];
+            $this->showUpdateModal = true;
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Terjadi kesalahan saat mengecek pembaruan GitHub: '.$e->getMessage(),
+            ]);
+        } finally {
+            $this->isCheckingUpdate = false;
+        }
     }
 
     /**
@@ -303,22 +320,30 @@ class DatabaseManagement extends Component
     {
         $this->authorizeSuperAdminOnly();
         $this->isInstallingUpdate = true;
-        $res = $updateService->applyUpdate();
-        $this->updateLogs = $res['logs'] ?? [];
-        $this->isInstallingUpdate = false;
+        try {
+            $res = $updateService->applyUpdate();
+            $this->updateLogs = $res['logs'] ?? [];
 
-        if ($res['success']) {
-            $this->currentVersionInfo = $res['current'] ?? $updateService->getCurrentVersionInfo();
-            $this->updateCheckResult = null;
-            $this->dispatch('alert', [
-                'type' => 'success',
-                'message' => $res['message'],
-            ]);
-        } else {
+            if ($res['success']) {
+                $this->currentVersionInfo = $res['current'] ?? $updateService->getCurrentVersionInfo();
+                $this->updateCheckResult = null;
+                $this->dispatch('alert', [
+                    'type' => 'success',
+                    'message' => $res['message'],
+                ]);
+            } else {
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => $res['message'],
+                ]);
+            }
+        } catch (Throwable $e) {
             $this->dispatch('alert', [
                 'type' => 'error',
-                'message' => $res['message'],
+                'message' => 'Gagal memasang pembaruan: '.$e->getMessage(),
             ]);
+        } finally {
+            $this->isInstallingUpdate = false;
         }
     }
 

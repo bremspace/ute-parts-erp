@@ -2,14 +2,19 @@
 
 namespace App\Modules\Rbac\Services;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 use Throwable;
 
 /**
  * Layanan pengecekan dan instalasi pembaruan aplikasi langsung dari GitHub (Source of Truth).
  * Mendukung repository publik maupun private (via Personal Access Token / Deploy Key).
+ * Dirancang tahan terhadap perbedaan environment (staging vs production), permission quirks,
+ * serta mendukung fallback otomatis antara GitHub REST API dan Git CLI.
  */
 class AppUpdateService
 {
@@ -35,7 +40,6 @@ class AppUpdateService
 
         foreach ($values as $key => $value) {
             $valueStr = (string) $value;
-            // Jika mengandung spasi atau karakter khusus dan belum berpetik
             if (str_contains($valueStr, ' ') && ! str_starts_with($valueStr, '"')) {
                 $valueStr = '"'.$valueStr.'"';
             }
@@ -54,21 +58,54 @@ class AppUpdateService
     }
 
     /**
-     * Dapatkan informasi commit saat ini.
+     * Dapatkan informasi commit saat ini (sanitized).
      */
     public function getCurrentVersionInfo(): array
     {
         $hash = $this->runGit(['rev-parse', '--short', 'HEAD']);
         $date = $this->runGit(['log', '-1', '--format=%cd', '--date=relative']);
         $message = $this->runGit(['log', '-1', '--format=%s']);
-        $branch = $this->runGit(['rev-parse', '--abbrev-ref', 'HEAD']) ?: 'main';
+        $branch = $this->runGit(['rev-parse', '--abbrev-ref', 'HEAD']);
+
+        $cleanCommit = ($hash['status'] === 0 && ! str_contains($hash['output'], 'fatal:'))
+            ? trim($hash['output'])
+            : 'dev';
+
+        $cleanBranch = ($branch['status'] === 0 && ! str_contains($branch['output'], 'fatal:') && trim($branch['output']) !== 'HEAD')
+            ? trim($branch['output'])
+            : 'main';
+
+        $cleanDate = ($date['status'] === 0 && ! str_contains($date['output'], 'fatal:'))
+            ? trim($date['output'])
+            : '-';
+
+        $cleanMessage = ($message['status'] === 0 && ! str_contains($message['output'], 'fatal:'))
+            ? trim($message['output'])
+            : 'Versi aktif sistem';
 
         return [
-            'commit' => trim($hash['output'] ?: 'dev'),
-            'date' => trim($date['output'] ?: '-'),
-            'message' => trim($message['output'] ?: 'Initial build'),
-            'branch' => trim($branch['output'] ?: 'main'),
+            'commit' => $cleanCommit,
+            'date' => $cleanDate,
+            'message' => $cleanMessage,
+            'branch' => $cleanBranch,
         ];
+    }
+
+    /**
+     * Deteksi nama owner dan repo GitHub dari remote origin.
+     *
+     * @return array{0: string, 1: string} [owner, repo]
+     */
+    public function getRepoOwnerAndName(): array
+    {
+        $res = $this->runGit(['remote', 'get-url', 'origin']);
+        $url = trim($res['output'] ?? '');
+
+        if (preg_match('#github\.com[:/]([^/]+)/([^/]+?)(\.git)?$#', $url, $matches)) {
+            return [$matches[1], $matches[2]];
+        }
+
+        return ['bremspace', 'ute-parts-erp'];
     }
 
     /**
@@ -81,27 +118,160 @@ class AppUpdateService
 
     /**
      * Cek apakah ada pembaruan baru di GitHub.
+     * Menggunakan strategi ganda: GitHub REST API (cepat, zero filesystem-write)
+     * dengan fallback otomatis ke Git CLI jika API tidak dapat dihubungi.
      */
     public function checkForUpdates(): array
     {
         $currentInfo = $this->getCurrentVersionInfo();
+        $branch = $currentInfo['branch'] ?: 'main';
         $token = $this->getGitToken();
 
-        // 1. Jalankan git fetch
-        $remoteFetchCmd = ['fetch', 'origin', 'main'];
+        // 1. Coba jalur GitHub REST API (ringan, tidak butuh write ke .git/FETCH_HEAD)
+        try {
+            $apiResult = $this->checkUpdatesViaGitHubApi($currentInfo, $branch, $token);
+            if ($apiResult !== null) {
+                return $apiResult;
+            }
+        } catch (Throwable $e) {
+            Log::info('GitHub REST API update check fallback ke Git CLI: '.$e->getMessage());
+        }
+
+        // 2. Fallback ke Git CLI
+        return $this->checkUpdatesViaGitCli($currentInfo, $branch, $token);
+    }
+
+    /**
+     * Cek update via GitHub REST API.
+     */
+    protected function checkUpdatesViaGitHubApi(array $currentInfo, string $branch, string $token = ''): ?array
+    {
+        [$owner, $repo] = $this->getRepoOwnerAndName();
+        $currentCommit = $currentInfo['commit'];
+
+        $headers = [
+            'User-Agent' => 'UteParts-ERP-Updater/1.0',
+            'Accept' => 'application/vnd.github+json',
+        ];
         if (! empty($token)) {
-            // Gunakan custom authorization header untuk private repo
+            $headers['Authorization'] = 'Bearer '.$token;
+        }
+
+        // Jika commit lokal valid (bukan 'dev'), gunakan compare API
+        if ($currentCommit !== 'dev' && preg_match('/^[0-9a-fA-F]{4,40}$/', $currentCommit)) {
+            $compareUrl = "https://api.github.com/repos/{$owner}/{$repo}/compare/{$currentCommit}...{$branch}";
+            $response = Http::withHeaders($headers)->timeout(8)->get($compareUrl);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $status = $data['status'] ?? '';
+                $totalCommits = (int) ($data['total_commits'] ?? 0);
+                $commits = $data['commits'] ?? [];
+
+                if ($status === 'identical' || $totalCommits <= 0) {
+                    return [
+                        'has_update' => false,
+                        'status' => 'up_to_date',
+                        'message' => 'Aplikasi sudah menggunakan versi terbaru.',
+                        'current' => $currentInfo,
+                        'changelog' => [],
+                        'commits_behind' => 0,
+                    ];
+                }
+
+                // Ada pembaruan: balik urutan agar commit terbaru tampil di atas
+                $reversedCommits = array_reverse($commits);
+                $changelog = [];
+                foreach (array_slice($reversedCommits, 0, 20) as $c) {
+                    $commitDate = $c['commit']['author']['date'] ?? null;
+                    $changelog[] = [
+                        'hash' => substr($c['sha'] ?? '', 0, 7),
+                        'subject' => strtok($c['commit']['message'] ?? '', "\n"),
+                        'author' => $c['commit']['author']['name'] ?? 'Developer',
+                        'date' => $commitDate ? Carbon::parse($commitDate)->diffForHumans() : '-',
+                    ];
+                }
+
+                $latestSha = ! empty($commits) ? end($commits)['sha'] : ($data['base_commit']['sha'] ?? '');
+
+                return [
+                    'has_update' => true,
+                    'status' => 'update_available',
+                    'message' => "Ditemukan {$totalCommits} pembaruan terbaru di GitHub.",
+                    'current' => $currentInfo,
+                    'latest_hash' => substr($latestSha, 0, 7) ?: '-',
+                    'commits_behind' => $totalCommits,
+                    'changelog' => $changelog,
+                ];
+            }
+        }
+
+        // Fallback: periksa commit HEAD branch terkini
+        $branchUrl = "https://api.github.com/repos/{$owner}/{$repo}/commits/{$branch}";
+        $response = Http::withHeaders($headers)->timeout(8)->get($branchUrl);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            $remoteSha = $data['sha'] ?? '';
+            $remoteShort = substr($remoteSha, 0, 7);
+
+            if ($remoteShort === $currentCommit) {
+                return [
+                    'has_update' => false,
+                    'status' => 'up_to_date',
+                    'message' => 'Aplikasi sudah menggunakan versi terbaru.',
+                    'current' => $currentInfo,
+                    'changelog' => [],
+                    'commits_behind' => 0,
+                ];
+            }
+
+            $commitDate = $data['commit']['author']['date'] ?? null;
+
+            return [
+                'has_update' => true,
+                'status' => 'update_available',
+                'message' => 'Pembaruan versi terbaru tersedia di GitHub.',
+                'current' => $currentInfo,
+                'latest_hash' => $remoteShort,
+                'commits_behind' => 1,
+                'changelog' => [
+                    [
+                        'hash' => $remoteShort,
+                        'subject' => strtok($data['commit']['message'] ?? '', "\n"),
+                        'author' => $data['commit']['author']['name'] ?? 'Developer',
+                        'date' => $commitDate ? Carbon::parse($commitDate)->diffForHumans() : '-',
+                    ],
+                ],
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Cek update via Git CLI (fallback lokal).
+     */
+    protected function checkUpdatesViaGitCli(array $currentInfo, string $branch, string $token = ''): array
+    {
+        $this->selfHealGitLockFiles();
+
+        // 1. Jalankan git fetch
+        $fetchArgs = ['fetch', 'origin', $branch];
+        if (! empty($token)) {
             $authHeader = 'AUTHORIZATION: bearer '.$token;
-            $fetchRes = $this->runGit(['-c', "http.extraheader={$authHeader}", 'fetch', 'origin', 'main']);
+            $fetchRes = $this->runGit(['-c', "http.extraheader={$authHeader}", 'fetch', 'origin', $branch]);
         } else {
-            $fetchRes = $this->runGit($remoteFetchCmd);
+            $fetchRes = $this->runGit($fetchArgs);
         }
 
         if ($fetchRes['status'] !== 0) {
+            $cleanOutput = preg_replace('/fatal:\s*/i', '', $fetchRes['output']);
+
             return [
                 'has_update' => false,
                 'status' => 'error',
-                'message' => 'Gagal terhubung ke remote GitHub: '.$fetchRes['output'],
+                'message' => 'Gagal terhubung ke remote GitHub: '.trim($cleanOutput),
                 'current' => $currentInfo,
                 'changelog' => [],
                 'commits_behind' => 0,
@@ -109,7 +279,7 @@ class AppUpdateService
         }
 
         // 2. Hitung jumlah commit tertinggal
-        $countRes = $this->runGit(['rev-list', '--count', 'HEAD..origin/main']);
+        $countRes = $this->runGit(['rev-list', '--count', "HEAD..origin/{$branch}"]);
         $commitsBehind = (int) trim($countRes['output'] ?: '0');
 
         if ($commitsBehind <= 0) {
@@ -124,7 +294,7 @@ class AppUpdateService
         }
 
         // 3. Ambil daftar changelog apa saja yang berubah
-        $logRes = $this->runGit(['log', 'HEAD..origin/main', '--pretty=format:%h||%s||%an||%ar', '-n', '20']);
+        $logRes = $this->runGit(['log', "HEAD..origin/{$branch}", '--pretty=format:%h||%s||%an||%ar', '-n', '20']);
         $changelog = [];
         if (! empty($logRes['output'])) {
             $lines = explode("\n", trim($logRes['output']));
@@ -141,7 +311,7 @@ class AppUpdateService
             }
         }
 
-        $latestRemoteHash = $this->runGit(['rev-parse', '--short', 'origin/main']);
+        $latestRemoteHash = $this->runGit(['rev-parse', '--short', "origin/{$branch}"]);
 
         return [
             'has_update' => true,
@@ -159,13 +329,15 @@ class AppUpdateService
      */
     public function applyUpdate(): array
     {
+        $this->selfHealGitLockFiles();
+        $branch = $this->getCurrentVersionInfo()['branch'] ?: 'main';
         $token = $this->getGitToken();
         $logs = [];
 
         // 1. Git Pull
         $pullArgs = ! empty($token)
-            ? ['-c', "http.extraheader=AUTHORIZATION: bearer {$token}", 'pull', 'origin', 'main']
-            : ['pull', 'origin', 'main'];
+            ? ['-c', "http.extraheader=AUTHORIZATION: bearer {$token}", 'pull', '--no-rebase', 'origin', $branch]
+            : ['pull', '--no-rebase', 'origin', $branch];
 
         $pullRes = $this->runGit($pullArgs);
         $logs[] = '[1/4] Git Pull: '.($pullRes['status'] === 0 ? 'Sukses' : 'Gagal ('.$pullRes['output'].')');
@@ -177,10 +349,20 @@ class AppUpdateService
             ];
         }
 
-        // 2. Composer install (hanya jika ada perubahan composer)
-        $composerRes = $this->runProcess(['composer', 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader']);
+        // 2. Composer install (hanya jika ada composer di sistem)
+        $composerHome = storage_path('framework/composer');
+        if (! File::isDirectory($composerHome)) {
+            @File::makeDirectory($composerHome, 0755, true);
+        }
+
+        $envVars = [
+            'COMPOSER_HOME' => $composerHome,
+            'HOME' => getenv('HOME') ?: '/var/www',
+        ];
+
+        $composerRes = $this->runProcess(['composer', 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader'], $envVars);
         if ($composerRes['status'] !== 0 && file_exists(base_path('composer.phar'))) {
-            $composerRes = $this->runProcess([PHP_BINARY, 'composer.phar', 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader']);
+            $composerRes = $this->runProcess([PHP_BINARY, 'composer.phar', 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader'], $envVars);
         }
         $logs[] = '[2/4] Composer Install: '.($composerRes['status'] === 0 ? 'Sukses' : 'Catatan: '.$composerRes['output']);
 
@@ -192,9 +374,12 @@ class AppUpdateService
             $logs[] = '[3/4] Migrasi Skema Database: Catatan ('.$e->getMessage().')';
         }
 
-        // 4. Clear Cache Server
+        // 4. Clear Cache Server & Refresh Optimasi
         try {
             Artisan::call('optimize:clear');
+            Artisan::call('config:clear');
+            Artisan::call('cache:clear');
+            Artisan::call('view:clear');
             $logs[] = '[4/4] Bersihkan Cache Aplikasi & Konfigurasi: Sukses.';
         } catch (Throwable $e) {
             $logs[] = '[4/4] Bersihkan Cache: '.$e->getMessage();
@@ -217,20 +402,59 @@ class AppUpdateService
     }
 
     /**
+     * Cari berkas SSH private key terbaik yang siap digunakan.
+     */
+    protected function resolveBestSshKeyPath(): ?string
+    {
+        $candidatePaths = [
+            $this->getSshKeyPath(),
+            '/var/www/.ssh/id_ed25519',
+            '/root/.ssh/id_ed25519_ute_deploy',
+            '/root/.ssh/id_ed25519',
+        ];
+
+        $home = getenv('HOME') ?: ($_SERVER['HOME'] ?? '');
+        if (! empty($home)) {
+            $candidatePaths[] = $home.'/.ssh/id_ed25519';
+            $candidatePaths[] = $home.'/.ssh/id_rsa';
+        }
+
+        foreach ($candidatePaths as $path) {
+            if (File::exists($path) && File::isReadable($path)) {
+                // Pastikan izin berkas 0600 agar OpenSSH tidak menolak berkas private key
+                @chmod($path, 0600);
+
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Dapatkan isi SSH Public Key yang ada di sistem (jika sudah di-generate).
      */
     public function getSshPublicKey(): ?string
     {
-        $pubPath = $this->getSshKeyPath().'.pub';
-        if (File::exists($pubPath)) {
-            return trim(File::get($pubPath));
-        }
+        $candidates = [
+            $this->getSshKeyPath().'.pub',
+            '/var/www/.ssh/id_ed25519.pub',
+            '/root/.ssh/id_ed25519_ute_deploy.pub',
+            '/root/.ssh/id_ed25519.pub',
+        ];
 
         $home = getenv('HOME') ?: ($_SERVER['HOME'] ?? '');
         if (! empty($home)) {
-            $homePub = $home.'/.ssh/id_ed25519.pub';
-            if (File::exists($homePub)) {
-                return trim(File::get($homePub));
+            $candidates[] = $home.'/.ssh/id_ed25519.pub';
+            $candidates[] = $home.'/.ssh/id_rsa.pub';
+        }
+
+        foreach ($candidates as $pubPath) {
+            if (File::exists($pubPath) && File::isReadable($pubPath)) {
+                $content = trim(File::get($pubPath));
+                if (! empty($content)) {
+                    return $content;
+                }
             }
         }
 
@@ -270,6 +494,14 @@ class AppUpdateService
             @chmod($keyPath, 0600);
             @chmod($pubPath, 0644);
 
+            // Jika /var/www/.ssh ada dan writable, sinkronkan juga
+            if (File::isDirectory('/var/www/.ssh') && is_writable('/var/www/.ssh')) {
+                @copy($keyPath, '/var/www/.ssh/id_ed25519');
+                @copy($pubPath, '/var/www/.ssh/id_ed25519.pub');
+                @chmod('/var/www/.ssh/id_ed25519', 0600);
+                @chmod('/var/www/.ssh/id_ed25519.pub', 0644);
+            }
+
             // Sesuaikan remote URL ke SSH jika masih HTTPS
             $this->ensureGitRemoteIsSsh();
 
@@ -303,17 +535,36 @@ class AppUpdateService
     }
 
     /**
-     * Jalankan perintah Git dalam direktori proyek.
+     * Bersihkan lock files git yang tertinggal jika proses sebelumnya terputus.
+     */
+    protected function selfHealGitLockFiles(): void
+    {
+        $base = $this->getBasePath();
+        $lockFile = $base.'/.git/index.lock';
+
+        if (File::exists($lockFile)) {
+            $age = time() - File::lastModified($lockFile);
+            if ($age > 60) {
+                @File::delete($lockFile);
+                Log::warning("AppUpdateService: Menghapus index.lock kadaluarsa ({$age}s)");
+            }
+        }
+    }
+
+    /**
+     * Jalankan perintah Git dalam direktori proyek dengan hardening environment.
      */
     protected function runGit(array $arguments): array
     {
-        $customArgs = [];
+        $customArgs = [
+            '-c', 'safe.directory=*',
+        ];
 
-        // Jika ada SSH key lokal di storage/app/keys/id_ed25519, gunakan core.sshCommand
-        $sshKey = $this->getSshKeyPath();
-        if (File::exists($sshKey)) {
+        // Konfigurasi SSH key jika ada berkas private key yang valid
+        $sshKey = $this->resolveBestSshKeyPath();
+        if ($sshKey) {
             $customArgs[] = '-c';
-            $customArgs[] = "core.sshCommand=ssh -i {$sshKey} -o StrictHostKeyChecking=no";
+            $customArgs[] = "core.sshCommand=ssh -i {$sshKey} -o StrictHostKeyChecking=accept-new -o BatchMode=yes";
         }
 
         array_unshift($arguments, ...$customArgs);
@@ -323,12 +574,16 @@ class AppUpdateService
     }
 
     /**
-     * Jalankan proses eksternal secara aman.
+     * Jalankan proses eksternal secara aman dengan timeout memadai.
      */
-    protected function runProcess(array $command): array
+    protected function runProcess(array $command, array $extraEnv = []): array
     {
         try {
-            $process = new Process($command, $this->getBasePath(), null, null, 120);
+            $env = array_merge([
+                'GIT_TERMINAL_PROMPT' => '0',
+            ], $extraEnv);
+
+            $process = new Process($command, $this->getBasePath(), $env, null, 120);
             $process->run();
 
             return [
