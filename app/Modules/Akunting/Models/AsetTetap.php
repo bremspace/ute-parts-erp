@@ -5,6 +5,7 @@ namespace App\Modules\Akunting\Models;
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
+use App\Traits\BelongsToCabang;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -30,6 +31,7 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class AsetTetap extends Model
 {
+    use BelongsToCabang;
     use CatatAktivitas;
     use LogsActivity;
 

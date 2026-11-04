@@ -10,12 +10,13 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
-use App\Modules\Wms\Models\StockMutationLog;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\StokOpname;
 use App\Modules\Wms\Models\StokOpnameItem;
 use App\Modules\Wms\Services\ScanResolverService;
+use App\Modules\Wms\Services\StokDeductionService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -439,37 +440,19 @@ class OpnameTab extends Component
                     ]);
                 }
 
-                $sebelum = $stok->jumlah;
-                $stok->update(['jumlah' => $item->stok_fisik]);
-
                 if ($item->selisih !== 0) {
-                    // [B-10i] user_id = approver opname (sama dgn StokLog & approver_id
-                    // di bawah) — mutasi stok harus bisa dibuktikan pelakunya.
-                    StockMutationLog::create([
-                        'produk_id' => $item->produk_id,
-                        'sku_variant_id' => $item->sku_variant_id,
-                        'gudang_id' => $opname->gudang_id,
-                        'user_id' => auth()->id(),
-                        'delta' => $item->selisih,
-                        'sumber' => 'opname',
-                        'referensi_tipe' => StokOpname::class,
-                        'referensi_id' => $opname->id,
-                        'terjadi_at' => now(),
-                    ]);
-
-                    StokLog::create([
-                        'gudang_id' => $opname->gudang_id,
-                        'produk_id' => $item->produk_id,
-                        'sku_variant_id' => $item->sku_variant_id,
-                        'user_id' => auth()->id(),
-                        'jenis' => 'opname',
-                        'referensi_tipe' => StokOpname::class,
-                        'referensi_id' => $opname->id,
-                        'jumlah_sebelum' => $sebelum,
-                        'perubahan' => $item->selisih,
-                        'jumlah_setelah' => $item->stok_fisik,
-                        'catatan' => "Approval Opname {$opname->no_opname}",
-                    ]);
+                    app(StokDeductionService::class)->mutasi(
+                        produkId: $item->produk_id,
+                        skuVariantId: $item->sku_variant_id,
+                        gudangId: $opname->gudang_id,
+                        delta: $item->selisih,
+                        jenis: 'opname',
+                        sumber: 'opname',
+                        referensiTipe: StokOpname::class,
+                        referensiId: $opname->id,
+                        userId: auth()->id(),
+                        catatan: "Approval Opname {$opname->no_opname}"
+                    );
 
                     // Jurnal penyesuaian keuangan persis prinsip akuntansi:
                     $hargaBeli = (float) ($item->produk?->harga_beli ?? 0);

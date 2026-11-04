@@ -6,15 +6,15 @@ use App\Models\User;
 use App\Models\UserPreference;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\Piutang;
-use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PartaiPricingService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Pos\Livewire\Concerns\ManagesHoldTransactions;
+use App\Modules\Pos\Livewire\Concerns\ManagesKasLaci;
 use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\HargaFleksibelService;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PembayaranPesananOnlineService;
@@ -24,8 +24,6 @@ use App\Modules\Pos\Services\TransaksiVoidService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
-use App\Modules\Reseller\Models\Komisi;
-use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Models\Brand;
@@ -40,19 +38,19 @@ use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Wms\Services\StockReservationService;
-use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ParsesNominal;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class PosKasir extends Component
 {
+    use ManagesHoldTransactions;
+    use ManagesKasLaci;
     use ParsesNominal;
     use PunyaRiwayatAktivitas;
 
@@ -2010,31 +2008,21 @@ class PosKasir extends Component
 
     public function updatedSplitTunai($value): void
     {
-        $total = (float) $this->totalAkhir;
         $tunai = (float) $this->parseNominal($value);
         if ($tunai < 0) {
             $tunai = 0;
             $this->splitTunai = '0';
         }
-        $sisaNonTunai = max(0, $total - $tunai);
-        $this->splitNonTunai = number_format($sisaNonTunai, 0, ',', '.');
         unset($this->kembalian);
-
-        if ($this->splitMetodeNonTunai === 'qris') {
-            $this->refreshQrisKasir($sisaNonTunai);
-        }
     }
 
     public function updatedSplitNonTunai($value): void
     {
-        $total = (float) $this->totalAkhir;
         $nonTunai = (float) $this->parseNominal($value);
         if ($nonTunai < 0) {
             $nonTunai = 0;
             $this->splitNonTunai = '0';
         }
-        $sisaTunai = max(0, $total - $nonTunai);
-        $this->splitTunai = number_format($sisaTunai, 0, ',', '.');
         unset($this->kembalian);
 
         if ($this->splitMetodeNonTunai === 'qris') {
@@ -2495,22 +2483,6 @@ class PosKasir extends Component
 
         try {
             DB::transaction(function () use ($cabangId, $totalAkhir, $jumlahBayarFinal, $kembalianFinal) {
-                $today = now()->format('Ymd');
-                $countToday = Transaksi::whereDate('created_at', now()->toDateString())
-                    ->where('cabang_id', $cabangId)
-                    ->count() + 1;
-                $noTransaksi = sprintf('TRX-C%02d-%s-%04d', $cabangId, $today, $countToday);
-
-                $pelangganSaatTransaksi = $this->selectedCustomerId ? Pelanggan::with('tierMembership')->find($this->selectedCustomerId) : null;
-                $namaTierTransaksi = $pelangganSaatTransaksi?->tierMembership?->nama;
-                $tipeKonsumenTransaksi = $pelangganSaatTransaksi ? app(PelangganService::class)->tipeKonsumen($pelangganSaatTransaksi) : 'retail';
-
-                $splitData = $this->metodeBayar === 'split' ? [
-                    'tunai' => $this->splitTunai,
-                    'non_tunai' => $this->splitNonTunai,
-                    'metode_non_tunai' => $this->splitMetodeNonTunai,
-                ] : null;
-
                 $durasiGaransi = $this->hitungDurasiGaransiHari();
                 $garansiTeks = $this->generateGaransiTeks($durasiGaransi);
                 $garansiBerakhir = $durasiGaransi > 0 ? now()->addDays($durasiGaransi)->toDateString() : null;
@@ -2521,233 +2493,62 @@ class PosKasir extends Component
                     0.0
                 );
 
-                $transaksi = Transaksi::create([
-                    'no_transaksi' => $noTransaksi,
+                $splitData = $this->metodeBayar === 'split' ? [
+                    'tunai' => $this->splitTunai,
+                    'non_tunai' => $this->splitNonTunai,
+                    'metode_non_tunai' => $this->splitMetodeNonTunai,
+                ] : null;
+
+                $itemsPayload = array_map(function ($item) {
+                    return [
+                        'produk_id' => $item['produk_id'],
+                        'sku_variant_id' => $item['sku_variant_id'],
+                        'jumlah' => $item['qty'],
+                        'satuan' => $item['satuan'] ?? null,
+                        'konversi' => max(0.0001, (float) ($item['konversi'] ?? 1)),
+                        'harga_satuan' => (float) $item['harga'],
+                        'diskon_nominal' => (float) ($item['diskon'] ?? 0),
+                        'subtotal' => (float) $item['subtotal'],
+                        'catatan' => $item['catatan'] ?? null,
+                        'sn_list' => $item['sn_list'] ?? [],
+                        'has_sn' => (bool) $this->snProdukDariItem($item),
+                    ];
+                }, $this->cart);
+
+                $transaksi = app(PosCheckoutService::class)->checkout([
                     'cabang_id' => $cabangId,
                     'kasir_id' => auth()->id() ?? 1,
                     'pelanggan_id' => $this->selectedCustomerId,
                     'gudang_id' => $this->selectedGudangId,
                     'sumber' => 'pos',
-                    'subtotal' => $this->subtotal,
-                    'diskon_persen' => $this->diskonPersen,
-                    'diskon_nominal' => $this->diskonNominal,
+                    'subtotal' => (float) $this->subtotal,
+                    'diskon_persen' => (float) $this->diskonPersen,
+                    'diskon_nominal' => (float) $this->diskonNominal,
                     'diskon_manual_authorized_by_id' => $this->diskonManualAuthorizedById,
                     'diskon_manual_alasan' => $this->diskonManualAlasan ?: null,
-                    'diskon_poin' => $this->diskonPoin,
-                    'poin_ditukar' => $this->poinDitukar,
-                    'diskon_partai' => $this->diskonPartai,
+                    'diskon_poin' => (float) $this->diskonPoin,
+                    'poin_ditukar' => (int) $this->poinDitukar,
+                    'diskon_partai' => (float) $this->diskonPartai,
                     'mode_reward_mitra' => $this->modeRewardMitra,
                     'komisi_mitra_nominal' => $totalKomisiMitra,
-                    'dpp' => $this->dpp,
-                    'pajak_nominal' => $this->pajakNominal,
-                    'ppn_nominal' => $this->pajakNominal,
-                    'total_akhir' => $totalAkhir,
+                    'dpp' => (float) $this->dpp,
+                    'pajak_nominal' => (float) $this->pajakNominal,
+                    'total_akhir' => (float) $totalAkhir,
                     'metode_bayar' => $this->metodeBayar,
-                    'jumlah_bayar' => $jumlahBayarFinal,
-                    'kembalian' => $kembalianFinal,
+                    'jumlah_bayar' => (float) $jumlahBayarFinal,
+                    'kembalian' => (float) $kembalianFinal,
                     'split_detail' => $splitData,
-                    'status' => 'selesai',
                     'catatan' => $this->catatan,
                     'durasi_garansi_hari' => $durasiGaransi,
                     'garansi_teks' => $garansiTeks,
                     'garansi_berakhir_pada' => $garansiBerakhir,
                     'catatan_garansi' => $this->catatanGaransi ?: null,
-                ]);
-
-                // Pre-load semua produk di cart sekali query (eliminasi N+1 query)
-                $produkIds = array_unique(array_column($this->cart, 'produk_id'));
-                $produkMap = Produk::whereIn('id', $produkIds)->get()->keyBy('id');
-
-                // Create items & deduct stock
-                foreach ($this->cart as $item) {
-                    $produk = $produkMap->get($item['produk_id']);
-                    $satuanDasar = $produk?->satuan ?: 'pcs';
-                    $satuanItem = $item['satuan'] ?? $satuanDasar;
-                    $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
-                    $qtyDasar = (int) round($item['qty'] * $konversi);
-                    $hppPerSatuan = $produk ? (float) $produk->harga_beli * $konversi : 0;
-
-                    $transaksiItem = TransaksiItem::create([
-                        'transaksi_id' => $transaksi->id,
-                        'produk_id' => $item['produk_id'],
-                        'sku_variant_id' => $item['sku_variant_id'],
-                        'jumlah' => $item['qty'],
-                        'satuan' => $satuanItem,
-                        'konversi' => $konversi,
-                        'harga_satuan' => $item['harga'],
-                        'diskon_nominal' => $item['diskon'] ?? 0,
-                        'subtotal' => $item['subtotal'],
-                        'hpp' => $hppPerSatuan,
-                        'catatan' => $item['catatan'] ?? null,
-                    ]);
-
-                    // [F2-3] Klaim SN → status terjual + tautan transaksi_item
-                    // (validasi: jumlah == qty, unik, ada, tersedia, cabang aktif).
-                    // Throw → seluruh transaksi rollback (tidak ada transaksi/jurnal/stok).
-                    // [P1-3] Flag sn di-derive ulang dari produk — $cart[i]['sn']
-                    // adalah prop publik Livewire yg bisa di-tamper client.
-                    if ($this->snProdukDariItem($item)) {
-                        app(NomorSeriService::class)->klaimJual(
-                            $item['sn_list'] ?? [],
-                            (int) $item['produk_id'],
-                            (int) $cabangId,
-                            $qtyDasar,
-                            $transaksiItem->id
-                        );
-                    }
-
-                    if ($this->selectedGudangId) {
-                        // [B-02/P1-1] Delegasi ke StokDeductionService: lockForUpdate,
-                        // satu kriteria resolusi baris stok, StokLog + StockMutationLog
-                        // (untuk sinkron channel).
-                        // [B-02/P0-1] izinkanNegatif TIDAK lagi diaktifkan (backorder
-                        // dibatalkan owner) → default false = stok kurang DITOLAK.
-                        // Garis pertahanan kedua: validasiStokKeranjang() di atas
-                        // sudah menolak stok 0/kurang sebelum transaksi dibuat.
-                        app(StokDeductionService::class)->kurangi(
-                            produkId: (int) $item['produk_id'],
-                            skuVariantId: $item['sku_variant_id'] ?: null,
-                            gudangId: (int) $this->selectedGudangId,
-                            qty: $qtyDasar,
-                            jenis: 'penjualan',
-                            referensiTipe: Transaksi::class,
-                            referensiId: $transaksi->id,
-                            userId: auth()->id(),
-                            catatan: "POS Kasir {$transaksi->no_transaksi} ({$item['qty']} {$satuanItem})",
-                        );
-                    }
-                }
-
-                // Customer points & loyalty ledger (sinkron CRM & mutasi tercatat)
-                if ($this->poinDitukar > 0 && $this->selectedCustomerId) {
-                    app(PelangganService::class)->tukarPoin(
-                        $this->selectedCustomerId,
-                        $this->poinDitukar,
-                        $transaksi->id,
-                        "Tukar {$this->poinDitukar} poin pada transaksi {$transaksi->no_transaksi}"
-                    );
-                }
-
-                if ($this->selectedCustomerId) {
-                    app(PelangganService::class)->tambahBelanjaDanPoin(
-                        $this->selectedCustomerId,
-                        (float) $this->totalAkhir,
-                        $transaksi->id
-                    );
-                }
-
-                // Jurnal akuntansi otomatis (PRD §4.6)
-                $jurnalService = app(JurnalService::class);
-                $totalHpp = 0.0;
-                foreach ($this->cart as $item) {
-                    $produk = $produkMap->get($item['produk_id']) ?? Produk::find($item['produk_id']);
-                    $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
-                    $hppSatuanDasar = $produk ? (float) $produk->harga_beli : 0;
-                    $totalHpp += $hppSatuanDasar * ((int) round($item['qty'] * $konversi));
-                }
-                $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
-                $kasbon = $this->metodeBayar === 'piutang';
-                $ppnNominal = (float) $this->pajakNominal;
-                $dpp = (float) $this->dpp;
-
-                // [F1-2] Balance: debit totalAkhir = kredit (DPP pendapatan + PPN 220-01)
-                // Saat PPN aktif: 410-01 kredit = DPP (bukan totalAkhir) agar seimbang dgn baris 220-01.
-                // Akun debit disesuaikan dengan metode bayar:
-                // - tunai   : 110-04 (Kas Laci)
-                // - piutang : 120-01 (Piutang Usaha)
-                // - bank/qris/transfer : 110-02 (Bank)
-                // - split   : baris terpisah sesuai porsi tunai (110-04) & non-tunai (110-02)
-                $debitLines = [];
-                if ($kasbon) {
-                    $debitLines[] = ['akun_kode' => '120-01', 'debit' => $this->totalAkhir, 'kredit' => 0];
-                } elseif ($this->metodeBayar === 'tunai') {
-                    $debitLines[] = ['akun_kode' => '110-04', 'debit' => $this->totalAkhir, 'kredit' => 0];
-                } elseif ($this->metodeBayar === 'split') {
-                    $nonTunai = (float) $this->splitNonTunai;
-                    $porsiBank = min($totalAkhir, $nonTunai);
-                    $porsiKas = max(0.0, $totalAkhir - $porsiBank);
-
-                    if ($porsiKas > 0) {
-                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $porsiKas, 'kredit' => 0];
-                    }
-                    if ($porsiBank > 0) {
-                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => $porsiBank, 'kredit' => 0];
-                    }
-                } else {
-                    // transfer / qris langsung ke Bank
-                    $debitLines[] = ['akun_kode' => '110-02', 'debit' => $this->totalAkhir, 'kredit' => 0];
-                }
-
-                $lines = array_merge($debitLines, [
-                    ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $ppnNominal > 0 ? $dpp : (float) $this->totalAkhir],
-                ]);
-                // PPN Keluaran → akun 220-01 (kontrak AC F1-2)
-                foreach (app(PajakService::class)->jurnalLines($ppnNominal, $noJurnal, $cabangId, auth()->id() ?? 0) as $ppnLine) {
-                    $lines[] = $ppnLine;
-                }
-                if ($totalHpp > 0) {
-                    $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
-                    $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
-                }
-                $jurnalService->post(
-                    $noJurnal,
-                    now(),
-                    'pos',
-                    $lines,
-                    "Jurnal POS {$noTransaksi}",
-                    $cabangId,
-                    auth()->id(),
-                    Transaksi::class,
-                    $transaksi->id
-                );
+                ], $itemsPayload);
 
                 $pelangganModel = $this->selectedCustomerId ? Pelanggan::with('tierMembership')->find($this->selectedCustomerId) : null;
                 $saldoPoin = $pelangganModel?->poin_loyalty ?? 0;
                 $tipeKonsumen = $pelangganModel ? app(PelangganService::class)->tipeKonsumen($pelangganModel) : 'retail';
-
-                // Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing via rule aktif
-                app(KomisiService::class)->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
-
-                // Pencatatan komisi akumulasi jika mode komisi_akumulasi aktif & belum dicatat rule engine
-                if ($transaksi->mode_reward_mitra === 'komisi_akumulasi' && (float) $transaksi->komisi_mitra_nominal > 0 && $this->selectedCustomerId) {
-                    $sudahAda = Komisi::where('transaksi_id', $transaksi->id)->where('pelanggan_id', $this->selectedCustomerId)->exists();
-                    if (! $sudahAda) {
-                        $today = now()->format('Ymd');
-                        $count = Komisi::whereDate('created_at', now()->toDateString())->count() + 1;
-                        $noKomisi = sprintf('KMS-%s-%04d', $today, $count);
-                        Komisi::create([
-                            'no_komisi' => $noKomisi,
-                            'pelanggan_id' => $this->selectedCustomerId,
-                            'transaksi_id' => $transaksi->id,
-                            'aktor_tipe' => $tipeKonsumen === 'agen' ? 'agen' : 'reseller',
-                            'aktor_id' => $this->selectedCustomerId,
-                            'nominal_komisi' => $transaksi->komisi_mitra_nominal,
-                            'jumlah_transaksi' => $transaksi->total_akhir,
-                            'status' => Komisi::STATUS_PENDING,
-                            'keterangan' => 'Komisi akumulasi mitra transaksi '.$transaksi->no_transaksi,
-                        ]);
-                    }
-                }
-
-                // Kasbon → catat Piutang (AR)
-                if ($kasbon && $this->selectedCustomerId) {
-                    $countPiutang = Piutang::where('cabang_id', $cabangId)
-                        ->whereDate('created_at', now()->toDateString())
-                        ->count() + 1;
-                    Piutang::create([
-                        'no_piutang' => sprintf('AR-%s-%04d', now()->format('Ymd'), $countPiutang),
-                        'pelanggan_id' => $this->selectedCustomerId,
-                        'transaksi_id' => $transaksi->id,
-                        'cabang_id' => $cabangId,
-                        'jumlah' => $totalAkhir,
-                        'jumlah_dibayar' => 0,
-                        'sisa' => $totalAkhir,
-                        'jatuh_tempo' => now()->addDays(30)->toDateString(),
-                        'status' => 'belum_lunas',
-                        'keterangan' => 'Kasbon POS '.$noTransaksi,
-                    ]);
-                    Pelanggan::where('id', $this->selectedCustomerId)->increment('saldo_piutang', $totalAkhir);
-                }
+                $namaTierTransaksi = $pelangganModel?->tierMembership?->nama;
 
                 $itemsReceipt = array_map(function ($it) {
                     $hargaDasar = (float) ($it['harga_dasar'] ?? $it['harga']);
@@ -3064,169 +2865,7 @@ class PosKasir extends Component
             ->get();
     }
 
-    // ==================== [T-03] PARK / TAHAN ====================
-
-    /** Simpan keranjang sebagai transaksi status 'ditahan' (F6) — belum kurangi stok. */
-    public function tahanTransaksi()
-    {
-        if (empty($this->cart)) {
-            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Keranjang kosong, tidak ada yang ditahan']);
-
-            return;
-        }
-
-        $cabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
-
-        // [B-02/P1-2] Simpan keranjang tertahan dgn gudang cabang aktif
-        $this->validasiGudangCabang();
-
-        try {
-            DB::transaction(function () use ($cabangId) {
-                $today = now()->format('Ymd');
-                $count = Transaksi::whereDate('created_at', now()->toDateString())
-                    ->where('cabang_id', $cabangId)->count() + 1;
-                $no = sprintf('TRX-C%02d-%s-T%04d', $cabangId, $today, $count);
-
-                $transaksi = Transaksi::create([
-                    'no_transaksi' => $no,
-                    'cabang_id' => $cabangId,
-                    'kasir_id' => auth()->id() ?? 1,
-                    'pelanggan_id' => $this->selectedCustomerId,
-                    'gudang_id' => $this->selectedGudangId,
-                    'sumber' => 'pos',
-                    'subtotal' => $this->subtotal,
-                    'diskon_persen' => $this->diskonPersen,
-                    'diskon_nominal' => $this->diskonNominal,
-                    'dpp' => $this->dpp,
-                    'pajak_nominal' => $this->pajakNominal,
-                    'ppn_nominal' => $this->pajakNominal,
-                    'total_akhir' => $this->totalAkhir,
-                    'metode_bayar' => 'ditahan',
-                    'jumlah_bayar' => 0,
-                    'kembalian' => 0,
-                    'split_detail' => [
-                        'cart' => array_values($this->cart),
-                        'diskon_persen' => $this->diskonPersen,
-                        'diskon_nominal' => $this->diskonNominal,
-                        'poin_ditukar' => $this->poinDitukar,
-                        'mode_reward_mitra' => $this->modeRewardMitra,
-                        'catatan' => 'Ditahan (park) oleh '.(auth()->user()?->name ?? 'kasir'),
-                    ],
-                    'status' => 'ditahan',
-                    'catatan' => 'Transaksi ditahan (park)',
-                ]);
-            });
-
-            $this->clearCart();
-            $this->showDitahanPanel = true; // [T-37] panel tertahan langsung terbuka setelah F6
-            $this->dispatch('alert', ['type' => 'success', 'message' => 'Transaksi ditahan — dapat dilanjutkan kasir lain di cabang ini']);
-        } catch (\Exception $e) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
-        }
-    }
-
-    /** Daftar transaksi ditahan (scope cabang aktif — POS-05). */
-    public function getDitahanListProperty()
-    {
-        return Transaksi::with('kasir')
-            ->where('cabang_id', session('cabang_id'))
-            ->where('status', 'ditahan')
-            ->latest()
-            ->get();
-    }
-
-    /** Lanjutkan transaksi yang ditahan → isi ulang keranjang, status duplikat jadi draft biasa. */
-    public function resumeDitahan(int $id)
-    {
-        $transaksi = Transaksi::where('id', $id)
-            ->where('cabang_id', session('cabang_id'))
-            ->where('status', 'ditahan')
-            ->firstOrFail();
-
-        $detail = $transaksi->split_detail ?? [];
-        $cartItems = $detail['cart'] ?? [];
-
-        if (empty($cartItems)) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Data keranjang ditahan tidak ditemukan']);
-
-            return;
-        }
-
-        // Muat ulang keranjang ke state (tanpa duplikat — reset dulu)
-        $this->clearCart();
-        foreach ($cartItems as $item) {
-            $pId = (int) ($item['produk_id'] ?? 0);
-            $vId = $item['sku_variant_id'] ?? null;
-            $satuanItem = $item['satuan'] ?? null;
-            $produk = $pId ? Produk::find($pId) : null;
-            $satuanDasar = $produk?->satuan ?: 'pcs';
-            $satuanSuffix = ($satuanItem && $satuanItem !== $satuanDasar) ? "-{$satuanItem}" : '';
-
-            $key = ($vId ? "{$pId}-{$vId}" : "{$pId}-0").$satuanSuffix;
-            // [F2-3][P2-3] Compat keranjang lama — flag sn SELALU di-derive ulang
-            // dari produk (server-side). Array + mempertahankan key kiri (payload
-            // lama), jadi pakai array_merge agar 'sn' selalu nilai segar.
-            $this->cart[$key] = array_merge($item, [
-                'sn' => $this->snProdukDariItem($item),
-                'sn_list' => $item['sn_list'] ?? [],
-            ]);
-        }
-        $this->diskonPersen = (float) ($detail['diskon_persen'] ?? 0);
-        $this->diskonNominal = (float) ($detail['diskon_nominal'] ?? 0);
-        $this->poinDitukar = (int) ($detail['poin_ditukar'] ?? 0);
-        $this->modeRewardMitra = (string) ($detail['mode_reward_mitra'] ?? 'diskon_langsung');
-        $this->selectedCustomerId = $transaksi->pelanggan_id;
-        $this->resetComputedTotals();
-        $this->hitungDiskonPartai();
-        $this->resetComputedTotals();
-        $this->recalcPajak(); // [F1-2] resume park → rehitung PPN dari diskon tersimpan
-
-        // Tandai transaksi asli dipindahkan → status 'batal' (tidak dipakai lagi), tanpa jurnal
-        $transaksi->update(['status' => 'dibatalkan', 'catatan' => 'Dilanjutkan (resume) oleh '.(auth()->user()?->name ?? 'kasir')]);
-
-        $this->showDitahanPanel = false;
-
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Transaksi ditahan dilanjutkan — silakan lanjut bayar']);
-    }
-
-    /** Alias untuk resumeDitahan agar kompatibel dengan template lama/baru. */
-    public function resumeTransaksi(int $id): void
-    {
-        $this->resumeDitahan($id);
-    }
-
-    /** Hapus / batalkan transaksi yang ditahan. */
-    public function hapusDitahan(int $id): void
-    {
-        $transaksi = Transaksi::where('id', $id)
-            ->where('cabang_id', session('cabang_id'))
-            ->where('status', 'ditahan')
-            ->first();
-
-        if (! $transaksi) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Transaksi ditahan tidak ditemukan']);
-
-            return;
-        }
-
-        $noTrx = $transaksi->no_transaksi;
-        $transaksi->update([
-            'status' => 'dibatalkan',
-            'catatan' => 'Dibatalkan/dihapus dari kasir oleh '.(auth()->user()?->name ?? 'kasir'),
-        ]);
-
-        $this->dispatch('alert', ['type' => 'success', 'message' => "Transaksi ditahan {$noTrx} berhasil dihapus"]);
-    }
-
-    public function bukaDitahanPanel(): void
-    {
-        $this->showDitahanPanel = true;
-    }
-
-    public function tutupDitahanPanel(): void
-    {
-        $this->showDitahanPanel = false;
-    }
+    // ==================== [T-03] PARK / TAHAN (Didelegasikan ke ManagesHoldTransactions) ====================
 
     // ==================== [T-08] PELANGGAN QUICK-ADD ====================
 
@@ -3351,225 +2990,6 @@ class PosKasir extends Component
         $this->kasSaldoFisikRaw = '';
         $this->kasHasil = null;
         $this->showKasModal = true;
-    }
-
-    /**
-     * Format raw input (1.000.000) to display format, parse to numeric.
-     * Called on blur to show formatted value in input.
-     */
-    public function formatKasSaldoAwal(): void
-    {
-        $this->kasSaldoAwal = $this->normalizeNominal($this->kasSaldoAwalRaw);
-        $this->kasSaldoAwalRaw = $this->formatNominal($this->kasSaldoAwal);
-    }
-
-    public function formatKasSaldoFisik(): void
-    {
-        $this->kasSaldoFisik = $this->normalizeNominal($this->kasSaldoFisikRaw);
-        $this->kasSaldoFisikRaw = $this->formatNominal($this->kasSaldoFisik);
-    }
-
-    private function formatNominal(float $value): string
-    {
-        return number_format($value, 0, ',', '.');
-    }
-
-    /**
-     * [T-45] Submit modal kas — validasi + feedback yang jelas.
-     * Buka kas: toast sukses "Kas berhasil dibuka" lalu modal tertutup (kembali
-     * ke tampilan POS). Tutup kas: tampil rekap selisih + toast.
-     * Validasi gagal: toast error + modal tetap terbuka.
-     */
-    public function prosesKas()
-    {
-        // Validasi Livewire: nominal wajib angka, tidak negatif
-        if ($this->kasModeBuka) {
-            $this->validate([
-                'kasSaldoAwalRaw' => ['required', 'string'],
-            ], [], [
-                'kasSaldoAwalRaw' => 'Saldo awal',
-            ]);
-            // Ensure parsed value is valid
-            $this->formatKasSaldoAwal();
-        } else {
-            $this->validate([
-                'kasSaldoFisikRaw' => ['required', 'string'],
-            ], [], [
-                'kasSaldoFisikRaw' => 'Saldo fisik akhir',
-            ]);
-            $this->formatKasSaldoFisik();
-        }
-
-        try {
-            $svc = app(KasSesiState::class);
-
-            if ($this->kasModeBuka) {
-                $this->kasHasil = $svc->bukaKas(
-                    $this->normalizeNominal($this->kasSaldoAwal),
-                    session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1,
-                    auth()->id(),
-                    $this->kasSumber,
-                    $this->selectedAkunSumber
-                );
-                $this->checkKasSesi();
-
-                // Sukses: toast + kembali ke tampilan POS (modal tertutup)
-                $this->kasHasil = null;
-                $this->showKasModal = false;
-                $this->dispatch('alert', ['type' => 'success', 'message' => 'Kas berhasil dibuka — silakan mulai transaksi']);
-            } else {
-                $this->kasHasil = $svc->tutupKas($this->normalizeNominal($this->kasSaldoFisik));
-                $this->checkKasSesi();
-
-                // [KAS-LACI] Bila ada selisih → status menunggu_approval
-                if (($this->kasHasil['status'] ?? '') === 'menunggu_approval') {
-                    $this->showKasModal = false;
-                    $this->dispatch('alert', [
-                        'type' => 'warning',
-                        'message' => 'Terdapat selisih kas — permintaan persetujuan telah dikirim ke owner / manager toko.',
-                    ]);
-                } else {
-                    $this->dispatch('alert', [
-                        'type' => 'success',
-                        'message' => 'Kas ditutup — saldo fisik didepositkan kembali.',
-                    ]);
-                }
-            }
-        } catch (\Exception $e) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * [T-45] Normalisasi nominal dari input ber-separator ribuan/desimal Indonesia.
-     * x-format-number (toRaw) sudah mengirim angka bersih lewat model; fungsi ini
-     * jadi pengaman ganda bila nilai berformat sempat terkirim ke server
-     * (mis. paste cepat sebelum koreksi listener berjalan).
-     * - "1.000.000"   → 1000000
-     * - "1.000.000,50"→ 1000000.5
-     * - "1000000.50"  → 1000000.5 (desimal titik tidak diutak-atik)
-     */
-    protected function normalizeNominal(mixed $nilai): float
-    {
-        return $this->parseNominal($nilai);
-    }
-
-    /**
-     * [KAS-LACI-MUTASI] Buka modal mutasi kas laci non-POS.
-     */
-    public function bukaMutasiKasModal(string $jenis = 'keluar'): void
-    {
-        $this->mutasiJenis = in_array($jenis, ['masuk', 'keluar'], true) ? $jenis : 'keluar';
-        $this->mutasiNominalRaw = '';
-        $this->mutasiNominal = 0;
-        $this->mutasiKeterangan = '';
-        $this->resetValidation(['mutasiNominalRaw', 'mutasiAkunLawan', 'mutasiKeterangan']);
-
-        $this->muatKategoriMutasi();
-        $this->muatRiwayatMutasiSesi();
-        $this->showMutasiKasModal = true;
-    }
-
-    public function updatedMutasiJenis(): void
-    {
-        $this->muatKategoriMutasi();
-    }
-
-    public function muatKategoriMutasi(): void
-    {
-        if ($this->mutasiJenis === 'keluar') {
-            // Pengeluaran kas laci: Beban operasional, perlengkapan toko, setor kas besar
-            $this->mutasiKategoriList = [
-                ['kode' => '520-05', 'nama' => 'Beban Lain-lain (Operasional Kecil/Konsumsi)', 'kelompok' => 'Beban'],
-                ['kode' => '520-03', 'nama' => 'Beban Listrik, Air & Kebersihan', 'kelompok' => 'Beban'],
-                ['kode' => '140-01', 'nama' => 'Perlengkapan Toko (ATK/Lakban/Plastik)', 'kelompok' => 'Aset Lancar'],
-                ['kode' => '520-04', 'nama' => 'Beban Transport / Marketing Toko', 'kelompok' => 'Beban'],
-                ['kode' => '110-01', 'nama' => 'Setor ke Kas Besar (Transfer Kas)', 'kelompok' => 'Kas/Bank'],
-            ];
-            $this->mutasiAkunLawan = '520-05';
-        } else {
-            // Pemasukan kas laci: Tambahan modal laci dari kas besar, pendapatan lain-lain
-            $this->mutasiKategoriList = [
-                ['kode' => '110-01', 'nama' => 'Kas Besar (Tambah Modal Laci)', 'kelompok' => 'Kas/Bank'],
-                ['kode' => '430-01', 'nama' => 'Pendapatan Lain-lain (Parkir/Kardus/Tip)', 'kelompok' => 'Pendapatan'],
-            ];
-            $this->mutasiAkunLawan = '110-01';
-        }
-    }
-
-    public function muatRiwayatMutasiSesi(): void
-    {
-        $sesi = app(KasSesiState::class)->sesiKasAktif();
-        if (! $sesi || ! Schema::hasTable('kas_mutasi_laci')) {
-            $this->riwayatMutasiSesi = [];
-
-            return;
-        }
-
-        $this->riwayatMutasiSesi = DB::table('kas_mutasi_laci')
-            ->where('kas_sesi_id', $sesi->id)
-            ->latest('id')
-            ->get()
-            ->map(function ($row) {
-                $akun = AkunCOA::where('kode', $row->akun_lawan_kode)->first();
-
-                return [
-                    'id' => $row->id,
-                    'jenis' => $row->jenis,
-                    'nominal' => (float) $row->nominal,
-                    'akun_lawan' => $akun ? "{$akun->kode} - {$akun->nama}" : $row->akun_lawan_kode,
-                    'keterangan' => $row->keterangan,
-                    'no_jurnal' => $row->no_jurnal,
-                    'jam' => date('H:i', strtotime($row->created_at)),
-                ];
-            })
-            ->toArray();
-    }
-
-    public function simpanMutasiKas(): void
-    {
-        $this->validate([
-            'mutasiNominalRaw' => 'required',
-            'mutasiAkunLawan' => 'required|string',
-            'mutasiKeterangan' => 'required|string|min:3|max:255',
-        ], [
-            'mutasiNominalRaw.required' => 'Nominal wajib diisi',
-            'mutasiAkunLawan.required' => 'Kategori transaksi wajib dipilih',
-            'mutasiKeterangan.required' => 'Keterangan transaksi wajib diisi',
-            'mutasiKeterangan.min' => 'Keterangan minimal 3 karakter',
-        ]);
-
-        $nominal = $this->parseNominal($this->mutasiNominalRaw);
-        if ($nominal <= 0) {
-            $this->addError('mutasiNominalRaw', 'Nominal harus lebih dari 0');
-
-            return;
-        }
-
-        try {
-            $svc = app(KasSesiState::class);
-            $res = $svc->catatMutasiLaci(
-                jenis: $this->mutasiJenis,
-                nominal: $nominal,
-                akunLawanKode: $this->mutasiAkunLawan,
-                keterangan: $this->mutasiKeterangan,
-                cabangId: session('cabang_id'),
-                userId: auth()->id()
-            );
-
-            $this->dispatch('alert', [
-                'type' => 'success',
-                'message' => "Mutasi kas {$this->mutasiJenis} Rp ".number_format($nominal, 0, ',', '.')." berhasil dicatat (#{$res['no_jurnal']})",
-            ]);
-
-            $this->mutasiNominalRaw = '';
-            $this->mutasiNominal = 0;
-            $this->mutasiKeterangan = '';
-            $this->muatRiwayatMutasiSesi();
-            $this->checkKasSesi();
-        } catch (\Exception $e) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
-        }
     }
 
     // --- [POS-SERVIS] Integrasi Pembayaran Servis di Kasir POS ---
@@ -3761,11 +3181,7 @@ class PosKasir extends Component
             DB::transaction(function () use ($cabangId, $total, $jumlahBayar, $splitTunai, $splitNonTunai, $splitData) {
                 $tiket = TiketServis::whereKey($this->selectedServisId)->lockForUpdate()->firstOrFail();
 
-                $today = now()->format('Ymd');
-                $countToday = Transaksi::whereDate('created_at', now()->toDateString())
-                    ->where('cabang_id', $cabangId)
-                    ->count() + 1;
-                $noTransaksi = sprintf('TRX-C%02d-%s-%04d', $cabangId, $today, $countToday);
+                $noTransaksi = app(TransaksiSequenceService::class)->generateNoTransaksi($cabangId);
 
                 $transaksi = Transaksi::create([
                     'no_transaksi' => $noTransaksi,

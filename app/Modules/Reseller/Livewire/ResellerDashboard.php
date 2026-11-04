@@ -192,6 +192,10 @@ class ResellerDashboard extends Component
         $userId = auth()->id();
         $fmt = $format === 'csv' ? 'csv' : 'xlsx';
 
+        $path = app(ExportLaporanService::class)->export(
+            'komisi', null, null, $cabangId, null, $fmt, $userId
+        );
+
         dispatch(new ExportLaporanJob(
             jenis: 'komisi',
             periodeDari: null,
@@ -200,6 +204,7 @@ class ResellerDashboard extends Component
             akunId: null,
             userId: $userId,
             format: $fmt,
+            existingPath: $path,
         ));
 
         $this->dispatch('alert', [
@@ -207,9 +212,6 @@ class ResellerDashboard extends Component
             'message' => 'Export komisi selesai — berkas mulai diunduh.',
         ]);
 
-        $path = app(ExportLaporanService::class)->export(
-            'komisi', null, null, $cabangId, null, $fmt, $userId
-        );
         $fullPath = Storage::disk('local')->path($path);
 
         return response()->download($fullPath, 'laporan-komisi-'.now()->format('Ymd-His').'.'.$fmt);

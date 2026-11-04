@@ -551,7 +551,8 @@ class GrnService
                     $hargaBeliPerBase,
                     $opsiMetode,
                     $skemaJual,
-                    $nilaiJualAtauMargin
+                    $nilaiJualAtauMargin,
+                    $grn->cabang_id ?? null
                 );
             }
         }

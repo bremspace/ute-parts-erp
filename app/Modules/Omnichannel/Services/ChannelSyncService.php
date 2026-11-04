@@ -316,7 +316,7 @@ class ChannelSyncService
         $items = $payload['item_list'] ?? [];
         $totalAmount = (float) ($payload['total_amount'] ?? 0);
 
-        $cabangId = $channel->kredensial['cabang_id'] ?? session('cabang_id') ?? 1;
+        $cabangId = $channel->kredensial['cabang_id'] ?? currentCabangId() ?? Cabang::value('id');
         $noTransaksi = 'TRX-CH-'.$channel->id.'-'.$channelOrder->channel_order_id;
 
         $transaksi = Transaksi::firstOrCreate(
@@ -482,7 +482,7 @@ class ChannelSyncService
         );
 
         try {
-            $cabangId = $order->payload['cabang_id'] ?? session('cabang_id') ?? 1;
+            $cabangId = $order->payload['cabang_id'] ?? currentCabangId() ?? Cabang::value('id');
             app(JurnalService::class)->post(
                 app(JurnalService::class)->generateNoJurnal('channel', $cabangId),
                 $order->updated_at ?? now(),

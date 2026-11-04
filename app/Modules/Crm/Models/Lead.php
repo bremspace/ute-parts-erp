@@ -5,6 +5,7 @@ namespace App\Modules\Crm\Models;
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
+use App\Traits\BelongsToCabang;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +23,7 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class Lead extends Model
 {
+    use BelongsToCabang;
     use CatatAktivitas;
     use LogsActivity;
 

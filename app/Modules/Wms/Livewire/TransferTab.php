@@ -7,12 +7,12 @@ use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
-use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\StokTransferItem;
 use App\Modules\Wms\Services\ScanResolverService;
+use App\Modules\Wms\Services\StokDeductionService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -464,36 +464,18 @@ class TransferTab extends Component
                         throw new \Exception('Qty melebihi stok tersedia di gudang sumber (tersedia: '.max(0, $sebelum - $locked).' unit) untuk item ID '.$item->produk_id);
                     }
 
-                    $setelah = $sebelum - $item->jumlah;
-                    $stokAsal->update(['jumlah' => $setelah]);
-
-                    // [T-41] SOT mutasi ke luar — wajib utk kirim transfer
-                    // [B-10i] user_id = pelaku kirim (sama dgn StokLog & approved_by).
-                    StockMutationLog::create([
-                        'produk_id' => $item->produk_id,
-                        'sku_variant_id' => $item->sku_variant_id,
-                        'gudang_id' => $transfer->gudang_asal_id,
-                        'user_id' => auth()->id(),
-                        'delta' => -$item->jumlah,
-                        'sumber' => 'transfer:out',
-                        'referensi_tipe' => StokTransfer::class,
-                        'referensi_id' => $transfer->id,
-                        'terjadi_at' => now(),
-                    ]);
-
-                    StokLog::create([
-                        'gudang_id' => $transfer->gudang_asal_id,
-                        'produk_id' => $item->produk_id,
-                        'sku_variant_id' => $item->sku_variant_id,
-                        'user_id' => auth()->id(),
-                        'jenis' => 'transfer_keluar',
-                        'referensi_tipe' => StokTransfer::class,
-                        'referensi_id' => $transfer->id,
-                        'jumlah_sebelum' => $sebelum,
-                        'perubahan' => -$item->jumlah,
-                        'jumlah_setelah' => $setelah,
-                        'catatan' => "Kirim transfer {$transfer->no_transfer}",
-                    ]);
+                    app(StokDeductionService::class)->mutasi(
+                        produkId: $item->produk_id,
+                        skuVariantId: $item->sku_variant_id,
+                        gudangId: $transfer->gudang_asal_id,
+                        delta: -$item->jumlah,
+                        jenis: 'transfer_keluar',
+                        sumber: 'transfer:out',
+                        referensiTipe: StokTransfer::class,
+                        referensiId: $transfer->id,
+                        userId: auth()->id(),
+                        catatan: "Kirim transfer {$transfer->no_transfer}"
+                    );
                 }
 
                 $transfer->update([
@@ -533,37 +515,18 @@ class TransferTab extends Component
                         ['jumlah' => 0, 'jumlah_minimum' => 0]
                     );
 
-                    $sebelum = $stokTujuan->jumlah;
-                    $setelah = $sebelum + $item->jumlah;
-                    $stokTujuan->update(['jumlah' => $setelah]);
-
-                    // [T-41] SOT mutasi ke dalam — wajib utk terima transfer
-                    // [B-10i] user_id = penerima transfer (sama dgn StokLog & user_penerima_id).
-                    StockMutationLog::create([
-                        'produk_id' => $item->produk_id,
-                        'sku_variant_id' => $item->sku_variant_id,
-                        'gudang_id' => $transfer->gudang_tujuan_id,
-                        'user_id' => auth()->id(),
-                        'delta' => $item->jumlah,
-                        'sumber' => 'transfer:in',
-                        'referensi_tipe' => StokTransfer::class,
-                        'referensi_id' => $transfer->id,
-                        'terjadi_at' => now(),
-                    ]);
-
-                    StokLog::create([
-                        'gudang_id' => $transfer->gudang_tujuan_id,
-                        'produk_id' => $item->produk_id,
-                        'sku_variant_id' => $item->sku_variant_id,
-                        'user_id' => auth()->id(),
-                        'jenis' => 'transfer_masuk',
-                        'referensi_tipe' => StokTransfer::class,
-                        'referensi_id' => $transfer->id,
-                        'jumlah_sebelum' => $sebelum,
-                        'perubahan' => $item->jumlah,
-                        'jumlah_setelah' => $setelah,
-                        'catatan' => "Terima transfer {$transfer->no_transfer}",
-                    ]);
+                    app(StokDeductionService::class)->mutasi(
+                        produkId: $item->produk_id,
+                        skuVariantId: $item->sku_variant_id,
+                        gudangId: $transfer->gudang_tujuan_id,
+                        delta: $item->jumlah,
+                        jenis: 'transfer_masuk',
+                        sumber: 'transfer:in',
+                        referensiTipe: StokTransfer::class,
+                        referensiId: $transfer->id,
+                        userId: auth()->id(),
+                        catatan: "Terima transfer {$transfer->no_transfer}"
+                    );
                 }
 
                 $transfer->update([

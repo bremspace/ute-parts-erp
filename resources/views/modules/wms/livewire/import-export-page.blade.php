@@ -208,7 +208,12 @@
                         @enderror
                     </div>
 
-                    <div class="flex items-center justify-end gap-3 pt-3 border-t border-black/5 dark:border-white/5">
+                    <div class="flex items-center justify-between flex-wrap gap-3 pt-3 border-t border-black/5 dark:border-white/5">
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-ink-400 hover:text-white">
+                            <input type="checkbox" wire:model="paksaCustomMapping" class="rounded border-white/10 text-up-primary focus:ring-0">
+                            <span>Selalu buka jendela Custom Mapping kolom</span>
+                        </label>
+
                         <button type="button"
                                 wire:click="previewImport"
                                 wire:loading.attr="disabled"
@@ -243,6 +248,533 @@
                             <span><strong>Aman &amp; Teruji:</strong> Import diproses per batch 100 baris dengan pencatatan jurnal saldo awal dan mutasi stok transparan.</span>
                         </li>
                     </ul>
+                </div>
+            </div>
+        @elseif($importStep === 'mapping')
+            <!-- Step 2: Custom Column Mapping Workspace -->
+            @php
+                $targetOptions = [
+                    '⭐ Kolom Utama (Wajib)' => [
+                        'nama' => 'Nama Produk / Sparepart [Wajib]',
+                        'harga_jual' => 'Harga Jual (Retail / Eceran) [Wajib]',
+                        'sku' => 'Kode SKU / Part Number [Wajib / Auto]',
+                    ],
+                    '💰 Harga & Nilai' => [
+                        'harga_beli' => 'Harga Beli (Modal / HPP)',
+                        'harga_reseller' => 'Harga Reseller',
+                        'harga_agen' => 'Harga Agen / Grosir',
+                    ],
+                    '📦 Stok & Lokasi Penyimpanan' => [
+                        'stok_awal' => 'Stok Awal (Saldo Awal)',
+                        'gudang' => 'Gudang Penyimpanan',
+                        'rak' => 'Lokasi Rak / Bin',
+                        'min_stock' => 'Stok Minimum (Alert Restock)',
+                        'reorder_point' => 'Reorder Point (ROP)',
+                        'sn' => 'Lacak Serial Number (ya / tidak)',
+                    ],
+                    '🏷️ Kategori, Brand & Supplier' => [
+                        'satuan' => 'Satuan Unit (pcs, box, set)',
+                        'kategori' => 'Kategori Produk',
+                        'sub_kategori' => 'Sub Kategori',
+                        'brand' => 'Brand / Merk Produk',
+                        'kualitas' => 'Kualitas / Grade (Original, OEM)',
+                        'kondisi' => 'Kondisi (baru / bekas / oem)',
+                        'supplier' => 'Supplier / Pemasok',
+                    ],
+                    '📱 Kompatibilitas Smartphone' => [
+                        'merk_hp' => 'Merk HP / Ponsel',
+                        'tipe_hp' => 'Tipe / Model HP Kompatibel',
+                        'kompatibilitas_hp' => 'Kompatibilitas HP Bebas',
+                        'produk_kompatibel_sku' => 'Produk Kompatibel (Cross-SKU)',
+                    ],
+                    '🔍 Barcode & Lainnya' => [
+                        'barcode_1' => 'Barcode Utama',
+                        'barcode_2' => 'Barcode 2 (Alternatif)',
+                        'barcode_3' => 'Barcode 3',
+                        'multi_barcode' => 'Multi Barcode (Pisahkan Koma)',
+                        'konversi_satuan' => 'Konversi Multi Satuan',
+                        'deskripsi' => 'Deskripsi / Keterangan',
+                        'foto_url' => 'URL Foto Produk',
+                    ],
+                ];
+
+                $mappedVals = array_filter(array_values($columnMapping ?? []), fn ($v) => $v !== '' && $v !== null && $v !== 'abaikan');
+                $hasNama = in_array('nama', $mappedVals, true);
+                $hasHarga = in_array('harga_jual', $mappedVals, true);
+                $hasSku = in_array('sku', $mappedVals, true);
+                $totalMapped = count($mappedVals);
+                $totalIgnored = count($customColumns) - $totalMapped;
+
+                $columnsJson = array_map(function ($c) {
+                    return [
+                        'key' => $c['key'],
+                        'name' => strtolower($c['raw_name']),
+                        'letter' => strtolower($c['col_letter']),
+                        'index' => $c['index'],
+                    ];
+                }, $customColumns);
+            @endphp
+
+            <div x-data="{
+                search: '',
+                filterTab: 'semua',
+                columns: {{ Js::from($columnsJson) }},
+                isMatch(name, key, letter, currentVal) {
+                    const mapping = ($wire && $wire.columnMapping && $wire.columnMapping[key] !== undefined)
+                        ? $wire.columnMapping[key]
+                        : currentVal;
+                    const isMapped = mapping !== '' && mapping !== null && mapping !== 'abaikan';
+                    const isWajib = ['nama', 'harga_jual', 'sku'].includes(mapping);
+
+                    if (this.filterTab === 'belum' && isMapped) return false;
+                    if (this.filterTab === 'sudah' && !isMapped) return false;
+                    if (this.filterTab === 'wajib' && !isWajib) return false;
+
+                    if (this.search && this.search.trim() !== '') {
+                        const q = this.search.toLowerCase().trim();
+                        const text = (name + ' ' + letter + ' ' + key + ' ' + (mapping || '')).toLowerCase();
+                        if (!text.includes(q)) return false;
+                    }
+                    return true;
+                },
+                get countSemua() {
+                    return this.columns.length;
+                },
+                get countBelum() {
+                    const mapping = ($wire && $wire.columnMapping) ? $wire.columnMapping : {{ Js::from($columnMapping) }};
+                    return this.columns.filter(c => {
+                        const val = mapping[c.key] || '';
+                        return !val || val === 'abaikan';
+                    }).length;
+                },
+                get countSudah() {
+                    const mapping = ($wire && $wire.columnMapping) ? $wire.columnMapping : {{ Js::from($columnMapping) }};
+                    return this.columns.filter(c => {
+                        const val = mapping[c.key] || '';
+                        return val && val !== 'abaikan';
+                    }).length;
+                },
+                get countWajib() {
+                    const mapping = ($wire && $wire.columnMapping) ? $wire.columnMapping : {{ Js::from($columnMapping) }};
+                    return this.columns.filter(c => ['nama', 'harga_jual', 'sku'].includes(mapping[c.key] || '')).length;
+                },
+                get visibleCount() {
+                    return this.columns.filter(c => {
+                        const mapping = ($wire && $wire.columnMapping) ? $wire.columnMapping : {{ Js::from($columnMapping) }};
+                        return this.isMatch(c.name, c.key, c.letter, mapping[c.key] || '');
+                    }).length;
+                }
+            }" class="space-y-6">
+
+                <!-- Header Card / Banner -->
+                <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-up-primary/15 via-up-primary/5 to-transparent border border-up-primary/30 space-y-4">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-up-primary/20 text-up-primary flex items-center justify-center text-lg font-bold shadow-sm shrink-0 mt-0.5">⚡</span>
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h2 class="text-sm sm:text-base font-bold text-ink-900 dark:text-white">Fitur Custom Import Aktif (Pemetaan Kolom)</h2>
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                                        {{ count($customColumns) }} Kolom Terbaca
+                                    </span>
+                                </div>
+                                <p class="text-xs text-ink-400 leading-relaxed max-w-3xl">
+                                    File Anda terbaca sebagai format kustom. Silakan cocokkan tiap kolom file dengan field master produk sistem. Kolom dengan status <strong>Abaikan</strong> akan dilewati secara otomatis.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Gudang Default Selector -->
+                        <div class="flex items-center justify-between sm:justify-end gap-2.5 bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 px-3.5 py-2 rounded-xl shrink-0">
+                            <span class="text-xs text-ink-400 font-semibold whitespace-nowrap">Gudang Default:</span>
+                            <select wire:model="defaultGudangId" class="text-xs rounded-lg bg-white dark:bg-black/70 border border-black/15 dark:border-white/15 px-2.5 py-1.5 text-ink-900 dark:text-white font-medium focus:ring-1 focus:ring-up-primary cursor-pointer">
+                                @foreach($gudangList as $g)
+                                    <option value="{{ $g->id }}">{{ $g->nama }} ({{ $g->kode }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Status Wajib Indicators & Quick Bulk Actions -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-up-primary/15 text-xs">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-[11px] text-ink-400 font-bold uppercase tracking-wider">Validasi Utama:</span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 {{ $hasNama ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-up-red/20 text-up-red border border-up-red/30 animate-pulse' }}">
+                                <span>{{ $hasNama ? '✓' : '⚠️' }}</span>
+                                <span>Nama Produk (Wajib)</span>
+                            </span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 {{ $hasHarga ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-up-red/20 text-up-red border border-up-red/30 animate-pulse' }}">
+                                <span>{{ $hasHarga ? '✓' : '⚠️' }}</span>
+                                <span>Harga Jual (Wajib)</span>
+                            </span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 {{ $hasSku ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-up-amber/20 text-up-amber border border-up-amber/30' }}">
+                                <span>{{ $hasSku ? '✓' : 'ℹ️' }}</span>
+                                <span>{{ $hasSku ? 'SKU Terpetakan' : 'SKU (Auto-Generate)' }}</span>
+                            </span>
+                        </div>
+
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-[11px] text-ink-400 mr-1">
+                                <strong class="text-ink-900 dark:text-white">{{ $totalMapped }}</strong> dipetakan, <strong class="text-ink-900 dark:text-white">{{ $totalIgnored }}</strong> diabaikan
+                            </span>
+                            <button type="button"
+                                    wire:click="resetCustomMapping"
+                                    class="px-2.5 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300 text-xs font-bold cursor-pointer transition">
+                                ↺ Reset Rekomendasi
+                            </button>
+                            <button type="button"
+                                    wire:click="abaikanSemuaKolom"
+                                    class="px-2.5 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-up-red/10 border border-black/10 dark:border-white/10 text-ink-500 hover:text-up-red text-xs font-bold cursor-pointer transition">
+                                ⛔ Abaikan Semua
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Filter / Search Toolbar (Alpine Client-Side) -->
+                <div class="p-3.5 sm:p-4 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-3">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                        <!-- Search Box -->
+                        <div class="relative flex-1 max-w-md">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ink-400 text-xs">
+                                🔍
+                            </span>
+                            <input type="text"
+                                   x-model.debounce.100ms="search"
+                                   placeholder="Cari kolom file atau target mapping..."
+                                   class="w-full pl-8 pr-8 py-2 text-xs rounded-xl bg-white dark:bg-black/30 border border-black/10 dark:border-white/10 text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-up-primary/40 transition">
+                            <button x-cloak
+                                    x-show="search.length > 0"
+                                    @click="search = ''"
+                                    type="button"
+                                    class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-ink-400 hover:text-ink-600 dark:hover:text-ink-200 text-xs cursor-pointer">
+                                ✕
+                            </button>
+                        </div>
+
+                        <!-- Filter Tabs -->
+                        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+                            <button type="button"
+                                    @click="filterTab = 'semua'"
+                                    :class="filterTab === 'semua' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-black' : 'bg-black/5 dark:bg-white/5 text-ink-400 hover:text-ink-900 dark:hover:text-white font-semibold'"
+                                    class="px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                                <span>Semua</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono"
+                                      :class="filterTab === 'semua' ? 'bg-white/20 text-white' : 'bg-black/10 dark:bg-white/10 text-ink-400'"
+                                      x-text="countSemua"></span>
+                            </button>
+
+                            <button type="button"
+                                    @click="filterTab = 'belum'"
+                                    :class="filterTab === 'belum' ? 'bg-up-amber text-black shadow-sm shadow-up-amber/30 font-black' : 'bg-black/5 dark:bg-white/5 text-ink-400 hover:text-ink-900 dark:hover:text-white font-semibold'"
+                                    class="px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                                <span>Belum Dipetakan</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono"
+                                      :class="filterTab === 'belum' ? 'bg-black/20 text-black font-bold' : 'bg-black/10 dark:bg-white/10 text-ink-400'"
+                                      x-text="countBelum"></span>
+                            </button>
+
+                            <button type="button"
+                                    @click="filterTab = 'sudah'"
+                                    :class="filterTab === 'sudah' ? 'bg-up-mint text-black shadow-sm shadow-up-mint/30 font-black' : 'bg-black/5 dark:bg-white/5 text-ink-400 hover:text-ink-900 dark:hover:text-white font-semibold'"
+                                    class="px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                                <span>Sudah Dipetakan</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono"
+                                      :class="filterTab === 'sudah' ? 'bg-black/20 text-black font-bold' : 'bg-black/10 dark:bg-white/10 text-ink-400'"
+                                      x-text="countSudah"></span>
+                            </button>
+
+                            <button type="button"
+                                    @click="filterTab = 'wajib'"
+                                    :class="filterTab === 'wajib' ? 'bg-up-primary/20 text-up-primary border border-up-primary/40 font-black' : 'bg-black/5 dark:bg-white/5 text-ink-400 hover:text-ink-900 dark:hover:text-white font-semibold'"
+                                    class="px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                                <span>⭐ Wajib</span>
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono"
+                                      :class="filterTab === 'wajib' ? 'bg-up-primary text-white font-bold' : 'bg-black/10 dark:bg-white/10 text-ink-400'"
+                                      x-text="countWajib"></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Toolbar Footer: Visible counter -->
+                    <div class="flex items-center justify-between text-[11px] text-ink-400 pt-2 border-t border-black/5 dark:border-white/5">
+                        <div>
+                            Menampilkan <strong class="text-ink-900 dark:text-white" x-text="visibleCount"></strong> dari <strong class="text-ink-900 dark:text-white" x-text="countSemua"></strong> kolom
+                        </div>
+                        <div class="flex items-center gap-1 text-[11px] text-ink-400">
+                            <span class="inline-block w-2 h-2 rounded-full bg-up-mint"></span>
+                            <span>Hijau = Aktif</span>
+                            <span class="inline-block w-2 h-2 rounded-full bg-up-primary ml-2"></span>
+                            <span>Biru = Wajib</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State (When Search / Filter Yields Zero Results) -->
+                <div x-cloak
+                     x-show="visibleCount === 0"
+                     class="py-12 px-4 text-center rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-dashed border-black/10 dark:border-white/10 space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-up-primary/10 text-up-primary flex items-center justify-center text-xl mx-auto">
+                        🔍
+                    </div>
+                    <div class="space-y-1">
+                        <h4 class="text-sm font-bold text-ink-900 dark:text-white">Tidak ada kolom yang cocok</h4>
+                        <p class="text-xs text-ink-400 max-w-sm mx-auto">
+                            Tidak ditemukan kolom yang cocok dengan kata kunci atau filter yang Anda pilih.
+                        </p>
+                    </div>
+                    <button type="button"
+                            @click="search = ''; filterTab = 'semua'"
+                            class="px-4 py-2 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary text-xs font-bold transition cursor-pointer">
+                        Reset Pencarian &amp; Filter
+                    </button>
+                </div>
+
+                <!-- MOBILE LAYOUT: Stacked Cards (sm & below / md:hidden) -->
+                <div class="md:hidden space-y-3" x-show="visibleCount > 0">
+                    @foreach($customColumns as $col)
+                        @php
+                            $selectedTarget = $columnMapping[$col['key']] ?? '';
+                            $isTargetRequired = in_array($selectedTarget, ['sku', 'nama', 'harga_jual'], true);
+                            $isTargetActive = ! empty($selectedTarget);
+                        @endphp
+                        <div x-show="isMatch('{{ strtolower(addslashes($col['raw_name'])) }}', '{{ $col['key'] }}', '{{ strtolower($col['col_letter']) }}', '{{ $selectedTarget }}')"
+                             wire:key="card-{{ $col['key'] }}"
+                             class="p-4 rounded-2xl transition border {{ $isTargetRequired ? 'bg-up-primary/[0.04] border-up-primary/40 shadow-sm' : ($isTargetActive ? 'bg-up-mint/[0.03] border-up-mint/30 shadow-sm' : 'bg-black/5 dark:bg-white/[0.02] border-black/10 dark:border-white/5 opacity-85 hover:opacity-100') }} space-y-3">
+
+                            <!-- Top row: Letter badge, Column name, Index & Status -->
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <span class="shrink-0 w-8 h-8 rounded-xl font-mono text-xs font-black flex items-center justify-center shadow-xs {{ $isTargetRequired ? 'bg-up-primary/20 text-up-primary border border-up-primary/30' : ($isTargetActive ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-black/10 dark:bg-white/10 text-ink-400') }}">
+                                        {{ $col['col_letter'] }}
+                                    </span>
+                                    <div class="min-w-0">
+                                        <div class="font-bold text-sm text-ink-950 dark:text-white truncate" title="{{ $col['raw_name'] }}">
+                                            {{ $col['raw_name'] }}
+                                        </div>
+                                        <div class="text-[10px] text-ink-400 font-mono">
+                                            Index #{{ $col['index'] }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    @if($isTargetRequired)
+                                        <span class="px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary text-[10px] font-black uppercase tracking-wider border border-up-primary/30">
+                                            ⭐ Wajib
+                                        </span>
+                                    @elseif($isTargetActive)
+                                        <span class="px-2 py-0.5 rounded-full bg-up-mint/20 text-up-mint text-[10px] font-bold uppercase tracking-wider border border-up-mint/30">
+                                            ✓ Aktif
+                                        </span>
+                                    @else
+                                        <span class="px-2 py-0.5 rounded-full bg-black/10 dark:bg-white/10 text-ink-400 text-[10px] font-medium">
+                                            Abaikan
+                                        </span>
+                                    @endif
+
+                                    @if($isTargetActive)
+                                        <button type="button"
+                                                wire:click="clearColumnMapping('{{ $col['key'] }}')"
+                                                title="Abaikan kolom ini"
+                                                class="w-6 h-6 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-up-red/20 text-ink-400 hover:text-up-red flex items-center justify-center transition cursor-pointer text-xs leading-none">
+                                            ✕
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <!-- Sample Data Chips -->
+                            <div class="space-y-1">
+                                <div class="text-[10px] text-ink-400 font-semibold uppercase tracking-wider">Contoh Nilai Data:</div>
+                                @if(! empty($col['sample_values']))
+                                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
+                                        @foreach($col['sample_values'] as $sample)
+                                            <span class="shrink-0 px-2 py-0.5 rounded-lg bg-black/10 dark:bg-white/5 border border-black/5 dark:border-white/5 text-[11px] font-mono text-ink-700 dark:text-ink-300 max-w-[220px] truncate" title="{{ $sample }}">
+                                                {{ $sample }}
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <div class="text-[11px] text-ink-500 italic">(sel kosong / tidak ada sampel)</div>
+                                @endif
+                            </div>
+
+                            <!-- Target Dropdown Select (Touch Target >= 44px) -->
+                            <div class="space-y-1">
+                                <label for="mobile-select-{{ $col['key'] }}" class="text-[10px] text-ink-400 font-semibold uppercase tracking-wider">
+                                    Petakan ke Field Master:
+                                </label>
+                                <select id="mobile-select-{{ $col['key'] }}"
+                                        wire:key="mobile-sel-{{ $col['key'] }}"
+                                        wire:model.live="columnMapping.{{ $col['key'] }}"
+                                        class="w-full min-h-[44px] text-sm rounded-xl px-3 py-2.5 border transition cursor-pointer {{ $isTargetRequired ? 'bg-up-primary/10 border-up-primary text-up-primary font-bold focus:ring-2 focus:ring-up-primary/40' : ($isTargetActive ? 'bg-white dark:bg-black/40 border-up-mint/50 text-up-mint font-semibold' : 'bg-white dark:bg-black/30 border-black/10 dark:border-white/10 text-ink-400') }}">
+                                    <option value="">-- ⛔ Abaikan Kolom Ini (Tidak Diimpor) --</option>
+                                    @foreach($targetOptions as $groupLabel => $opts)
+                                        <optgroup label="{{ $groupLabel }}">
+                                            @foreach($opts as $val => $label)
+                                                <option value="{{ $val }}">{{ $label }}</option>
+                                            @endforeach
+                                        </optgroup>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <!-- DESKTOP LAYOUT: Polished Glassmorphic Table (md & above) -->
+                <div class="hidden md:block p-6 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-4" x-show="visibleCount > 0">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="border-b border-black/10 dark:border-white/10 text-[11px] text-ink-400 uppercase tracking-wider">
+                                    <th class="py-3 px-3 w-16 text-center">Kolom</th>
+                                    <th class="py-3 px-4 w-1/4">Nama Kolom di File</th>
+                                    <th class="py-3 px-4 w-1/3">Contoh Nilai Data (Sampel)</th>
+                                    <th class="py-3 px-2 w-8 text-center">→</th>
+                                    <th class="py-3 px-4">Dipetakan ke Kolom Master Produk</th>
+                                    <th class="py-3 px-3 w-12 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-black/5 dark:divide-white/5">
+                                @foreach($customColumns as $col)
+                                    @php
+                                        $selectedTarget = $columnMapping[$col['key']] ?? '';
+                                        $isTargetRequired = in_array($selectedTarget, ['sku', 'nama', 'harga_jual'], true);
+                                        $isTargetActive = ! empty($selectedTarget);
+                                    @endphp
+                                    <tr x-show="isMatch('{{ strtolower(addslashes($col['raw_name'])) }}', '{{ $col['key'] }}', '{{ strtolower($col['col_letter']) }}', '{{ $selectedTarget }}')"
+                                        wire:key="row-{{ $col['key'] }}"
+                                        class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition {{ $isTargetRequired ? 'bg-up-primary/[0.03]' : ($isTargetActive ? 'bg-up-mint/[0.02]' : 'opacity-65 hover:opacity-100') }}">
+                                        <!-- Column Letter / Index -->
+                                        <td class="py-3.5 px-3 text-center">
+                                            <span class="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg font-mono text-[11px] font-black {{ $isTargetRequired ? 'bg-up-primary/20 text-up-primary border border-up-primary/30' : ($isTargetActive ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-black/5 dark:bg-white/5 text-ink-400') }}">
+                                                {{ $col['col_letter'] }}
+                                            </span>
+                                        </td>
+
+                                        <!-- Raw Header Name -->
+                                        <td class="py-3.5 px-4">
+                                            <div class="font-bold text-xs text-ink-900 dark:text-white flex items-center gap-1.5">
+                                                <span>{{ $col['raw_name'] }}</span>
+                                            </div>
+                                            <div class="text-[10px] text-ink-400 font-mono mt-0.5">Index #{{ $col['index'] }}</div>
+                                        </td>
+
+                                        <!-- Sample Values -->
+                                        <td class="py-3.5 px-4">
+                                            @if(! empty($col['sample_values']))
+                                                <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                                                    @foreach($col['sample_values'] as $sample)
+                                                        <span class="px-2 py-0.5 rounded bg-black/10 dark:bg-white/5 text-[11px] font-mono text-ink-700 dark:text-ink-300 max-w-[200px] truncate" title="{{ $sample }}">
+                                                            {{ $sample }}
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            @else
+                                                <span class="text-[11px] text-ink-500 italic">(sel kosong / tidak ada sampel)</span>
+                                            @endif
+                                        </td>
+
+                                        <!-- Arrow Icon -->
+                                        <td class="py-3.5 px-2 text-center text-ink-400 text-sm font-bold">
+                                            →
+                                        </td>
+
+                                        <!-- Target Field Dropdown -->
+                                        <td class="py-3.5 px-4">
+                                            <div class="flex items-center gap-2">
+                                                <select id="desktop-select-{{ $col['key'] }}"
+                                                        wire:key="desktop-sel-{{ $col['key'] }}"
+                                                        wire:model.live="columnMapping.{{ $col['key'] }}"
+                                                        class="w-full text-xs rounded-xl px-3 py-2 border transition cursor-pointer {{ $isTargetRequired ? 'bg-up-primary/10 border-up-primary text-up-primary font-bold focus:ring-1 focus:ring-up-primary' : ($isTargetActive ? 'bg-white dark:bg-black/40 border-up-mint/50 text-up-mint' : 'bg-white dark:bg-black/30 border-black/10 dark:border-white/10 text-ink-400') }}">
+                                                    <option value="">-- ⛔ Abaikan Kolom Ini (Tidak Diimpor) --</option>
+                                                    @foreach($targetOptions as $groupLabel => $opts)
+                                                        <optgroup label="{{ $groupLabel }}">
+                                                            @foreach($opts as $val => $label)
+                                                                <option value="{{ $val }}">{{ $label }}</option>
+                                                            @endforeach
+                                                        </optgroup>
+                                                    @endforeach
+                                                </select>
+
+                                                @if($isTargetRequired)
+                                                    <span class="px-2 py-1 rounded-md bg-up-primary/20 text-up-primary text-[10px] font-black uppercase whitespace-nowrap border border-up-primary/30">
+                                                        ⭐ Wajib
+                                                    </span>
+                                                @elseif($isTargetActive)
+                                                    <span class="px-2 py-1 rounded-md bg-up-mint/20 text-up-mint text-[10px] font-bold uppercase whitespace-nowrap border border-up-mint/30">
+                                                        ✓ Aktif
+                                                    </span>
+                                                @else
+                                                    <span class="text-[10px] text-ink-500 whitespace-nowrap italic px-1">
+                                                        Dilewati
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </td>
+
+                                        <!-- Quick Action -->
+                                        <td class="py-3.5 px-3 text-center">
+                                            @if($isTargetActive)
+                                                <button type="button"
+                                                        wire:click="clearColumnMapping('{{ $col['key'] }}')"
+                                                        title="Abaikan kolom ini"
+                                                        class="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-up-red/20 text-ink-400 hover:text-up-red flex items-center justify-center transition cursor-pointer text-xs mx-auto">
+                                                    ✕
+                                                </button>
+                                            @else
+                                                <span class="text-ink-500 text-xs">-</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Spacer for Mobile Floating Bar -->
+                <div class="h-6 md:hidden"></div>
+
+                <!-- Sticky Action & Status Bar (Mobile-optimized & Desktop Floating) -->
+                <div class="sticky bottom-4 z-30 p-3.5 sm:p-4 rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl transition">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 max-w-7xl mx-auto">
+                        <!-- Validation summary badges -->
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center sm:justify-start w-full sm:w-auto text-xs">
+                            <span class="text-[11px] font-bold text-ink-400 uppercase tracking-wider hidden sm:inline">Status:</span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 {{ $hasNama ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-up-red/20 text-up-red border border-up-red/30 animate-pulse' }}">
+                                <span>{{ $hasNama ? '✓' : '⚠️' }}</span>
+                                <span>Nama {{ $hasNama ? '' : '[Wajib]' }}</span>
+                            </span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 {{ $hasHarga ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-up-red/20 text-up-red border border-up-red/30 animate-pulse' }}">
+                                <span>{{ $hasHarga ? '✓' : '⚠️' }}</span>
+                                <span>Harga {{ $hasHarga ? '' : '[Wajib]' }}</span>
+                            </span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 {{ $hasSku ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-up-amber/20 text-up-amber border border-up-amber/30' }}">
+                                <span>{{ $hasSku ? '✓' : 'ℹ️' }}</span>
+                                <span>SKU {{ $hasSku ? '✓' : '(Auto)' }}</span>
+                            </span>
+                        </div>
+
+                        <!-- CTA & Secondary Button -->
+                        <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                            <button type="button"
+                                    wire:click="resetUpload"
+                                    class="w-auto px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs cursor-pointer transition whitespace-nowrap">
+                                ← Ganti File
+                            </button>
+
+                            <button type="button"
+                                    wire:click="applyCustomMappingAndPreview"
+                                    wire:loading.attr="disabled"
+                                    class="flex-1 sm:flex-initial px-6 sm:px-8 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-black text-xs cursor-pointer shadow-lg shadow-up-primary/25 transition flex items-center justify-center gap-2 whitespace-nowrap">
+                                <span wire:loading.remove wire:target="applyCustomMappingAndPreview">Terapkan Pemetaan &amp; Buka Preview →</span>
+                                <span wire:loading wire:target="applyCustomMappingAndPreview">Menerapkan Pemetaan &amp; Menganalisis...</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         @elseif($importStep === 'preview')
@@ -711,11 +1243,22 @@
 
                 <!-- Action Buttons: Commit Import & Reset -->
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-black/10 dark:border-white/5">
-                    <button type="button"
-                            wire:click="resetUpload"
-                            class="w-full sm:w-auto px-5 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 text-ink-300 font-bold text-xs cursor-pointer transition">
-                        ← Upload Ulang / Ganti File
-                    </button>
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <button type="button"
+                                wire:click="resetUpload"
+                                class="w-full sm:w-auto px-5 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 text-ink-300 font-bold text-xs cursor-pointer transition">
+                            ← Upload Ulang / Ganti File
+                        </button>
+
+                        @if($isCustomMapping || ! empty($customColumns))
+                            <button type="button"
+                                    wire:click="backToMapping"
+                                    class="w-full sm:w-auto px-5 py-3 rounded-xl bg-up-primary/10 border border-up-primary/30 hover:bg-up-primary/20 text-up-primary font-bold text-xs cursor-pointer transition flex items-center justify-center gap-1.5">
+                                <span>⚙️</span>
+                                <span>Ubah Pemetaan Kolom</span>
+                            </button>
+                        @endif
+                    </div>
 
                     <button type="button"
                             x-data="{ submitting: false }"

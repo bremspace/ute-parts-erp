@@ -252,4 +252,105 @@ class SetupWizardTest extends TestCase
         $this->assertNotNull($config->get('app_logo'));
         $this->assertStringContainsString('logo/brand-logo-', $config->get('app_logo'));
     }
+
+    public function test_belum_punya_domain_mitigation_workflow(): void
+    {
+        $cabang = Cabang::create([
+            'kode' => 'CBG-01',
+            'nama' => 'Cabang Pusat',
+            'is_active' => true,
+        ]);
+
+        $admin = User::create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@bremspace.id',
+            'password' => Hash::make('password'),
+        ]);
+        $admin->assignRole('super-admin');
+
+        session(['cabang_id' => $cabang->id, 'cabang_nama' => $cabang->nama]);
+
+        Livewire::actingAs($admin)
+            ->test(SetupWizard::class)
+            ->assertSet('currentStep', 1)
+            ->set('belumPunyaDomain', true)
+            ->assertSet('belumPunyaDomain', true)
+            ->call('checkDns')
+            ->assertSet('dnsStatus', 'matched')
+            ->call('nextStep')
+            ->assertHasNoErrors()
+            ->assertSet('currentStep', 2);
+    }
+
+    public function test_custom_mapping_tools_and_reset_in_setup_wizard(): void
+    {
+        $cabang = Cabang::create([
+            'kode' => 'CBG-01',
+            'nama' => 'Cabang Pusat',
+            'is_active' => true,
+        ]);
+
+        $admin = User::create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@bremspace.id',
+            'password' => Hash::make('password'),
+        ]);
+        $admin->assignRole('super-admin');
+
+        session(['cabang_id' => $cabang->id, 'cabang_nama' => $cabang->nama]);
+
+        $customColumns = [
+            [
+                'key' => 'col_0',
+                'index' => 0,
+                'col_letter' => 'A',
+                'raw_name' => 'Item Code',
+                'suggested_mapping' => 'sku',
+                'sample_values' => ['SKU-001'],
+            ],
+            [
+                'key' => 'col_1',
+                'index' => 1,
+                'col_letter' => 'B',
+                'raw_name' => 'Item Description',
+                'suggested_mapping' => 'nama',
+                'sample_values' => ['LCD iPhone 11'],
+            ],
+            [
+                'key' => 'col_2',
+                'index' => 2,
+                'col_letter' => 'C',
+                'raw_name' => 'Selling Price',
+                'suggested_mapping' => 'harga_jual',
+                'sample_values' => ['450000'],
+            ],
+        ];
+
+        Livewire::actingAs($admin)
+            ->test(SetupWizard::class)
+            ->set('currentStep', 4)
+            ->set('isCustomMapping', true)
+            ->set('customColumns', $customColumns)
+            ->set('columnMapping', [
+                'col_0' => 'sku',
+                'col_1' => 'nama',
+                'col_2' => 'harga_jual',
+            ])
+            ->call('clearColumnMapping', 'col_0')
+            ->assertSet('columnMapping.col_0', '')
+            ->call('abaikanSemuaKolom')
+            ->assertSet('columnMapping.col_1', '')
+            ->assertSet('columnMapping.col_2', '')
+            ->call('resetCustomMapping')
+            ->assertSet('columnMapping.col_0', 'sku')
+            ->assertSet('columnMapping.col_1', 'nama')
+            ->assertSet('columnMapping.col_2', 'harga_jual')
+            ->set('sudahPreview', true)
+            ->call('backToMapping')
+            ->assertSet('sudahPreview', false)
+            ->call('resetImport')
+            ->assertSet('isCustomMapping', false)
+            ->assertSet('sudahPreview', false)
+            ->assertSet('customColumns', []);
+    }
 }

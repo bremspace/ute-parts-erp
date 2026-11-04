@@ -31,7 +31,6 @@ class WmsImportNewColumnsTest extends TestCase
         $rak = Rak::create(['gudang_id' => $gudang->id, 'nama' => 'Rak A1', 'kode' => 'RAK-A1', 'is_active' => true]);
 
         $service = app(ImportProdukService::class);
-        $kolom = $service->templateColumns();
 
         $baris = [
             [
@@ -64,6 +63,8 @@ class WmsImportNewColumnsTest extends TestCase
                 'foto_url' => 'https://example.com/lcd.webp',
             ],
         ];
+
+        $kolom = array_keys($baris[0]);
 
         $filePath = storage_path('app/import-tmp/test-new-cols.csv');
         if (! is_dir(dirname($filePath))) {
@@ -141,7 +142,6 @@ class WmsImportNewColumnsTest extends TestCase
         $rak = Rak::create(['gudang_id' => $gudang->id, 'kode' => 'RK-02', 'nama' => 'Rak B1', 'is_active' => true]);
 
         $service = app(ImportProdukService::class);
-        $kolom = $service->templateColumns();
 
         $baris = [
             [
@@ -204,6 +204,8 @@ class WmsImportNewColumnsTest extends TestCase
             ],
         ];
 
+        $kolom = array_keys($baris[0]);
+
         $export = new class($kolom, $baris) implements FromCollection, WithHeadings
         {
             public function __construct(private array $kolom, private array $baris) {}
@@ -263,7 +265,6 @@ class WmsImportNewColumnsTest extends TestCase
         $gudang = Gudang::create(['cabang_id' => $cabang->id, 'nama' => 'Gudang Relaksasi', 'kode' => 'GDG-RLX', 'is_active' => true]);
 
         $service = app(ImportProdukService::class);
-        $kolom = $service->templateColumns();
 
         $baris = [
             [
@@ -296,6 +297,8 @@ class WmsImportNewColumnsTest extends TestCase
                 'foto_url' => '',
             ],
         ];
+
+        $kolom = array_keys($baris[0]);
 
         $export = new class($kolom, $baris) implements FromCollection, WithHeadings
         {

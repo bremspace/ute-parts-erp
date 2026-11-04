@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\Rak;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\KategoriProdukSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -463,11 +465,12 @@ class DatabaseManagementService
                     }
                 }
 
-                // Jaminan cabang utama & relasi pivot seluruh akun bawaan
+                // Jaminan cabang utama, gudang default, rak default & relasi pivot seluruh akun bawaan
                 $cabangUtama = Cabang::firstOrCreate(
                     ['kode' => 'CBG-01'],
                     ['nama' => 'Cabang Pusat', 'is_active' => true]
                 );
+                $this->ensureDefaultWarehouseAndShelf($cabangUtama->id);
                 foreach (User::all() as $u) {
                     if (! $u->cabangs()->where('cabang_id', $cabangUtama->id)->exists()) {
                         $u->cabangs()->attach($cabangUtama->id, ['is_default' => true]);
@@ -544,6 +547,7 @@ class DatabaseManagementService
                         ['kode' => 'CBG-01'],
                         ['nama' => 'Cabang Pusat', 'is_active' => true]
                     );
+                    $this->ensureDefaultWarehouseAndShelf($cabang->id);
                     if ($admin) {
                         $admin->syncRoles($savedRoles);
                         $admin->cabangs()->syncWithoutDetaching([$cabang->id => ['is_default' => true]]);
@@ -617,6 +621,32 @@ class DatabaseManagementService
             'zero_stock' => true,
             'reset_password' => true,
         ]);
+    }
+
+    /**
+     * Auto-provisioning gudang & rak default untuk cabang (Anti-Lockout & Self-Healing Pasca Reset).
+     */
+    public function ensureDefaultWarehouseAndShelf(int $cabangId): array
+    {
+        $gudang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first();
+        if (! $gudang) {
+            $baseKode = $cabangId > 1 ? "GDG-C{$cabangId}-01" : 'GDG-01';
+            $gudang = Gudang::firstOrCreate(
+                ['kode' => $baseKode],
+                ['cabang_id' => $cabangId, 'nama' => 'Gudang Utama', 'is_active' => true]
+            );
+        }
+
+        $rak = Rak::where('gudang_id', $gudang->id)->where('is_active', true)->first();
+        if (! $rak) {
+            $baseRak = "RAK-DEF-G{$gudang->id}";
+            $rak = Rak::firstOrCreate(
+                ['kode' => $baseRak],
+                ['gudang_id' => $gudang->id, 'nama' => 'Rak Utama', 'is_active' => true]
+            );
+        }
+
+        return ['gudang' => $gudang, 'rak' => $rak];
     }
 
     /**

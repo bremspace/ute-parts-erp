@@ -8,6 +8,7 @@ use App\Modules\Webhook\Enums\WebhookEvent;
 use App\Modules\Webhook\Models\WebhookDelivery;
 use App\Modules\Webhook\Models\WebhookEndpoint;
 use App\Modules\Wms\Models\StokLog;
+use App\Services\BranchContextManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -57,7 +58,9 @@ class SendWebhookJob implements ShouldQueue
             return; // permanen — tanpa throw (queue tidak retry)
         }
 
-        $data = $this->bangunPayload($delivery);
+        $data = $endpoint->cabang_id
+            ? app(BranchContextManager::class)->runInBranchContext((int) $endpoint->cabang_id, fn () => $this->bangunPayload($delivery))
+            : $this->bangunPayload($delivery);
         if ($data === null) {
             $this->tandaiGagal($delivery, $endpoint, 'Data sumber tidak ditemukan untuk payload webhook', null);
 

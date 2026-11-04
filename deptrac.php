@@ -93,20 +93,22 @@ return static function (DeptracConfig $config): void {
             // Core boleh dipakai siapa pun; core tidak boleh bergantung ke
             // domain kecuali yang didaftarkan di bawah (debt terkomentar di atas).
             Ruleset::forLayer($coreWorkflow)->accesses(
-                $coreNotifikasi, $coreRbac, $coreAkunting, $wms, $pos,
+                $coreNotifikasi, $coreRbac, $coreAkunting, $wms, $pos, $crm,
             ),
-            Ruleset::forLayer($coreNotifikasi),
+            Ruleset::forLayer($coreNotifikasi)->accesses(
+                $coreRbac, $coreWorkflow, $pos, $crm,
+            ),
             Ruleset::forLayer($coreRbac)->accesses(
-                $coreAkunting, $wms, $servis, $crm, $reseller, $pos,
+                $coreAkunting, $coreNotifikasi, $wms, $servis, $crm, $reseller, $pos, $hr, $marketplace,
             ),
             Ruleset::forLayer($coreAkunting)->accesses(
-                $coreNotifikasi, $coreRbac, $pos, $crm, $wms, $servis, $reseller,
+                $coreWorkflow, $coreNotifikasi, $coreRbac, $pos, $crm, $wms, $servis, $reseller, $hr,
             ),
 
             // Modul domain: akses ke core + edge domain nyata.
             Ruleset::forLayer($wms)->accesses(
                 $coreWorkflow, $coreNotifikasi, $coreRbac, $coreAkunting,
-                $pos, $servis, $omnichannel,
+                $pos, $servis, $omnichannel, $crm, $marketplace,
             ),
             Ruleset::forLayer($reseller)->accesses(
                 $coreWorkflow, $coreNotifikasi, $coreRbac, $coreAkunting,
@@ -114,7 +116,7 @@ return static function (DeptracConfig $config): void {
             ),
             Ruleset::forLayer($crm)->accesses(
                 $coreWorkflow, $coreNotifikasi, $coreRbac, $coreAkunting,
-                $reseller, $pos, $wms, $servis,
+                $reseller, $pos, $wms, $servis, $marketplace,
             ),
             Ruleset::forLayer($hr)->accesses(
                 $coreWorkflow, $coreNotifikasi, $coreRbac, $coreAkunting,
@@ -122,18 +124,18 @@ return static function (DeptracConfig $config): void {
             ),
             Ruleset::forLayer($pos)->accesses(
                 $coreWorkflow, $coreNotifikasi, $coreRbac, $coreAkunting,
-                $crm, $hr, $reseller, $wms,
+                $crm, $hr, $reseller, $wms, $servis, $marketplace, $omnichannel,
             ),
             Ruleset::forLayer($servis)->accesses(
                 $coreWorkflow, $coreNotifikasi, $coreRbac, $coreAkunting,
-                $crm, $hr, $reseller, $wms,
+                $crm, $hr, $reseller, $wms, $pos, $marketplace,
             ),
             Ruleset::forLayer($marketplace)->accesses(
                 $coreWorkflow, $coreNotifikasi, $coreRbac, $coreAkunting,
                 $pos, $crm, $servis, $wms, $reseller,
             ),
             Ruleset::forLayer($omnichannel)->accesses(
-                $coreNotifikasi, $coreRbac, $coreAkunting, $wms, $pos,
+                $coreNotifikasi, $coreRbac, $coreAkunting, $wms, $pos, $marketplace,
             ),
             Ruleset::forLayer($webhook)->accesses(
                 $coreNotifikasi, $coreRbac, $coreAkunting, $pos, $wms, $servis,

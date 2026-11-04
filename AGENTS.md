@@ -1,15 +1,16 @@
-# Ute Parts — Agent Instructions
+# Bremspace ERP — Agent Instructions
 
 ## Mandatory Reading (before any work)
-1. `docs/prd/PRD-Frontend-UteParts.md` — UI/UX contract, Design System "Ute Prism", component names
+1. `docs/prd/PRD-Frontend-UteParts.md` — UI/UX contract, Design System "Bremspace Prism", component names
 2. `docs/prd/PRD-Backend-UteParts.md` — entities, business rules, API contracts, 7-day roadmap
 3. `DESIGN.md` — UI design tokens & frontend base knowledge
 4. `docs/adr/` — Architecture Decision Records (see list below)
 
 **Follow the 7-day roadmap in docs/prd/PRD-Backend-UteParts.md §9. Do not skip modules — each day builds on the previous.** After each phase, update `docs/CHANGELOG.md` with a summary of completed work.
+**White-labeling Note**: Product is fully white-labeled as **Bremspace ERP**. All branding, design tokens, and customer-facing interfaces use the Bremspace identity.
 
 ## Stack (verifiable facts only)
-- **Laravel 13** (PHP 8.3+), TALL stack (Tailwind 4, Alpine.js, Livewire)
+- **Laravel 13** (PHP 8.5+), TALL stack (Tailwind 4, Alpine.js, Livewire)
 - **Vite 8** + `@tailwindcss/vite` v4, `laravel-vite-plugin` v3
 - **MySQL** (production), **SQLite :memory:** (tests via phpunit.xml)
 - **Dev dependencies**: Pint (formatter), PHPUnit 12, Faker, Mockery, Collision
@@ -39,11 +40,11 @@ Each module owns Models, Controllers, Livewire components, Services, Migrations.
 - **Marketplace** (`/` public storefront) — customers, mobile-first, light mode default
 
 ## Key Constraints (non-obvious)
-- **1GB RAM server** (VPS Murni / Standalone Linux, non-CyberPanel): PHP 8.3+, OPcache mandatory, `database` queue driver (not Redis unless RAM permits), async reports with 15-min cache, no sync queue dispatch in requests
+- **2GB+ RAM server** (VPS Murni / Standalone Linux, non-CyberPanel): PHP 8.5+, OPcache mandatory, `database` queue driver (not Redis unless RAM permits), async reports with 15-min cache, no sync queue dispatch in requests
 - **All queries MUST scope to `cabang_id`** (active branch in session). Never leak cross-branch data.
 - **RBAC via `spatie/laravel-permission` enforced in route middleware**, not just UI
 - **Auth via Laravel Sanctum** (SPA cookie session)
-- **PHP binary**: `/usr/bin/php8.3` atau `/usr/local/lsws/lsphp85/bin/php` (VPS); verify with `find /usr -name "php" -path "*/bin/*" 2>/dev/null | head -1`
+- **PHP binary**: `/usr/bin/php8.5` atau `/usr/local/lsws/lsphp85/bin/php` (VPS); verify with `find /usr -name "php" -path "*/bin/*" 2>/dev/null | head -1`
 
 ## API Contract Rules
 - Every endpoint uses codes like `[API: AUTH-01]`, `[API: POS-01]`, etc. defined in `PRD-Backend-UteParts.md` §5
@@ -79,7 +80,7 @@ npm run build
 - **Never dispatch sync queue in requests** — notifications must go through queue (`database` driver + Supervisor)
 - Key test files: `tests/Unit/PricingServiceTest.php`, `tests/Unit/ServisStateMachineTest.php`, `tests/Feature/JurnalServiceTest.php`, `tests/Feature/IntegrasiModulTest.php`
 
-## Design System — "Ute Prism" (from PRD-Frontend-UteParts.md §3)
+## Design System — "Bremspace Prism" (from PRD-Frontend-UteParts.md §3)
 - **Tokens**: `--up-primary` (#5B4FE9), `--up-accent` (#E8873B), `--up-mint` (#1FBF8F), `--up-amber` (#F5A623), `--up-red` (#EF4444)
 - **Glassmorphism surfaces**, circuit-line motifs (decorative only, not in data tables)
 - **Components**: `GlassCard`, `PrismButton`, `TierBadge`, `StatusPill`, `StockGauge`, `BarcodeScanInput`, `DataTable`, `Toast`, `ConfirmDialog`
@@ -123,7 +124,7 @@ npm run build
 ## References (preserve these links)
 - `docs/prd/PRD-Frontend-UteParts.md` §3 — Design System tokens and components
 - `docs/prd/PRD-Backend-UteParts.md` §4–§9 — Roadmap, kamus data, RBAC matrix, modul rules
-- `DESIGN.md` — Design System Ute Prism base knowledge
+- `DESIGN.md` — Design System Bremspace Prism base knowledge
 - `docs/CHANGELOG.md` — update after each fase selesai
 - `SESSION-STATE.md` — running session notes, critical constraints
 - `docs/adr/` — Architecture Decision Records

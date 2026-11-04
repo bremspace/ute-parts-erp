@@ -45,7 +45,7 @@ class ImportExportPage extends Component
 
     public ?int $gudangPusatId = null;
 
-    public string $importStep = 'upload'; // 'upload' | 'preview' | 'selesai'
+    public string $importStep = 'upload'; // 'upload' | 'mapping' | 'preview' | 'selesai'
 
     public array $importPreview = [];
 
@@ -54,6 +54,17 @@ class ImportExportPage extends Component
     public int $importLogId = 0;
 
     public ?array $activeImportLog = null;
+
+    // Custom Mapping
+    public bool $isCustomMapping = false;
+
+    public array $customColumns = [];
+
+    public array $columnMapping = [];
+
+    public ?int $defaultGudangId = null;
+
+    public bool $paksaCustomMapping = false;
 
     // Resolusi Interaktif
     public int $thresholdKemiripan = 99; // 80 - 100%
@@ -130,6 +141,7 @@ class ImportExportPage extends Component
         if ($gudangPertama) {
             $this->gudangTokoId = $gudangPertama->id;
             $this->gudangPusatId = $gudangPertama->id;
+            $this->defaultGudangId = $gudangPertama->id;
         }
 
         $runningFotoLog = ImportLog::where('user_id', auth()->id())
@@ -192,6 +204,9 @@ class ImportExportPage extends Component
         $this->importFilePath = '';
         $this->importStep = 'upload';
         $this->activeImportLog = null;
+        $this->isCustomMapping = false;
+        $this->customColumns = [];
+        $this->columnMapping = [];
     }
 
     public function previewImport(): void
@@ -216,8 +231,33 @@ class ImportExportPage extends Component
                     $this->gudangTokoId,
                     $this->gudangPusatId
                 );
+                $this->isCustomMapping = false;
             } else {
-                $hasil = app(ImportProdukService::class)->preview($realPath, (int) $this->thresholdKemiripan);
+                $service = app(ImportProdukService::class);
+                $inspect = $service->inspectFile($realPath);
+
+                // Jika file BUKAN template bawaan, fitur Custom Import (pemetaan kolom) aktif otomatis
+                if (! $inspect['is_template'] || $this->paksaCustomMapping) {
+                    $this->importFilePath = $path;
+                    $this->isCustomMapping = true;
+                    $this->customColumns = $inspect['headings'];
+                    $this->columnMapping = [];
+                    foreach ($inspect['headings'] as $h) {
+                        $this->columnMapping[$h['key']] = $h['suggested_mapping'];
+                    }
+                    $this->importStep = 'mapping';
+
+                    $this->dispatch('alert', [
+                        'type' => 'info',
+                        'message' => 'File terdeteksi bukan template bawaan. Fitur Custom Mapping aktif: silakan cocokkan kolom file dengan kolom master produk.',
+                    ]);
+
+                    return;
+                }
+
+                $this->isCustomMapping = false;
+                $this->customColumns = $inspect['headings'];
+                $hasil = $service->preview($realPath, (int) $this->thresholdKemiripan, [], [], [], $cabangId);
             }
 
             $this->importFilePath = $path;
@@ -268,6 +308,132 @@ class ImportExportPage extends Component
         }
     }
 
+    public function applyCustomMappingAndPreview(): void
+    {
+        if (! $this->importFilePath) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'File import tidak ditemukan. Silakan unggah ulang.']);
+
+            return;
+        }
+
+        $mappedValues = array_filter(array_values($this->columnMapping), fn ($v) => $v !== '' && $v !== null && $v !== 'abaikan');
+
+        if (! in_array('nama', $mappedValues, true)) {
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => 'Kolom "Nama Produk" wajib dipetakan untuk melanjutkan import master produk.',
+            ]);
+
+            return;
+        }
+
+        if (! in_array('harga_jual', $mappedValues, true)) {
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => 'Kolom "Harga Jual" wajib dipetakan untuk melanjutkan import master produk.',
+            ]);
+
+            return;
+        }
+
+        try {
+            $realPath = Storage::disk('local')->path($this->importFilePath);
+            $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
+
+            $hasil = app(ImportProdukService::class)->preview(
+                $realPath,
+                (int) $this->thresholdKemiripan,
+                $this->resolusiDuplikat,
+                $this->resolusiBarcode,
+                $this->resolusiErrorBaris,
+                $cabangId,
+                $this->columnMapping,
+                $this->defaultGudangId
+            );
+
+            $this->importPreview = $hasil;
+            $this->importStep = 'preview';
+
+            $this->aksiKemiripan = [];
+            if (! empty($hasil['kemiripan_rows'])) {
+                foreach ($hasil['kemiripan_rows'] as $kr) {
+                    $this->aksiKemiripan[$kr['baris']] = $kr['default_aksi'] ?? 'gabung';
+                }
+            }
+
+            $this->resolusiDuplikat = [];
+            $this->resolusiBarcode = [];
+            $this->resolusiErrorBaris = [];
+            if (! empty($hasil['duplikat_rows'])) {
+                foreach ($hasil['duplikat_rows'] as $dr) {
+                    $isBarcode = ($dr['tipe'] ?? '') === 'barcode';
+                    if ($isBarcode) {
+                        $this->resolusiBarcode[$dr['baris']] = [
+                            'aksi' => 'kosongkan_barcode',
+                            'barcode_baru' => '',
+                        ];
+                    }
+                    $this->resolusiDuplikat[$dr['baris']] = [
+                        'aksi' => $isBarcode ? 'kosongkan_barcode' : ($dr['lokasi'] === 'database' ? 'timpa_update' : 'ganti_sku'),
+                        'sku_baru' => $dr['sku_rekomendasi'] ?? '',
+                    ];
+                }
+            }
+
+            $totalMapped = count($mappedValues);
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Pemetaan kolom berhasil diterapkan ({$totalMapped} kolom aktif). Menampilkan hasil preview.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function backToMapping(): void
+    {
+        $this->importStep = 'mapping';
+    }
+
+    public function resetCustomMapping(): void
+    {
+        if (empty($this->customColumns)) {
+            return;
+        }
+
+        foreach ($this->customColumns as $h) {
+            $this->columnMapping[$h['key']] = $h['suggested_mapping'];
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Pemetaan kolom berhasil direset ke rekomendasi cerdas sistem.',
+        ]);
+    }
+
+    public function abaikanSemuaKolom(): void
+    {
+        if (empty($this->customColumns)) {
+            return;
+        }
+
+        foreach ($this->customColumns as $h) {
+            $this->columnMapping[$h['key']] = '';
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Seluruh kolom telah di-set ke Abaikan. Silakan pilih kolom yang ingin diimpor.',
+        ]);
+    }
+
+    public function clearColumnMapping(string $key): void
+    {
+        if (isset($this->columnMapping[$key])) {
+            $this->columnMapping[$key] = '';
+        }
+    }
+
     public function updatedThresholdKemiripan(): void
     {
         $this->thresholdKemiripan = max(50, min(100, (int) $this->thresholdKemiripan));
@@ -277,7 +443,16 @@ class ImportExportPage extends Component
             try {
                 $realPath = Storage::disk('local')->path($this->importFilePath);
                 if (file_exists($realPath)) {
-                    $hasil = app(ImportProdukService::class)->preview($realPath, $this->thresholdKemiripan);
+                    $hasil = app(ImportProdukService::class)->preview(
+                        $realPath,
+                        $this->thresholdKemiripan,
+                        [],
+                        [],
+                        [],
+                        null,
+                        $this->isCustomMapping ? $this->columnMapping : [],
+                        $this->defaultGudangId
+                    );
                     $this->importPreview = $hasil;
 
                     // Re-init default aksi kemiripan untuk baris baru terdeteksi
@@ -582,6 +757,9 @@ class ImportExportPage extends Component
                 $filePath = $this->importFilePath;
                 $this->importFilePath = '';
 
+                $columnMapping = $this->isCustomMapping ? $this->columnMapping : [];
+                $defaultGudangId = $this->defaultGudangId;
+
                 if ($totalBaris <= 100) {
                     ImportProdukExcelJob::dispatchSync(
                         $log->id,
@@ -595,7 +773,9 @@ class ImportExportPage extends Component
                         $this->resolusiDuplikat,
                         $this->thresholdKemiripan,
                         $this->resolusiBarcode,
-                        $this->resolusiErrorBaris
+                        $this->resolusiErrorBaris,
+                        $columnMapping,
+                        $defaultGudangId
                     );
                 } else {
                     ImportProdukExcelJob::dispatch(
@@ -610,7 +790,9 @@ class ImportExportPage extends Component
                         $this->resolusiDuplikat,
                         $this->thresholdKemiripan,
                         $this->resolusiBarcode,
-                        $this->resolusiErrorBaris
+                        $this->resolusiErrorBaris,
+                        $columnMapping,
+                        $defaultGudangId
                     );
                 }
             }
@@ -1126,6 +1308,10 @@ class ImportExportPage extends Component
             'importPreview' => $this->importPreview,
             'aksiKemiripan' => $this->aksiKemiripan,
             'resolusiDuplikat' => $this->resolusiDuplikat,
+            'mappableColumns' => app(ImportProdukService::class)->getMappableSystemColumns(),
+            'customColumns' => $this->customColumns,
+            'isCustomMapping' => $this->isCustomMapping,
+            'columnMapping' => $this->columnMapping,
         ]);
     }
 }

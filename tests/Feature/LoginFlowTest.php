@@ -59,7 +59,7 @@ class LoginFlowTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_superadmin_login_with_alias_and_fallback_passwords(): void
+    public function test_superadmin_login_requires_valid_credentials(): void
     {
         $cabang = Cabang::create([
             'kode' => 'CBG-01',
@@ -77,7 +77,7 @@ class LoginFlowTest extends TestCase
         $admin->assignRole('super-admin');
         $admin->cabangs()->attach($cabang->id, ['is_default' => true]);
 
-        // 1. Login dengan Password123!
+        // 1. Login dengan password yang valid berhasil
         $this->post('/app/login', [
             'email' => 'superadmin@uteparts.id',
             'password' => 'Password123!',
@@ -86,20 +86,11 @@ class LoginFlowTest extends TestCase
 
         Auth::logout();
 
-        // 2. Login dengan variasi password123 (lowercase)
+        // 2. Login dengan password yang salah ditolak (tanpa backdoor fallback bypass)
         $this->post('/app/login', [
             'email' => 'superadmin@uteparts.id',
-            'password' => 'password123',
-        ])->assertRedirect('/app/dashboard');
-        $this->assertAuthenticatedAs($admin);
-
-        Auth::logout();
-
-        // 3. Login dengan alias super-admin@uteparts.id (dengan strip)
-        $this->post('/app/login', [
-            'email' => 'super-admin@uteparts.id',
-            'password' => 'password123',
-        ])->assertRedirect('/app/dashboard');
-        $this->assertAuthenticatedAs($admin);
+            'password' => 'wrong-password',
+        ])->assertSessionHasErrors('email');
+        $this->assertGuest();
     }
 }

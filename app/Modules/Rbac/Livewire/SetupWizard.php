@@ -11,6 +11,7 @@ use App\Modules\Pos\Models\QrisCabang;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Exports\ImportProdukTemplateExport;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Services\ImportProdukService;
 use Illuminate\Support\Facades\Cache;
@@ -41,6 +42,8 @@ class SetupWizard extends Component
     public string $namaToko = 'Bremspace';
 
     public string $domainToko = 'bremspace.id';
+
+    public bool $belumPunyaDomain = false;
 
     public string $serverPublicIp = '66.42.48.27';
 
@@ -122,6 +125,16 @@ class SetupWizard extends Component
     public bool $sudahPreview = false;
 
     public string $storedFilePath = '';
+
+    public bool $isCustomMapping = false;
+
+    public array $customColumns = [];
+
+    public array $columnMapping = [];
+
+    public bool $paksaCustomMapping = false;
+
+    public ?int $defaultGudangId = null;
 
     public array $previewSummary = [
         'total_baris' => 0,
@@ -257,6 +270,19 @@ class SetupWizard extends Component
         $this->ppnPersen = (int) $config->get('ppn_persen', 11);
     }
 
+    public function updatedBelumPunyaDomain(bool $val): void
+    {
+        if ($val) {
+            $host = request()->getHost();
+            if ($host && $host !== 'localhost' && ! in_array($host, ['127.0.0.1', '::1'], true)) {
+                $this->domainToko = $this->cleanDomainString($host);
+            } else {
+                $this->domainToko = 'toko.local';
+            }
+            $this->updatedDomainToko($this->domainToko);
+        }
+    }
+
     public function updatedDomainToko(string $val): void
     {
         $clean = $this->cleanDomainString($val);
@@ -277,6 +303,13 @@ class SetupWizard extends Component
         if (empty($domain)) {
             $this->dnsStatus = 'empty';
             $this->dnsResolvedIp = null;
+
+            return;
+        }
+
+        if ($this->belumPunyaDomain || filter_var($domain, FILTER_VALIDATE_IP) || $domain === 'localhost' || str_ends_with($domain, '.local') || str_ends_with($domain, '.lan') || str_ends_with($domain, '.internal') || str_ends_with($domain, '.test')) {
+            $this->dnsStatus = 'matched';
+            $this->dnsResolvedIp = filter_var($domain, FILTER_VALIDATE_IP) ? $domain : '127.0.0.1';
 
             return;
         }
@@ -335,6 +368,7 @@ class SetupWizard extends Component
     {
         $domain = strtolower(trim($domain));
         $domain = preg_replace('#^https?://#', '', $domain);
+        $domain = preg_replace('#:\d+$#', '', $domain);
         $domain = preg_replace('#/.*$#', '', $domain);
 
         return trim($domain, '.');
@@ -373,7 +407,12 @@ class SetupWizard extends Component
         if ($this->currentStep === 1) {
             $rules = [
                 'namaToko' => 'required|string|max:100',
-                'domainToko' => ['required', 'string', 'max:100', 'regex:/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/'],
+                'domainToko' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    'regex:/^(([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:[0-9]{1,3}\.){3}[0-9]{1,3}|localhost|[a-zA-Z0-9\-]+\.(local|lan|internal|test))$/i',
+                ],
                 'namaCabang' => 'required|string|max:100',
                 'teleponToko' => 'nullable|string|max:30',
                 'alamatToko' => 'nullable|string|max:255',
@@ -473,14 +512,35 @@ class SetupWizard extends Component
             $service = app(ImportProdukService::class);
             $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
 
-            $preview = $service->preview($fullPath, 99, [], [], [], $cabangId);
+            if ($this->formatMigrasi === 'sid_retail') {
+                $this->isCustomMapping = false;
+                $preview = $service->preview($fullPath, 99, [], [], [], $cabangId);
+            } else {
+                $inspect = $service->inspectFile($fullPath);
+                $this->customColumns = $inspect['headings'] ?? [];
+
+                if (! ($inspect['is_template'] ?? false) || $this->paksaCustomMapping) {
+                    $this->isCustomMapping = true;
+                    $this->columnMapping = [];
+                    foreach ($this->customColumns as $h) {
+                        $this->columnMapping[$h['key']] = $h['suggested_mapping'];
+                    }
+                    $this->sudahPreview = false;
+                    $this->previewSummary = [];
+
+                    return;
+                }
+
+                $this->isCustomMapping = false;
+                $preview = $service->preview($fullPath, 99, [], [], [], $cabangId);
+            }
 
             $this->previewSummary = [
                 'total_baris' => $preview['total_baris'] ?? 0,
                 'total_valid' => $preview['valid'] ?? 0,
                 'total_invalid' => $preview['invalid'] ?? 0,
-                'total_sku' => count($preview['hasil'] ?? []),
-                'estimasi_nilai' => $this->hitungEstimasiNilai($preview['hasil'] ?? []),
+                'total_sku' => count($preview['hasil'] ?? $preview['sampel'] ?? []),
+                'estimasi_nilai' => $this->hitungEstimasiNilai($preview['hasil'] ?? $preview['sampel'] ?? []),
             ];
 
             $this->sudahPreview = true;
@@ -490,11 +550,117 @@ class SetupWizard extends Component
         }
     }
 
+    public function applyCustomMappingAndPreview(): void
+    {
+        $this->errorMessage = null;
+
+        $mappedValues = array_filter(array_values($this->columnMapping), fn ($v) => $v !== '' && $v !== null && $v !== 'abaikan');
+
+        if (! in_array('nama', $mappedValues, true)) {
+            $this->errorMessage = 'Kolom Nama Produk wajib dipetakan.';
+
+            return;
+        }
+
+        if (! in_array('harga_jual', $mappedValues, true)) {
+            $this->errorMessage = 'Kolom Harga Jual (Retail) wajib dipetakan.';
+
+            return;
+        }
+
+        try {
+            $fullPath = Storage::disk('local')->path($this->storedFilePath);
+            $service = app(ImportProdukService::class);
+            $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
+
+            $preview = $service->preview(
+                filePath: $fullPath,
+                threshold: 99,
+                resolusiDuplikat: [],
+                resolusiBarcode: [],
+                resolusiErrorBaris: [],
+                cabangId: $cabangId,
+                columnMapping: $this->columnMapping,
+                defaultGudangId: $this->defaultGudangId
+            );
+
+            $this->previewSummary = [
+                'total_baris' => $preview['total_baris'] ?? 0,
+                'total_valid' => $preview['valid'] ?? 0,
+                'total_invalid' => $preview['invalid'] ?? 0,
+                'total_sku' => count($preview['hasil'] ?? $preview['sampel'] ?? []),
+                'estimasi_nilai' => $this->hitungEstimasiNilai($preview['hasil'] ?? $preview['sampel'] ?? []),
+            ];
+
+            $this->sudahPreview = true;
+        } catch (Throwable $e) {
+            $this->errorMessage = 'Gagal menerapkan pemetaan: '.$e->getMessage();
+            Log::error('Wizard custom mapping preview error: '.$e->getMessage());
+        }
+    }
+
+    public function backToMapping(): void
+    {
+        $this->sudahPreview = false;
+        $this->errorMessage = null;
+    }
+
+    public function resetCustomMapping(): void
+    {
+        if (empty($this->customColumns)) {
+            return;
+        }
+
+        foreach ($this->customColumns as $h) {
+            $this->columnMapping[$h['key']] = $h['suggested_mapping'];
+        }
+        $this->errorMessage = null;
+    }
+
+    public function abaikanSemuaKolom(): void
+    {
+        if (empty($this->customColumns)) {
+            return;
+        }
+
+        foreach ($this->customColumns as $h) {
+            $this->columnMapping[$h['key']] = '';
+        }
+    }
+
+    public function clearColumnMapping(string $key): void
+    {
+        $this->columnMapping[$key] = '';
+    }
+
+    public function resetImport(): void
+    {
+        $this->fileMigrasi = null;
+        $this->storedFilePath = '';
+        $this->sudahPreview = false;
+        $this->isCustomMapping = false;
+        $this->customColumns = [];
+        $this->columnMapping = [];
+        $this->previewSummary = [
+            'total_baris' => 0,
+            'total_valid' => 0,
+            'total_invalid' => 0,
+            'total_sku' => 0,
+            'estimasi_nilai' => 0,
+        ];
+        $this->errorMessage = null;
+    }
+
+    public function resetUpload(): void
+    {
+        $this->resetImport();
+    }
+
     private function hitungEstimasiNilai(array $hasilRows): float
     {
         $total = 0.0;
         foreach ($hasilRows as $item) {
-            $data = $item['data'] ?? [];
+            $data = $item['data'] ?? $item;
             $stok = (float) ($data['stok_awal'] ?? $data['stok'] ?? 0);
             $hpp = (float) ($data['harga_beli'] ?? $data['hpp'] ?? 0);
             $total += ($stok * $hpp);
@@ -737,7 +903,9 @@ class SetupWizard extends Component
                             $this->storedFilePath,
                             auth()->id(),
                             $this->formatMigrasi === 'sid_retail' ? 'sid_retail' : 'standar',
-                            $cabang->id
+                            $cabang->id,
+                            $this->columnMapping,
+                            $this->defaultGudangId
                         );
                     } else {
                         ImportProdukExcelJob::dispatch(
@@ -745,7 +913,9 @@ class SetupWizard extends Component
                             $this->storedFilePath,
                             auth()->id(),
                             $this->formatMigrasi === 'sid_retail' ? 'sid_retail' : 'standar',
-                            $cabang->id
+                            $cabang->id,
+                            $this->columnMapping,
+                            $this->defaultGudangId
                         );
                     }
                 }
@@ -789,10 +959,20 @@ class SetupWizard extends Component
         $bankNominal = $this->parseNominal($this->saldoBank);
         $totalModalNominal = $kasNominal + $bankNominal;
 
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
+        $gudangList = class_exists(Gudang::class)
+            ? Gudang::where('cabang_id', $cabangId)->where('is_active', true)->get()
+            : collect();
+
+        if (! $this->defaultGudangId && $gudangList->isNotEmpty()) {
+            $this->defaultGudangId = $gudangList->first()->id;
+        }
+
         return view('modules.rbac.livewire.setup-wizard', [
             'totalModalNominal' => $totalModalNominal,
             'kasNominal' => $kasNominal,
             'bankNominal' => $bankNominal,
+            'gudangList' => $gudangList,
         ]);
     }
 }

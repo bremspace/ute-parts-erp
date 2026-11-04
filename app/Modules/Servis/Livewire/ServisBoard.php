@@ -425,6 +425,10 @@ class ServisBoard extends Component
         $userId = auth()->id();
         $fmt = $format === 'csv' ? 'csv' : 'xlsx';
 
+        $path = app(ExportLaporanService::class)->export(
+            'servis', null, null, $cabangId, null, $fmt, $userId
+        );
+
         dispatch(new ExportLaporanJob(
             jenis: 'servis',
             periodeDari: null,
@@ -433,6 +437,7 @@ class ServisBoard extends Component
             akunId: null,
             userId: $userId,
             format: $fmt,
+            existingPath: $path,
         ));
 
         $this->dispatch('alert', [
@@ -440,9 +445,6 @@ class ServisBoard extends Component
             'message' => 'Export servis selesai — berkas mulai diunduh.',
         ]);
 
-        $path = app(ExportLaporanService::class)->export(
-            'servis', null, null, $cabangId, null, $fmt, $userId
-        );
         $fullPath = Storage::disk('local')->path($path);
 
         return response()->download($fullPath, 'laporan-servis-'.now()->format('Ymd-His').'.'.$fmt);

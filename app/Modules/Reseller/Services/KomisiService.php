@@ -693,7 +693,7 @@ class KomisiService
                 }
 
                 // Komisi reseller (eksternal): jurnal Beban Komisi Reseller (510-01) vs Utang Komisi (210-03)
-                $cabangId = $komisi->transaksi?->cabang_id ?? session('cabang_id') ?? 1;
+                $cabangId = $komisi->transaksi?->cabang_id ?? currentCabangId() ?? Cabang::value('id');
                 $noJurnal = $this->jurnalService->generateNoJurnal('komisi', $cabangId);
                 $this->jurnalService->post(
                     $noJurnal,

@@ -35,9 +35,9 @@ Route::middleware(['throttle:60,1'])->group(function () {
     // [API: SERVICE-06b] Approve/reject estimasi publik (token, tanpa login)
     // [API: SERVICE-07] Booking servis online publik (marketplace)
     // [API: SERVICE-08] Tracking servis publik (token, tanpa login) (T-22)
-    Route::post('/servis/public/approve/{token}', [ServisController::class, 'publicApprove']);
-    Route::post('/servis/booking-online', [ServisController::class, 'bookingOnline']);
-    Route::get('/servis/tracking/{token}', [ServisController::class, 'trackingPublik']);
+    Route::post('/servis/public/approve/{token}', [ServisController::class, 'publicApprove'])->middleware('throttle:15,1');
+    Route::post('/servis/booking-online', [ServisController::class, 'bookingOnline'])->middleware('throttle:15,1');
+    Route::get('/servis/tracking/{token}', [ServisController::class, 'trackingPublik'])->middleware('throttle:30,1');
 
     // [API: QRIS-01] Webhook Notifikasi Pembayaran QRIS dari Android forwarder & polling status
     Route::match(['get', 'post'], '/webhook/qris-notif', [QrisNotificationController::class, 'handle']);

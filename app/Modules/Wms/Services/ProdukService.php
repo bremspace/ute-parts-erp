@@ -8,6 +8,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StockMutationLog;
@@ -220,6 +221,33 @@ class ProdukService
             }
 
             $this->simpanHargaTier($produk->id, $variant->id, $hargaTier, $hargaJual);
+
+            if (! $gudangId) {
+                $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
+                $gudang = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
+                    ->where('is_active', true)
+                    ->first() ?? Gudang::where('is_active', true)->first();
+
+                if (! $gudang) {
+                    $effectiveCabangId = $cabangId ?? 1;
+                    $gudang = Gudang::firstOrCreate(
+                        ['kode' => 'GDG-01'],
+                        ['cabang_id' => $effectiveCabangId, 'nama' => 'Gudang Utama', 'is_active' => true]
+                    );
+                }
+                $gudangId = $gudang->id;
+            }
+
+            if (! $rakId && $gudangId) {
+                $rak = Rak::where('gudang_id', $gudangId)->where('is_active', true)->first();
+                if (! $rak) {
+                    $rak = Rak::firstOrCreate(
+                        ['kode' => "RAK-DEF-G{$gudangId}"],
+                        ['gudang_id' => $gudangId, 'nama' => 'Rak Utama', 'is_active' => true]
+                    );
+                }
+                $rakId = $rak->id;
+            }
 
             if ($gudangId && $stokAwal > 0) {
                 $this->inisialisasiStokAwal(
@@ -814,7 +842,8 @@ class ProdukService
         float $hargaBeliMasuk,
         ?string $opsiMetode = null,
         ?string $skemaJual = null,
-        ?float $nilaiJualAtauMargin = null
+        ?float $nilaiJualAtauMargin = null,
+        ?int $cabangId = null
     ): array {
         if ($qtyMasuk <= 0 || $hargaBeliMasuk <= 0) {
             return ['sukses' => false, 'pesan' => 'Qty atau harga beli tidak valid'];
@@ -831,7 +860,12 @@ class ProdukService
         $hargaBeliBaru = $hargaBeliLama;
 
         if ($metodeAktif === 'average') {
-            $stokTotalSekarang = (int) StokItem::where('produk_id', $produkId)->sum('jumlah');
+            $cabangTarget = $cabangId ?? currentCabangId();
+            $stokQuery = StokItem::where('produk_id', $produkId);
+            if ($cabangTarget) {
+                $stokQuery->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangTarget));
+            }
+            $stokTotalSekarang = (int) $stokQuery->sum('jumlah');
             $stokLama = max(0, $stokTotalSekarang - $qtyMasuk);
 
             if ($stokLama <= 0) {

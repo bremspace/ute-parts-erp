@@ -141,13 +141,19 @@ class LaporanPajak extends Component
         $userId = auth()->id();
         $cabangId = session('cabang_id');
 
+        $path = app(ExportLaporanService::class)->export(
+            'pajak', $this->periodeDari, $this->periodeSampai, $cabangId, null, 'xlsx', $userId
+        );
+
         dispatch(new ExportLaporanJob(
             jenis: 'pajak',
             periodeDari: $this->periodeDari,
             periodeSampai: $this->periodeSampai,
             cabangId: $cabangId,
             akunId: null,
-            userId: $userId
+            userId: $userId,
+            format: 'xlsx',
+            existingPath: $path,
         ));
 
         $this->dispatch('alert', [
@@ -155,9 +161,6 @@ class LaporanPajak extends Component
             'message' => 'Export laporan pajak selesai — berkas mulai diunduh.',
         ]);
 
-        $path = app(ExportLaporanService::class)->export(
-            'pajak', $this->periodeDari, $this->periodeSampai, $cabangId, null, 'xlsx', $userId
-        );
         $fullPath = Storage::disk('local')->path($path);
 
         return response()->download($fullPath, 'laporan-pajak-'.now()->format('Ymd-His').'.xlsx');

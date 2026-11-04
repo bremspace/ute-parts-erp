@@ -3,19 +3,12 @@
 namespace App\Providers;
 
 use App\Modules\Crm\Services\KonfigurasiService;
-use App\Modules\Marketplace\Services\WebKonsumenService;
-use App\Modules\Pos\Models\ReturnPenjualan;
-use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Wms\Models\PurchaseOrder;
-use App\Modules\Wms\Models\ReturnPembelian;
-use App\Modules\Workflow\Observers\PurchaseOrderObserver;
-use App\Modules\Workflow\Observers\ReturnPembelianObserver;
-use App\Modules\Workflow\Observers\ReturnPenjualanObserver;
-use App\Modules\Workflow\Observers\TransaksiObserver;
+use App\Services\BranchContextManager;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -31,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(BranchContextManager::class);
     }
 
     /**
@@ -39,6 +32,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // [T-04] Prevent Eloquent lazy loading in local and testing environments
+        Model::preventLazyLoading(! $this->app->isProduction());
+
         // Dynamic Brand / App Name & Host Resolver (Multi-Port & LAN zero-config)
         // Abaikan saat console command (artisan package:discover / migrate) agar tidak probe DB prematur
         if (! $this->app->runningInConsole()) {
@@ -61,13 +57,6 @@ class AppServiceProvider extends ServiceProvider
             return method_exists($user, 'hasRole') && ($user->hasRole('super-admin') || $user->hasRole('owner')) ? true : null;
         });
 
-        // [F1-1] Approval Engine auto-fire — observer pada model (PO, retur, diskon besar),
-        // menyala terlepas dari komponen/controller mana pun yang menyimpan model tsb.
-        PurchaseOrder::observe(PurchaseOrderObserver::class);
-        ReturnPenjualan::observe(ReturnPenjualanObserver::class);
-        ReturnPembelian::observe(ReturnPembelianObserver::class);
-        Transaksi::observe(TransaksiObserver::class);
-
         // [F3-1] Blade directive @cansee('harga_beli') — calls global helper canSeeField()
         // defined in app/Helpers/functions.php (autoloaded via composer.json files)
         Blade::directive('cansee', function ($field) {
@@ -78,25 +67,6 @@ class AppServiceProvider extends ServiceProvider
         });
         Blade::directive('endcansee', function () {
             return '<?php endif; ?>';
-        });
-
-        // View composer untuk konfigurasi CMS Web Konsumen (Marketplace)
-        view()->composer(['layouts.marketplace', 'modules.marketplace.livewire.shop-catalog', 'modules.marketplace.livewire.shop-detail'], function ($view) {
-            try {
-                $service = app(WebKonsumenService::class);
-                $view->with('webConfig', $service->getAll());
-            } catch (\Throwable $e) {
-                $view->with('webConfig', []);
-            }
-        });
-
-        view()->composer('modules.marketplace.livewire.shop-catalog', function ($view) {
-            try {
-                $service = app(WebKonsumenService::class);
-                $view->with('webBanners', $service->getActiveBanners());
-            } catch (\Throwable $e) {
-                $view->with('webBanners', collect());
-            }
         });
 
         // [SEC-1] Wajib persistent: middleware permission harus jalan lagi di

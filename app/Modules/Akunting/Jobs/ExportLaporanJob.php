@@ -4,6 +4,7 @@ namespace App\Modules\Akunting\Jobs;
 
 use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Services\BranchContextManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -30,15 +31,29 @@ class ExportLaporanJob implements ShouldQueue
         public ?int $cabangId,
         public ?int $akunId,
         public ?int $userId,
-        public string $format = 'xlsx' // [F2-5] xlsx | csv
+        public string $format = 'xlsx', // [F2-5] xlsx | csv
+        public ?string $existingPath = null
     ) {}
 
     public function handle(ExportLaporanService $service, NotificationService $notif): void
     {
         try {
-            // [P0] Forward userId eksplisit — di queue worker auth() = null, tanpa
-            // ini filename prefix jatuh ke "0_" dan download 403 (ownership ACC-11b).
-            $path = $service->export($this->jenis, $this->periodeDari, $this->periodeSampai, $this->cabangId, $this->akunId, $this->format, $this->userId);
+            // [T-03] Re-use pre-generated export file if provided to avoid duplicate execution
+            $runner = $this->existingPath
+                ? fn () => $this->existingPath
+                : fn () => $service->export(
+                    $this->jenis,
+                    $this->periodeDari,
+                    $this->periodeSampai,
+                    $this->cabangId,
+                    $this->akunId,
+                    $this->format,
+                    $this->userId
+                );
+
+            $path = $this->cabangId
+                ? app(BranchContextManager::class)->runInBranchContext($this->cabangId, $runner)
+                : $runner();
 
             // Notifikasi persist + queue (inapp = catat di database, tanpa outbound)
             $notif->kirim(

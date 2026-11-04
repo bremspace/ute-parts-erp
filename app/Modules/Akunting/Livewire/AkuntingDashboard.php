@@ -347,6 +347,10 @@ class AkuntingDashboard extends Component
         $dari = $jenis === 'buku_besar' ? ($this->bukuBesarDari ?: $this->periodeDari) : $this->periodeDari;
         $sampai = $jenis === 'buku_besar' ? ($this->bukuBesarSampai ?: $this->periodeSampai) : $this->periodeSampai;
 
+        $path = app(ExportLaporanService::class)->export(
+            $jenis, $dari ?: null, $sampai ?: null, $exportCabangId, $targetAkunId, $fmt, $userId
+        );
+
         dispatch(new ExportLaporanJob(
             jenis: $jenis,
             periodeDari: $dari ?: null,
@@ -355,6 +359,7 @@ class AkuntingDashboard extends Component
             akunId: $targetAkunId,
             userId: $userId,
             format: $fmt,
+            existingPath: $path,
         ));
 
         $cakupanText = $this->cakupanLaporan === 'konsolidasi' ? ' konsolidasi' : '';
@@ -363,9 +368,6 @@ class AkuntingDashboard extends Component
             'message' => 'Export '.str_replace('_', ' ', $jenis).$cakupanText.' selesai — berkas mulai diunduh.',
         ]);
 
-        $path = app(ExportLaporanService::class)->export(
-            $jenis, $dari ?: null, $sampai ?: null, $exportCabangId, $targetAkunId, $fmt, $userId
-        );
         $fullPath = Storage::disk('local')->path($path);
 
         return response()->download($fullPath, 'laporan-'.$jenis.'-'.now()->format('Ymd-His').'.'.$fmt);

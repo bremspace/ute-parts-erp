@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Jobs;
 
 use App\Modules\Wms\Services\SupplierScoringService;
+use App\Services\BranchContextManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -27,6 +28,10 @@ class SupplierScoreJob implements ShouldQueue
 
     public function handle(SupplierScoringService $service): array
     {
-        return $service->hitungSemua($this->periode, $this->cabangId);
+        $runner = fn () => $service->hitungSemua($this->periode, $this->cabangId);
+
+        return $this->cabangId
+            ? app(BranchContextManager::class)->runInBranchContext($this->cabangId, $runner)
+            : $runner();
     }
 }

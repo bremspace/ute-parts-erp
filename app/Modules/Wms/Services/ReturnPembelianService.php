@@ -50,12 +50,13 @@ class ReturnPembelianService
         $userId = $arg7 !== null ? $arg7 : (is_int($arg5) && $arg6 === null ? $arg5 : auth()->id());
         $cabangId = is_int($arg5) && $arg6 !== null ? $arg5 : (int) $po->gudangTujuan?->cabang_id;
         $gudangId = is_int($arg6) ? $arg6 : (int) $po->gudang_tujuan_id;
+        $isLegacyDirect = ($arg7 === null && $arg6 === null);
 
         if (empty($items)) {
             throw ValidationException::withMessages(['items' => 'Item retur pembelian tidak boleh kosong']);
         }
 
-        return DB::transaction(function () use ($po, $items, $alasan, $metodePengembalian, $cabangId, $gudangId, $userId) {
+        return DB::transaction(function () use ($po, $items, $alasan, $metodePengembalian, $cabangId, $gudangId, $userId, $isLegacyDirect) {
             $poLocked = PurchaseOrder::whereKey($po->id)->lockForUpdate()->firstOrFail();
 
             $totalRetur = 0;
@@ -152,7 +153,14 @@ class ReturnPembelianService
                 }
             }
 
-            // Buat draft retur pembelian (fase 1: draft)
+            // Buat draft retur pembelian (fase 1: draft) atau langsung eksekusi bila legacy 5-arg caller
+            if ($isLegacyDirect) {
+                $needsApproval = $this->approvalService->adaPending('retur_pembelian', $retur->id);
+                if (! $needsApproval) {
+                    $this->eksekusiRetur($retur, $userId);
+                }
+            }
+
             $returResult = $retur->fresh(['items.produk', 'purchaseOrder', 'supplier', 'gudang']);
             app(TransactionActivityLogService::class)->catatReturnPembelian($returResult);
 
@@ -179,7 +187,7 @@ class ReturnPembelianService
             throw ValidationException::withMessages(['items' => 'Pilih minimal satu barang dari pool karantina untuk diretur']);
         }
 
-        $cabangId = $cabangId ?? session('cabang_id') ?? 1;
+        $cabangId = $cabangId ?? currentCabangId() ?? auth()->user()?->cabangs()->first()?->id ?? Cabang::value('id');
         if (! $gudangId) {
             $gudangId = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
                 ?? Gudang::value('id');

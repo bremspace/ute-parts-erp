@@ -251,7 +251,7 @@ class RoleWorkflowMatrixTest extends TestCase
         $respPo = $this->postJson('/api/wms/po', [
             'supplier_id' => $supplierId,
             'gudang_tujuan_id' => $this->gudangPusat->id,
-            'metode_bayar' => 'tunai',
+            'metode_bayar' => 'kredit',
             'tanggal_order' => now()->toDateString(),
             'estimasi_datang' => now()->addDays(3)->toDateString(),
             'items' => [

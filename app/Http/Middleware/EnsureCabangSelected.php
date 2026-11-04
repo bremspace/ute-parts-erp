@@ -3,6 +3,9 @@
 namespace App\Http\Middleware;
 
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\Rak;
+use App\Services\BranchContextManager;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -66,6 +69,39 @@ class EnsureCabangSelected
             }
         }
 
+        // Sinkronisasi ke BranchContextManager singleton untuk runtime lifecycle
+        if (session()->has('cabang_id')) {
+            $activeCabangId = (int) session('cabang_id');
+            app(BranchContextManager::class)->setActiveCabangId($activeCabangId);
+            $this->ensureDefaultWarehouseAndShelf($activeCabangId);
+        }
+
         return $next($request);
+    }
+
+    /**
+     * Pastikan cabang aktif memiliki gudang utama & rak default (Anti-Wipe Self-Healing).
+     */
+    protected function ensureDefaultWarehouseAndShelf(int $cabangId): void
+    {
+        try {
+            $gudang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first();
+            if (! $gudang) {
+                $baseKode = $cabangId > 1 ? "GDG-C{$cabangId}-01" : 'GDG-01';
+                $gudang = Gudang::firstOrCreate(
+                    ['kode' => $baseKode],
+                    ['cabang_id' => $cabangId, 'nama' => 'Gudang Utama', 'is_active' => true]
+                );
+            }
+
+            if ($gudang && ! Rak::where('gudang_id', $gudang->id)->where('is_active', true)->exists()) {
+                $baseRak = "RAK-DEF-G{$gudang->id}";
+                Rak::firstOrCreate(
+                    ['kode' => $baseRak],
+                    ['gudang_id' => $gudang->id, 'nama' => 'Rak Utama', 'is_active' => true]
+                );
+            }
+        } catch (\Throwable) {
+        }
     }
 }

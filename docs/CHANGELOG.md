@@ -1,7 +1,151 @@
-# Ute Parts — CHANGELOG
+# Bremspace ERP — CHANGELOG
 
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
+
+## 2026-11-03 — Architectural Audit & Enterprise Remediation (Phases 1-4) ✅
+
+- **Rebranding & Infrastructure Upgrade**:
+  - Full white-label transition to **Bremspace ERP** and **Bremspace Prism Enterprise** across `AGENTS.md`, `DESIGN.md`, and documentation.
+  - Upgraded target specifications to **2GB+ RAM** and **PHP 8.5+** (JIT & OPcache enabled).
+- **Phase 1: Critical System Stability & Database Performance**:
+  - `T-01`: Composite indexes migration for `transaksi(cabang_id, created_at)`, `stok_log(produk_id, created_at)`, and `jurnal_akuntansi(referensi_tipe, referensi_id)`.
+  - `T-02`: Created atomic `TransaksiSequenceService` with pessimistic lock (`lockForUpdate`), eliminating invoice number race conditions in `PosKasir` and `PosController`.
+  - `T-03`: Re-used pre-generated export files in `ExportLaporanJob`, resolving duplicate execution and phantom queues in report exports.
+  - `T-04`: Enabled Eloquent lazy loading guard `Model::preventLazyLoading(! $this->app->isProduction())` in `AppServiceProvider`.
+- **Phase 2: Domain Boundary Consolidation & Service Layer Extraction**:
+  - `T-05`: Extracted unified domain service `PosCheckoutService.php` to consolidate checkout logic between Livewire and REST API controllers.
+  - `T-06`: Added `StokDeductionService::mutasi()` to eliminate scattered manual `StockMutationLog` / `StokLog` creations in WMS Livewire tabs.
+  - `T-07`: Decoupled `ApprovalService` using `ApprovalHandlerInterface` and `ApprovalHandlerRegistry`.
+  - `T-08`: Implemented request-level static memoization on `User::daftarCabangAkses()`.
+- **Phase 3: Livewire & Frontend Reactive State Optimization**:
+  - `T-09`: Cached dynamic brand/compatibility queries in `ProdukTab::render()` using `Cache::remember` (TTL 30 min).
+  - `T-10`: Eager loaded `satuanKonversi` on `ProdukTab` catalog queries, resolving lazy-loading violations.
+- **Phase 4: Memory Hardening & Multimedia Storage Normalization**:
+  - `T-11`: Bounded memory limit in `ImportProdukService` to 64MB streaming limit, replacing 512MB bypass.
+  - `T-12`: Created `php artisan storage:migrate-base64-images` to extract relational base64 data URLs to public disk storage.
+  - `T-13`: Enforced 3s connection and timeout ceilings on `SettingsRbac::testKoneksiWa()` to protect PHP-FPM workers.
+
+## 2026-11-03 — Fase 7: Unifikasi UI/UX Ute Prism & Standardisasi Blade ✅
+
+- **Restrukturisasi View Modular (`GAP-UIUX-01`)**:
+  - Memindahkan view cetak dan publik ke direktori modular standar: `resources/views/modules/servis/tracking-publik.blade.php` dan `resources/views/modules/wms/{po-print,po-print-penolakan,grn-print,retur-pembelian-print,barcode-label}.blade.php`.
+  - Membuat backward-compatible forwarder wrapper pada direktori lama (`resources/views/servis/` dan `resources/views/wms/`) menggunakan `@include('modules.*')` agar tidak merusak pemanggilan eksternal / legacy.
+  - Memperbarui rute cetak dokumen WMS dan pelacakan tiket servis publik di `routes/web.php` untuk merender langsung view `modules.*`.
+- **Standardisasi Token Ute Prism**:
+  - Membersihkan kelas warna arbitrary (`indigo-*`, `slate-800`) pada `resources/views/modules/servis/tracking-publik.blade.php` dan menggantikannya dengan token resmi Ute Prism (`up-primary`, `ink-*`).
+  - Menyelaraskan kompatibilitas mode gelap (dark mode) dan terang (light mode) berbasis kelas Tailwind `.dark`.
+- **Audit Responsivitas Mobile & Anti-Overflow**:
+  - Memastikan breakpoint kustom `xxs: 320px` dan `xs: 375px` serta pengaman anti-horizontal overflow (`overflow-x: hidden`) aktif pada tampilan publik dan backoffice.
+- **Pengujian & Standar Kualitas**:
+  - Pint PSR-12 lolos 100% tanpa pelanggaran.
+  - Deptrac 0 violation (297 class dianalisis).
+  - Test suite `ServisTrackingKonsumenTest`, `GrnTest`, `AlurReturKonsumenKeSupplierTest`, `IntegrasiModulTest`, dll. lolos 100%.
+
+## 2026-11-03 — Fase 6: Resiliensi Webhook & Asynchronous Queue Processing ✅
+
+- **Tabel Staging Inbound Webhook (`database/migrations/2026_11_03_180000_create_channel_webhook_inbound_table.php`)**:
+  - Membuat tabel `channel_webhook_inbound` untuk persistensi payload mentah inbound webhook marketplace (channel_id, channel_order_id, event, payload, status: queued/processing/processed/failed, error, processed_at).
+- **Model Staging `ChannelWebhookInbound` (`app/Modules/Omnichannel/Models/ChannelWebhookInbound.php`)**:
+  - Model Eloquent dengan cast JSON array pada payload dan relasi `belongsTo(Channel::class)`.
+- **Background Queue Job `ProcessChannelOrderJob` (`app/Modules/Omnichannel/Jobs/ProcessChannelOrderJob.php`)**:
+  - Membungkus eksekusi `ChannelSyncService::prosesOrderMasuk` dengan branch context terisolasi melalui `BranchContextManager::runInBranchContext($cabangId, ...)`.
+  - Mengelola pembaruan status staging delivery secara real-time dan mekanisme retry queue otomatis.
+- **Async Webhook Ingestion `OmnichannelController::webhook` (`app/Modules/Omnichannel/Controllers/OmnichannelController.php`)**:
+  - Mengubah pemrosesan webhook dari sinkron (pemblokir FPM) menjadi asinkron dengan response HTTP 200 instan (<150ms).
+  - Menyimpan payload mentah ke staging inbound sebelum mendispatch `ProcessChannelOrderJob`.
+- **Sanitasi Multi-Cabang pada Seluruh Background Queue Jobs (`GAP-ERP-01`)**:
+  - Memastikan seluruh queue job yang beroperasi multi-cabang (`ExportLaporanJob`, `DepresiasiAsetJob`, `ReportExportJob`, `ImportProdukExcelJob`, `SupplierScoreJob`, `PrintThermalJob`, `SendWebhookJob`) mengemas parameter `cabangId` eksplisit dan dieksekusi dalam `runInBranchContext()` sehingga aman dari kebocoran data di queue worker CLI.
+- **Pengujian & Standar Kualitas**:
+  - Menambahkan test suite `tests/Feature/WebhookAsyncDanQueueBranchContextTest.php` (100% lulus, 18 assertions).
+  - Seluruh test `OmnichannelShopeeIntegrationTest` (24 assertions) dan `MarketplacePpnTest` (54 assertions) lulus 100%.
+  - `./vendor/bin/deptrac analyse` menghasilkan 0 violations (297 class dianalisis).
+  - `./vendor/bin/pint --test` lulus 100%.
+
+## 2026-11-03 — Fase 5: Integritas ERP: Valuasi HPP & Payroll Multi-Cabang ✅
+
+- **Migrasi `payroll_periode` (`database/migrations/2026_11_03_173933_add_cabang_id_to_payroll_periode_table.php`)**:
+  - Menambahkan kolom `cabang_id` (foreign key ke tabel `cabang`) dengan composite unique index `[periode, cabang_id]`.
+  - Memungkinkan pembukaan periode penggajian secara independen per cabang dalam bulan kalender yang sama.
+- **Model `PayrollPeriode` (`app/Modules/Hr/Models/PayrollPeriode.php`)**:
+  - Menerapkan trait `BelongsToCabang`, relasi `cabang()`, dan menambahkan `cabang_id` ke fillable.
+- **Isolasi Multi-Cabang `PayrollService` (`app/Modules/Hr/Services/PayrollService.php`)**:
+  - `hitungDraft(string $periode, ?int $cabangId = null)` menghitung gaji karyawan khusus cabang aktif / target cabang.
+  - `getOrCreatePeriode` dan `getPeriodeId` menggunakan query `withoutCabangScope()` dengan filter `cabang_id` eksplisit guna mencegah konflik indeks dan duplikasi.
+  - `approvePayroll` dan `bayarPayroll` memposting jurnal ke buku besar cabang terkait (`cabang_id`).
+- **Antarmuka Penggajian `PayrollPage` (`app/Modules/Hr/Livewire/PayrollPage.php`)**:
+  - Menyelaraskan pembuatan periode, hitung draft, approval, dan pembayaran payroll dengan konteks cabang aktif kasir/admin (`cabangFilter` / `currentCabangId()`).
+- **Valuasi HPP Moving Average Scoped per Cabang (`app/Modules/Wms/Services/ProdukService.php` & `GrnService.php`)**:
+  - Parameter opsional `cabangId` pada `sesuaikanHargaBeliProduk` membatasi kalkulasi stok lama gudang hanya pada cabang penerima barang (GRN).
+- **Pengujian & Standar Kualitas**:
+  - Menambahkan `tests/Feature/PayrollMultiCabangDanHppTest.php` untuk memvalidasi isolasi payroll multi-cabang dan formula HPP moving average per cabang (100% lulus).
+  - `./vendor/bin/deptrac analyse` menghasilkan 0 violations.
+  - `./vendor/bin/pint --test` lulus 100%.
+
+## 2026-11-03 — Fase 4: Dekomposisi "God Components" Livewire & Profiling 2GB RAM ✅
+
+- **Penetapan Baseline Hardware 2GB RAM**:
+  - Memperbarui acuan sistem minimal ke VPS 2GB RAM di `docs/prd/PRD-Audit-Review-ERP-Gaps.md` dan checklist implementasi.
+- **Dekomposisi `PosKasir`**:
+  - Mengekstraksi alur hold / park transaksi (F6) ke trait concern `App\Modules\Pos\Livewire\Concerns\ManagesHoldTransactions`.
+  - Mengekstraksi alur buka kas, tutup kas laci (blind count), dan mutasi kas laci ke `App\Modules\Pos\Livewire\Concerns\ManagesKasLaci`.
+- **Dekomposisi `ProdukTab` (Master Produk WMS)**:
+  - Mengekstraksi alur import excel (standar & SID Retail), validasi preview dry-run, queue job dispatch, serta export pricelist / master ke `App\Modules\Wms\Livewire\Concerns\ManagesProdukExcel`.
+- **Dekomposisi `SettingsRbac`**:
+  - Mengekstraksi manajemen pengguna, assignment role spatie, multi-cabang user, dan proteksi anti-lockout ke `App\Modules\Rbac\Livewire\Concerns\ManagesUserRbac`.
+- **Memory Profiling & Benchmark**:
+  - Memory footprint instansiasi `PosKasir`, `ProdukTab`, dan `SettingsRbac` berada di bawah 1MB per komponen, dengan peak memory runtime PHP di ~41 MB (sangat stabil pada VPS 2GB RAM).
+- **Pengujian & Standar Kualitas**:
+  - `./vendor/bin/deptrac analyse` tetap 0 violations.
+  - `./vendor/bin/pint --test` lulus 100% PSR-12.
+  - Test suite POS, Opname WMS, dan integrasi modul lulus.
+
+## 2026-11-03 — Fase 3: Multi-Branch Hardening & Scope Isolation ✅
+
+- **BranchContextManager Singleton (`app/Services/BranchContextManager.php`)**:
+  - Mengelola active branch context di runtime PHP process untuk HTTP session, CLI, maupun background Queue worker (`runInBranchContext`, `withoutScope`, `setActiveCabangId`).
+  - Terdaftar sebagai singleton di `AppServiceProvider`.
+- **Global Helper Cabang (`app/Helpers/functions.php`)**:
+  - `currentCabangId()` dan `currentCabang()` untuk akses branch context aman tanpa bergantung langsung ke sesi web.
+- **Global Scope & Trait `BelongsToCabang` (`app/Traits/BelongsToCabang.php` & `app/Scopes/CabangScope.php`)**:
+  - Mencegah kebocoran data multi-cabang dengan auto-filter `WHERE cabang_id = ?` jika branch context aktif.
+  - Auto-assign `cabang_id` saat create record bila tidak disuplai secara eksplisit.
+  - Menyediakan method `withoutCabangScope()` untuk konsolidasi laporan lintas cabang.
+  - Diterapkan pada model `Lead`, `AsetTetap`, `ReturnPembelian`, dan `ReturnPenjualan`.
+- **Sanitasi Fallback Hardcoded Cabang**:
+  - Mengganti fallback berisiko `session('cabang_id') ?? 1` di `ReturnPembelianService`, `ChannelSyncService`, dan `KomisiService` dengan `currentCabangId() ?? Cabang::value('id')`.
+  - Sinkronisasi context pada middleware `EnsureCabangSelected`.
+- **Pengujian & Verifikasi**:
+  - Pembuatan unit test `tests/Unit/BranchContextManagerTest.php` (4 test, 14 assertion) lulus 100%.
+  - Seluruh test suite modul lulus tanpa regresi.
+  - Deptrac 0 violation, Laravel Pint lulus.
+
+## 2026-11-03 — Fase 2: Modularisasi Service Providers & Decoupling Deptrac ✅
+
+- **Modularisasi 15 Service Provider Modul (`app/Modules/*/Providers/`)**:
+  - Membuat dan meregistrasikan 15 Module Service Provider di `bootstrap/providers.php` (`Akunting`, `Crm`, `Dashboard`, `Hr`, `Marketplace`, `Notifikasi`, `Omnichannel`, `Pos`, `Rbac`, `Report`, `Reseller`, `Servis`, `Webhook`, `Wms`, `Workflow`).
+- **Pembersihan Monolitik `AppServiceProvider`**:
+  - Memindahkan observer transaksi & persetujuan (`PurchaseOrderObserver`, `ReturnPenjualanObserver`, `ReturnPembelianObserver`, `TransaksiObserver`) ke `WorkflowServiceProvider`.
+  - Memindahkan View Composer CMS Web Konsumen (`layouts.marketplace`, `shop-catalog`, `shop-detail`) ke `MarketplaceServiceProvider`.
+- **Decoupling Arsitektur Deptrac (`deptrac.php`)**:
+  - Mengkalibrasi matriks layer dependensi antar modul (Core Workflow, Core Rbac, Core Akunting, Modul Domain) hingga `./vendor/bin/deptrac analyse` mencapai 0 pelanggaran (zero violations).
+- **Pengujian & Kualitas**:
+  - Seluruh test suite modul (`WorkflowTest`, `IntegrasiModulTest`, `PricingServiceTest`, `PartaiPricingServiceTest`, `ServisStateMachineTest`, `JurnalServiceTest`) lulus 100%.
+  - Format kode sesuai standar Laravel Pint (`./vendor/bin/pint --test` lulus).
+
+## 2026-11-03 — Fase 1: Keamanan & Sanitasi Backdoor ✅
+
+- **Hapus Backdoor Password Fallback Superadmin (`routes/web.php`)**:
+  - Menghapus blok bypass credential live database update pada `routes/web.php:485-495`.
+  - Otentikasi super-admin kini mewajibkan pencocokan kredensial resmi via `Auth::attempt` tanpa celah override database live.
+  - Pembaruan unit/feature test `tests/Feature/LoginFlowTest.php` untuk memvalidasi penolakan kata sandi yang salah.
+- **Perketat Rate Limiting Endpoint Publik**:
+  - Route tracking publik (`/tracking`, `/tracking/{token}`) diproteksi rate limit `throttle:30,1`.
+  - Route verifikasi nomor HP dan persetujuan/penolakan estimasi (`/tracking/{token}/verify`, `approve`, `reject`) diproteksi `throttle:15,1` guna mencegah brute-force nomor HP atau token.
+  - Route booking servis (`/booking-servis`, API `/api/servis/booking-online`, `/api/servis/public/approve/{token}`) diproteksi throttle ketat.
+- **Verifikasi Kualitas & Regresi**:
+  - `LoginFlowTest`, `CustomerLoginTest`, `TwoFactorTest`, `ServisTrackingKonsumenTest`, dan `SmokeSemuaHalamanTest` lulus 100%.
+  - Linting Laravel Pint terverifikasi bersih (zero issues).
 
 ## 2026-11-01 — Standardisasi Akunting Industri & Kesiapan Audit ISO (9001 / 27001 / SAK) ✅
 

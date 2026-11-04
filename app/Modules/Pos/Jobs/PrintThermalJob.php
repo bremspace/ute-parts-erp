@@ -5,6 +5,7 @@ namespace App\Modules\Pos\Jobs;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\EscPosWriter;
+use App\Services\BranchContextManager;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -26,7 +27,8 @@ class PrintThermalJob implements ShouldQueue
 
     public function handle(): void
     {
-        $transaksi = Transaksi::with(['items.produk', 'items.skuVariant', 'pelanggan', 'kasir', 'cabang', 'tiketServis'])
+        $transaksi = Transaksi::withoutGlobalScopes()
+            ->with(['items.produk', 'items.skuVariant', 'pelanggan', 'kasir', 'cabang', 'tiketServis'])
             ->find($this->transaksiId);
 
         if (! $transaksi) {
@@ -34,6 +36,16 @@ class PrintThermalJob implements ShouldQueue
 
             return;
         }
+
+        $cabangId = $transaksi->cabang_id ?? 1;
+
+        app(BranchContextManager::class)->runInBranchContext((int) $cabangId, function () use ($transaksi) {
+            $this->prosesCetak($transaksi);
+        });
+    }
+
+    protected function prosesCetak(Transaksi $transaksi): void
+    {
 
         $items = $transaksi->items->map(fn ($item) => [
             'nama' => $this->itemName($item),

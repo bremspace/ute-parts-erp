@@ -3,25 +3,20 @@
 namespace App\Modules\Pos\Controllers;
 
 use App\Modules\Akunting\Models\Piutang;
-use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
-use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Exceptions\StokTidakCukupException;
 use App\Modules\Pos\Jobs\PrintThermalJob;
 use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\KasSesiState;
+use App\Modules\Pos\Services\PosCheckoutService;
 use App\Modules\Pos\Services\PosOfflineSyncService;
 use App\Modules\Pos\Services\PricingService;
-use App\Modules\Reseller\Models\Komisi;
-use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\StockReservationService;
-use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -333,13 +328,6 @@ class PosController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $cabangId, $gudangId) {
-                // Generate nomor transaksi unik
-                $today = now()->format('Ymd');
-                $countToday = Transaksi::whereDate('created_at', now()->toDateString())
-                    ->where('cabang_id', $cabangId)
-                    ->count() + 1;
-                $noTransaksi = sprintf('TRX-C%02d-%s-%04d', $cabangId, $today, $countToday);
-
                 $subtotal = 0;
                 $itemsData = [];
 
@@ -371,8 +359,6 @@ class PosController extends Controller
                         $stokBisaJual = max(0, $stokFisik - $reserved);
 
                         if ($stokBisaJual < $qtyDasar) {
-                            // [B-02 revisi] Exception domain → controller mengembalikan 422
-                            // + pesan Indonesia (bukan 500 lewat \Exception generik).
                             throw new StokTidakCukupException(
                                 "Stok tidak mencukupi untuk {$produk->nama}. Tersedia: {$stokBisaJual}, diminta: {$qtyDasar}",
                                 (int) $produk->id,
@@ -383,16 +369,15 @@ class PosController extends Controller
                     }
 
                     $itemsData[] = [
-                        'produk' => $produk,
+                        'produk_id' => $produk->id,
                         'sku_variant_id' => $item['sku_variant_id'] ?? null,
                         'satuan' => $satuan,
                         'konversi' => $konversi,
-                        'qty_dasar' => $qtyDasar,
                         'jumlah' => $qty,
                         'harga_satuan' => $hargaSatuan,
                         'diskon_nominal' => $diskonItem,
                         'subtotal' => $lineSubtotal,
-                        'hpp' => (float) $produk->harga_beli,
+                        'hpp' => (float) $produk->harga_beli * $konversi,
                     ];
                 }
 
@@ -423,8 +408,7 @@ class PosController extends Controller
                     $kembalian = 0;
                 }
 
-                $transaksi = Transaksi::create([
-                    'no_transaksi' => $noTransaksi,
+                $transaksi = app(PosCheckoutService::class)->checkout([
                     'cabang_id' => $cabangId,
                     'kasir_id' => auth()->id(),
                     'pelanggan_id' => $request->pelanggan_id,
@@ -446,157 +430,13 @@ class PosController extends Controller
                     'komisi_mitra_nominal' => (float) ($request->komisi_mitra_nominal ?? 0),
                     'dpp' => $dpp,
                     'pajak_nominal' => $ppnNominal,
-                    'ppn_nominal' => $ppnNominal,
                     'total_akhir' => $totalAkhir,
                     'metode_bayar' => $request->metode_bayar,
                     'jumlah_bayar' => $jumlahBayar,
                     'kembalian' => $kembalian,
                     'split_detail' => $request->split_detail,
-                    'status' => 'selesai',
                     'catatan' => $request->catatan,
-                ]);
-
-                // Buat item transaksi & kurangi stok
-                foreach ($itemsData as $row) {
-                    TransaksiItem::create([
-                        'transaksi_id' => $transaksi->id,
-                        'produk_id' => $row['produk']->id,
-                        'sku_variant_id' => $row['sku_variant_id'],
-                        'jumlah' => $row['jumlah'],
-                        'satuan' => $row['satuan'],
-                        'konversi' => $row['konversi'],
-                        'harga_satuan' => $row['harga_satuan'],
-                        'diskon_nominal' => $row['diskon_nominal'],
-                        'subtotal' => $row['subtotal'],
-                        'hpp' => (float) $row['hpp'] * $row['konversi'],
-                    ]);
-
-                    if ($gudangId) {
-                        // [B-10b/P1-2] Delegasi ke StokDeductionService (satu-satunya
-                        // jalur kanonik): lockForUpdate, kriteria resolusi baris stok
-                        // yang sama dgn gauge kasir, StokLog + StockMutationLog (sinkron
-                        // channel). Sebelumnya API ini menulis StokLog saja sehingga
-                        // stock_mutation_log tidak terisi (P1-2: 12 stok_log vs 3 mutasi).
-                        // [B-02 revisi] izinkanNegatif TIDAK lagi diaktifkan — stok kurang
-                        // ditolak, sama dgn PosKasir (Livewire). Default `false` = tolak.
-                        app(StokDeductionService::class)->kurangi(
-                            produkId: (int) $row['produk']->id,
-                            skuVariantId: $row['sku_variant_id'] ?: null,
-                            gudangId: (int) $gudangId,
-                            qty: $row['qty_dasar'],
-                            jenis: 'penjualan',
-                            referensiTipe: Transaksi::class,
-                            referensiId: $transaksi->id,
-                            userId: auth()->id(),
-                            catatan: "POS Penjualan {$transaksi->no_transaksi} ({$row['jumlah']} {$row['satuan']})",
-                        );
-                    }
-                }
-
-                // Jika pelanggan terdaftar, update akumulasi belanja & poin loyalty (sinkron CRM)
-                if ($request->pelanggan_id) {
-                    app(PelangganService::class)->tambahBelanjaDanPoin($request->pelanggan_id, (float) $totalAkhir);
-                }
-
-                // Jurnal akuntansi otomatis (PRD §4.6): Kas masuk, Pendapatan, HPP, Persediaan turun
-                $jurnalService = app(JurnalService::class);
-                $totalHpp = 0.0;
-                foreach ($itemsData as $row) {
-                    $totalHpp += (float) $row['hpp'] * (float) $row['qty_dasar'];
-                }
-
-                $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
-                $kasbon = $request->metode_bayar === 'piutang';
-
-                $debitLines = [];
-                if ($kasbon) {
-                    $debitLines[] = ['akun_kode' => '120-01', 'debit' => (float) $totalAkhir, 'kredit' => 0];
-                } elseif ($request->metode_bayar === 'tunai') {
-                    $debitLines[] = ['akun_kode' => '110-04', 'debit' => (float) $totalAkhir, 'kredit' => 0];
-                } elseif ($request->metode_bayar === 'split' && is_array($request->split_detail)) {
-                    $splitNonTunai = (float) ($request->split_detail['non_tunai'] ?? 0);
-                    $porsiBank = min((float) $totalAkhir, $splitNonTunai);
-                    $porsiKas = max(0.0, (float) $totalAkhir - $porsiBank);
-
-                    if ($porsiKas > 0) {
-                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $porsiKas, 'kredit' => 0];
-                    }
-                    if ($porsiBank > 0) {
-                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => $porsiBank, 'kredit' => 0];
-                    }
-                } else {
-                    // transfer / qris langsung ke Bank
-                    $debitLines[] = ['akun_kode' => '110-02', 'debit' => (float) $totalAkhir, 'kredit' => 0];
-                }
-
-                $lines = $debitLines;
-                $lines[] = ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $ppnNominal > 0 ? (float) $dpp : (float) $totalAkhir];
-                // PPN Keluaran → akun 220-01 (kontrak AC F1-2)
-                foreach (app(PajakService::class)->jurnalLines($ppnNominal, $noJurnal, $cabangId, auth()->id() ?? 0) as $ppnLine) {
-                    $lines[] = $ppnLine;
-                }
-                if ($totalHpp > 0) {
-                    $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0]; // HPP
-                    $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp]; // Persediaan turun
-                }
-
-                $jurnalService->post(
-                    $noJurnal,
-                    now(),
-                    'pos',
-                    $lines,
-                    "Jurnal POS {$noTransaksi}",
-                    $cabangId,
-                    auth()->id(),
-                    Transaksi::class,
-                    $transaksi->id
-                );
-
-                // Kasbon → catat Piutang (AR)
-                if ($kasbon && $request->pelanggan_id) {
-                    $countPiutang = Piutang::where('cabang_id', $cabangId)
-                        ->whereDate('created_at', now()->toDateString())
-                        ->count() + 1;
-                    Piutang::create([
-                        'no_piutang' => sprintf('AR-%s-%04d', now()->format('Ymd'), $countPiutang),
-                        'pelanggan_id' => $request->pelanggan_id,
-                        'transaksi_id' => $transaksi->id,
-                        'cabang_id' => $cabangId,
-                        'jumlah' => $totalAkhir,
-                        'jumlah_dibayar' => 0,
-                        'sisa' => $totalAkhir,
-                        'jatuh_tempo' => now()->addDays(30)->toDateString(),
-                        'status' => 'belum_lunas',
-                        'keterangan' => 'Kasbon POS '.$noTransaksi,
-                    ]);
-                    Pelanggan::where('id', $request->pelanggan_id)->increment('saldo_piutang', $totalAkhir);
-                }
-
-                // Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing via rule aktif
-                app(KomisiService::class)->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
-
-                // Pencatatan komisi akumulasi jika mode komisi_akumulasi aktif & belum dicatat rule engine
-                if ($transaksi->mode_reward_mitra === 'komisi_akumulasi' && (float) $transaksi->komisi_mitra_nominal > 0 && $request->pelanggan_id) {
-                    $sudahAda = Komisi::where('transaksi_id', $transaksi->id)->where('pelanggan_id', $request->pelanggan_id)->exists();
-                    if (! $sudahAda) {
-                        $today = now()->format('Ymd');
-                        $count = Komisi::whereDate('created_at', now()->toDateString())->count() + 1;
-                        $noKomisi = sprintf('KMS-%s-%04d', $today, $count);
-                        $pelangganModel = Pelanggan::find($request->pelanggan_id);
-                        $tipeKonsumen = $pelangganModel ? app(PelangganService::class)->tipeKonsumen($pelangganModel) : 'reseller';
-                        Komisi::create([
-                            'no_komisi' => $noKomisi,
-                            'pelanggan_id' => $request->pelanggan_id,
-                            'transaksi_id' => $transaksi->id,
-                            'aktor_tipe' => $tipeKonsumen === 'agen' ? 'agen' : 'reseller',
-                            'aktor_id' => $request->pelanggan_id,
-                            'nominal_komisi' => $transaksi->komisi_mitra_nominal,
-                            'jumlah_transaksi' => $transaksi->total_akhir,
-                            'status' => Komisi::STATUS_PENDING,
-                            'keterangan' => 'Komisi akumulasi mitra transaksi '.$transaksi->no_transaksi,
-                        ]);
-                    }
-                }
+                ], $itemsData);
 
                 return $this->success(
                     $transaksi->load(['items.produk', 'items.skuVariant', 'pelanggan', 'cabang']),

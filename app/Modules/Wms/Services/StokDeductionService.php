@@ -255,6 +255,71 @@ class StokDeductionService
     }
 
     /**
+     * Catat mutasi stok langsung (misal: transfer, opname penyesuaian, koreksi)
+     * Sinkron ke StokItem, StokLog, dan StockMutationLog secara atomik.
+     */
+    public function mutasi(
+        int $produkId,
+        ?int $skuVariantId,
+        int $gudangId,
+        int $delta,
+        string $jenis,
+        string $sumber,
+        string $referensiTipe,
+        ?int $referensiId,
+        ?int $userId,
+        ?string $catatan = null
+    ): StokItem {
+        $stok = $this->cariBarisStok($produkId, $skuVariantId, $gudangId, lock: true);
+
+        if (! $stok) {
+            $stok = StokItem::create([
+                'produk_id' => $produkId,
+                'sku_variant_id' => $skuVariantId,
+                'gudang_id' => $gudangId,
+                'jumlah' => 0,
+            ]);
+        }
+
+        $sebelum = $stok->jumlah;
+        $setelah = $sebelum + $delta;
+        $stok->update(['jumlah' => $setelah]);
+
+        StokLog::create([
+            'gudang_id' => $gudangId,
+            'produk_id' => $produkId,
+            'sku_variant_id' => $stok->sku_variant_id,
+            'user_id' => $userId,
+            'jenis' => $jenis,
+            'referensi_tipe' => $referensiTipe,
+            'referensi_id' => $referensiId,
+            'jumlah_sebelum' => $sebelum,
+            'perubahan' => $delta,
+            'jumlah_setelah' => $setelah,
+            'catatan' => $catatan,
+        ]);
+
+        StockMutationLog::create([
+            'produk_id' => $produkId,
+            'sku_variant_id' => $stok->sku_variant_id,
+            'gudang_id' => $gudangId,
+            'user_id' => $userId,
+            'delta' => $delta,
+            'sumber' => $sumber,
+            'referensi_tipe' => $referensiTipe,
+            'referensi_id' => $referensiId,
+            'terjadi_at' => now(),
+        ]);
+
+        try {
+            app(ChannelSyncService::class)->dispatchSyncStok($produkId, $stok->sku_variant_id);
+        } catch (\Throwable) {
+        }
+
+        return $stok;
+    }
+
+    /**
      * [B-03/P1-3] Satu kriteria resolusi baris stok utk seluruh jalur deduksi.
      *
      * - varian terisi → baris varian eksak;

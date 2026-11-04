@@ -124,22 +124,32 @@ class User extends Authenticatable
     }
 
     /**
+     * Cache request-level memoization untuk daftarCabangAkses.
+     */
+    protected static array $memoDaftarCabangAkses = [];
+
+    /**
      * Daftar seluruh cabang yang dapat diakses oleh user.
      * super-admin/finance/marketing/hr: seluruh cabang aktif di sistem.
      * role cabang operasional: cabang aktif yang ditugaskan kepada user.
      */
     public function daftarCabangAkses()
     {
+        $cacheKey = $this->id ?? 'guest';
+        if (isset(static::$memoDaftarCabangAkses[$cacheKey])) {
+            return static::$memoDaftarCabangAkses[$cacheKey];
+        }
+
         // Role tingkat manajemen/pusat (HQ) dapat memilih dan berpindah ke semua cabang aktif
         if ($this->hasAnyRole(['super-admin', 'owner', 'finance', 'marketing', 'kelola-hr'])) {
-            return Cabang::where('is_active', true)->orderBy('id')->get();
+            return static::$memoDaftarCabangAkses[$cacheKey] = Cabang::where('is_active', true)->orderBy('id')->get();
         }
 
         if ($this->cabangs()->doesntExist()) {
-            return Cabang::where('is_active', true)->orderBy('id')->get();
+            return static::$memoDaftarCabangAkses[$cacheKey] = Cabang::where('is_active', true)->orderBy('id')->get();
         }
 
-        return $this->cabangs()
+        return static::$memoDaftarCabangAkses[$cacheKey] = $this->cabangs()
             ->where('cabang.is_active', true)
             ->distinct()
             ->orderBy('cabang.id')

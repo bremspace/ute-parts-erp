@@ -112,8 +112,8 @@ Route::match(['GET', 'POST'], '/tracking', function (Request $request) {
         return redirect()->to(url('/tracking/'.$tiket->token_approval));
     }
 
-    return view('servis.tracking-publik', ['tiket' => null, 'perluVerifikasi' => false]);
-})->name('servis.tracking.search');
+    return view('modules.servis.tracking-publik', ['tiket' => null, 'perluVerifikasi' => false]);
+})->middleware('throttle:30,1')->name('servis.tracking.search');
 
 Route::get('/tracking/{token}', function ($token) {
     $servisService = app(ServisService::class);
@@ -135,7 +135,7 @@ Route::get('/tracking/{token}', function ($token) {
     }
 
     if (! $servisService->isTrackingAuthorized($tiket)) {
-        return view('servis.tracking-publik', [
+        return view('modules.servis.tracking-publik', [
             'tiket' => null,
             'perluVerifikasi' => true,
             'token' => $token,
@@ -148,7 +148,7 @@ Route::get('/tracking/{token}', function ($token) {
         ]);
     }
 
-    return view('servis.tracking-publik', [
+    return view('modules.servis.tracking-publik', [
         'perluVerifikasi' => false,
         'tiket' => [
             'no_tiket' => $tiket->no_tiket,
@@ -211,7 +211,7 @@ Route::get('/tracking/{token}', function ($token) {
             ],
         ],
     ]);
-})->name('servis.tracking');
+})->middleware('throttle:30,1')->name('servis.tracking');
 
 Route::post('/tracking/{token}/verify', function (Request $request, $token) {
     $servisService = app(ServisService::class);
@@ -229,7 +229,7 @@ Route::post('/tracking/{token}/verify', function (Request $request, $token) {
     }
 
     return redirect()->to(url('/tracking/'.$token))->with('error', '5 digit terakhir nomor HP tidak cocok. Silakan coba lagi.');
-})->name('servis.tracking.verify');
+})->middleware('throttle:15,1')->name('servis.tracking.verify');
 
 Route::post('/tracking/{token}/approve', function (Request $request, $token) {
     $servisService = app(ServisService::class);
@@ -258,7 +258,7 @@ Route::post('/tracking/{token}/approve', function (Request $request, $token) {
     } catch (Exception $e) {
         return redirect()->back()->with('error', $e->getMessage());
     }
-})->name('servis.tracking.approve');
+})->middleware('throttle:15,1')->name('servis.tracking.approve');
 
 Route::post('/tracking/{token}/reject', function (Request $request, $token) {
     $servisService = app(ServisService::class);
@@ -287,12 +287,12 @@ Route::post('/tracking/{token}/reject', function (Request $request, $token) {
     } catch (Exception $e) {
         return redirect()->back()->with('error', $e->getMessage());
     }
-})->name('servis.tracking.reject');
+})->middleware('throttle:15,1')->name('servis.tracking.reject');
 
 if (class_exists(BookingServis::class)) {
-    Route::get('/booking-servis', BookingServis::class)->name('servis.booking');
+    Route::get('/booking-servis', BookingServis::class)->middleware('throttle:30,1')->name('servis.booking');
 } else {
-    Route::get('/booking-servis', fn () => 'Booking Servis')->name('servis.booking');
+    Route::get('/booking-servis', fn () => 'Booking Servis')->middleware('throttle:30,1')->name('servis.booking');
 }
 
 // ===== [API: PAY-02] Webhook Duitku — path tanpa prefix /api (PRD §5) =====
@@ -451,7 +451,7 @@ Route::get('/print-barcode', function (Request $request) {
         'copies' => max(1, min(50, (int) $request->query('copies', 1))),
     ];
 
-    return view('wms.barcode-label', [
+    return view('modules.wms.barcode-label', [
         'produks' => $produks,
         'labelConfig' => $labelConfig,
     ]);
@@ -479,20 +479,8 @@ Route::post('/app/login', function (Request $request) {
     // Preserve CSRF token before authentication
     $csrfToken = $request->session()->token();
 
-    // 1. Coba otentikasi standar dengan email asli
+    // 1. Otentikasi kredensial pengguna
     $attemptSuccess = Auth::attempt(['email' => $rawEmail, 'password' => $rawPassword]);
-
-    // 2. Fallback untuk super admin (toleransi variasi email & password bawaan)
-    if (! $attemptSuccess && in_array($lowerEmail, ['superadmin', 'super-admin', 'superadmin@uteparts.id', 'super-admin@uteparts.id', 'super-admin@uteparts.test'], true)) {
-        $superCandidate = User::whereIn('email', ['superadmin@uteparts.id', 'super-admin@uteparts.id'])->first();
-        if ($superCandidate) {
-            $allowedPasswords = ['Password123!', 'password123', 'password', 'Password123', 'admin', 'admin123', '12345678'];
-            if (in_array($rawPassword, $allowedPasswords, true)) {
-                $superCandidate->update(['password' => Hash::make($rawPassword)]);
-            }
-            $attemptSuccess = Auth::attempt(['email' => $superCandidate->email, 'password' => $rawPassword]);
-        }
-    }
 
     if (! $attemptSuccess) {
         return back()->withErrors(['email' => 'Email atau password salah']);
@@ -663,27 +651,27 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
     Route::get('/wms/po/{id}/print', function ($id) {
         $po = PurchaseOrder::with(['supplier', 'gudangTujuan.cabang', 'items.produk', 'items.skuVariant'])->findOrFail($id);
 
-        return view('wms.po-print', ['po' => $po]);
+        return view('modules.wms.po-print', ['po' => $po]);
     })->name('wms.po.print')->middleware('permission:wms.view');
 
     Route::get('/wms/po/{id}/print-penolakan', function ($id) {
         $po = PurchaseOrder::with(['supplier', 'gudangTujuan.cabang', 'items.produk', 'items.skuVariant'])->findOrFail($id);
 
-        return view('wms.po-print-penolakan', ['po' => $po]);
+        return view('modules.wms.po-print-penolakan', ['po' => $po]);
     })->name('wms.po.print-penolakan')->middleware('permission:wms.view');
 
     // Cetak Dokumen Bukti Penerimaan Barang (GRN) Setengah A4 (A5)
     Route::get('/wms/grn/{id}/print', function ($id) {
         $grn = Grn::with(['purchaseOrder.supplier', 'purchaseOrder.gudangTujuan.cabang', 'gudang.cabang', 'user'])->findOrFail($id);
 
-        return view('wms.grn-print', ['grn' => $grn]);
+        return view('modules.wms.grn-print', ['grn' => $grn]);
     })->name('wms.grn.print')->middleware('permission:wms.view');
 
     // Cetak Dokumen Surat Pengantar Retur Pembelian / Retur ke Supplier (A5/A4 Standar)
     Route::get('/wms/retur-pembelian/{id}/print', function ($id) {
         $retur = ReturnPembelian::with(['supplier', 'items.produk', 'gudang.cabang', 'user'])->findOrFail($id);
 
-        return view('wms.retur-pembelian-print', ['retur' => $retur]);
+        return view('modules.wms.retur-pembelian-print', ['retur' => $retur]);
     })->name('wms.retur-pembelian.print')->middleware('permission:wms.view');
 
     // Cetak Label Pengiriman Ekspedisi Pesanan Online (SOT Printer)

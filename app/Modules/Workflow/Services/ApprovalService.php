@@ -192,6 +192,11 @@ class ApprovalService
      */
     protected function selesaikanEntity(ApprovalRequest $request, string $status, int $actionedBy, ?string $catatan, array $options = []): void
     {
+        // [Phase 2 / T-07] Delegate to dynamic registry handler first if registered
+        if (app(ApprovalHandlerRegistry::class)->handle($request, $status, $actionedBy, $catatan, $options)) {
+            return;
+        }
+
         if ($request->entity_type === 'grn') {
             $grnService = app(GrnService::class);
 

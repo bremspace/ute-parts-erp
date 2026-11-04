@@ -1,5 +1,5 @@
 ---
-name: Ute Prism Enterprise
+name: Bremspace Prism Enterprise
 description: Precision high-density operational aesthetic and fluid touch commerce for multi-branch hardware retail & repair lifecycle
 colors:
   primary: "#4F46E5"
@@ -67,11 +67,11 @@ motion:
   dialog-duration: "200ms"
 ---
 
-# Design System: Ute Prism Enterprise
+# Design System: Bremspace Prism Enterprise
 
 ## 1. Filosofi & Karakter Visual
 
-**Ute Prism Enterprise** adalah sistem desain antarmuka berskala produksi untuk operasional toko fisik, teknisi reparasi, logistik, dan e-commerce suku cadang. Desain mengadopsi prinsip:
+**Bremspace Prism Enterprise** adalah sistem desain antarmuka berskala produksi untuk operasional toko fisik, teknisi reparasi, logistik, dan e-commerce suku cadang. Desain mengadopsi prinsip:
 - **Restrained Craft:** Menghindari elemen dekoratif berlebih. Blur dan material tembus cahaya diaplikasikan fungsional sebagai pembeda level kedalaman (elevation), bukan sekadar kosmetik.
 - **Physical Feel (Tactile):** Respon interaksi tombol dan dialog meniru mekanika hardware instan tanpa jeda perceptif.
 - **Data Densitas Tinggi Namun Teratur:** Backoffice memaksimalkan pemanfaatan ruang layar untuk efisiensi input, sementara Storefront memberikan ruang sentuh jempol (thumb-zone) yang lega.
@@ -132,7 +132,7 @@ motion:
 
 ---
 
-## 5. Komponen Standar Ute Prism Enterprise
+## 5. Komponen Standar Bremspace Prism Enterprise
 
 | Komponen | Spesifikasi Visual Dark Mode | Spesifikasi Visual Light Mode | Interaksi & State |
 | :--- | :--- | :--- | :--- |

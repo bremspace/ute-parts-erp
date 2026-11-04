@@ -55,7 +55,7 @@ class ProdukSatuanKonversi extends Model
      */
     public function getKeteranganKonversiAttribute(): string
     {
-        $base = $this->produk?->satuan ?: 'pcs';
+        $base = $this->relationLoaded('produk') ? ($this->produk?->satuan ?: 'pcs') : 'pcs';
         $pengaliFormat = (float) $this->pengali + 0;
         $faktorFormat = (float) $this->faktor_konversi + 0;
 

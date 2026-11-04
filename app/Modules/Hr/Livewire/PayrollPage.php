@@ -204,7 +204,10 @@ class PayrollPage extends Component
 
         $this->validate(['inputPeriodeBaru' => 'required|string|size:7|regex:/^\d{4}-\d{2}$/']);
 
-        $existing = PayrollPeriode::where('periode', $this->inputPeriodeBaru)->first();
+        $cabangId = currentCabangId();
+        $existing = PayrollPeriode::where('periode', $this->inputPeriodeBaru)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId), fn ($q) => $q->whereNull('cabang_id'))
+            ->first();
         if ($existing) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Periode sudah ada']);
             $this->periode = $this->inputPeriodeBaru;
@@ -215,6 +218,7 @@ class PayrollPage extends Component
         }
 
         PayrollPeriode::create([
+            'cabang_id' => $cabangId,
             'periode' => $this->inputPeriodeBaru,
             'tanggal_mulai' => $this->inputPeriodeBaru.'-01',
             'tanggal_selesai' => date('Y-m-t', strtotime($this->inputPeriodeBaru.'-01')),
@@ -237,7 +241,8 @@ class PayrollPage extends Component
         }
 
         try {
-            $result = app(PayrollService::class)->hitungDraft($this->periode);
+            $cabangId = $this->cabangFilter !== 'semua' ? (int) $this->cabangFilter : currentCabangId();
+            $result = app(PayrollService::class)->hitungDraft($this->periode, $cabangId);
             $this->loadSlips();
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Draft payroll periode '.$this->periode.' berhasil dihitung ('.$result['karyawan_diproses'].' karyawan)']);
         } catch (\Throwable $e) {
@@ -270,7 +275,8 @@ class PayrollPage extends Component
         }
 
         try {
-            $result = app(PayrollService::class)->ajukanApproval($this->periode, auth()->id());
+            $cabangId = $this->cabangFilter !== 'semua' ? (int) $this->cabangFilter : currentCabangId();
+            $result = app(PayrollService::class)->ajukanApproval($this->periode, auth()->id(), '', $cabangId);
 
             if ($result['needs_approval']) {
                 $this->showApproveModal = true;
@@ -286,7 +292,8 @@ class PayrollPage extends Component
     public function finalisasiDisetujui(): void
     {
         try {
-            $result = app(PayrollService::class)->finalisasiDisetujui($this->periode);
+            $cabangId = $this->cabangFilter !== 'semua' ? (int) $this->cabangFilter : currentCabangId();
+            $result = app(PayrollService::class)->finalisasiDisetujui($this->periode, $cabangId);
             $this->showApproveModal = false;
             $this->loadSlips();
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Payroll periode '.$this->periode.' disetujui. Jurnal: '.$result['no_jurnal']]);
@@ -320,7 +327,8 @@ class PayrollPage extends Component
         }
 
         try {
-            $result = app(PayrollService::class)->bayarPayroll($this->periode, $this->akunBayarKode ?: '110-01');
+            $cabangId = $this->cabangFilter !== 'semua' ? (int) $this->cabangFilter : currentCabangId();
+            $result = app(PayrollService::class)->bayarPayroll($this->periode, $this->akunBayarKode ?: '110-01', $cabangId);
             $this->loadSlips();
             $this->showBayarModal = false;
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Pembayaran payroll periode '.$this->periode.' berhasil. Jurnal: '.$result['no_jurnal']]);

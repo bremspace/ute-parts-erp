@@ -44,6 +44,10 @@ class PartaiPricingServiceTest extends TestCase
         $mockConfig->shouldReceive('hargaPartaiBerlakuUntuk')->andReturn('semua');
         $mockConfig->shouldReceive('hargaPartaiQtyDiskonPersen')->andReturn(5.0);
         $mockConfig->shouldReceive('hargaPartaiNominalDiskonPersen')->andReturn(0.0);
+        $mockConfig->shouldReceive('hargaPartaiTiersQty')->andReturn([
+            ['min_qty' => 10, 'diskon_persen' => 5.0],
+        ]);
+        $mockConfig->shouldReceive('hargaPartaiTiersNominal')->andReturn([]);
 
         $service = new PartaiPricingService($mockConfig);
         $items = [
@@ -67,6 +71,10 @@ class PartaiPricingServiceTest extends TestCase
         $mockConfig->shouldReceive('hargaPartaiBerlakuUntuk')->andReturn('semua');
         $mockConfig->shouldReceive('hargaPartaiQtyDiskonPersen')->andReturn(3.0);
         $mockConfig->shouldReceive('hargaPartaiNominalDiskonPersen')->andReturn(7.0);
+        $mockConfig->shouldReceive('hargaPartaiTiersQty')->andReturn([]);
+        $mockConfig->shouldReceive('hargaPartaiTiersNominal')->andReturn([
+            ['min_nominal' => 1000000.0, 'diskon_persen' => 7.0],
+        ]);
 
         $service = new PartaiPricingService($mockConfig);
         $items = [
@@ -90,6 +98,12 @@ class PartaiPricingServiceTest extends TestCase
         $mockConfig->shouldReceive('hargaPartaiBerlakuUntuk')->andReturn('semua');
         $mockConfig->shouldReceive('hargaPartaiQtyDiskonPersen')->andReturn(5.0);
         $mockConfig->shouldReceive('hargaPartaiNominalDiskonPersen')->andReturn(2.0);
+        $mockConfig->shouldReceive('hargaPartaiTiersQty')->andReturn([
+            ['min_qty' => 10, 'diskon_persen' => 5.0],
+        ]);
+        $mockConfig->shouldReceive('hargaPartaiTiersNominal')->andReturn([
+            ['min_nominal' => 1000000.0, 'diskon_persen' => 2.0],
+        ]);
 
         $service = new PartaiPricingService($mockConfig);
         $items = [
@@ -101,7 +115,7 @@ class PartaiPricingServiceTest extends TestCase
         $this->assertTrue($res['aktif']);
         $this->assertEquals(5.0, $res['persen']);
         $this->assertEquals(60000.0, $res['diskon_nominal']); // 5% of 1,200,000
-        $this->assertStringContainsString('+ Belanja Besar', $res['alasan']);
+        $this->assertStringContainsString('+ Belanja Rp 1.000.000', $res['alasan']);
     }
 
     public function test_respects_member_only_restriction(): void
@@ -113,6 +127,10 @@ class PartaiPricingServiceTest extends TestCase
         $mockConfig->shouldReceive('hargaPartaiBerlakuUntuk')->andReturn('member');
         $mockConfig->shouldReceive('hargaPartaiQtyDiskonPersen')->andReturn(4.0);
         $mockConfig->shouldReceive('hargaPartaiNominalDiskonPersen')->andReturn(0.0);
+        $mockConfig->shouldReceive('hargaPartaiTiersQty')->andReturn([
+            ['min_qty' => 5, 'diskon_persen' => 4.0],
+        ]);
+        $mockConfig->shouldReceive('hargaPartaiTiersNominal')->andReturn([]);
 
         $service = new PartaiPricingService($mockConfig);
         $items = [

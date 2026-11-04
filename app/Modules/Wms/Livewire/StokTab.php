@@ -232,6 +232,10 @@ class StokTab extends Component
         $userId = auth()->id();
         $fmt = $format === 'csv' ? 'csv' : 'xlsx';
 
+        $path = app(ExportLaporanService::class)->export(
+            'stok', null, null, $cabangId, null, $fmt, $userId
+        );
+
         dispatch(new ExportLaporanJob(
             jenis: 'stok',
             periodeDari: null,
@@ -240,6 +244,7 @@ class StokTab extends Component
             akunId: null,
             userId: $userId,
             format: $fmt,
+            existingPath: $path,
         ));
 
         $this->dispatch('alert', [
@@ -247,9 +252,6 @@ class StokTab extends Component
             'message' => 'Export stok selesai — berkas mulai diunduh.',
         ]);
 
-        $path = app(ExportLaporanService::class)->export(
-            'stok', null, null, $cabangId, null, $fmt, $userId
-        );
         $fullPath = Storage::disk('local')->path($path);
 
         return response()->download($fullPath, 'laporan-stok-'.now()->format('Ymd-His').'.'.$fmt);

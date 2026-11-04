@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\User;
+use App\Modules\Rbac\Models\Cabang;
+use App\Services\BranchContextManager;
 
 if (! function_exists('isSuperAdminOrOwner')) {
     /**
@@ -45,5 +47,25 @@ if (! function_exists('canSeeField')) {
         }
 
         return false;
+    }
+}
+
+if (! function_exists('currentCabangId')) {
+    /**
+     * Dapatkan ID cabang aktif saat ini dari BranchContextManager.
+     */
+    function currentCabangId(): ?int
+    {
+        return app(BranchContextManager::class)->getActiveCabangId();
+    }
+}
+
+if (! function_exists('currentCabang')) {
+    /**
+     * Dapatkan instance Model Cabang aktif saat ini.
+     */
+    function currentCabang(): ?Cabang
+    {
+        return app(BranchContextManager::class)->getActiveCabang();
     }
 }

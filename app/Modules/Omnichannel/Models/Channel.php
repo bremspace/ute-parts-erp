@@ -4,6 +4,7 @@ namespace App\Modules\Omnichannel\Models;
 
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -11,6 +12,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable([
     'nama', 'platform', 'status', 'kredensial', 'last_sync_at', 'last_sync_status', 'is_active',
 ])]
+#[Hidden(['kredensial'])]
 class Channel extends Model
 {
     use CatatAktivitas;

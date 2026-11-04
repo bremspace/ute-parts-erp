@@ -6,6 +6,7 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Marketplace\Services\OrderService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
@@ -76,6 +77,8 @@ class MarketplacePpnTest extends TestCase
         $this->pelanggan = Pelanggan::create([
             'nama' => 'Buyer PPN', 'telepon' => '081200000001', 'is_reseller' => false,
         ]);
+
+        app(KonfigurasiService::class)->set('harga_partai_aktif', 'false');
 
         config([
             'duitku.merchant_code' => 'TST001',

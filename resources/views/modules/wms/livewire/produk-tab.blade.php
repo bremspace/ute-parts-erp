@@ -1471,7 +1471,7 @@
                         $tierInfo = $this->resolveHargaTierProduk($p);
                         $isSelected = in_array($p->id, $selectedProdukIds, true);
                     @endphp
-                    <tr class="hover:bg-white/[0.02] transition-colors {{ $isSelected ? 'bg-up-primary/5' : '' }}">
+                    <tr wire:key="pt-row-{{ $p->id }}" class="hover:bg-white/[0.02] transition-colors {{ $isSelected ? 'bg-up-primary/5' : '' }}">
                         @if($visibleColumns['checkbox'] ?? true)
                             <td class="py-2.5 px-3 w-10 text-center">
                                 <input type="checkbox"
@@ -1503,13 +1503,55 @@
                                                 ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod));
                                         }
                                         $kompatibelListRow = $kompatibelListRow->unique()->values();
-                                        $kompatibelTextRow = $kompatibelListRow->isNotEmpty()
+                                        $countRowTipe = $kompatibelListRow->count();
+                                        $fullKompatibelTextRow = $kompatibelListRow->isNotEmpty()
                                             ? $kompatibelListRow->join(', ')
                                             : trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
                                     @endphp
-                                    <span class="block text-[10px] text-ink-400 mt-0.5 truncate" title="{{ $kompatibelTextRow ?: '-' }}">
-                                        <strong class="text-ink-700 dark:text-ink-200">{{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}</strong> · {{ $kompatibelTextRow ?: '-' }}
-                                    </span>
+
+                                    <div x-data="{ expandedKompatibel: false }" class="mt-0.5">
+                                        <div class="text-[10px] text-ink-400 leading-relaxed flex items-center gap-1.5 flex-wrap">
+                                            <strong class="text-ink-700 dark:text-ink-200">{{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}</strong>
+                                            @if($countRowTipe > 0)
+                                                <span class="text-ink-500">·</span>
+                                                <span class="inline-flex items-center gap-1 flex-wrap">
+                                                    @foreach($kompatibelListRow->take(5) as $thItem)
+                                                        <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-medium bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300">
+                                                            {{ $thItem }}
+                                                        </span>
+                                                    @endforeach
+
+                                                    @if($countRowTipe > 5)
+                                                        <button type="button"
+                                                                @click.stop="expandedKompatibel = !expandedKompatibel"
+                                                                class="inline-flex items-center gap-0.5 text-[9px] font-semibold text-up-primary hover:text-up-primary/80 transition-colors py-0.2 px-1.5 rounded-md bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/25 cursor-pointer">
+                                                            <span x-text="expandedKompatibel ? 'Tutup' : 'Lihat semua (+{{ $countRowTipe - 5 }})'"></span>
+                                                            <svg class="w-2.5 h-2.5 transition-transform duration-200" :class="expandedKompatibel ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </button>
+                                                    @endif
+                                                </span>
+                                            @else
+                                                <span class="text-ink-500 italic">· {{ trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? '')) ?: 'Universal' }}</span>
+                                            @endif
+                                        </div>
+
+                                        @if($countRowTipe > 5)
+                                            <div x-show="expandedKompatibel"
+                                                 x-cloak
+                                                 x-transition:enter="transition ease-out duration-150"
+                                                 x-transition:enter-start="opacity-0 -translate-y-1"
+                                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                                 class="flex flex-wrap gap-1 mt-1 p-1.5 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                                                @foreach($kompatibelListRow->slice(5) as $thItem)
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300">
+                                                        {{ $thItem }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
                                     <span class="flex gap-1 mt-1 flex-wrap items-center">
                                         @if(!empty($filterModelKompatibel) && strcasecmp((string)$p->model_kompatibel, (string)$filterModelKompatibel) !== 0)
                                             <span class="px-1.5 py-0.2 rounded bg-up-primary/20 border border-up-primary/40 text-[9px] font-bold text-up-primary" title="Produk ini kompatibel silang / substitusi untuk {{ $filterModelKompatibel }}">
@@ -1565,7 +1607,7 @@
                         @endif
 
                         @if($visibleColumns['kompatibilitas'] ?? false)
-                            <td class="py-2.5 px-3 text-xs min-w-[140px]">
+                            <td class="py-2.5 px-3 text-xs min-w-[160px] max-w-[280px]" x-data="{ expanded: false }">
                                 @php
                                     $allTipeHpList = collect();
                                     if ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
@@ -1578,23 +1620,63 @@
                                             ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod));
                                     }
                                     $allTipeHpList = $allTipeHpList->unique()->values();
+                                    $countTipe = $allTipeHpList->count();
                                     $fullTipeTooltip = $allTipeHpList->isNotEmpty()
                                         ? $allTipeHpList->join(', ')
                                         : trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
                                 @endphp
-                                <span class="font-medium text-ink-200 block truncate" title="{{ $fullTipeTooltip }}">{{ $fullTipeTooltip ?: '-' }}</span>
+
+                                <div class="flex items-center justify-between gap-1 mb-1">
+                                    <span class="font-medium text-ink-700 dark:text-ink-200 block truncate text-[11px]" title="{{ $fullTipeTooltip }}">
+                                        {{ $fullTipeTooltip ?: '-' }}
+                                    </span>
+                                    @if($countTipe > 5)
+                                        <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-ink-400 shrink-0" title="Total {{ $countTipe }} tipe kompatibel">
+                                            {{ $countTipe }} tipe
+                                        </span>
+                                    @endif
+                                </div>
+
                                 @if(!empty($filterModelKompatibel) && strcasecmp((string)$p->model_kompatibel, (string)$filterModelKompatibel) !== 0)
-                                    <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-up-primary/20 border border-up-primary/40 text-[9px] font-bold text-up-primary">
+                                    <span class="inline-block mb-1 px-1.5 py-0.2 rounded bg-up-primary/20 border border-up-primary/40 text-[9px] font-bold text-up-primary">
                                         Kompatibel {{ $filterModelKompatibel }}
                                     </span>
                                 @endif
+
                                 @if($allTipeHpList->isNotEmpty())
-                                    <div class="mt-1 flex flex-wrap gap-1" title="{{ $fullTipeTooltip }}">
-                                        @foreach($allTipeHpList as $thItem)
+                                    <div class="flex flex-wrap gap-1 items-center" title="{{ $fullTipeTooltip }}">
+                                        {{-- 5 tipe pertama --}}
+                                        @foreach($allTipeHpList->take(5) as $thItem)
                                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300">
                                                 {{ $thItem }}
                                             </span>
                                         @endforeach
+
+                                        {{-- Tipe 6 ke atas saat di-expand --}}
+                                        @if($countTipe > 5)
+                                            <div x-show="expanded"
+                                                 x-cloak
+                                                 x-transition:enter="transition ease-out duration-150"
+                                                 x-transition:enter-start="opacity-0 -translate-y-1"
+                                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                                 class="flex flex-wrap gap-1 w-full mt-1">
+                                                @foreach($allTipeHpList->slice(5) as $thItem)
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300">
+                                                        {{ $thItem }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+
+                                            {{-- Tombol Toggle Expand / Tutup --}}
+                                            <button type="button"
+                                                    @click.stop="expanded = !expanded"
+                                                    class="inline-flex items-center gap-1 text-[9px] font-semibold text-up-primary hover:text-up-primary/80 transition-colors py-0.5 px-2 rounded-md bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/25 cursor-pointer mt-0.5">
+                                                <span x-text="expanded ? 'Tutup' : 'Lihat semua (+{{ $countTipe - 5 }})'"></span>
+                                                <svg class="w-2.5 h-2.5 transition-transform duration-200" :class="expanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+                                        @endif
                                     </div>
                                 @endif
                             </td>
@@ -1880,7 +1962,7 @@
                         $stokTotal = $p->stokItems->sum('jumlah');
                         $skuPertama = $p->skuVariants->first()?->sku;
                     @endphp
-                    <div class="glass-panel p-4 rounded-2xl border border-white/5 hover:border-white/15 transition-[border-color,box-shadow] duration-140 flex flex-col justify-between group">
+                    <div wire:key="pt-card-{{ $p->id }}" class="glass-panel p-4 rounded-2xl border border-white/5 hover:border-white/15 transition-[border-color,box-shadow] duration-140 flex flex-col justify-between group">
                         <div class="space-y-3">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="w-14 h-14 rounded-xl overflow-hidden bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 shrink-0 flex items-center justify-center relative">
@@ -1942,26 +2024,72 @@
                             </div>
 
                             @php
-                                $kompatibelGrid = '';
+                                $kompatibelGridList = collect();
                                 if ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
-                                    $kompatibelGrid = $p->tipeHps->map(fn($t) => trim("{$t->merk} {$t->model}"))->filter()->unique()->implode(', ');
+                                    $kompatibelGridList = $p->tipeHps->map(fn($t) => trim("{$t->merk} {$t->model}"))->filter();
                                 } elseif (!empty($p->kompatibilitas_hp) && is_array($p->kompatibilitas_hp)) {
-                                    $kompatibelGrid = collect($p->kompatibilitas_hp)->map(fn($k) => trim(($k['merk'] ?? '').' '.($k['model'] ?? '')))->filter()->unique()->implode(', ');
+                                    $kompatibelGridList = collect($p->kompatibilitas_hp)->map(fn($k) => trim(($k['merk'] ?? '').' '.($k['model'] ?? '')))->filter();
                                 } elseif (!empty($p->model_kompatibel)) {
                                     $m = trim((string)($p->brand_kompatibel ?? ''));
-                                    $kompatibelGrid = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))))
-                                        ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod))->implode(', ');
+                                    $kompatibelGridList = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))))
+                                        ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod));
                                 } else {
-                                    $kompatibelGrid = trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
+                                    $fallback = trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
+                                    $kompatibelGridList = $fallback ? collect([$fallback]) : collect();
                                 }
+                                $kompatibelGridList = $kompatibelGridList->unique()->values();
+                                $countGrid = $kompatibelGridList->count();
+                                $kompatibelGridText = $kompatibelGridList->isNotEmpty() ? $kompatibelGridList->implode(', ') : 'Universal';
                             @endphp
-                            <div class="px-2.5 py-2 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] flex items-center justify-between gap-2">
-                                <span class="text-ink-400 text-[10px] uppercase font-semibold shrink-0 flex items-center gap-1">
-                                    <span>📱</span> Kompatibel:
-                                </span>
-                                <span class="text-ink-200 font-medium truncate text-right text-[11px]" title="{{ $kompatibelGrid ?: 'Universal / Semua' }}">
-                                    {{ $kompatibelGrid ?: 'Universal' }}
-                                </span>
+                            <div class="px-2.5 py-2 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] space-y-1.5" x-data="{ expanded: false }">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-ink-400 text-[10px] uppercase font-semibold shrink-0 flex items-center gap-1">
+                                        <span>📱</span> Kompatibel:
+                                    </span>
+                                    @if($countGrid > 0)
+                                        <span class="text-ink-400 text-[10px] font-mono">
+                                            {{ $countGrid }} tipe
+                                        </span>
+                                    @else
+                                        <span class="text-ink-400 text-[11px] italic">Universal</span>
+                                    @endif
+                                </div>
+
+                                @if($countGrid > 0)
+                                    <div class="flex flex-wrap gap-1 items-center" title="{{ $kompatibelGridText }}">
+                                        {{-- 5 tipe pertama --}}
+                                        @foreach($kompatibelGridList->take(5) as $thItem)
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300">
+                                                {{ $thItem }}
+                                            </span>
+                                        @endforeach
+
+                                        {{-- Sisa tipe saat expand --}}
+                                        @if($countGrid > 5)
+                                            <div x-show="expanded"
+                                                 x-cloak
+                                                 x-transition:enter="transition ease-out duration-150"
+                                                 x-transition:enter-start="opacity-0 -translate-y-1"
+                                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                                 class="flex flex-wrap gap-1 w-full mt-1">
+                                                @foreach($kompatibelGridList->slice(5) as $thItem)
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300">
+                                                        {{ $thItem }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+
+                                            <button type="button"
+                                                    @click.stop="expanded = !expanded"
+                                                    class="inline-flex items-center gap-1 text-[9px] font-semibold text-up-primary hover:text-up-primary/80 transition-colors py-0.5 px-2 rounded-md bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/25 cursor-pointer mt-0.5">
+                                                <span x-text="expanded ? 'Tutup' : 'Lihat semua (+{{ $countGrid - 5 }})'"></span>
+                                                <svg class="w-2.5 h-2.5 transition-transform duration-200" :class="expanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+                                        @endif
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs">

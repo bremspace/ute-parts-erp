@@ -4,6 +4,7 @@ namespace App\Modules\Akunting\Jobs;
 
 use App\Modules\Akunting\Services\DepresiasiService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Services\BranchContextManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -47,7 +48,10 @@ class DepresiasiAsetJob implements ShouldQueue
         // Default: bulan sebelumnya (jadwal monthlyOn tgl 1 → proses bulan lalu)
         $periode = $this->periode ?? now()->startOfMonth()->subMonth()->format('Y-m');
 
-        $hasil = $service->prosesPeriode($periode, $this->cabangId);
+        $runner = fn () => $service->prosesPeriode($periode, $this->cabangId);
+        $hasil = $this->cabangId
+            ? app(BranchContextManager::class)->runInBranchContext($this->cabangId, $runner)
+            : $runner();
 
         if ($hasil['diproses'] > 0) {
             $notifikasi->kirim(

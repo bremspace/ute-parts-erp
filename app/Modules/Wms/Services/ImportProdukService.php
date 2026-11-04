@@ -982,6 +982,528 @@ class ImportProdukService
         return $rakBaru->id;
     }
 
+    public function colLetterToIndex(string $col): int
+    {
+        $col = strtoupper(trim($col));
+        $len = strlen($col);
+        $idx = 0;
+        for ($i = 0; $i < $len; $i++) {
+            $idx = $idx * 26 + (ord($col[$i]) - ord('A') + 1);
+        }
+
+        return $idx - 1;
+    }
+
+    public function indexToColLetter(int $idx): string
+    {
+        $letter = '';
+        while ($idx >= 0) {
+            $letter = chr(($idx % 26) + ord('A')).$letter;
+            $idx = intdiv($idx, 26) - 1;
+        }
+
+        return $letter;
+    }
+
+    /**
+     * Daftar seluruh kolom Master Produk yang didukung oleh sistem untuk pemetaan (custom mapping).
+     *
+     * @return array<string, array{label: string, required: bool, description: string, group: string}>
+     */
+    public function getMappableSystemColumns(): array
+    {
+        return [
+            'sku' => [
+                'label' => 'Kode SKU / Part Number',
+                'required' => true,
+                'description' => 'Kode unik produk. Jika tidak dipetakan, sistem akan membuatkan SKU otomatis.',
+                'group' => 'Identitas Produk',
+            ],
+            'nama' => [
+                'label' => 'Nama Produk / Sparepart',
+                'required' => true,
+                'description' => 'Nama lengkap produk yang akan ditampilkan di katalog, POS, dan nota.',
+                'group' => 'Identitas Produk',
+            ],
+            'harga_jual' => [
+                'label' => 'Harga Jual (Retail / Eceran)',
+                'required' => true,
+                'description' => 'Harga jual standar kasir/POS untuk pelanggan umum.',
+                'group' => 'Harga & Nilai',
+            ],
+            'harga_beli' => [
+                'label' => 'Harga Beli (Modal / HPP)',
+                'required' => false,
+                'description' => 'Harga pokok modal pembelian dari supplier/distributor.',
+                'group' => 'Harga & Nilai',
+            ],
+            'harga_reseller' => [
+                'label' => 'Harga Reseller',
+                'required' => false,
+                'description' => 'Harga khusus untuk tier reseller/bengkel mitra.',
+                'group' => 'Harga & Nilai',
+            ],
+            'harga_agen' => [
+                'label' => 'Harga Agen / Grosir',
+                'required' => false,
+                'description' => 'Harga khusus untuk pelanggan tier agen/distributor partai besar.',
+                'group' => 'Harga & Nilai',
+            ],
+            'stok_awal' => [
+                'label' => 'Stok Awal (Saldo Awal)',
+                'required' => false,
+                'description' => 'Jumlah stok awal fisik saat inisialisasi master produk.',
+                'group' => 'Stok & Lokasi',
+            ],
+            'satuan' => [
+                'label' => 'Satuan Unit (UOM)',
+                'required' => false,
+                'description' => 'Satuan dasar produk (pcs, box, unit, set). Default: pcs.',
+                'group' => 'Identitas Produk',
+            ],
+            'barcode_1' => [
+                'label' => 'Barcode Utama',
+                'required' => false,
+                'description' => 'Nomor barcode utama yang tercetak pada kemasan produk.',
+                'group' => 'Barcode',
+            ],
+            'barcode_2' => [
+                'label' => 'Barcode 2 (Alternatif)',
+                'required' => false,
+                'description' => 'Barcode sekunder atau kode supplier.',
+                'group' => 'Barcode',
+            ],
+            'barcode_3' => [
+                'label' => 'Barcode 3',
+                'required' => false,
+                'description' => 'Barcode tambahan ketiga.',
+                'group' => 'Barcode',
+            ],
+            'multi_barcode' => [
+                'label' => 'Multi Barcode (Pisahkan Koma)',
+                'required' => false,
+                'description' => 'Daftar barcode alternatif dipisahkan dengan koma.',
+                'group' => 'Barcode',
+            ],
+            'kategori' => [
+                'label' => 'Kategori Produk',
+                'required' => false,
+                'description' => 'Kategori utama sparepart (LCD, Baterai, Flexible, dll). Default: Umum.',
+                'group' => 'Kategori & Brand',
+            ],
+            'sub_kategori' => [
+                'label' => 'Sub Kategori',
+                'required' => false,
+                'description' => 'Sub kategori spesifik produk.',
+                'group' => 'Kategori & Brand',
+            ],
+            'brand' => [
+                'label' => 'Brand / Merk Produk',
+                'required' => false,
+                'description' => 'Merk sparepart (Crown, OG, Shine Star, dll).',
+                'group' => 'Kategori & Brand',
+            ],
+            'kualitas' => [
+                'label' => 'Kualitas / Grade',
+                'required' => false,
+                'description' => 'Tingkat kualitas part (Original, OEM, Grade A, Incell).',
+                'group' => 'Kategori & Brand',
+            ],
+            'kondisi' => [
+                'label' => 'Kondisi Produk',
+                'required' => false,
+                'description' => 'Status kondisi: baru, bekas, ref, atau oem. Default: baru.',
+                'group' => 'Kategori & Brand',
+            ],
+            'supplier' => [
+                'label' => 'Supplier / Pemasok',
+                'required' => false,
+                'description' => 'Nama supplier asal barang.',
+                'group' => 'Kategori & Brand',
+            ],
+            'merk_hp' => [
+                'label' => 'Merk Ponsel / Smartphone',
+                'required' => false,
+                'description' => 'Merk device kompatibel (Apple, Samsung, Xiaomi, Oppo, dll).',
+                'group' => 'Kompatibilitas Smartphone',
+            ],
+            'tipe_hp' => [
+                'label' => 'Tipe / Model HP Kompatibel',
+                'required' => false,
+                'description' => 'Model smartphone (cth: iPhone 13, iPhone 14 Pro Max, A54).',
+                'group' => 'Kompatibilitas Smartphone',
+            ],
+            'kompatibilitas_hp' => [
+                'label' => 'Kompatibilitas HP Bebas',
+                'required' => false,
+                'description' => 'Teks bebas model atau catatan kompabilitas perangkat.',
+                'group' => 'Kompatibilitas Smartphone',
+            ],
+            'produk_kompatibel_sku' => [
+                'label' => 'Produk Kompatibel (Cross-SKU)',
+                'required' => false,
+                'description' => 'SKU produk lain yang kompatibel atau dapat saling menggantikan.',
+                'group' => 'Kompatibilitas Smartphone',
+            ],
+            'min_stock' => [
+                'label' => 'Stok Minimum (Alert)',
+                'required' => false,
+                'description' => 'Batas minimum persediaan untuk memicu notifikasi restock.',
+                'group' => 'Stok & Lokasi',
+            ],
+            'reorder_point' => [
+                'label' => 'Reorder Point (ROP)',
+                'required' => false,
+                'description' => 'Titik kuantitas untuk segera melakukan pemesanan ulang ke supplier.',
+                'group' => 'Stok & Lokasi',
+            ],
+            'gudang' => [
+                'label' => 'Gudang Penyimpanan',
+                'required' => false,
+                'description' => 'Nama atau kode gudang penyimpanan.',
+                'group' => 'Stok & Lokasi',
+            ],
+            'rak' => [
+                'label' => 'Lokasi Rak / Bin',
+                'required' => false,
+                'description' => 'Nama atau nomor rak/bin lokasi penyimpanan fisik.',
+                'group' => 'Stok & Lokasi',
+            ],
+            'sn' => [
+                'label' => 'Lacak Serial Number (SN)',
+                'required' => false,
+                'description' => 'Apakah produk memerlukan pelacakan nomor seri unik (ya / tidak).',
+                'group' => 'Stok & Lokasi',
+            ],
+            'konversi_satuan' => [
+                'label' => 'Konversi Satuan Bertingkat',
+                'required' => false,
+                'description' => 'Multi satuan bertingkat (contoh: box:10:120000;pack:5:62000).',
+                'group' => 'Identitas Produk',
+            ],
+            'deskripsi' => [
+                'label' => 'Deskripsi / Keterangan',
+                'required' => false,
+                'description' => 'Keterangan lengkap atau spesifikasi teknis barang.',
+                'group' => 'Lainnya',
+            ],
+            'foto_url' => [
+                'label' => 'URL Foto Produk',
+                'required' => false,
+                'description' => 'Tautan gambar atau foto produk online.',
+                'group' => 'Lainnya',
+            ],
+        ];
+    }
+
+    /**
+     * Rekomendasi otomatis kolom sistem berdasarkan header yang terbaca dari file yang di-upload.
+     */
+    public function suggestSystemField(string $heading): string
+    {
+        $clean = strtolower(trim($heading));
+        $clean = preg_replace('/\s*\(.*?\)\s*/', '', $clean) ?? $clean;
+        $clean = preg_replace('/[^a-z0-9\s_-]/', '', $clean) ?? $clean;
+        $norm = preg_replace('/[\s_-]+/', '_', trim($clean)) ?? '';
+
+        $normalized = $this->normalizeImportHeading($heading);
+        $mappable = array_keys($this->getMappableSystemColumns());
+
+        if (in_array($normalized, $mappable, true)) {
+            return $normalized;
+        }
+
+        return match (true) {
+            str_contains($norm, 'sku') || str_contains($norm, 'part_no') || str_contains($norm, 'part_num') || str_contains($norm, 'kd_brg') || str_contains($norm, 'kdbrg') || str_contains($norm, 'kd_item') || str_contains($norm, 'kditem') || str_contains($norm, 'kd_produk') || str_contains($norm, 'kdproduk') || $norm === 'kode' || $norm === 'code' || $norm === 'item_code' || $norm === 'kode_barang' || $norm === 'kode_item' || $norm === 'kode_produk' || $norm === 'part_number' => 'sku',
+            str_contains($norm, 'nama') || str_contains($norm, 'nm_brg') || str_contains($norm, 'product_name') || str_contains($norm, 'item_name') || str_contains($norm, 'deskripsi_barang') || str_contains($norm, 'nama_barang') || str_contains($norm, 'nama_item') || str_contains($norm, 'nama_produk') || str_contains($norm, 'sparepart') => 'nama',
+            str_contains($norm, 'hjual') || str_contains($norm, 'h_jual') || str_contains($norm, 'jual') || str_contains($norm, 'sell') || str_contains($norm, 'retail') || str_contains($norm, 'eceran') || $norm === 'harga' || $norm === 'price' => 'harga_jual',
+            str_contains($norm, 'hbeli') || str_contains($norm, 'h_beli') || str_contains($norm, 'modal') || str_contains($norm, 'hpp') || str_contains($norm, 'cost') || str_contains($norm, 'beli') || str_contains($norm, 'pokok') || str_contains($norm, 'kulakan') => 'harga_beli',
+            str_contains($norm, 'reseller') || str_contains($norm, 'grosir') => 'harga_reseller',
+            str_contains($norm, 'agen') || str_contains($norm, 'distributor') => 'harga_agen',
+            str_contains($norm, 'stok') || str_contains($norm, 'stock') || str_contains($norm, 'qty') || str_contains($norm, 'jumlah') || str_contains($norm, 'saldo_awal') || str_contains($norm, 'kuantitas') => 'stok_awal',
+            str_contains($norm, 'barcode_1') || $norm === 'barcode' || $norm === 'ean' || $norm === 'upc' || str_contains($norm, 'kode_bar') => 'barcode_1',
+            str_contains($norm, 'barcode_2') => 'barcode_2',
+            str_contains($norm, 'barcode_3') => 'barcode_3',
+            str_contains($norm, 'multi_barcode') || str_contains($norm, 'barcode_alt') => 'multi_barcode',
+            str_contains($norm, 'satuan') || str_contains($norm, 'uom') || $norm === 'unit' => 'satuan',
+            str_contains($norm, 'sub_kat') || str_contains($norm, 'subkat') || str_contains($norm, 'sub_cat') => 'sub_kategori',
+            str_contains($norm, 'kategori') || str_contains($norm, 'category') || str_contains($norm, 'kelompok') || str_contains($norm, 'golongan') => 'kategori',
+            str_contains($norm, 'brand_hp') || str_contains($norm, 'merk_hp') || str_contains($norm, 'merek_hp') => 'merk_hp',
+            str_contains($norm, 'brand') || str_contains($norm, 'merk') || str_contains($norm, 'merek') => 'brand',
+            str_contains($norm, 'kualitas') || str_contains($norm, 'grade') || str_contains($norm, 'quality') => 'kualitas',
+            str_contains($norm, 'kondisi') || str_contains($norm, 'condition') => 'kondisi',
+            str_contains($norm, 'supplier') || str_contains($norm, 'pemasok') || str_contains($norm, 'vendor') => 'supplier',
+            str_contains($norm, 'tipe_hp') || str_contains($norm, 'model_hp') || str_contains($norm, 'kompatibel') || str_contains($norm, 'device_model') || $norm === 'tipe' || $norm === 'model' => 'tipe_hp',
+            str_contains($norm, 'gudang') || str_contains($norm, 'warehouse') => 'gudang',
+            str_contains($norm, 'rak') || str_contains($norm, 'bin') || str_contains($norm, 'shelf') => 'rak',
+            str_contains($norm, 'min_st') || str_contains($norm, 'stok_min') || str_contains($norm, 'min_qty') => 'min_stock',
+            str_contains($norm, 'rop') || str_contains($norm, 'reorder') => 'reorder_point',
+            str_contains($norm, 'sn') || str_contains($norm, 'serial') => 'sn',
+            str_contains($norm, 'deskripsi') || str_contains($norm, 'keterangan') || str_contains($norm, 'catatan') || str_contains($norm, 'notes') || str_contains($norm, 'description') => 'deskripsi',
+            str_contains($norm, 'foto') || str_contains($norm, 'gambar') || str_contains($norm, 'image') => 'foto_url',
+            default => '',
+        };
+    }
+
+    /**
+     * Memeriksa apakah file yang di-upload adalah template bawaan sistem.
+     * Jika BUKAN template bawaan, maka fitur Custom Import akan aktif.
+     */
+    public function isTemplateBawaan(array $rawHeadings): bool
+    {
+        if (empty($rawHeadings)) {
+            return false;
+        }
+
+        $templateColumns = $this->templateColumns();
+        $normalizedHeadings = array_map(fn ($h) => $this->normalizeImportHeading((string) $h), $rawHeadings);
+
+        $wajib = ['sku', 'nama', 'harga_jual'];
+        if (count(array_intersect($normalizedHeadings, $wajib)) < 3) {
+            return false;
+        }
+
+        $first3 = array_slice($normalizedHeadings, 0, 3);
+        if (! isset($first3[0], $first3[1]) || $first3[0] !== 'sku' || $first3[1] !== 'nama') {
+            return false;
+        }
+
+        $matchCount = count(array_intersect($normalizedHeadings, $templateColumns));
+        $ratio = $matchCount / max(1, count($normalizedHeadings));
+
+        return $matchCount >= 10 && $ratio >= 0.6;
+    }
+
+    /**
+     * Menginspeksi struktur file yang di-upload (header dan sampel nilai baris pertama).
+     * Digunakan oleh Livewire untuk mendeteksi apakah file template bawaan atau bukan.
+     */
+    public function inspectFile(string $filePath): array
+    {
+        $filePath = $this->resolveFilePath($filePath);
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+        if (in_array($ext, ['csv', 'txt'], true)) {
+            return $this->inspectCsvFile($filePath);
+        }
+
+        return $this->inspectXlsxFile($filePath);
+    }
+
+    protected function inspectCsvFile(string $filePath): array
+    {
+        $handle = fopen($filePath, 'r');
+        if ($handle === false) {
+            throw new \Exception('Tidak dapat membuka file CSV: '.$filePath);
+        }
+
+        $sampel = '';
+        $headerLine = '';
+        $nomor = 0;
+        while ($nomor < 10 && ($baris = fgets($handle)) !== false) {
+            if ($nomor === 0) {
+                $headerLine = $baris;
+            } else {
+                $sampel .= $baris;
+            }
+            $nomor++;
+        }
+        if (substr_count($sampel, ';') + substr_count($sampel, ',') === 0) {
+            $sampel = $headerLine;
+        }
+        $delimiter = substr_count($sampel, ';') >= substr_count($sampel, ',') ? ';' : ',';
+        rewind($handle);
+
+        $rawHeadings = [];
+        $sampleRows = [];
+        $lineIdx = 0;
+        while (($data = fgetcsv($handle, 0, $delimiter)) !== false && $lineIdx < 5) {
+            if ($lineIdx === 0) {
+                if (isset($data[0])) {
+                    $data[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $data[0]) ?? $data[0];
+                }
+                $rawHeadings = $data;
+            } else {
+                if (count(array_filter($data, fn ($v) => $v !== '' && $v !== null)) > 0) {
+                    $sampleRows[] = $data;
+                }
+            }
+            $lineIdx++;
+        }
+        fclose($handle);
+
+        return $this->buildInspectionResult($rawHeadings, $sampleRows);
+    }
+
+    protected function inspectXlsxFile(string $filePath): array
+    {
+        try {
+            $zip = new ZipArchive;
+            if ($zip->open($filePath) === true) {
+                $sharedStrings = [];
+                $sharedContent = $zip->getFromName('xl/sharedStrings.xml');
+                if ($sharedContent !== false) {
+                    $sReader = new XMLReader;
+                    $sReader->XML($sharedContent);
+                    while ($sReader->read()) {
+                        if ($sReader->nodeType === XMLReader::ELEMENT && $sReader->name === 'si') {
+                            $outer = $sReader->readOuterXml();
+                            $xml = simplexml_load_string($outer);
+                            if ($xml !== false) {
+                                if (isset($xml->t)) {
+                                    $sharedStrings[] = (string) $xml->t;
+                                } elseif (isset($xml->r)) {
+                                    $text = '';
+                                    foreach ($xml->r as $r) {
+                                        $text .= (string) $r->t;
+                                    }
+                                    $sharedStrings[] = $text;
+                                } else {
+                                    $sharedStrings[] = '';
+                                }
+                            }
+                        }
+                    }
+                    $sReader->close();
+                }
+
+                $sheetCandidates = ['xl/worksheets/sheet1.xml'];
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $stat = $zip->statIndex($i);
+                    if (preg_match('#^xl/worksheets/sheet\d+\.xml$#', $stat['name']) && ! in_array($stat['name'], $sheetCandidates, true)) {
+                        $sheetCandidates[] = $stat['name'];
+                    }
+                }
+
+                foreach ($sheetCandidates as $candidateName) {
+                    $content = $zip->getFromName($candidateName);
+                    if ($content === false) {
+                        continue;
+                    }
+
+                    $reader = new XMLReader;
+                    $reader->XML($content);
+                    $rawHeadings = [];
+                    $sampleRows = [];
+                    $rowNum = 0;
+
+                    while ($reader->read()) {
+                        if ($reader->nodeType === XMLReader::ELEMENT && $reader->name === 'row') {
+                            $rowXml = $reader->readOuterXml();
+                            $cells = $this->parseRowCells($rowXml, $sharedStrings);
+                            if ($rowNum === 0) {
+                                $rawHeadings = $cells;
+                            } elseif (! empty($cells) && count($sampleRows) < 3) {
+                                $sampleRows[] = $cells;
+                            }
+                            $rowNum++;
+                            if ($rowNum >= 6) {
+                                break;
+                            }
+                        }
+                    }
+                    $reader->close();
+
+                    if (! empty($rawHeadings)) {
+                        $zip->close();
+
+                        return $this->buildInspectionResult($rawHeadings, $sampleRows);
+                    }
+                }
+                $zip->close();
+            }
+        } catch (\Throwable $e) {
+            Log::info('inspectXlsxFile fast parser fallback: '.$e->getMessage());
+        }
+
+        $sheets = Excel::toCollection(null, $filePath, null, ExcelReader::XLSX);
+        $first = $sheets->first() ?? collect();
+        $rawHeadings = [];
+        $sampleRows = [];
+        foreach ($first->take(4) as $idx => $row) {
+            $arr = is_array($row) ? $row : (method_exists($row, 'toArray') ? $row->toArray() : (array) $row);
+            if ($idx === 0) {
+                $rawHeadings = $arr;
+            } else {
+                $sampleRows[] = $arr;
+            }
+        }
+
+        return $this->buildInspectionResult($rawHeadings, $sampleRows);
+    }
+
+    protected function buildInspectionResult(array $rawHeadings, array $sampleRows): array
+    {
+        $headings = [];
+        $colIndex = 0;
+        $rawList = [];
+
+        foreach ($rawHeadings as $key => $headingVal) {
+            $rawName = trim((string) $headingVal);
+            $colLetter = is_string($key) && preg_match('/^[A-Z]+$/', $key) ? $key : $this->indexToColLetter($colIndex);
+            $rawList[] = $rawName;
+
+            $samples = [];
+            foreach ($sampleRows as $sr) {
+                $val = $sr[$key] ?? $sr[$colIndex] ?? null;
+                if ($val !== null && $val !== '') {
+                    $strVal = is_scalar($val) ? trim((string) $val) : '';
+                    if ($strVal !== '' && ! in_array($strVal, $samples, true)) {
+                        $samples[] = Str::limit($strVal, 40);
+                    }
+                }
+            }
+
+            $suggested = $this->suggestSystemField($rawName);
+
+            $headings[] = [
+                'index' => $colIndex,
+                'col_letter' => $colLetter,
+                'key' => 'col_'.$colIndex,
+                'raw_name' => $rawName !== '' ? $rawName : ('Kolom '.$colLetter),
+                'sample_values' => $samples,
+                'suggested_mapping' => $suggested,
+            ];
+
+            $colIndex++;
+        }
+
+        $isTemplate = $this->isTemplateBawaan($rawList);
+
+        return [
+            'is_template' => $isTemplate,
+            'headings' => $headings,
+            'total_columns' => count($headings),
+            'sample_count' => count($sampleRows),
+        ];
+    }
+
+    /**
+     * Resolusi kolom file ke field master produk sistem berdasarkan mapping yang dipilih user.
+     * Kolom yang tidak dipetakan / bernilai kosong / abaikan akan menghasilkan null.
+     */
+    public function resolveTargetField(array $columnMapping, string $colLetter, int $colIndex, string $rawHeading): ?string
+    {
+        $key = 'col_'.$colIndex;
+        $target = $columnMapping[$key]
+            ?? $columnMapping[$colLetter]
+            ?? $columnMapping[$colIndex]
+            ?? $columnMapping[$rawHeading]
+            ?? $columnMapping[$this->normalizeImportHeading($rawHeading)]
+            ?? null;
+
+        if ($target === null) {
+            return null;
+        }
+
+        $target = trim((string) $target);
+        if ($target === '' || in_array(strtolower($target), ['abaikan', 'skip', 'ignore', 'none', '-'], true)) {
+            return null;
+        }
+
+        return $target;
+    }
+
     /** Kolom template (urutan = heading export). */
     public function templateColumns(): array
     {
@@ -1071,10 +1593,11 @@ class ImportProdukService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function parseRows(string $filePath): array
+    public function parseRows(string $filePath, array $columnMapping = []): array
     {
-        @ini_set('memory_limit', '512M');
-        @set_time_limit(0);
+        // Enforce lightweight streaming memory limit (bounded to 64MB)
+        @ini_set('memory_limit', '64M');
+        @set_time_limit(120);
 
         $filePath = $this->resolveFilePath($filePath);
 
@@ -1082,11 +1605,11 @@ class ImportProdukService
         // xlsx/xls → Fast streaming XMLReader dahulu, fallback ke PhpSpreadsheet jika format tidak standar.
         $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
         if (in_array($ext, ['csv', 'txt'], true)) {
-            return $this->parseRowsCsv($filePath);
+            return $this->parseRowsCsv($filePath, $columnMapping);
         }
 
         try {
-            return $this->parseRowsXlsxFast($filePath);
+            return $this->parseRowsXlsxFast($filePath, $columnMapping);
         } catch (\Throwable $fastErr) {
             Log::info('Fast XLSX parser fallback to PhpSpreadsheet: '.$fastErr->getMessage());
         }
@@ -1094,38 +1617,68 @@ class ImportProdukService
         $sheets = Excel::toCollection(null, $filePath, null, ExcelReader::XLSX);
         $first = $sheets->first() ?? collect();
 
-        $headings = [];
+        $rawHeadings = [];
         $rowPertama = $first->first();
         if ($rowPertama) {
             $arr = is_array($rowPertama) ? $rowPertama : (method_exists($rowPertama, 'toArray') ? $rowPertama->toArray() : (array) $rowPertama);
-            foreach ($arr as $value) {
-                $headings[] = $this->normalizeImportHeading((string) $value);
-            }
+            $rawHeadings = array_values($arr);
         }
 
-        $wajib = ['sku', 'nama', 'harga_jual'];
-        $ada = array_intersect($headings, $wajib);
-        if (count($ada) < count($wajib)) {
-            throw new \Exception(
-                'Format kolom tidak dikenali. Baris 1 harus berisi header: sku, nama, satuan, harga_beli, harga_jual, ... (unduh template untuk contoh).'
-            );
+        $hasCustomMapping = ! empty(array_filter($columnMapping, fn ($v) => $v !== '' && $v !== null && $v !== 'abaikan'));
+
+        if (! $hasCustomMapping) {
+            $headings = array_map(fn ($h) => $this->normalizeImportHeading((string) $h), $rawHeadings);
+            $wajib = ['sku', 'nama', 'harga_jual'];
+            $ada = array_intersect($headings, $wajib);
+            if (count($ada) < count($wajib)) {
+                throw new \Exception(
+                    'Format kolom tidak dikenali. Baris 1 harus berisi header: sku, nama, satuan, harga_beli, harga_jual, ... (unduh template untuk contoh).'
+                );
+            }
         }
 
         $rows = [];
         foreach ($first->slice(1) as $row) {
             $normalized = [];
             $rowArr = is_array($row) ? $row : (method_exists($row, 'toArray') ? $row->toArray() : (array) $row);
-            foreach ($headings as $i => $heading) {
-                if ($heading === '') {
-                    continue;
+            $hasVal = false;
+
+            if ($hasCustomMapping) {
+                foreach ($rowArr as $i => $value) {
+                    $rawHead = (string) ($rawHeadings[$i] ?? '');
+                    $colLetter = $this->indexToColLetter((int) $i);
+                    $targetField = $this->resolveTargetField($columnMapping, $colLetter, (int) $i, $rawHead);
+                    if ($targetField) {
+                        $val = is_scalar($value) ? trim((string) $value) : $value;
+                        if ($val !== '' && $val !== null) {
+                            $hasVal = true;
+                        }
+                        $normalized[$targetField] = $val;
+                    }
                 }
-                $value = $rowArr[$i] ?? null;
-                $normalized[$heading] = is_scalar($value) ? trim((string) $value) : $value;
+            } else {
+                foreach ($headings as $i => $heading) {
+                    if ($heading === '') {
+                        continue;
+                    }
+                    $value = $rowArr[$i] ?? null;
+                    if ($value !== '' && $value !== null) {
+                        $hasVal = true;
+                    }
+                    $normalized[$heading] = is_scalar($value) ? trim((string) $value) : $value;
+                }
             }
+
             // Baris kosong total → skip
-            if (count(array_filter($normalized, fn ($v) => $v !== '' && $v !== null)) === 0) {
+            if (! $hasVal) {
                 continue;
             }
+
+            if ($hasCustomMapping && empty($normalized['sku']) && ! empty($normalized['nama'])) {
+                $dummy = [];
+                $normalized['sku'] = $this->generateFallbackSku($normalized['nama'], $dummy);
+            }
+
             $rows[] = $normalized;
         }
 
@@ -1141,7 +1694,7 @@ class ImportProdukService
      *
      * @return array<int, array<string, mixed>>
      */
-    protected function parseRowsXlsxFast(string $filePath): array
+    protected function parseRowsXlsxFast(string $filePath, array $columnMapping = []): array
     {
         $zip = new ZipArchive;
         if ($zip->open($filePath) !== true) {
@@ -1178,7 +1731,7 @@ class ImportProdukService
             $sReader->close();
         }
 
-        // 2. Cari sheet data yang memiliki kolom wajib
+        // 2. Cari sheet data
         $sheetCandidates = ['xl/worksheets/sheet1.xml'];
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $stat = $zip->statIndex($i);
@@ -1187,6 +1740,7 @@ class ImportProdukService
             }
         }
 
+        $hasCustomMapping = ! empty(array_filter($columnMapping, fn ($v) => $v !== '' && $v !== null && $v !== 'abaikan'));
         $wajib = ['sku', 'nama', 'harga_jual'];
         $selectedHeaders = null;
         $selectedSheetContent = null;
@@ -1206,25 +1760,56 @@ class ImportProdukService
                     $rowXml = $testReader->readOuterXml();
                     $cells = $this->parseRowCells($rowXml, $sharedStrings);
                     foreach ($cells as $colLetter => $val) {
-                        $candidateHeaders[$colLetter] = $this->normalizeImportHeading((string) $val);
+                        $candidateHeaders[$colLetter] = (string) $val;
                     }
                     break;
                 }
             }
             $testReader->close();
 
-            $ada = array_intersect(array_values($candidateHeaders), $wajib);
-            if (count($ada) >= count($wajib)) {
-                $selectedHeaders = $candidateHeaders;
-                $selectedSheetContent = $content;
-                break;
+            if ($hasCustomMapping) {
+                if (! empty($candidateHeaders)) {
+                    $selectedHeaders = $candidateHeaders;
+                    $selectedSheetContent = $content;
+                    break;
+                }
+            } else {
+                $candidateNorm = array_map(fn ($h) => $this->normalizeImportHeading((string) $h), $candidateHeaders);
+                $ada = array_intersect(array_values($candidateNorm), $wajib);
+                if (count($ada) >= count($wajib)) {
+                    $selectedHeaders = $candidateNorm;
+                    $selectedSheetContent = $content;
+                    break;
+                }
             }
         }
 
         $zip->close();
 
         if (! $selectedSheetContent || ! $selectedHeaders) {
+            if ($hasCustomMapping) {
+                throw new \RuntimeException('Sheet data di file XLSX kosong atau tidak dapat dibaca.');
+            }
             throw new \RuntimeException('Sheet data dengan header wajib (sku, nama, harga_jual) tidak ditemukan');
+        }
+
+        // Build active map
+        $activeMap = [];
+        if ($hasCustomMapping) {
+            $colIdx = 0;
+            foreach ($selectedHeaders as $colLetter => $rawVal) {
+                $targetField = $this->resolveTargetField($columnMapping, $colLetter, $colIdx, (string) $rawVal);
+                if ($targetField) {
+                    $activeMap[$colLetter] = $targetField;
+                }
+                $colIdx++;
+            }
+        } else {
+            foreach ($selectedHeaders as $colLetter => $heading) {
+                if ($heading !== '') {
+                    $activeMap[$colLetter] = $heading;
+                }
+            }
         }
 
         // 3. Baca baris data
@@ -1249,18 +1834,19 @@ class ImportProdukService
 
                 $normalized = [];
                 $hasVal = false;
-                foreach ($selectedHeaders as $colLetter => $heading) {
-                    if ($heading === '') {
-                        continue;
-                    }
+                foreach ($activeMap as $colLetter => $targetField) {
                     $val = $cells[$colLetter] ?? null;
                     if ($val !== null && $val !== '') {
                         $hasVal = true;
                     }
-                    $normalized[$heading] = is_scalar($val) ? trim((string) $val) : $val;
+                    $normalized[$targetField] = is_scalar($val) ? trim((string) $val) : $val;
                 }
 
                 if ($hasVal) {
+                    if ($hasCustomMapping && empty($normalized['sku']) && ! empty($normalized['nama'])) {
+                        $dummy = [];
+                        $normalized['sku'] = $this->generateFallbackSku($normalized['nama'], $dummy);
+                    }
                     $rows[] = $normalized;
                 }
             }
@@ -1322,10 +1908,11 @@ class ImportProdukService
      *
      * @return array<int, array<string, string>>
      */
-    protected function parseRowsCsv(string $filePath): array
+    protected function parseRowsCsv(string $filePath, array $columnMapping = []): array
     {
-        @ini_set('memory_limit', '512M');
-        @set_time_limit(0);
+        // Bounded to 64MB streaming limit
+        @ini_set('memory_limit', '64M');
+        @set_time_limit(120);
 
         $handle = fopen($filePath, 'r');
         if ($handle === false) {
@@ -1357,43 +1944,67 @@ class ImportProdukService
 
         rewind($handle);
 
+        $hasCustomMapping = ! empty(array_filter($columnMapping, fn ($v) => $v !== '' && $v !== null && $v !== 'abaikan'));
         $rows = [];
-        $headings = [];
+        $activeMap = [];
         $isHeading = true;
-        $gagalFormat = false;
+
         while (($data = fgetcsv($handle, 0, $delimiter)) !== false) {
             if ($isHeading) {
                 // Bersihkan BOM UTF-8 di sel pertama
                 if (isset($data[0])) {
                     $data[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $data[0]) ?? $data[0];
                 }
-                $headings = array_map(fn ($h) => $this->normalizeImportHeading((string) $h), $data);
                 $isHeading = false;
 
-                $wajib = ['sku', 'nama', 'harga_jual'];
-                $ada = array_intersect($headings, $wajib);
-                if (count($ada) < count($wajib)) {
-                    fclose($handle);
-                    throw new \Exception(
-                        'Format kolom tidak dikenali. Baris 1 harus berisi header: sku, nama, satuan, harga_beli, harga_jual, ... (unduh template untuk contoh).'
-                    );
+                if ($hasCustomMapping) {
+                    foreach ($data as $idx => $rawVal) {
+                        $colLetter = $this->indexToColLetter((int) $idx);
+                        $target = $this->resolveTargetField($columnMapping, $colLetter, (int) $idx, (string) $rawVal);
+                        if ($target) {
+                            $activeMap[$idx] = $target;
+                        }
+                    }
+                } else {
+                    $headings = array_map(fn ($h) => $this->normalizeImportHeading((string) $h), $data);
+                    $wajib = ['sku', 'nama', 'harga_jual'];
+                    $ada = array_intersect($headings, $wajib);
+                    if (count($ada) < count($wajib)) {
+                        fclose($handle);
+                        throw new \Exception(
+                            'Format kolom tidak dikenali. Baris 1 harus berisi header: sku, nama, satuan, harga_beli, harga_jual, ... (unduh template untuk contoh).'
+                        );
+                    }
+                    foreach ($headings as $idx => $h) {
+                        if ($h !== '') {
+                            $activeMap[$idx] = $h;
+                        }
+                    }
                 }
 
                 continue;
             }
 
             $normalized = [];
-            foreach ($headings as $i => $heading) {
-                if ($heading === '') {
-                    continue;
+            $hasVal = false;
+            foreach ($activeMap as $idx => $targetField) {
+                $value = $data[$idx] ?? '';
+                if ($value !== '' && $value !== null) {
+                    $hasVal = true;
                 }
-                $value = $data[$i] ?? '';
-                $normalized[$heading] = is_scalar($value) ? trim((string) $value) : $value;
+                $normalized[$targetField] = is_scalar($value) ? trim((string) $value) : $value;
             }
+
             // Baris kosong total → skip
-            if (count(array_filter($normalized, fn ($v) => $v !== '' && $v !== null)) === 0) {
+            if (! $hasVal) {
                 continue;
             }
+
+            if ($hasCustomMapping && empty($normalized['sku']) && ! empty($normalized['nama'])) {
+                $dummy = [];
+                $normalized['sku'] = $this->generateFallbackSku($normalized['nama'], $dummy);
+            }
+
             $rows[] = $normalized;
         }
         fclose($handle);
@@ -1690,7 +2301,7 @@ class ImportProdukService
             if ($s !== '') {
                 $fileSkus[strtolower($s)] = $s;
             }
-            $b = $this->normalizeBarcode($r['barcode'] ?? null);
+            $b = $this->normalizeBarcode($r['barcode_1'] ?? $r['barcode'] ?? null);
             if ($b !== '') {
                 $fileBarcodes[$b] = $b;
             }
@@ -1748,9 +2359,9 @@ class ImportProdukService
      * [B-10f/P1-5] Validasi lintas cabang dijalankan di preview (fail fast)
      * supaya user tahu SEBELUM commit.
      */
-    public function preview(string $filePath, int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiDuplikat = [], array $resolusiBarcode = [], array $resolusiErrorBaris = [], ?int $cabangId = null): array
+    public function preview(string $filePath, int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiDuplikat = [], array $resolusiBarcode = [], array $resolusiErrorBaris = [], ?int $cabangId = null, array $columnMapping = [], ?int $defaultGudangId = null): array
     {
-        $rows = $this->parseRows($filePath);
+        $rows = $this->parseRows($filePath, $columnMapping);
         $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id;
         // [B-10f] File lintas cabang ditolak (tidak ada mutasi stok/jurnal yg bisa dicocokkan)
         $this->cabangTunggalDariRows($rows, $cabangId);
@@ -1804,13 +2415,18 @@ class ImportProdukService
             $skuBaru = is_array($resDup) ? trim((string) ($resDup['sku_baru'] ?? '')) : '';
 
             $rowValidasi = $row;
+            if ($defaultGudangId && empty($rowValidasi['gudang']) && (float) ($rowValidasi['stok_awal'] ?? 0) > 0) {
+                $rowValidasi['gudang'] = (string) $defaultGudangId;
+            }
             if ($aksiDup === 'ganti_sku' && $skuBaru !== '') {
                 $rowValidasi['sku'] = $skuBaru;
             }
             if ($aksiBc === 'kosongkan_barcode' || $aksiDup === 'kosongkan_barcode') {
                 $rowValidasi['barcode'] = null;
+                $rowValidasi['barcode_1'] = null;
             } elseif ($aksiBc === 'ganti_barcode' && $barcodeBaru !== '') {
                 $rowValidasi['barcode'] = $barcodeBaru;
+                $rowValidasi['barcode_1'] = $barcodeBaru;
             }
 
             $errors = $this->validateRow($rowValidasi, $konteks);
@@ -2110,9 +2726,9 @@ class ImportProdukService
      * - branches:chunk dipakai karena RAM 1GB — satu file besar tidak boleh jadi
      *   satu transaksi raksasa yang menahan lock (/tmp) lama.
      */
-    public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiBarcode = [], array $resolusiErrorBaris = [], ?int $cabangId = null): array
+    public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiBarcode = [], array $resolusiErrorBaris = [], ?int $cabangId = null, array $columnMapping = [], ?int $defaultGudangId = null): array
     {
-        $rows = $this->parseRows($filePath);
+        $rows = $this->parseRows($filePath, $columnMapping);
         $totalBaris = count($rows);
 
         ImportLog::where('id', $importLogId)->update([
@@ -2148,13 +2764,16 @@ class ImportProdukService
         foreach (array_chunk($rows, $chunkSize) as $indexChunk => $chunk) {
             $lastItemChunk = ['sku' => null, 'nama' => null, 'baris' => null];
 
-            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk, &$importedSkuToId, $aksiKemiripan, $resolusiDuplikat, $threshold, $chunkSize, &$lastItemChunk, $resolusiBarcode, $resolusiErrorBaris) {
+            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk, &$importedSkuToId, $aksiKemiripan, $resolusiDuplikat, $threshold, $chunkSize, &$lastItemChunk, $resolusiBarcode, $resolusiErrorBaris, $defaultGudangId) {
                 // Akumulator NILAI per chunk: jurnal di-post dalam transaksi yang
                 // SAMA dengan mutasi stok baris-baris chunk ini.
                 $nilaiChunk = 0.0;
 
                 foreach ($chunk as $i => $row) {
                     $nomorBaris = $indexChunk * $chunkSize + $i + 2;
+                    if ($defaultGudangId && empty($row['gudang']) && (float) ($row['stok_awal'] ?? 0) > 0) {
+                        $row['gudang'] = (string) $defaultGudangId;
+                    }
                     $skuRaw = trim((string) ($row['sku'] ?? ''));
                     $namaRaw = trim((string) ($row['nama'] ?? ''));
                     $barcodeRaw = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
@@ -2196,8 +2815,10 @@ class ImportProdukService
                         continue;
                     } elseif ($aksiBc === 'kosongkan_barcode') {
                         $row['barcode'] = null;
+                        $row['barcode_1'] = null;
                     } elseif ($aksiBc === 'ganti_barcode' && $barcodeBaru !== '') {
                         $row['barcode'] = $barcodeBaru;
+                        $row['barcode_1'] = $barcodeBaru;
                     }
 
                     // Resolusi Duplikat SKU / Barcode dari input pengguna
@@ -2217,6 +2838,7 @@ class ImportProdukService
                         continue;
                     } elseif ($aksiDup === 'kosongkan_barcode') {
                         $row['barcode'] = null;
+                        $row['barcode_1'] = null;
                     }
 
                     if ($aksiDup === 'ganti_sku' && $skuBaru !== '') {

@@ -2,10 +2,13 @@
 
 namespace App\Modules\Omnichannel\Controllers;
 
+use App\Modules\Omnichannel\Jobs\ProcessChannelOrderJob;
 use App\Modules\Omnichannel\Models\Channel;
 use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
+use App\Modules\Omnichannel\Models\ChannelWebhookInbound;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
+use App\Modules\Rbac\Models\Cabang;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -277,24 +280,44 @@ class OmnichannelController extends Controller
             }
         }
 
-        try {
-            $channelOrder = $this->syncService->prosesOrderMasuk($channel, $request->all());
+        $payload = $request->all();
+        $orderId = (string) ($payload['order_sn'] ?? $payload['order_id'] ?? $payload['data']['order_sn'] ?? '');
 
-            Log::info("[{$channel->platform}-webhook] Order diproses", [
-                'channel' => $channel->nama,
-                'order' => $channelOrder->channel_order_id,
-                'status' => $channelOrder->status,
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Order berhasil diproses',
-                'order_id' => $channelOrder->channel_order_id,
-            ]);
-        } catch (\Throwable $e) {
-            Log::error("Webhook channel {$channel->nama} gagal: {$e->getMessage()}");
-
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        if ($orderId === '') {
+            return response()->json(['success' => false, 'message' => 'order_sn atau order_id wajib ada pada payload order channel.'], 422);
         }
+
+        $cabangId = $channel->kredensial['cabang_id'] ?? currentCabangId() ?? Cabang::value('id');
+
+        // Simpan payload mentah ke staging inbound webhook
+        $inbound = ChannelWebhookInbound::create([
+            'channel_id' => $channel->id,
+            'channel_order_id' => $orderId,
+            'event' => 'order',
+            'payload' => $payload,
+            'status' => 'queued',
+        ]);
+
+        // Dispatch background queue job dengan explicit branch context
+        ProcessChannelOrderJob::dispatch(
+            $channel->id,
+            $payload,
+            $cabangId ? (int) $cabangId : null,
+            $inbound->id
+        );
+
+        Log::info("[{$channel->platform}-webhook] Webhook order diterima dan diantrikan", [
+            'channel' => $channel->nama,
+            'order_id' => $orderId,
+            'inbound_id' => $inbound->id,
+            'cabang_id' => $cabangId,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order berhasil diproses',
+            'order_id' => $orderId,
+            'delivery_id' => $inbound->id,
+        ]);
     }
 }

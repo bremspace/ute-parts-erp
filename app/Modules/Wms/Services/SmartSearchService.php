@@ -159,52 +159,64 @@ class SmartSearchService
         }
         $allKeywords = array_values(array_unique(array_filter($allKeywords, fn ($k) => strlen($k) >= 2)));
 
-        // Pre-fetch matching IDs dari master data (uncorrelated scan untuk kecepatan instan)
-        $matchingBrandIds = ! empty($allKeywords) ? Brand::query()
-            ->where(function ($bq) use ($allKeywords) {
-                foreach ($allKeywords as $kw) {
-                    $bq->orWhere('nama', 'like', "%{$kw}%");
-                }
-            })
-            ->pluck('id')
-            ->all() : [];
+        // Pre-fetch matching IDs dari master data (in-memory cached collection untuk kecepatan instan)
+        $allBrands = Cache::remember('smart_search_master_brands', self::FACETED_CACHE_TTL, fn () => Brand::select('id', 'nama')->get());
+        $allKualitas = Cache::remember('smart_search_master_kualitas', self::FACETED_CACHE_TTL, fn () => KualitasProduk::select('id', 'nama')->get());
+        $allKategori = Cache::remember('smart_search_master_kategori', self::FACETED_CACHE_TTL, fn () => KategoriProduk::select('id', 'nama')->get());
+        $allSuppliers = Cache::remember('smart_search_master_suppliers', self::FACETED_CACHE_TTL, fn () => Supplier::select('id', 'nama')->get());
 
-        $matchingKualitasIds = ! empty($allKeywords) ? KualitasProduk::query()
-            ->where(function ($kq) use ($allKeywords) {
-                foreach ($allKeywords as $kw) {
-                    $kq->orWhere('nama', 'like', "%{$kw}%");
+        $matchingBrandIds = ! empty($allKeywords) ? $allBrands->filter(function ($b) use ($allKeywords) {
+            foreach ($allKeywords as $kw) {
+                if (stripos($b->nama, $kw) !== false) {
+                    return true;
                 }
-            })
-            ->pluck('id')
-            ->all() : [];
+            }
 
-        $matchingKategoriIds = ! empty($allKeywords) ? KategoriProduk::query()
-            ->where(function ($cq) use ($allKeywords) {
-                foreach ($allKeywords as $kw) {
-                    $cq->orWhere('nama', 'like', "%{$kw}%");
-                }
-            })
-            ->pluck('id')
-            ->all() : [];
+            return false;
+        })->pluck('id')->all() : [];
 
-        $matchingTipeHpIds = ! empty($allKeywords) ? TipeHp::query()
-            ->where(function ($tq) use ($allKeywords) {
-                foreach ($allKeywords as $kw) {
-                    $tq->orWhere('merk', 'like', "%{$kw}%")
-                        ->orWhere('model', 'like', "%{$kw}%");
+        $matchingKualitasIds = ! empty($allKeywords) ? $allKualitas->filter(function ($kq) use ($allKeywords) {
+            foreach ($allKeywords as $kw) {
+                if (stripos($kq->nama, $kw) !== false) {
+                    return true;
                 }
-            })
-            ->pluck('id')
-            ->all() : [];
+            }
 
-        $matchingSupplierIds = ! empty($allKeywords) ? Supplier::query()
-            ->where(function ($sq) use ($allKeywords) {
-                foreach ($allKeywords as $kw) {
-                    $sq->orWhere('nama', 'like', "%{$kw}%");
+            return false;
+        })->pluck('id')->all() : [];
+
+        $matchingKategoriIds = ! empty($allKeywords) ? $allKategori->filter(function ($cq) use ($allKeywords) {
+            foreach ($allKeywords as $kw) {
+                if (stripos($cq->nama, $kw) !== false) {
+                    return true;
                 }
-            })
-            ->pluck('id')
-            ->all() : [];
+            }
+
+            return false;
+        })->pluck('id')->all() : [];
+
+        $matchingSupplierIds = ! empty($allKeywords) ? $allSuppliers->filter(function ($sq) use ($allKeywords) {
+            foreach ($allKeywords as $kw) {
+                if (stripos($sq->nama, $kw) !== false) {
+                    return true;
+                }
+            }
+
+            return false;
+        })->pluck('id')->all() : [];
+
+        $tipeHpCacheKey = 'smart_search_tipe_hp_'.md5(implode('|', $allKeywords));
+        $matchingTipeHpIds = ! empty($allKeywords) ? Cache::remember($tipeHpCacheKey, self::FACETED_CACHE_TTL, function () use ($allKeywords) {
+            return TipeHp::query()
+                ->where(function ($tq) use ($allKeywords) {
+                    foreach ($allKeywords as $kw) {
+                        $tq->orWhere('merk', 'like', "%{$kw}%")
+                            ->orWhere('model', 'like', "%{$kw}%");
+                    }
+                })
+                ->pluck('id')
+                ->all();
+        }) : [];
 
         return $query->where(function ($sub) use ($term, $tokenGroups, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds, $matchingSupplierIds) {
             // 1. Exact match Barcode utama produk & multi barcode terindeks (barcode_1 .. barcode_N)

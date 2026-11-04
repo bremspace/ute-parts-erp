@@ -7,6 +7,7 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use App\Modules\Wms\Models\Gudang;
+use App\Traits\BelongsToCabang;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,7 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class ReturnPenjualan extends Model
 {
+    use BelongsToCabang;
     use CatatAktivitas;
     use LogsActivity;
 

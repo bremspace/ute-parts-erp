@@ -2,18 +2,22 @@
 
 namespace App\Modules\Hr\Models;
 
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
+use App\Traits\BelongsToCabang;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
-    'periode', 'tanggal_mulai', 'tanggal_selesai', 'status', 'catatan',
+    'cabang_id', 'periode', 'tanggal_mulai', 'tanggal_selesai', 'status', 'catatan',
 ])]
 class PayrollPeriode extends Model
 {
+    use BelongsToCabang;
     use CatatAktivitas;
     use LogsActivity;
 
@@ -28,6 +32,11 @@ class PayrollPeriode extends Model
     protected $table = 'payroll_periode';
 
     protected $casts = ['status' => 'string'];
+
+    public function cabang(): BelongsTo
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id');
+    }
 
     public function slips(): HasMany
     {

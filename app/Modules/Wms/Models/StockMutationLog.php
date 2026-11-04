@@ -30,4 +30,19 @@ class StockMutationLog extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * [ISO 9001 / ISO 27001 / ISO 25010] Integritas Ledger Mutasi Stok:
+     * Baris log mutasi stok bersifat append-only / immutable (tidak dapat diubah atau dihapus).
+     */
+    protected static function booted(): void
+    {
+        static::updating(function () {
+            throw new \DomainException('Baris log mutasi stok bersifat immutable (tidak dapat diubah) demi kepatuhan ISO/audit.');
+        });
+
+        static::deleting(function () {
+            throw new \DomainException('Baris log mutasi stok bersifat immutable (tidak dapat dihapus) demi kepatuhan ISO/audit.');
+        });
+    }
 }

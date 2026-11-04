@@ -6,6 +6,7 @@ use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\ImportSidRetailService;
+use App\Services\BranchContextManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -38,7 +39,9 @@ class ImportProdukExcelJob implements ShouldQueue
         public array $resolusiDuplikat = [],
         public int $thresholdKemiripan = 99,
         public array $resolusiBarcode = [],
-        public array $resolusiErrorBaris = []
+        public array $resolusiErrorBaris = [],
+        public array $columnMapping = [],
+        public ?int $defaultGudangId = null
     ) {}
 
     public function handle(
@@ -65,18 +68,21 @@ class ImportProdukExcelJob implements ShouldQueue
                     : $service->resolveFilePath($filePath);
             }
 
-            if ($this->format === 'sid_retail') {
-                $cabangId = $this->cabangId ?? 1;
-                $hasil = $sidService->commit(
-                    $filePath,
-                    $this->importLogId,
-                    $cabangId,
-                    $this->gudangTokoId,
-                    $this->gudangPusatId,
-                    $this->userId
-                );
-            } else {
-                $hasil = $service->commit(
+            $cabangId = $this->cabangId ?? currentCabangId() ?? 1;
+
+            $hasil = app(BranchContextManager::class)->runInBranchContext($cabangId, function () use ($service, $sidService, $filePath, $cabangId) {
+                if ($this->format === 'sid_retail') {
+                    return $sidService->commit(
+                        $filePath,
+                        $this->importLogId,
+                        $cabangId,
+                        $this->gudangTokoId,
+                        $this->gudangPusatId,
+                        $this->userId
+                    );
+                }
+
+                return $service->commit(
                     $filePath,
                     $this->importLogId,
                     $this->userId,
@@ -85,9 +91,11 @@ class ImportProdukExcelJob implements ShouldQueue
                     $this->thresholdKemiripan,
                     $this->resolusiBarcode,
                     $this->resolusiErrorBaris,
-                    $this->cabangId
+                    $cabangId,
+                    $this->columnMapping,
+                    $this->defaultGudangId
                 );
-            }
+            });
 
             $label = $hasil['label_status'] ?? ($hasil['gagal'] > 0 ? 'Diterima Sebagian' : 'Diterima Sempurna');
             $pesanPeringatan = (! empty($hasil['total_peringatan']) && $hasil['total_peringatan'] > 0)

@@ -35,47 +35,52 @@ class PayrollService
      *
      * @return array{karyawan_diproses: int, total_gaji: float, periode: string}
      */
-    public function hitungDraft(string $periode): array
+    public function hitungDraft(string $periode, ?int $cabangId = null): array
     {
+        $targetCabangId = $cabangId ?? currentCabangId();
+
         // Pastikan periode ada dulu
-        $periodeId = $this->getOrCreatePeriode($periode);
+        $periodeId = $this->getOrCreatePeriode($periode, $targetCabangId);
         $periodeRecord = PayrollPeriode::find($periodeId);
 
         if ($periodeRecord && $periodeRecord->status === PayrollPeriode::STATUS_DIBAYAR) {
             throw new \DomainException("Periode {$periode} sudah dibayar. Tidak dapat dihitung ulang.");
         }
 
-        $karyawans = Karyawan::where('status_aktif', true)->get();
+        $karyawans = Karyawan::where('status_aktif', true)
+            ->when($targetCabangId, fn ($q) => $q->where('cabang_id', $targetCabangId))
+            ->get();
         $totalGaji = 0;
         $diproses = 0;
 
         foreach ($karyawans as $karyawan) {
-            $this->hitungKaryawan($karyawan, $periode);
+            $this->hitungKaryawan($karyawan, $periode, $targetCabangId);
             $diproses++;
         }
 
         // Hitung total
-        $slips = PayrollSlip::where('payroll_periode_id', $this->getPeriodeId($periode))->get();
+        $slips = PayrollSlip::where('payroll_periode_id', $periodeId)->get();
         $totalGaji = $slips->sum('total_gaji');
 
-        return ['karyawan_diproses' => $diproses, 'total_gaji' => $totalGaji, 'periode' => $periode];
+        return ['karyawan_diproses' => $diproses, 'total_gaji' => $totalGaji, 'periode' => $periode, 'cabang_id' => $targetCabangId];
     }
 
     /**
      * Ajukan approval payroll via F1-1 engine.
      * Return apakah perlu approval dan detail request.
      */
-    public function ajukanApproval(string $periode, int $userId, string $reason = ''): array
+    public function ajukanApproval(string $periode, int $userId, string $reason = '', ?int $cabangId = null): array
     {
-        $result = $this->hitungDraft($periode);
+        $targetCabangId = $cabangId ?? currentCabangId();
+        $result = $this->hitungDraft($periode, $targetCabangId);
         $totalGaji = $result['total_gaji'];
         $needsApproval = $totalGaji > self::THRESHOLD_APPROVAL;
         $approvalRequestId = null;
 
         if ($needsApproval) {
-            $periodeId = $this->getOrCreatePeriode($periode);
+            $periodeId = $this->getOrCreatePeriode($periode, $targetCabangId);
             $approvalRequestId = app(ApprovalService::class)
-                ->ajukan('payroll', $periodeId, session('cabang_id'), [
+                ->ajukan('payroll', $periodeId, $targetCabangId, [
                     'amount' => $totalGaji,
                     'reason' => $reason ?: "Payroll periode {$periode} perlu approval",
                 ], $userId)
@@ -98,9 +103,10 @@ class PayrollService
      * Total di atas THRESHOLD_APPROVAL wajib sudah ada ApprovalRequest
      * (entity_type payroll) berstatus 'disetujui' — §4.1 alur 2.
      */
-    public function finalisasiDisetujui(string $periode): array
+    public function finalisasiDisetujui(string $periode, ?int $cabangId = null): array
     {
-        $periodeId = $this->getOrCreatePeriode($periode);
+        $targetCabangId = $cabangId ?? currentCabangId();
+        $periodeId = $this->getOrCreatePeriode($periode, $targetCabangId);
         $periodeRecord = PayrollPeriode::find($periodeId);
         if (! $periodeRecord) {
             throw new \Exception('Periode tidak ditemukan');
@@ -125,9 +131,9 @@ class PayrollService
         // commit. Sebelumnya status di-update ke 'selesai' DULU lalu approvePayroll()
         // mem-post jurnal → bila jurnal gagal, periode tetap 'selesai' tanpa akun.
         // Satu DB::transaction dipakai agar keduanya commit/rollback bersama.
-        return DB::transaction(function () use ($periode, $periodeRecord) {
+        return DB::transaction(function () use ($periode, $periodeRecord, $targetCabangId) {
             // Post jurnal via approvePayroll
-            $hasil = $this->approvePayroll($periode);
+            $hasil = $this->approvePayroll($periode, $targetCabangId);
 
             $periodeRecord->update(['status' => PayrollPeriode::STATUS_SELESAI]);
 
@@ -138,9 +144,10 @@ class PayrollService
     /**
      * Approve payroll periode → post jurnal.
      */
-    public function approvePayroll(string $periode): array
+    public function approvePayroll(string $periode, ?int $cabangId = null): array
     {
-        $periodeId = $this->getOrCreatePeriode($periode);
+        $targetCabangId = $cabangId ?? currentCabangId();
+        $periodeId = $this->getOrCreatePeriode($periode, $targetCabangId);
         $slips = PayrollSlip::where('payroll_periode_id', $periodeId)->get();
 
         $totalGaji = (float) $slips->sum('total_gaji');
@@ -168,8 +175,8 @@ class PayrollService
             now(),
             'payroll',
             $lines,
-            "Payroll periode {$periode}",
-            session('cabang_id'),
+            "Payroll periode {$periode}".($targetCabangId ? " (Cabang #{$targetCabangId})" : ''),
+            $targetCabangId,
             auth()->id(),
             PayrollPeriode::class,
             $periodeId
@@ -190,16 +197,17 @@ class PayrollService
      * DB::transaction, baru slip/perioda ditandai 'dibayar'. Jurnal gagal →
      * status tidak final (rollback total).
      */
-    public function bayarPayroll(string $periode, string $akunKasKode = '110-01'): array
+    public function bayarPayroll(string $periode, string $akunKasKode = '110-01', ?int $cabangId = null): array
     {
-        $periodeId = $this->getOrCreatePeriode($periode);
+        $targetCabangId = $cabangId ?? currentCabangId();
+        $periodeId = $this->getOrCreatePeriode($periode, $targetCabangId);
         $periodeRecord = PayrollPeriode::find($periodeId);
 
         if ($periodeRecord && $periodeRecord->status === PayrollPeriode::STATUS_DIBAYAR) {
             throw new \DomainException("Periode {$periode} sudah dibayar sebelumnya.");
         }
 
-        return DB::transaction(function () use ($periode, $periodeId, $akunKasKode) {
+        return DB::transaction(function () use ($periode, $periodeId, $akunKasKode, $targetCabangId) {
             // Jurnal pembayaran: debit Utang Gaji (210-02) / kredit Kas ($akunKasKode)
             $slips = PayrollSlip::where('payroll_periode_id', $periodeId)->get();
             $total = $slips->sum('total_gaji');
@@ -215,8 +223,8 @@ class PayrollService
                 now(),
                 'payroll-bayar',
                 $lines,
-                "Pembayaran payroll periode {$periode}",
-                session('cabang_id'),
+                "Pembayaran payroll periode {$periode}".($targetCabangId ? " (Cabang #{$targetCabangId})" : ''),
+                $targetCabangId,
                 auth()->id(),
                 PayrollPeriode::class,
                 $periodeId
@@ -247,14 +255,23 @@ class PayrollService
     /**
      * Get atau create payroll periode.
      */
-    protected function getOrCreatePeriode(string $periode): int
+    protected function getOrCreatePeriode(string $periode, ?int $cabangId = null): int
     {
-        $record = PayrollPeriode::where('periode', $periode)->first();
+        $targetCabangId = $cabangId ?? currentCabangId();
+        $query = PayrollPeriode::withoutCabangScope()->where('periode', $periode);
+        if ($targetCabangId) {
+            $query->where('cabang_id', $targetCabangId);
+        } else {
+            $query->whereNull('cabang_id');
+        }
+
+        $record = $query->first();
         if ($record) {
             return $record->id;
         }
 
         return PayrollPeriode::create([
+            'cabang_id' => $targetCabangId,
             'periode' => $periode,
             'tanggal_mulai' => $periode.'-01',
             'tanggal_selesai' => date('Y-m-t', strtotime($periode.'-01')),
@@ -262,21 +279,29 @@ class PayrollService
         ])->id;
     }
 
-    protected function getPeriodeId(string $periode): int
+    protected function getPeriodeId(string $periode, ?int $cabangId = null): int
     {
-        return PayrollPeriode::where('periode', $periode)->value('id') ?? 0;
+        $targetCabangId = $cabangId ?? currentCabangId();
+        $query = PayrollPeriode::withoutCabangScope()->where('periode', $periode);
+        if ($targetCabangId) {
+            $query->where('cabang_id', $targetCabangId);
+        } else {
+            $query->whereNull('cabang_id');
+        }
+
+        return $query->value('id') ?? 0;
     }
 
     /**
      * Hitung gaji per karyawan.
      */
-    protected function hitungKaryawan(Karyawan $karyawan, string $periode): PayrollSlip
+    protected function hitungKaryawan(Karyawan $karyawan, string $periode, ?int $cabangId = null): PayrollSlip
     {
         $pokok = $karyawan->gaji_pokok;
         $tunjangan = $this->hitungTunjangan($karyawan->id);
         $potonganAbsen = app(AbsensiService::class)->potonganAbsen($karyawan->id, $periode);
         $potongan = $this->hitungPotongan($karyawan->id, $periode);
-        $resTeknisi = $this->hitungKomisiTeknisiWithDetails($karyawan, $periode);
+        $resTeknisi = $this->hitungKomisiTeknisiWithDetails($karyawan, $periode, $cabangId);
         $komisiTeknisi = $resTeknisi['total'];
         $resInternal = $this->hitungKomisiInternalWithDetails($karyawan->id, $periode);
         $komisiInternal = $resInternal['total'];
@@ -284,7 +309,7 @@ class PayrollService
 
         $totalGaji = max(0, $pokok + $tunjangan - $potongan + $komisi);
 
-        $periodeId = $this->getOrCreatePeriode($periode);
+        $periodeId = $this->getOrCreatePeriode($periode, $cabangId);
 
         $slip = PayrollSlip::updateOrCreate(
             ['payroll_periode_id' => $periodeId, 'karyawan_id' => $karyawan->id],
@@ -362,16 +387,18 @@ class PayrollService
         return $this->hitungKomisiTeknisiWithDetails($karyawan, $periode)['total'];
     }
 
-    protected function hitungKomisiTeknisiWithDetails(Karyawan $karyawan, string $periode): array
+    protected function hitungKomisiTeknisiWithDetails(Karyawan $karyawan, string $periode, ?int $cabangId = null): array
     {
         if ($karyawan->jabatan !== 'teknisi') {
             return ['total' => 0.0, 'items' => []];
         }
 
+        $targetCabangId = $cabangId ?? $karyawan->cabang_id ?? currentCabangId();
+
         $rules = KomisiTeknisiRule::where('is_aktif', true)
-            ->where(function ($q) {
+            ->where(function ($q) use ($targetCabangId) {
                 $q->whereNull('cabang_id')
-                    ->orWhere('cabang_id', session('cabang_id'));
+                    ->when($targetCabangId, fn ($sub) => $sub->orWhere('cabang_id', $targetCabangId));
             })
             ->get();
 

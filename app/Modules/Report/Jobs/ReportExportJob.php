@@ -4,6 +4,7 @@ namespace App\Modules\Report\Jobs;
 
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Report\Services\ReportBuilderService;
+use App\Services\BranchContextManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -51,78 +52,86 @@ class ReportExportJob implements ShouldQueue
 
     public function handle(ReportBuilderService $service, NotificationService $notif): void
     {
-        try {
-            $query = $service->buildQuery(
-                $this->modelName,
-                $this->columns ?: ['*'],
-                $this->filters,
-                $this->groupBy,
-                $this->cabangId
-            );
+        $runner = function () use ($service, $notif) {
+            try {
+                $query = $service->buildQuery(
+                    $this->modelName,
+                    $this->columns ?: ['*'],
+                    $this->filters,
+                    $this->groupBy,
+                    $this->cabangId
+                );
 
-            // [P2-11] Tanpa cache dataset penuh di store — baris dibaca sekali
-            // (limit+1 untuk deteksi pemotongan) lalu langsung ditulis ke file.
-            $rawRows = $query->limit($this->rowLimit + 1)->get()
-                ->map(fn ($item) => $item->toArray())
-                ->all();
+                // [P2-11] Tanpa cache dataset penuh di store — baris dibaca sekali
+                // (limit+1 untuk deteksi pemotongan) lalu langsung ditulis ke file.
+                $rawRows = $query->limit($this->rowLimit + 1)->get()
+                    ->map(fn ($item) => $item->toArray())
+                    ->all();
 
-            $truncated = count($rawRows) > $this->rowLimit;
-            if ($truncated) {
-                $rawRows = array_slice($rawRows, 0, $this->rowLimit);
-            }
+                $truncated = count($rawRows) > $this->rowLimit;
+                if ($truncated) {
+                    $rawRows = array_slice($rawRows, 0, $this->rowLimit);
+                }
 
-            $rows = $service->formatRowsForDisplay($rawRows);
-            $exportRows = $service->formatRowsForExport($rows);
+                $rows = $service->formatRowsForDisplay($rawRows);
+                $exportRows = $service->formatRowsForExport($rows);
 
-            // [P2-11/CROSS-LANE] Nama file WAJIB diawali "{userId}_" — cek
-            // kepemilikan unduh di AkuntingController membaca integer sebelum "_".
-            $ext = $this->format === 'csv' ? 'csv' : 'xlsx';
-            $slug = Str::slug($this->reportName) ?: 'laporan';
-            $filename = $this->userId.'_laporan_'.$slug.'-'.now()->format('Ymd-His').'.'.$ext;
-            $path = 'exports/'.$filename;
+                // [P2-11/CROSS-LANE] Nama file WAJIB diawali "{userId}_" — cek
+                // kepemilikan unduh di AkuntingController membaca integer sebelum "_".
+                $ext = $this->format === 'csv' ? 'csv' : 'xlsx';
+                $slug = Str::slug($this->reportName) ?: 'laporan';
+                $filename = $this->userId.'_laporan_'.$slug.'-'.now()->format('Ymd-His').'.'.$ext;
+                $path = 'exports/'.$filename;
 
-            if ($this->format === 'csv') {
-                $csv = $this->convertToCsv($exportRows);
-                Storage::put($path, $csv);
-            } else {
-                Excel::store(new class($exportRows) implements FromArray, WithHeadings
-                {
-                    public function __construct(private array $rows) {}
-
-                    public function headings(): array
+                if ($this->format === 'csv') {
+                    $csv = $this->convertToCsv($exportRows);
+                    Storage::put($path, $csv);
+                } else {
+                    Excel::store(new class($exportRows) implements FromArray, WithHeadings
                     {
-                        return ! empty($this->rows) ? array_keys($this->rows[0]) : [];
-                    }
+                        public function __construct(private array $rows) {}
 
-                    public function array(): array
-                    {
-                        return array_map(fn ($r) => array_values((array) $r), $this->rows);
-                    }
-                }, $path, 'local');
-            }
+                        public function headings(): array
+                        {
+                            return ! empty($this->rows) ? array_keys($this->rows[0]) : [];
+                        }
 
-            // [P2-11] Tanda pemotongan pada pesan notifikasi (bukan senyap).
-            $konten = 'Laporan "'.$this->reportName.'" ('.strtoupper($this->format).') siap diunduh.';
-            if ($truncated) {
-                $konten .= ' - dipotong maksimal '.number_format($this->rowLimit, 0, ',', '.').' baris';
-            }
+                        public function array(): array
+                        {
+                            return array_map(fn ($r) => array_values((array) $r), $this->rows);
+                        }
+                    }, $path, 'local');
+                }
 
-            $notif->kirim(
-                'inapp', null,
-                'Export laporan "'.$this->reportName.'" selesai',
-                $konten,
-                ['url' => url('/api/akunting/export/download?path='.base64_encode($path)), 'jenis' => $this->modelName, 'user_id' => $this->userId]
-            );
-        } catch (\Throwable $e) {
-            Log::error("ReportExportJob gagal: {$e->getMessage()}");
-            if ($this->userId) {
+                // [P2-11] Tanda pemotongan pada pesan notifikasi (bukan senyap).
+                $konten = 'Laporan "'.$this->reportName.'" ('.strtoupper($this->format).') siap diunduh.';
+                if ($truncated) {
+                    $konten .= ' - dipotong maksimal '.number_format($this->rowLimit, 0, ',', '.').' baris';
+                }
+
                 $notif->kirim(
                     'inapp', null,
-                    'Export laporan gagal',
-                    'Laporan "'.$this->reportName.'" gagal: '.$e->getMessage(),
-                    ['jenis' => $this->modelName, 'user_id' => $this->userId]
+                    'Export laporan "'.$this->reportName.'" selesai',
+                    $konten,
+                    ['url' => url('/api/akunting/export/download?path='.base64_encode($path)), 'jenis' => $this->modelName, 'user_id' => $this->userId]
                 );
+            } catch (\Throwable $e) {
+                Log::error("ReportExportJob gagal: {$e->getMessage()}");
+                if ($this->userId) {
+                    $notif->kirim(
+                        'inapp', null,
+                        'Export laporan gagal',
+                        'Laporan "'.$this->reportName.'" gagal: '.$e->getMessage(),
+                        ['jenis' => $this->modelName, 'user_id' => $this->userId]
+                    );
+                }
             }
+        };
+
+        if ($this->cabangId) {
+            app(BranchContextManager::class)->runInBranchContext($this->cabangId, $runner);
+        } else {
+            $runner();
         }
     }
 
