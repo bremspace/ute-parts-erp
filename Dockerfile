@@ -17,40 +17,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Jakarta \
     COMPOSER_ALLOW_SUPERUSER=1
 
-# Install system dependencies & build tools
+# Install system runtime dependencies
 RUN apk add --no-cache \
     curl \
     git \
     unzip \
-    libzip-dev \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    icu-dev \
-    libxml2-dev \
-    sqlite-dev \
-    oniguruma-dev \
     tzdata \
     bash \
     supervisor \
     netcat-openbsd
 
-# Configure & Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        pdo \
-        pdo_mysql \
-        pdo_sqlite \
-        sqlite3 \
-        mbstring \
-        xml \
-        intl \
-        gd \
-        zip \
-        bcmath \
-        opcache \
-        exif \
-        fileinfo
+# Install PHP extensions using official multi-platform extension installer
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions pdo_mysql gd zip bcmath exif intl
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

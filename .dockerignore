@@ -1,6 +1,7 @@
 .git
 .github
 node_modules
+vendor
 docker/data/mysql
 storage/license.key
 storage/installed.lock
