@@ -479,6 +479,14 @@
                                                     +{{ $product->satuanKonversi->count() }} Satuan
                                                 </span>
                                             @endif
+                                            @php
+                                                $modalKompatibel = $product->daftar_kompatibel;
+                                            @endphp
+                                            @if($modalKompatibel->isNotEmpty())
+                                                <span class="inline-flex items-center rounded-md bg-up-primary/10 text-up-primary border border-up-primary/20 px-2 py-0.5 text-[10px] sm:text-[11px]" title="{{ $modalKompatibel->join(', ') }}">
+                                                    📱 {{ $modalKompatibel->take(3)->join(', ') }}{{ $modalKompatibel->count() > 3 ? ' (+'.($modalKompatibel->count() - 3).')' : '' }}
+                                                </span>
+                                            @endif
                                         </div>
                                     </div>
                                     <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">

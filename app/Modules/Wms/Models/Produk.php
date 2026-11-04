@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -277,6 +278,55 @@ class Produk extends Model
             'produk_id',
             'tipe_hp_id'
         );
+    }
+
+    /**
+     * Daftar tipe HP kompatibel yang terformat rapi ({Merk} {Model}).
+     * Selaras antara Master Produk, POS Kasir, dan Katalog Online.
+     *
+     * @return Collection<int, string>
+     */
+    public function getDaftarKompatibelAttribute(): Collection
+    {
+        $list = collect();
+
+        if ($this->relationLoaded('tipeHps') && $this->tipeHps->isNotEmpty()) {
+            $list = $list->merge($this->tipeHps->map(function ($t) {
+                $merk = trim((string) ($t->merk ?? ''));
+                $model = trim((string) ($t->model ?? ''));
+                if ($merk !== '' && ! str_starts_with(strtolower($model), strtolower($merk))) {
+                    return "{$merk} {$model}";
+                }
+
+                return $model ?: $merk;
+            }));
+        }
+
+        if (is_array($this->kompatibilitas_hp) && ! empty($this->kompatibilitas_hp)) {
+            $list = $list->merge(collect($this->kompatibilitas_hp)->map(function ($t) {
+                $merk = trim((string) ($t['merk'] ?? ''));
+                $model = trim((string) ($t['model'] ?? ''));
+                if ($merk !== '' && ! str_starts_with(strtolower($model), strtolower($merk))) {
+                    return "{$merk} {$model}";
+                }
+
+                return $model ?: $merk;
+            }));
+        }
+
+        if (! empty($this->model_kompatibel)) {
+            $m = trim((string) ($this->brand_kompatibel ?? ''));
+            $rawModels = array_filter(array_map('trim', explode(',', (string) $this->model_kompatibel)));
+            $list = $list->merge(collect($rawModels)->map(function ($mod) use ($m) {
+                if ($m !== '' && ! str_contains($m, ',') && ! str_starts_with(strtolower($mod), strtolower($m))) {
+                    return "{$m} {$mod}";
+                }
+
+                return $mod;
+            }));
+        }
+
+        return $list->filter()->unique()->values();
     }
 
     public function channelMappings(): HasMany

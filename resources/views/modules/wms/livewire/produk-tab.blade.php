@@ -1492,17 +1492,7 @@
                                 <div class="min-w-0">
                                     <span class="font-semibold text-ink-900 dark:text-white block text-xs leading-snug line-clamp-2" title="{{ $p->nama }}">{{ $p->nama }}</span>
                                     @php
-                                        $kompatibelListRow = collect();
-                                        if ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
-                                            $kompatibelListRow = $p->tipeHps->map(fn($t) => trim(($t->merk ? $t->merk.' ' : '').$t->model))->filter();
-                                        } elseif (is_array($p->kompatibilitas_hp) && !empty($p->kompatibilitas_hp)) {
-                                            $kompatibelListRow = collect($p->kompatibilitas_hp)->map(fn($t) => trim((!empty($t['merk']) ? $t['merk'].' ' : '').($t['model'] ?? '')))->filter();
-                                        } elseif (!empty($p->model_kompatibel)) {
-                                            $m = trim((string)($p->brand_kompatibel ?? ''));
-                                            $kompatibelListRow = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))))
-                                                ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod));
-                                        }
-                                        $kompatibelListRow = $kompatibelListRow->unique()->values();
+                                        $kompatibelListRow = $p->daftar_kompatibel;
                                         $countRowTipe = $kompatibelListRow->count();
                                         $fullKompatibelTextRow = $kompatibelListRow->isNotEmpty()
                                             ? $kompatibelListRow->join(', ')
@@ -1609,17 +1599,7 @@
                         @if($visibleColumns['kompatibilitas'] ?? false)
                             <td class="py-2.5 px-3 text-xs min-w-[160px] max-w-[280px]" x-data="{ expanded: false }">
                                 @php
-                                    $allTipeHpList = collect();
-                                    if ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
-                                        $allTipeHpList = $p->tipeHps->map(fn($t) => trim(($t->merk ? $t->merk.' ' : '').$t->model))->filter();
-                                    } elseif (is_array($p->kompatibilitas_hp) && !empty($p->kompatibilitas_hp)) {
-                                        $allTipeHpList = collect($p->kompatibilitas_hp)->map(fn($t) => trim((!empty($t['merk']) ? $t['merk'].' ' : '').($t['model'] ?? '')))->filter();
-                                    } elseif (!empty($p->model_kompatibel)) {
-                                        $m = trim((string)($p->brand_kompatibel ?? ''));
-                                        $allTipeHpList = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))))
-                                            ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod));
-                                    }
-                                    $allTipeHpList = $allTipeHpList->unique()->values();
+                                    $allTipeHpList = $p->daftar_kompatibel;
                                     $countTipe = $allTipeHpList->count();
                                     $fullTipeTooltip = $allTipeHpList->isNotEmpty()
                                         ? $allTipeHpList->join(', ')
@@ -2024,20 +2004,7 @@
                             </div>
 
                             @php
-                                $kompatibelGridList = collect();
-                                if ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
-                                    $kompatibelGridList = $p->tipeHps->map(fn($t) => trim("{$t->merk} {$t->model}"))->filter();
-                                } elseif (!empty($p->kompatibilitas_hp) && is_array($p->kompatibilitas_hp)) {
-                                    $kompatibelGridList = collect($p->kompatibilitas_hp)->map(fn($k) => trim(($k['merk'] ?? '').' '.($k['model'] ?? '')))->filter();
-                                } elseif (!empty($p->model_kompatibel)) {
-                                    $m = trim((string)($p->brand_kompatibel ?? ''));
-                                    $kompatibelGridList = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))))
-                                        ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod));
-                                } else {
-                                    $fallback = trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
-                                    $kompatibelGridList = $fallback ? collect([$fallback]) : collect();
-                                }
-                                $kompatibelGridList = $kompatibelGridList->unique()->values();
+                                $kompatibelGridList = $p->daftar_kompatibel;
                                 $countGrid = $kompatibelGridList->count();
                                 $kompatibelGridText = $kompatibelGridList->isNotEmpty() ? $kompatibelGridList->implode(', ') : 'Universal';
                             @endphp
