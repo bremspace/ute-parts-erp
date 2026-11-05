@@ -233,6 +233,7 @@ class ProdukTab extends Component
         'multi_satuan' => [],
         // [MULTI BARCODE & OPSI SKU]
         'barcode_alt_input' => '',
+        'barcode_alt_list' => [],
         'opsi_sku' => 'otomatis', // 'otomatis' | 'barcode' | 'manual'
         // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
         'abc_class' => 'B',
@@ -610,6 +611,10 @@ class ProdukTab extends Component
             'margin_persen' => null,
             'hitung_dari_margin' => false,
             'multi_satuan' => [],
+            // [MULTI BARCODE & OPSI SKU]
+            'barcode_alt_input' => '',
+            'barcode_alt_list' => [],
+            'opsi_sku' => 'otomatis',
             // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
             'abc_class' => 'B',
             'reorder_point' => null,
@@ -973,6 +978,36 @@ class ProdukTab extends Component
         }
     }
 
+    public function tambahBarcodeAltField(string $formType = 'tambah'): void
+    {
+        if ($formType === 'tambah') {
+            if (! isset($this->produkForm['barcode_alt_list']) || ! is_array($this->produkForm['barcode_alt_list'])) {
+                $this->produkForm['barcode_alt_list'] = [];
+            }
+            $this->produkForm['barcode_alt_list'][] = '';
+        } else {
+            if (! isset($this->editProdukForm['barcode_alt_list']) || ! is_array($this->editProdukForm['barcode_alt_list'])) {
+                $this->editProdukForm['barcode_alt_list'] = [];
+            }
+            $this->editProdukForm['barcode_alt_list'][] = '';
+        }
+    }
+
+    public function hapusBarcodeAltField(int $index, string $formType = 'tambah'): void
+    {
+        if ($formType === 'tambah') {
+            if (isset($this->produkForm['barcode_alt_list'][$index])) {
+                unset($this->produkForm['barcode_alt_list'][$index]);
+                $this->produkForm['barcode_alt_list'] = array_values($this->produkForm['barcode_alt_list']);
+            }
+        } else {
+            if (isset($this->editProdukForm['barcode_alt_list'][$index])) {
+                unset($this->editProdukForm['barcode_alt_list'][$index]);
+                $this->editProdukForm['barcode_alt_list'] = array_values($this->editProdukForm['barcode_alt_list']);
+            }
+        }
+    }
+
     public function terapkanRekomendasiMargin(string $mode = 'create'): void
     {
         if (! isSuperAdminOrOwner() && ! $this->boleh('wms.create', 'Anda tidak memiliki izin mengubah harga produk.')) {
@@ -1123,9 +1158,12 @@ class ProdukTab extends Component
             }
         }
 
-        $altList = ! empty($this->produkForm['barcode_alt_input'])
-            ? array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', (string) $this->produkForm['barcode_alt_input']))))
-            : [];
+        $altList = [];
+        if (! empty($this->produkForm['barcode_alt_list']) && is_array($this->produkForm['barcode_alt_list'])) {
+            $altList = array_values(array_filter(array_map('trim', $this->produkForm['barcode_alt_list'])));
+        } elseif (! empty($this->produkForm['barcode_alt_input'])) {
+            $altList = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', (string) $this->produkForm['barcode_alt_input']))));
+        }
 
         try {
             app(ProdukService::class)->buatProduk(
@@ -1275,6 +1313,15 @@ class ProdukTab extends Component
         $this->editKompatibelSelectedTipeHpIds = [];
         $this->searchTipeHpEdit = '';
 
+        $altBarcodes = [];
+        if ($p->barcodes && $p->barcodes->count() > 1) {
+            $altBarcodes = $p->barcodes->sortBy('urutan')->skip(1)->pluck('barcode')->filter()->values()->all();
+        } elseif (is_array($p->barcode_alt) && ! empty($p->barcode_alt)) {
+            $altBarcodes = array_values(array_filter($p->barcode_alt));
+        } elseif (! empty($p->barcode_alt_string)) {
+            $altBarcodes = array_values(array_filter(array_map('trim', explode(',', $p->barcode_alt_string))));
+        }
+
         $this->editProdukForm = [
             'nama' => $p->nama,
             'sku' => $p->skuVariants->first()?->sku ?? '',
@@ -1326,7 +1373,8 @@ class ProdukTab extends Component
             })->toArray(),
             'deskripsi' => $p->deskripsi ?? '',
             // [MULTI BARCODE & OPSI SKU]
-            'barcode_alt_input' => $p->barcode_alt_string,
+            'barcode_alt_input' => implode(', ', $altBarcodes),
+            'barcode_alt_list' => $altBarcodes,
             'opsi_sku' => (! empty($p->barcode) && ($p->skuVariants->first()?->sku === $p->barcode)) ? 'barcode' : 'manual',
             // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
             'abc_class' => $p->abc_class ?: 'B',
@@ -1625,9 +1673,12 @@ class ProdukTab extends Component
             }
         }
 
-        $altList = isset($this->editProdukForm['barcode_alt_input'])
-            ? array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', (string) $this->editProdukForm['barcode_alt_input']))))
-            : [];
+        $altList = [];
+        if (isset($this->editProdukForm['barcode_alt_list']) && is_array($this->editProdukForm['barcode_alt_list'])) {
+            $altList = array_values(array_filter(array_map('trim', $this->editProdukForm['barcode_alt_list'])));
+        } elseif (isset($this->editProdukForm['barcode_alt_input'])) {
+            $altList = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', (string) $this->editProdukForm['barcode_alt_input']))));
+        }
 
         try {
             app(ProdukService::class)->updateProduk(

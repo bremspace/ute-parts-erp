@@ -12,10 +12,12 @@ use App\Modules\Wms\Models\TipeHp;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class AtributProdukExport implements Export, WithMultipleSheets
@@ -279,7 +281,7 @@ class AtributProdukExport implements Export, WithMultipleSheets
         }
 
         if (! $this->spesifikTipe || $this->spesifikTipe === 'tipe_hp') {
-            $sheets[] = new class($this->mode) implements FromCollection, WithHeadings, WithStyles, WithTitle
+            $sheets[] = new class($this->mode) implements FromCollection, WithColumnFormatting, WithHeadings, WithStyles, WithTitle
             {
                 public function __construct(protected string $mode) {}
 
@@ -291,6 +293,13 @@ class AtributProdukExport implements Export, WithMultipleSheets
                 public function headings(): array
                 {
                     return ['merk', 'model', 'kode_produk', 'nama', 'is_active'];
+                }
+
+                public function columnFormats(): array
+                {
+                    return [
+                        'C' => NumberFormat::FORMAT_TEXT, // kode_produk
+                    ];
                 }
 
                 public function collection(): Collection

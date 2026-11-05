@@ -2272,14 +2272,58 @@
                         </div>
                     </div>
 
-                    <!-- Multi Barcode / QR Tambahan (Supplier / Alternatif) -->
-                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
+                    <!-- Multi Barcode / QR Tambahan (Supplier / Alternatif) Dedicated Fields -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
                         <div class="flex items-center justify-between">
-                            <label class="text-[11px] font-semibold text-ink-300">Multi Barcode / QR Tambahan (Barcode Supplier / Alt)</label>
-                            <span class="text-[10px] text-ink-500">Mendukung multi barcode suplier & internal</span>
+                            <div>
+                                <label class="block text-xs font-semibold text-white">Barcode Tambahan / Multi-Barcode (Supplier / Alternatif)</label>
+                                <p class="text-[10px] text-ink-400">Daftarkan dedicated barcode per supplier/pabrik. Kasir & scanner otomatis mengenali semua kode ini.</p>
+                            </div>
+                            <button type="button" wire:click="tambahBarcodeAltField('tambah')" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-up-primary/15 hover:bg-up-primary text-up-primary hover:text-white border border-up-primary/30 text-[11px] font-semibold transition active:scale-95 cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                <span>Tambah Barcode</span>
+                            </button>
                         </div>
-                        <input type="text" wire:model="produkForm.barcode_alt_input" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" placeholder="Pisahkan dengan koma jika lebih dari satu. Cth: SPL-88291, SUP-99012" />
-                        <p class="text-[10px] text-ink-500">Kamera scanner & kasir akan otomatis mengenali barcode utama maupun semua barcode tambahan di atas.</p>
+
+                        @if(!empty($produkForm['barcode_alt_list']))
+                            <div class="space-y-2">
+                                @foreach($produkForm['barcode_alt_list'] as $idx => $altBc)
+                                    <div class="flex items-center gap-2" wire:key="tambah-bc-alt-{{ $idx }}">
+                                        <div class="relative flex-1">
+                                            <div class="absolute inset-y-0 left-0 flex items-center pl-2.5 gap-1.5 pointer-events-none">
+                                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-white/10 text-up-mint">Alt #{{ $idx + 1 }}</span>
+                                            </div>
+                                            <button type="button"
+                                                    onclick="window.uteBarcode && window.uteBarcode.openCameraScanner({ title: 'Scan Barcode Tambahan #{{ $idx + 1 }}', onScan: (code) => { @this.set('produkForm.barcode_alt_list.{{ $idx }}', code); } })"
+                                                    class="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-lg text-up-primary hover:text-white hover:bg-up-primary/20 active:scale-95 transition flex items-center justify-center cursor-pointer z-10"
+                                                    title="Scan dengan kamera"
+                                                    aria-label="Scan barcode kamera">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                </svg>
+                                            </button>
+                                            <input type="text"
+                                                   wire:model="produkForm.barcode_alt_list.{{ $idx }}"
+                                                   class="w-full pl-16 pr-10 py-2 rounded-xl glass-input text-xs font-mono"
+                                                   placeholder="Cth: SPL-88291 atau SUP-99012" />
+                                        </div>
+                                        <button type="button"
+                                                wire:click="hapusBarcodeAltField({{ $idx }}, 'tambah')"
+                                                class="p-2 rounded-xl text-ink-400 hover:text-up-red hover:bg-up-red/10 border border-white/5 transition cursor-pointer"
+                                                title="Hapus Barcode Tambahan #{{ $idx + 1 }}">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="p-3 rounded-xl border border-dashed border-white/10 text-center flex flex-col items-center justify-center gap-1.5 text-ink-400 bg-black/10">
+                                <span class="text-xs">Belum ada barcode tambahan terdaftar.</span>
+                                <button type="button" wire:click="tambahBarcodeAltField('tambah')" class="text-[11px] text-up-mint hover:underline font-semibold cursor-pointer">
+                                    + Tambah Barcode Supplier / Alternatif
+                                </button>
+                            </div>
+                        @endif
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
@@ -3243,13 +3287,57 @@
                     </div>
 
                     <!-- Multi Barcode / QR Tambahan (Supplier / Alternatif) Edit Form -->
-                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
+                    <div class="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
                         <div class="flex items-center justify-between">
-                            <label class="text-[11px] font-semibold text-ink-300">Multi Barcode / QR Tambahan (Barcode Supplier / Alt)</label>
-                            <span class="text-[10px] text-ink-500">Mendukung multi barcode suplier & internal</span>
+                            <div>
+                                <label class="block text-xs font-semibold text-white">Barcode Tambahan / Multi-Barcode (Supplier / Alternatif)</label>
+                                <p class="text-[10px] text-ink-400">Daftarkan dedicated barcode per supplier/pabrik. Kasir & scanner otomatis mengenali semua kode ini.</p>
+                            </div>
+                            <button type="button" wire:click="tambahBarcodeAltField('edit')" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-up-primary/15 hover:bg-up-primary text-up-primary hover:text-white border border-up-primary/30 text-[11px] font-semibold transition active:scale-95 cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                <span>Tambah Barcode</span>
+                            </button>
                         </div>
-                        <input type="text" wire:model="editProdukForm.barcode_alt_input" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" placeholder="Pisahkan dengan koma jika lebih dari satu. Cth: SPL-88291, SUP-99012" />
-                        <p class="text-[10px] text-ink-500">Kamera scanner & kasir akan otomatis mengenali barcode utama maupun semua barcode tambahan di atas.</p>
+
+                        @if(!empty($editProdukForm['barcode_alt_list']))
+                            <div class="space-y-2">
+                                @foreach($editProdukForm['barcode_alt_list'] as $idx => $altBc)
+                                    <div class="flex items-center gap-2" wire:key="edit-bc-alt-{{ $idx }}">
+                                        <div class="relative flex-1">
+                                            <div class="absolute inset-y-0 left-0 flex items-center pl-2.5 gap-1.5 pointer-events-none">
+                                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-white/10 text-up-mint">Alt #{{ $idx + 1 }}</span>
+                                            </div>
+                                            <button type="button"
+                                                    onclick="window.uteBarcode && window.uteBarcode.openCameraScanner({ title: 'Scan Barcode Tambahan #{{ $idx + 1 }}', onScan: (code) => { @this.set('editProdukForm.barcode_alt_list.{{ $idx }}', code); } })"
+                                                    class="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-lg text-up-primary hover:text-white hover:bg-up-primary/20 active:scale-95 transition flex items-center justify-center cursor-pointer z-10"
+                                                    title="Scan dengan kamera"
+                                                    aria-label="Scan barcode kamera">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                </svg>
+                                            </button>
+                                            <input type="text"
+                                                   wire:model="editProdukForm.barcode_alt_list.{{ $idx }}"
+                                                   class="w-full pl-16 pr-10 py-2 rounded-xl glass-input text-xs font-mono"
+                                                   placeholder="Cth: SPL-88291 atau SUP-99012" />
+                                        </div>
+                                        <button type="button"
+                                                wire:click="hapusBarcodeAltField({{ $idx }}, 'edit')"
+                                                class="p-2 rounded-xl text-ink-400 hover:text-up-red hover:bg-up-red/10 border border-white/5 transition cursor-pointer"
+                                                title="Hapus Barcode Tambahan #{{ $idx + 1 }}">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="p-3 rounded-xl border border-dashed border-white/10 text-center flex flex-col items-center justify-center gap-1.5 text-ink-400 bg-black/10">
+                                <span class="text-xs">Belum ada barcode tambahan terdaftar.</span>
+                                <button type="button" wire:click="tambahBarcodeAltField('edit')" class="text-[11px] text-up-mint hover:underline font-semibold cursor-pointer">
+                                    + Tambah Barcode Supplier / Alternatif
+                                </button>
+                            </div>
+                        @endif
                     </div>
 
                     <!-- Opsi Penamaan SKU Edit Form -->

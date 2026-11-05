@@ -14,13 +14,19 @@ use App\Modules\Wms\Models\TipeHp;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ExportMasterProdukService
@@ -76,7 +82,7 @@ class ExportMasterProdukService
                 {
                     return [
                         // Sheet 1: Data Produk
-                        new class($this->dataRows) implements FromArray, WithEvents, WithHeadings, WithTitle
+                        new class($this->dataRows) extends DefaultValueBinder implements FromArray, WithColumnFormatting, WithCustomValueBinder, WithEvents, WithHeadings, WithTitle
                         {
                             public function __construct(private array $rows) {}
 
@@ -97,11 +103,44 @@ class ExportMasterProdukService
                                 return array_map(fn ($r) => array_values((array) $r), $this->rows);
                             }
 
+                            public function columnFormats(): array
+                            {
+                                return [
+                                    'A' => NumberFormat::FORMAT_TEXT, // sku
+                                    'C' => NumberFormat::FORMAT_TEXT, // barcode_1
+                                    'D' => NumberFormat::FORMAT_TEXT, // barcode_2
+                                    'E' => NumberFormat::FORMAT_TEXT, // barcode_3
+                                    'F' => NumberFormat::FORMAT_TEXT, // multi_barcode
+                                ];
+                            }
+
+                            public function bindValue(Cell $cell, mixed $value): bool
+                            {
+                                $col = $cell->getColumn();
+                                if (in_array($col, ['A', 'C', 'D', 'E', 'F'], true) && $value !== null) {
+                                    $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+
+                                    return true;
+                                }
+
+                                if (is_string($value) && strlen($value) > 1 && $value[0] === '0' && ctype_digit($value)) {
+                                    $cell->setValueExplicit($value, DataType::TYPE_STRING);
+
+                                    return true;
+                                }
+
+                                return parent::bindValue($cell, $value);
+                            }
+
                             public function registerEvents(): array
                             {
                                 return [
                                     AfterSheet::class => function (AfterSheet $event) {
                                         $sheet = $event->sheet->getDelegate();
+
+                                        // Kunci format teks pada kolom SKU dan Barcode agar awalan nol tidak hilang
+                                        $sheet->getStyle('A:A')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_TEXT);
+                                        $sheet->getStyle('C:F')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_TEXT);
 
                                         // Dropdown Satuan (Kolom G) -> Referensi Sheet 2 (kolom D)
                                         $valSatuan = $sheet->getCell('G2')->getDataValidation();

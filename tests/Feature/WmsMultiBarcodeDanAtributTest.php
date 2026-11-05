@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Exports\ImportProdukTemplateExport;
+use App\Modules\Wms\Livewire\ProdukTab;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
@@ -17,6 +19,7 @@ use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Wms\Services\SmartSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -346,5 +349,49 @@ class WmsMultiBarcodeDanAtributTest extends TestCase
         $this->assertTrue($res150['found']);
         $this->assertEquals('FP-UNIV-999', $res150['sku']);
         $this->assertEquals('barcode_150', $res150['barcode_label']);
+    }
+
+    public function test_sku_dan_barcode_dengan_awalan_nol_dipertahankan(): void
+    {
+        $importService = app(ImportProdukService::class);
+
+        // Uji normalisasi SKU awalan angka 0
+        $this->assertSame('00123', $importService->normalizeSku('00123'));
+        $this->assertSame('00123', $importService->normalizeSku('="00123"'));
+        $this->assertSame('00123', $importService->normalizeSku("'00123"));
+
+        // Uji normalisasi Barcode awalan angka 0
+        $this->assertSame('08991234500001', $importService->normalizeBarcode('08991234500001'));
+        $this->assertSame('08991234500001', $importService->normalizeBarcode('="08991234500001"'));
+        $this->assertSame('08991234500001', $importService->normalizeBarcode("'08991234500001"));
+
+        // Uji template export memiliki column formatting TEXT untuk kolom SKU dan Barcode
+        $templateExport = new ImportProdukTemplateExport;
+        $sheets = $templateExport->sheets();
+        $sheet1 = $sheets[0];
+        $this->assertInstanceOf(WithColumnFormatting::class, $sheet1);
+        $formats = $sheet1->columnFormats();
+        $this->assertEquals('@', $formats['A']);
+        $this->assertEquals('@', $formats['C']);
+        $this->assertEquals('@', $formats['D']);
+        $this->assertEquals('@', $formats['E']);
+        $this->assertEquals('@', $formats['F']);
+    }
+
+    public function test_ui_produk_tab_dedicated_fields_multi_barcode(): void
+    {
+        $this->actingAs($this->admin);
+        session(['cabang_id' => $this->cabang->id]);
+
+        $component = Livewire::test(ProdukTab::class)
+            ->call('openProdukModal')
+            ->assertSet('produkForm.barcode_alt_list', [])
+            ->call('tambahBarcodeAltField', 'tambah')
+            ->assertSet('produkForm.barcode_alt_list', [''])
+            ->set('produkForm.barcode_alt_list.0', 'ALT-BC-001')
+            ->call('tambahBarcodeAltField', 'tambah')
+            ->set('produkForm.barcode_alt_list.1', 'ALT-BC-002')
+            ->call('hapusBarcodeAltField', 0, 'tambah')
+            ->assertSet('produkForm.barcode_alt_list', ['ALT-BC-002']);
     }
 }

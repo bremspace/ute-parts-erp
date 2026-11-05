@@ -76,8 +76,36 @@ class ImportProdukService
     protected ?array $existingProductCache = null;
 
     /**
+     * Normalisasi nilai SKU dari Excel/CSV.
+     * Mempertahankan awalan angka nol (cth: "00123"), membersihkan tanda petik atau formula Excel.
+     */
+    public function normalizeSku(mixed $raw): string
+    {
+        if ($raw === null || $raw === '') {
+            return '';
+        }
+        $str = trim((string) $raw);
+        if ($str === '') {
+            return '';
+        }
+        // Tangani escape formula Excel seperti ="00123" atau '00123
+        if (preg_match('/^=\s*["\'](.*)["\']\s*$/s', $str, $m)) {
+            $str = trim($m[1]);
+        }
+        $str = ltrim($str, "'");
+
+        // Tangani notasi ilmiah dari sel numerik format General (cth 1.23E+04)
+        if (preg_match('/^[0-9]+(\.[0-9]+)?[eE]\+[0-9]+$/', $str) && is_numeric($str)) {
+            return sprintf('%.0f', (float) $str);
+        }
+
+        return trim($str);
+    }
+
+    /**
      * Normalisasi nilai barcode dari Excel/CSV.
-     * Mencegah notasi ilmiah (misal 8.99123E+12) dan float tidak sengaja dari cell format General.
+     * Mempertahankan awalan angka nol (cth: "08991234500001"), membersihkan tanda petik atau formula Excel,
+     * serta mencegah notasi ilmiah (misal 8.99123E+12) dan float tidak sengaja dari cell format General.
      */
     public function normalizeBarcode(mixed $raw): string
     {
@@ -88,6 +116,12 @@ class ImportProdukService
         if ($str === '') {
             return '';
         }
+        // Tangani escape formula Excel seperti ="08123" atau '08123
+        if (preg_match('/^=\s*["\'](.*)["\']\s*$/s', $str, $m)) {
+            $str = trim($m[1]);
+        }
+        $str = ltrim($str, "'");
+
         if (preg_match('/^[0-9]+(\.[0-9]+)?[eE]\+[0-9]+$/', $str) && is_numeric($str)) {
             return sprintf('%.0f', (float) $str);
         }
@@ -95,7 +129,7 @@ class ImportProdukService
             return sprintf('%.0f', (float) $raw);
         }
 
-        return $str;
+        return trim($str);
     }
 
     /**
@@ -1522,8 +1556,8 @@ class ImportProdukService
     {
         return [
             [
-                'sku' => 'LCD-IP13-ORI', 'nama' => 'LCD iPhone 13 Original',
-                'barcode_1' => '8991234500001',
+                'sku' => '00123-IP13-ORI', 'nama' => 'LCD iPhone 13 Original',
+                'barcode_1' => '08991234500001',
                 'barcode_2' => 'SPL-88291',
                 'barcode_3' => 'SUP-99012',
                 'multi_barcode' => 'ALT-QR-1301, ALT-QR-1302',
@@ -1653,7 +1687,13 @@ class ImportProdukService
                         if ($val !== '' && $val !== null) {
                             $hasVal = true;
                         }
-                        $normalized[$targetField] = $val;
+                        $valStr = is_scalar($val) ? trim((string) $val) : $val;
+                        if ($targetField === 'sku') {
+                            $valStr = $this->normalizeSku($valStr);
+                        } elseif (str_starts_with($targetField, 'barcode') || $targetField === 'multi_barcode') {
+                            $valStr = $this->normalizeBarcode($valStr);
+                        }
+                        $normalized[$targetField] = $valStr;
                     }
                 }
             } else {
@@ -1665,7 +1705,13 @@ class ImportProdukService
                     if ($value !== '' && $value !== null) {
                         $hasVal = true;
                     }
-                    $normalized[$heading] = is_scalar($value) ? trim((string) $value) : $value;
+                    $valStr = is_scalar($value) ? trim((string) $value) : $value;
+                    if ($heading === 'sku') {
+                        $valStr = $this->normalizeSku($valStr);
+                    } elseif (str_starts_with($heading, 'barcode') || $heading === 'multi_barcode') {
+                        $valStr = $this->normalizeBarcode($valStr);
+                    }
+                    $normalized[$heading] = $valStr;
                 }
             }
 
@@ -1839,7 +1885,13 @@ class ImportProdukService
                     if ($val !== null && $val !== '') {
                         $hasVal = true;
                     }
-                    $normalized[$targetField] = is_scalar($val) ? trim((string) $val) : $val;
+                    $valStr = is_scalar($val) ? trim((string) $val) : $val;
+                    if ($targetField === 'sku') {
+                        $valStr = $this->normalizeSku($valStr);
+                    } elseif (str_starts_with($targetField, 'barcode') || $targetField === 'multi_barcode') {
+                        $valStr = $this->normalizeBarcode($valStr);
+                    }
+                    $normalized[$targetField] = $valStr;
                 }
 
                 if ($hasVal) {
@@ -1992,7 +2044,13 @@ class ImportProdukService
                 if ($value !== '' && $value !== null) {
                     $hasVal = true;
                 }
-                $normalized[$targetField] = is_scalar($value) ? trim((string) $value) : $value;
+                $valStr = is_scalar($value) ? trim((string) $value) : $value;
+                if ($targetField === 'sku') {
+                    $valStr = $this->normalizeSku($valStr);
+                } elseif (str_starts_with($targetField, 'barcode') || $targetField === 'multi_barcode') {
+                    $valStr = $this->normalizeBarcode($valStr);
+                }
+                $normalized[$targetField] = $valStr;
             }
 
             // Baris kosong total → skip
