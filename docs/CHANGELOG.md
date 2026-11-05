@@ -3,6 +3,14 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-06 — Servis: Perbaikan Guard Serah Terima (Deadlock Pembatalan & Kebocoran Pendapatan)
+
+- **[P0/BUG-1] ServisService::updateStatus()** — Guard `diambil` T-13 menyebabkan deadlock pada tiket batal: transisi `batal → diambil` memaksa `status_pembayaran = 'lunas'`, padahal `bayar()` menolak tiket berstatus `batal` → unit tidak bisa diserahkan, pelanggan dipaksa "bayar" tanpa tagihan sah. Kini tiket `batal`/`ditolak` yang **belum pernah selesai** (`tanggal_selesai` null) dapat diserahkan tanpa biaya (ISO 9001 §8.7: pekerjaan tidak jadi = output nonkonform tidak ditagih).
+- **[P0/BUG-2]** Menutup kebocoran searah sebaliknya: tiket yang jurnal `onSelesai`-nya sudah terposting (pernah `selesai`, piutang diakui) lalu di-override ke `ditolak`/`batal` sebelumnya bisa diserahkan **gratis**. Kini tetap terkunci tanpa lunas; hanya pemegang `servis.override-status` dengan alasan (tercatat audit) yang dapat melepas unit.
+- Aturan tetap: `selesai → diambil` wajib lunas.
+- `labelMap` notifikasi pelanggan kini memuat label `batal` ("Servis Dibatalkan") — sebelumnya WA mengirim kode mentah.
+- **Testing**: `tests/Feature/ServisBatalSerahTerimaTest.php` baru (5 kasus: batal→diambil gratis, ditolak→diambil gratis, batal+dijurnal terkunci tanpa override, ditolak+dijurnal terkunci, selesai→diambil wajib lunas). 22/22 pass pada suite audit + pembayaran + state machine.
+
 ## 2026-11-05 — Optional `kode_produk` on Compatible Phone Types (`TipeHp`) & Full Integration ✅
 
 - **Database & Architecture**:

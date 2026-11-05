@@ -303,9 +303,43 @@ class ServisService
                 throw new \Exception('Alasan wajib diisi saat melakukan override status');
             }
 
-            // [T-13] Guard transisi diambil: harus lunas (kecuali servis batal/ditolak tanpa perbaikan)
-            if ($statusBaru === 'diambil' && $statusLama !== 'ditolak' && $tiket->status_pembayaran !== 'lunas') {
+            // [T-13/P0-AUDIT] Guard transisi diambil (serah terima unit).
+            // Aturan tetap: tiket 'selesai' (jurnal onSelesai sudah diposting,
+            // piutang diakui) WAJIB lunas sebelum unit keluar.
+            //
+            // [P0-AUDIT/BUG-1] Perbaikan deadlock pembatalan: transisi
+            // 'batal' → 'diambil' dulu memaksa status_pembayaran = 'lunas',
+            // padahal bayar() menolak tiket berstatus 'batal' → tiket batal
+            // yang BELUM pernah selesai TERKUNCI PERMANEN (unit tidak bisa
+            // diserahkan, pelanggan dipaksa "bayar" tanpa tagihan sah).
+            // Praktik industri + ISO 9001 (8.7): pekerjaan tidak jadi → tidak
+            // ada output konform yang ditagih → serah terima TANPA biaya.
+            if ($statusBaru === 'diambil' && $statusLama === 'selesai' && $tiket->status_pembayaran !== 'lunas') {
                 throw new \Exception('Unit tidak dapat diserahkan/diambil sebelum pembayaran lunas');
+            }
+
+            // [P0-AUDIT/BUG-2] Tutup kebocoran searah sebaliknya: dulu 'ditolak'
+            // dikecualikan TOTAL dari guard, jadi tiket yang SUDAH pernah
+            // 'selesai' (jurnal + piutang terposting) lalu di-override ke
+            // 'ditolak'/'batal' bisa diserahkan DENGAN GRATIS — pendapatan
+            // hilang. Kini tiket batal/ditolak yang sudah punya jurnal
+            // terposting tetap terkunci tanpa lunas; hanya admin pemegang
+            // `servis.override-status` dengan alasan (tercatat di AuditService
+            // via logStatus) yang dapat melepas unit.
+            if ($statusBaru === 'diambil'
+                && in_array($statusLama, ['batal', 'ditolak'], true)
+                && $tiket->status_pembayaran !== 'lunas'
+                && $tiket->tanggal_selesai !== null) {
+                $aktor = $user;
+                $bolehAltRelease = $aktor
+                    && $aktor->can('servis.override-status')
+                    && ! blank($alasan);
+
+                if (! $bolehAltRelease) {
+                    throw new \Exception(
+                        'Tiket ini sudah memiliki tagihan terposting (jurnal selesai). Lunasi tagihan atau lakukan override dengan alasan sebelum menyerahkan unit.'
+                    );
+                }
             }
 
             $tiket->update(['status' => $statusBaru]);
@@ -348,6 +382,7 @@ class ServisService
             'selesai' => 'Perbaikan Selesai (Siap Diambil)',
             'diambil' => 'Unit Telah Diserahkan',
             'ditolak' => 'Estimasi Ditolak',
+            'batal' => 'Servis Dibatalkan',
         ];
         $labelStatus = $labelMap[$statusBaru] ?? $statusBaru;
         $trackingUrl = $tiket->token_approval ? url("/tracking/{$tiket->token_approval}") : '';
