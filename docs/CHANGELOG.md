@@ -3,6 +3,26 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-05 — Optional `kode_produk` on Compatible Phone Types (`TipeHp`) & Full Integration ✅
+
+- **Database & Architecture**:
+  - Migration `2026_11_05_120000_add_kode_produk_to_tipe_hp_table.php`: adds indexed nullable column `kode_produk` (varchar 100) after `model` on table `tipe_hp`.
+  - Replaced strict unique constraint on `['merk', 'model']` with an index `['merk', 'model']` to permit registering distinct devices sharing identical brand and model names with different product codes (e.g. `Apple iPhone 16 (A3287)` vs `Apple iPhone 16 (A3081)`).
+- **Backend & Model**:
+  - Added `kode_produk` to `TipeHp` fillables and resolution map cache.
+  - Updated `formatNamaTampilan()` to append `(kode_produk)` automatically (e.g. `Apple iPhone 16 (A3287)`).
+  - Updated `SettingsRbac.php` and `ProdukTab.php` quick add validation to allow identical merk+model pairs if their `kode_produk` values differ.
+- **Frontend & UI/UX**:
+  - `settings-rbac.blade.php`: added `kode_produk` input in `showTipeHpModal`, added dedicated `Kode Produk` column in desktop dual-scroll table, badge in mobile cards, and import preview column.
+  - `produk-tab.blade.php`: updated quick-add modal to support `kode_produk`, and unified multi-select compatibility option labels and selected tags to reflect full canonical names including `kode_produk`.
+- **Excel Export & Import Round-trip**:
+  - `AtributProdukExport.php`: updated Tipe HP template and data export sheets with `kode_produk` column and sample rows.
+  - `ImportAtributService.php`: updated preview, normalization, and commit logic to support `kode_produk`.
+  - `ExportMasterProdukService.php` & `ImportProdukService.php`: export formats model as `{model} ({kode_produk})` and product catalog import parser automatically resolves/creates `TipeHp` with matching product codes.
+- **Testing**:
+  - Extended `tests/Feature/KompatibelModelUnlimitedAndPosAlignTest.php` and `tests/Feature/WmsImportExportAtributTest.php` to verify full export, import, multi-product-code coexistence, and CRUD flows.
+
+
 ## 2026-11-05 — Master Product Attribute Permanent Default Fallback & Safe Full CRUD ✅
 
 - **Database & Model Fallback Protection**:
