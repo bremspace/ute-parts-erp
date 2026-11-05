@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Marketplace\Livewire\ShopPage;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
@@ -14,6 +15,7 @@ use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -210,5 +212,89 @@ class KompatibelModelUnlimitedAndPosAlignTest extends TestCase
         ]);
 
         $this->assertEquals(['Realme C67', 'Realme 11 Pro'], $pString->daftar_kompatibel->all());
+    }
+
+    public function test_tipe_hp_format_nama_tampilan_and_resolve_label(): void
+    {
+        // 1. Model iPhone 11 dengan merk Apple -> Apple iPhone 11
+        $this->assertEquals('Apple iPhone 11', TipeHp::formatNamaTampilan('Apple', 'iPhone 11'));
+
+        // 2. Model 11 dengan merk Apple -> Apple iPhone 11
+        $this->assertEquals('Apple iPhone 11', TipeHp::formatNamaTampilan('Apple', '11'));
+
+        // 3. Nama lengkap atribut terisi -> Apple iPhone 11 (A2221)
+        $this->assertEquals('Apple iPhone 11 (A2221)', TipeHp::formatNamaTampilan('Apple', 'iPhone 11', 'Apple iPhone 11 (A2221)'));
+        $this->assertEquals('Apple iPhone 11 (A2221)', TipeHp::formatNamaTampilan('Apple', 'iPhone 11', 'iPhone 11 (A2221)'));
+
+        // 4. Model Galaxy A52 dengan merk Samsung -> Samsung Galaxy A52
+        $this->assertEquals('Samsung Galaxy A52', TipeHp::formatNamaTampilan('Samsung', 'Galaxy A52'));
+
+        // 5. Model sudah mengandung merk -> Samsung Galaxy A52 (tidak dobel)
+        $this->assertEquals('Samsung Galaxy A52', TipeHp::formatNamaTampilan('Samsung', 'Samsung Galaxy A52'));
+
+        // 6. Generic / Universal
+        $this->assertEquals('Multi-Brand Qualcomm', TipeHp::formatNamaTampilan('Universal', 'Multi-Brand Qualcomm'));
+
+        // 7. Resolusi dari database TipeHp
+        TipeHp::updateOrCreate(
+            ['merk' => 'Apple', 'model' => 'iPhone 11'],
+            ['nama' => 'Apple iPhone 11 (A2221)', 'is_active' => true]
+        );
+        Cache::forget('tipe_hp_resolution_map');
+
+        $this->assertEquals('Apple iPhone 11 (A2221)', TipeHp::resolveLabelForModel('iPhone 11'));
+        $this->assertEquals('Apple iPhone 11 (A2221)', TipeHp::resolveLabelForModel('iPhone 11', 'Apple'));
+    }
+
+    public function test_filter_dropdown_tipe_hp_includes_brand_in_pos_kasir(): void
+    {
+        TipeHp::updateOrCreate(
+            ['merk' => 'Apple', 'model' => 'iPhone 11'],
+            ['nama' => 'Apple iPhone 11 (A2221)', 'is_active' => true]
+        );
+        TipeHp::updateOrCreate(
+            ['merk' => 'Samsung', 'model' => 'Galaxy A52'],
+            ['nama' => null, 'is_active' => true]
+        );
+        Cache::forget('tipe_hp_resolution_map');
+
+        $this->actingAs($this->user);
+        session(['cabang_id' => $this->cabang->id]);
+
+        Livewire::test(PosKasir::class)
+            ->assertSeeHtml('Apple iPhone 11 (A2221)')
+            ->assertSeeHtml('Samsung Galaxy A52');
+    }
+
+    public function test_filter_dropdown_tipe_hp_includes_brand_in_web_konsumen_shop_catalog(): void
+    {
+        TipeHp::updateOrCreate(
+            ['merk' => 'Apple', 'model' => 'iPhone 11'],
+            ['nama' => 'Apple iPhone 11 (A2221)', 'is_active' => true]
+        );
+        TipeHp::updateOrCreate(
+            ['merk' => 'Samsung', 'model' => 'Galaxy A52'],
+            ['nama' => null, 'is_active' => true]
+        );
+        TipeHp::clearResolutionCache();
+
+        $p = Produk::create([
+            'nama' => 'LCD Apple iPhone 11 Premium',
+            'kategori' => 'LCD',
+            'satuan' => 'PCS',
+            'harga_beli' => 200000,
+            'harga_jual_retail' => 350000,
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11',
+            'is_active' => true,
+        ]);
+
+        $thApple = TipeHp::where('model', 'iPhone 11')->first();
+        if ($thApple) {
+            $p->tipeHps()->sync([$thApple->id]);
+        }
+
+        Livewire::test(ShopPage::class)
+            ->assertSeeHtml('Apple iPhone 11 (A2221)');
     }
 }

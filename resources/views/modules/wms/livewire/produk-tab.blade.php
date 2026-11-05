@@ -120,46 +120,7 @@
                                 <select wire:model.live="filterModelKompatibel" class="px-3 py-2 {{ $filterModelKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter berdasarkan Tipe/Model Smartphone Kompatibel">
                                     <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
                                     @foreach($modelKompatibelList as $mk)
-                                        @php
-                                            $brandFilter = trim((string) ($filterBrandKompatibel ?? ''));
-                                            $lowerMk = strtolower($mk);
-                                            $nonPhoneMerks = ['Accessories', 'Tg', 'Tools Service', 'Universal', 'OEM'];
-                                            if (in_array($lowerMk, ['universal', 'semua tipe hp'], true)) {
-                                                $mkLabel = $mk;
-                                            } elseif (!empty($brandFilter)) {
-                                                if (in_array($brandFilter, $nonPhoneMerks, true) || str_starts_with($lowerMk, strtolower($brandFilter))) {
-                                                    $mkLabel = $mk;
-                                                } elseif (strcasecmp($brandFilter, 'Apple') === 0) {
-                                                    if (str_starts_with($lowerMk, 'iphone') || str_starts_with($lowerMk, 'ipad')) {
-                                                        $mkLabel = $mk;
-                                                    } elseif (preg_match('/^\d+(\s*(pro|plus|max|mini|e))?/i', $mk)) {
-                                                        $mkLabel = 'iPhone ' . $mk;
-                                                    } else {
-                                                        $mkLabel = $brandFilter . ' ' . $mk;
-                                                    }
-                                                } elseif (str_starts_with($lowerMk, 'galaxy') || str_starts_with($lowerMk, 'redmi') || str_starts_with($lowerMk, 'poco') || str_starts_with($lowerMk, 'pixel')) {
-                                                    $mkLabel = $mk;
-                                                } else {
-                                                    $mkLabel = $brandFilter . ' ' . $mk;
-                                                }
-                                            } else {
-                                                if (str_starts_with($lowerMk, 'iphone') || str_starts_with($lowerMk, 'ipad') || str_starts_with($lowerMk, 'galaxy') || str_starts_with($lowerMk, 'redmi') || str_starts_with($lowerMk, 'poco') || str_starts_with($lowerMk, 'pixel')) {
-                                                    $mkLabel = $mk;
-                                                } else {
-                                                    $foundTh = isset($tipeHpList) ? ($tipeHpList->where('model', $mk)->first(fn($t) => !in_array($t->merk, $nonPhoneMerks, true)) ?? $tipeHpList->firstWhere('model', $mk)) : null;
-                                                    if ($foundTh && !empty($foundTh->merk) && !in_array($foundTh->merk, $nonPhoneMerks, true) && !str_starts_with($lowerMk, strtolower($foundTh->merk))) {
-                                                        if (strcasecmp($foundTh->merk, 'Apple') === 0 && preg_match('/^\d+/i', $mk)) {
-                                                            $mkLabel = 'iPhone ' . $mk;
-                                                        } else {
-                                                            $mkLabel = $foundTh->merk . ' ' . $mk;
-                                                        }
-                                                    } else {
-                                                        $mkLabel = $mk;
-                                                    }
-                                                }
-                                            }
-                                        @endphp
-                                        <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mkLabel }}</option>
+                                        <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
                                     @endforeach
                                 </select>
                                 @if($filterModelKompatibel)
@@ -829,46 +790,7 @@
                                                     <select wire:model.live="filterModelKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
                                                         <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
                                                         @foreach($modelKompatibelList as $mk)
-                                                            @php
-                                                                $brandFilter = trim((string) ($filterBrandKompatibel ?? ''));
-                                                                $lowerMk = strtolower($mk);
-                                                                $nonPhoneMerks = ['Accessories', 'Tg', 'Tools Service', 'Universal', 'OEM'];
-                                                                if (in_array($lowerMk, ['universal', 'semua tipe hp'], true)) {
-                                                                    $mkLabel = $mk;
-                                                                } elseif (!empty($brandFilter)) {
-                                                                    if (in_array($brandFilter, $nonPhoneMerks, true) || str_starts_with($lowerMk, strtolower($brandFilter))) {
-                                                                        $mkLabel = $mk;
-                                                                    } elseif (strcasecmp($brandFilter, 'Apple') === 0) {
-                                                                        if (str_starts_with($lowerMk, 'iphone') || str_starts_with($lowerMk, 'ipad')) {
-                                                                            $mkLabel = $mk;
-                                                                        } elseif (preg_match('/^\d+(\s*(pro|plus|max|mini|e))?/i', $mk)) {
-                                                                            $mkLabel = 'iPhone ' . $mk;
-                                                                        } else {
-                                                                            $mkLabel = $brandFilter . ' ' . $mk;
-                                                                        }
-                                                                    } elseif (str_starts_with($lowerMk, 'galaxy') || str_starts_with($lowerMk, 'redmi') || str_starts_with($lowerMk, 'poco') || str_starts_with($lowerMk, 'pixel')) {
-                                                                        $mkLabel = $mk;
-                                                                    } else {
-                                                                        $mkLabel = $brandFilter . ' ' . $mk;
-                                                                    }
-                                                                } else {
-                                                                    if (str_starts_with($lowerMk, 'iphone') || str_starts_with($lowerMk, 'ipad') || str_starts_with($lowerMk, 'galaxy') || str_starts_with($lowerMk, 'redmi') || str_starts_with($lowerMk, 'poco') || str_starts_with($lowerMk, 'pixel')) {
-                                                                        $mkLabel = $mk;
-                                                                    } else {
-                                                                        $foundTh = isset($tipeHpList) ? ($tipeHpList->where('model', $mk)->first(fn($t) => !in_array($t->merk, $nonPhoneMerks, true)) ?? $tipeHpList->firstWhere('model', $mk)) : null;
-                                                                        if ($foundTh && !empty($foundTh->merk) && !in_array($foundTh->merk, $nonPhoneMerks, true) && !str_starts_with($lowerMk, strtolower($foundTh->merk))) {
-                                                                            if (strcasecmp($foundTh->merk, 'Apple') === 0 && preg_match('/^\d+/i', $mk)) {
-                                                                                $mkLabel = 'iPhone ' . $mk;
-                                                                            } else {
-                                                                                $mkLabel = $foundTh->merk . ' ' . $mk;
-                                                                            }
-                                                                        } else {
-                                                                            $mkLabel = $mk;
-                                                                        }
-                                                                    }
-                                                                }
-                                                            @endphp
-                                                            <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mkLabel }}</option>
+                                                            <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
                                                         @endforeach
                                                     </select>
                                                 </div>

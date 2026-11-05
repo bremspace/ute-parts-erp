@@ -3,6 +3,21 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-05 — Unified Phone Model Filter Dropdown & Brand Label Resolution ✅
+
+- **TipeHp Canonical Label Resolution**:
+  - Implemented `TipeHp::formatNamaTampilan(?string $merk, ?string $model, ?string $nama)` and `nama_tampilan` accessor.
+  - Automatically prepends brand to model (e.g. `Apple iPhone 11`, `Samsung Galaxy A52`) and utilizes full catalog attribute display names when populated (e.g. `Apple iPhone 11 (A2221)`).
+  - Handles Apple numeric models (e.g. `11` -> `Apple iPhone 11`) and avoids duplications (e.g. `Samsung Samsung Galaxy`).
+  - Added `TipeHp::resolveLabelForModel(string $model, ?string $brandHint)` with cached query resolution map and cache invalidation on save/delete.
+- **Cross-Module Dropdown Synchronization (Desktop & Mobile)**:
+  - **POS Kasir (`pos-kasir.blade.php`)**: Unified both desktop filter bar and mobile filter bottom sheet to render canonical `{Merk} {Model}` labels across `tipeHpList`, `modelKompatibelList`, and active filter badges.
+  - **WMS Master Produk (`produk-tab.blade.php`)**: Standardized filter dropdowns and active indicators to show unified brand-prepended model names.
+  - **WMS Product Search Modal (`product-search-modal.blade.php`)**: Aligned modal dropdown options for Tipe HP and Model Kompatibel.
+  - **Web Konsumen / Marketplace (`shop-catalog.blade.php`)**: Cleaned up inline heuristic duplication in favor of `TipeHp::resolveLabelForModel`, keeping canonical model values for URL routing and queries while displaying full brand-prepended labels in mobile and desktop selectors, breadcrumbs, and active filter tags.
+- **Testing**:
+  - Expanded `tests/Feature/KompatibelModelUnlimitedAndPosAlignTest.php` with unit tests for label formatting, database cache resolution, POS cashier HTML rendering, and Web Konsumen catalog assertions (7 passed, 23 assertions).
+
 ## 2026-11-05 — POS Mobile Search & Transaction UI/UX Refactor ✅
 
 - **Mobile Search & Floating Overlay**:

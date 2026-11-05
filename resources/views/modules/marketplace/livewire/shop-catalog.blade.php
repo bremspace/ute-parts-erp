@@ -54,10 +54,11 @@
             ];
         }
         if (!empty($filterHpModel)) {
+            $formattedModelLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($filterHpModel, $filterHpMerk ?: null);
             $catalogBreadcrumbs['itemListElement'][] = [
                 '@type' => 'ListItem',
                 'position' => $pos++,
-                'name' => $filterHpModel,
+                'name' => $formattedModelLabel,
                 'item' => route('shop', ['kategori' => $filterKategori, 'hpModel' => $filterHpModel]),
             ];
         }
@@ -495,7 +496,7 @@
         @if(!empty($filterHpModel))
             <span class="text-ink-300 dark:text-ink-700">/</span>
             <span class="text-ink-900 dark:text-white font-bold flex items-center gap-1">
-                <span>{{ !empty($activeCategoryName) ? $activeCategoryName . ' ' : '' }}{{ $filterHpModel }}</span>
+                <span>{{ !empty($activeCategoryName) ? $activeCategoryName . ' ' : '' }}{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($filterHpModel, $filterHpMerk ?: null) }}</span>
                 <button type="button" wire:click="resetSingleFilter('hpModel')" class="hover:text-up-red text-ink-400 text-[10px] ml-1 cursor-pointer" title="Hapus filter model">✕</button>
             </span>
         @endif
@@ -555,7 +556,7 @@
         @endif
         @if(!empty($filterHpModel))
             <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-up-primary/10 text-up-primary border border-up-primary/20 text-[11px] font-semibold">
-                <span>Model: {{ $filterHpModel }}</span>
+                <span>Model: {{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($filterHpModel, $filterHpMerk ?: null) }}</span>
                 <button type="button" wire:click="resetSingleFilter('hpModel')" class="hover:text-up-red font-bold cursor-pointer">✕</button>
             </span>
         @endif
@@ -719,50 +720,7 @@
                         @php
                             $m = is_numeric($key) ? $val : $key;
                             $count = is_numeric($key) ? null : $val;
-                            $brand = trim((string) ($filterHpMerk ?? ''));
-                            $lowerM = strtolower($m);
-                            $nonPhoneMerks = ['Accessories', 'Tg', 'Tools Service', 'Universal', 'OEM'];
-                            if (in_array($lowerM, ['universal', 'semua tipe hp'], true)) {
-                                $mLabel = $m;
-                            } elseif (!empty($brand)) {
-                                if (in_array($brand, $nonPhoneMerks, true) || str_starts_with($lowerM, strtolower($brand))) {
-                                    $mLabel = $m;
-                                } elseif (strcasecmp($brand, 'Apple') === 0) {
-                                    if (str_starts_with($lowerM, 'iphone') || str_starts_with($lowerM, 'ipad')) {
-                                        $mLabel = $m;
-                                    } elseif (preg_match('/^\d+(\s*(pro|plus|max|mini|e))?/i', $m)) {
-                                        $mLabel = 'iPhone ' . $m;
-                                    } else {
-                                        $mLabel = $brand . ' ' . $m;
-                                    }
-                                } elseif (str_starts_with($lowerM, 'galaxy') || str_starts_with($lowerM, 'redmi') || str_starts_with($lowerM, 'poco') || str_starts_with($lowerM, 'pixel')) {
-                                    $mLabel = $m;
-                                } else {
-                                    $mLabel = $brand . ' ' . $m;
-                                }
-                            } else {
-                                static $tipeHpMap = null;
-                                if ($tipeHpMap === null) {
-                                    $tipeHpMap = \Illuminate\Support\Facades\Cache::remember('shop_tipe_hp_map', 300, function () {
-                                        return \App\Modules\Wms\Models\TipeHp::where('is_active', true)
-                                            ->select('merk', 'model')
-                                            ->get()
-                                            ->filter(fn($t) => !in_array($t->merk, ['Accessories', 'Tg', 'Tools Service', 'Universal', 'OEM'], true))
-                                            ->pluck('merk', 'model')
-                                            ->all();
-                                    });
-                                }
-                                $inferredMerk = $tipeHpMap[$m] ?? null;
-                                if ($inferredMerk && !in_array($inferredMerk, $nonPhoneMerks, true) && !str_starts_with($lowerM, strtolower($inferredMerk))) {
-                                    if (strcasecmp($inferredMerk, 'Apple') === 0 && preg_match('/^\d+/i', $m)) {
-                                        $mLabel = 'iPhone ' . $m;
-                                    } else {
-                                        $mLabel = $inferredMerk . ' ' . $m;
-                                    }
-                                } else {
-                                    $mLabel = $m;
-                                }
-                            }
+                            $mLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($m, $filterHpMerk ?: null);
                         @endphp
                         <option value="{{ $m }}">{{ $mLabel }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
                     @endforeach

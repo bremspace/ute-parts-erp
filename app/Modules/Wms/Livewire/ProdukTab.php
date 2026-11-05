@@ -4115,7 +4115,7 @@ class ProdukTab extends Component
             ->get();
         $tipeHpOptions = $tipeHpList->map(fn ($t) => [
             'id' => $t->id,
-            'label' => "{$t->merk} {$t->model}",
+            'label' => $t->nama_tampilan,
         ])->all();
 
         $selectedIds = array_filter(array_merge(

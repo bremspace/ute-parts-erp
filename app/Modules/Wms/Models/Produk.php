@@ -291,39 +291,13 @@ class Produk extends Model
         $list = collect();
 
         if ($this->relationLoaded('tipeHps') && $this->tipeHps->isNotEmpty()) {
-            $list = $list->merge($this->tipeHps->map(function ($t) {
-                $merk = trim((string) ($t->merk ?? ''));
-                $model = trim((string) ($t->model ?? ''));
-                if ($merk !== '' && ! str_starts_with(strtolower($model), strtolower($merk))) {
-                    return "{$merk} {$model}";
-                }
-
-                return $model ?: $merk;
-            }));
-        }
-
-        if (is_array($this->kompatibilitas_hp) && ! empty($this->kompatibilitas_hp)) {
-            $list = $list->merge(collect($this->kompatibilitas_hp)->map(function ($t) {
-                $merk = trim((string) ($t['merk'] ?? ''));
-                $model = trim((string) ($t['model'] ?? ''));
-                if ($merk !== '' && ! str_starts_with(strtolower($model), strtolower($merk))) {
-                    return "{$merk} {$model}";
-                }
-
-                return $model ?: $merk;
-            }));
-        }
-
-        if (! empty($this->model_kompatibel)) {
+            $list = $this->tipeHps->map(fn ($t) => $t->nama_tampilan);
+        } elseif (is_array($this->kompatibilitas_hp) && ! empty($this->kompatibilitas_hp)) {
+            $list = collect($this->kompatibilitas_hp)->map(fn ($t) => TipeHp::formatNamaTampilan($t['merk'] ?? '', $t['model'] ?? ''));
+        } elseif (! empty($this->model_kompatibel)) {
             $m = trim((string) ($this->brand_kompatibel ?? ''));
             $rawModels = array_filter(array_map('trim', explode(',', (string) $this->model_kompatibel)));
-            $list = $list->merge(collect($rawModels)->map(function ($mod) use ($m) {
-                if ($m !== '' && ! str_contains($m, ',') && ! str_starts_with(strtolower($mod), strtolower($m))) {
-                    return "{$m} {$mod}";
-                }
-
-                return $mod;
-            }));
+            $list = collect($rawModels)->map(fn ($mod) => TipeHp::resolveLabelForModel($mod, $m));
         }
 
         return $list->filter()->unique()->values();
