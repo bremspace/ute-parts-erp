@@ -37,7 +37,7 @@ cp stop-server.sh "$TMP_DIR/"
 cp compose.client.yaml "$TMP_DIR/compose.yaml"
 
 # Salin skrip pembantu & konfigurasi docker
-mkdir -p "$TMP_DIR/scripts/license" "$TMP_DIR/scripts/updater" "$TMP_DIR/docker/nginx"
+mkdir -p "$TMP_DIR/scripts/license" "$TMP_DIR/scripts/updater" "$TMP_DIR/docker/nginx" "$TMP_DIR/public"
 cp scripts/install-docker.ps1 "$TMP_DIR/scripts/"
 cp scripts/install-docker.sh "$TMP_DIR/scripts/"
 cp scripts/install-termux.sh "$TMP_DIR/scripts/"
@@ -51,6 +51,8 @@ cp scripts/license/LicenseVerifier.php "$TMP_DIR/scripts/license/"
 cp scripts/updater/SystemUpdater.php "$TMP_DIR/scripts/updater/"
 
 cp docker/nginx/default.conf "$TMP_DIR/docker/nginx/"
+cp docker/entrypoint.sh "$TMP_DIR/docker/"
+cp public/install.php "$TMP_DIR/public/"
 
 if [ -f ".env.example" ]; then
     cp .env.example "$TMP_DIR/.env.example"
