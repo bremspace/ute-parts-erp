@@ -34,8 +34,8 @@ services:
     restart: unless-stopped
     ports:
       - "1741:1741"
-      - "80:80"
-      - "443:443"
+      # - "80:80"
+      # - "443:443"
     volumes:
       - .:/var/www/html:ro
       - ./public:/var/www/html/public:ro

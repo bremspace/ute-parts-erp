@@ -37,6 +37,11 @@ if (! $isInstalled && file_exists($envFile)) {
 // HELPER FUNCTIONS & DIAGNOSTICS
 // =============================================================================
 
+function isDockerEnvironment(): bool
+{
+    return file_exists('/.dockerenv') || getenv('IS_DOCKER') === 'true' || getenv('DB_HOST') === 'db';
+}
+
 function getPhpBinary(): string
 {
     $winToolsPhp = dirname(__DIR__).DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'php'.DIRECTORY_SEPARATOR.'php.exe';
@@ -367,6 +372,7 @@ function checkServerDiagnostics(): array
     return [
         'os' => $osInfo,
         'is_windows' => $isWindows,
+        'is_docker' => isDockerEnvironment(),
         'php_version' => PHP_VERSION,
         'php_ok' => version_compare(PHP_VERSION, '8.4.0', '>='),
         'php_ini' => $iniPath,
@@ -727,41 +733,93 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
             exit;
         }
 
-        $host = trim($_POST['db_host'] ?? '127.0.0.1');
-        $port = trim($_POST['db_port'] ?? '3306');
-        $name = trim($_POST['db_name'] ?? 'erp_pos_db');
-        $user = trim($_POST['db_user'] ?? 'root');
-        $pass = trim($_POST['db_pass'] ?? '');
+        $isDocker = isDockerEnvironment();
+        $defaultHost = $isDocker ? 'db' : '127.0.0.1';
+        $defaultName = $isDocker ? (getenv('DB_DATABASE') ?: 'bremspace_erp') : 'erp_pos_db';
+        $defaultUser = $isDocker ? (getenv('DB_USERNAME') ?: 'bremspace') : 'root';
+        $defaultPass = $isDocker ? (getenv('DB_PASSWORD') ?: 'bremspace_secret') : '';
 
+        $host = trim($_POST['db_host'] ?? $defaultHost);
+        $port = trim($_POST['db_port'] ?? '3306');
+        $name = trim($_POST['db_name'] ?? $defaultName);
+        $user = trim($_POST['db_user'] ?? $defaultUser);
+        $pass = trim($_POST['db_pass'] ?? $defaultPass);
+
+        $pdo = null;
+        $triedFallback = false;
         try {
             // Coba koneksi ke server dulu
             $pdo = new PDO("mysql:host={$host};port={$port}", $user, $pass, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_TIMEOUT => 3,
             ]);
-
-            // Cek apakah database sudah ada
-            $stmt = $pdo->query("SHOW DATABASES LIKE '{$name}'");
-            $exists = (bool) $stmt->fetch();
-
-            if (! $exists && ! empty($_POST['create_if_missing'])) {
-                $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-                $exists = true;
+        } catch (PDOException $e) {
+            // Jika berjalan di dalam Docker dan user memakai 127.0.0.1 / localhost, alihkan ke host container 'db'
+            if ($isDocker && ($host === '127.0.0.1' || $host === 'localhost')) {
+                try {
+                    $pdo = new PDO("mysql:host=db;port={$port}", $user, $pass, [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_TIMEOUT => 3,
+                    ]);
+                    $host = 'db';
+                    $triedFallback = true;
+                } catch (PDOException) {
+                    // Coba dengan credential default compose jika sebelumnya user 'root'
+                    try {
+                        $fallbackUser = getenv('DB_USERNAME') ?: 'bremspace';
+                        $fallbackPass = getenv('DB_PASSWORD') ?: 'bremspace_secret';
+                        $pdo = new PDO("mysql:host=db;port={$port}", $fallbackUser, $fallbackPass, [
+                            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                            PDO::ATTR_TIMEOUT => 3,
+                        ]);
+                        $host = 'db';
+                        $user = $fallbackUser;
+                        $pass = $fallbackPass;
+                        $triedFallback = true;
+                    } catch (PDOException) {
+                        // Abaikan jika tetap gagal
+                    }
+                }
             }
 
-            echo json_encode([
-                'success' => true,
-                'message' => $exists
-                    ? "Koneksi berhasil! Database '{$name}' siap digunakan."
-                    : "Koneksi ke MySQL sukses, namun database '{$name}' belum ada (centang opsi buat otomatis).",
-                'db_exists' => $exists,
-            ]);
-        } catch (PDOException $e) {
-            echo json_encode([
-                'success' => false,
-                'message' => 'Gagal koneksi MySQL: '.$e->getMessage().' (Pastikan service MySQL aktif, atau pilih SQLite).',
-            ]);
+            if (! $pdo) {
+                $extraMsg = $isDocker && ($host === '127.0.0.1' || $host === 'localhost')
+                    ? ' Catatan Docker: Host container MySQL adalah "db", bukan "127.0.0.1".'
+                    : '';
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Gagal koneksi MySQL: '.$e->getMessage().' (Pastikan service MySQL aktif, atau pilih SQLite).'.$extraMsg,
+                    'suggest_docker_switch' => $isDocker,
+                ]);
+                exit;
+            }
         }
+
+        // Cek apakah database sudah ada
+        $stmt = $pdo->query("SHOW DATABASES LIKE '{$name}'");
+        $exists = (bool) $stmt->fetch();
+
+        if (! $exists && ! empty($_POST['create_if_missing'])) {
+            $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $exists = true;
+        }
+
+        $msg = $exists
+            ? "Koneksi berhasil! Database '{$name}' siap digunakan."
+            : "Koneksi ke MySQL sukses, namun database '{$name}' belum ada (centang opsi buat otomatis).";
+
+        if ($triedFallback) {
+            $msg = "✔ Host dialihkan otomatis ke container MySQL ('{$host}'). ".$msg;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => $msg,
+            'db_exists' => $exists,
+            'auto_switched_host' => $triedFallback ? $host : null,
+            'auto_switched_user' => $triedFallback ? $user : null,
+            'auto_switched_pass' => $triedFallback ? $pass : null,
+        ]);
         exit;
     }
 
@@ -895,19 +953,43 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                         }
                         $dbConfig = "DB_CONNECTION=sqlite\nDB_DATABASE={$sqliteRel}\nDB_HOST=127.0.0.1\nDB_PORT=3306\nDB_USERNAME=root\nDB_PASSWORD=";
                     } else {
-                        $dbHost = trim($_POST['db_host'] ?? '127.0.0.1');
+                        $isDocker = isDockerEnvironment();
+                        $defaultHost = $isDocker ? 'db' : '127.0.0.1';
+                        $defaultName = $isDocker ? (getenv('DB_DATABASE') ?: 'bremspace_erp') : 'erp_pos_db';
+                        $defaultUser = $isDocker ? (getenv('DB_USERNAME') ?: 'bremspace') : 'root';
+                        $defaultPass = $isDocker ? (getenv('DB_PASSWORD') ?: 'bremspace_secret') : '';
+
+                        $dbHost = trim($_POST['db_host'] ?? $defaultHost);
                         $dbPort = trim($_POST['db_port'] ?? '3306');
-                        $dbName = trim($_POST['db_name'] ?? 'erp_pos_db');
-                        $dbUser = trim($_POST['db_user'] ?? 'root');
-                        $dbPass = trim($_POST['db_pass'] ?? '');
+                        $dbName = trim($_POST['db_name'] ?? $defaultName);
+                        $dbUser = trim($_POST['db_user'] ?? $defaultUser);
+                        $dbPass = trim($_POST['db_pass'] ?? $defaultPass);
+
+                        if ($isDocker && ($dbHost === '127.0.0.1' || $dbHost === 'localhost')) {
+                            try {
+                                $pdoTest = new PDO("mysql:host=db;port={$dbPort}", $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 2]);
+                                $dbHost = 'db';
+                            } catch (Throwable) {
+                                if ($dbUser === 'root' && empty($dbPass)) {
+                                    try {
+                                        $fallbackUser = getenv('DB_USERNAME') ?: 'bremspace';
+                                        $fallbackPass = getenv('DB_PASSWORD') ?: 'bremspace_secret';
+                                        $pdoTest = new PDO("mysql:host=db;port={$dbPort}", $fallbackUser, $fallbackPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 2]);
+                                        $dbHost = 'db';
+                                        $dbUser = $fallbackUser;
+                                        $dbPass = $fallbackPass;
+                                    } catch (Throwable) {
+                                    }
+                                }
+                            }
+                        }
+
                         $dbConfig = "DB_CONNECTION=mysql\nDB_HOST={$dbHost}\nDB_PORT={$dbPort}\nDB_DATABASE={$dbName}\nDB_USERNAME={$dbUser}\nDB_PASSWORD={$dbPass}";
 
-                        if (($dbHost === '127.0.0.1' || $dbHost === 'localhost') && ! empty($dbUser)) {
-                            try {
-                                $pdo = new PDO("mysql:host={$dbHost};port={$dbPort}", $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 3]);
-                                $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-                            } catch (Throwable) {
-                            }
+                        try {
+                            $pdo = new PDO("mysql:host={$dbHost};port={$dbPort}", $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 3]);
+                            $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                        } catch (Throwable) {
                         }
                     }
 
@@ -1117,6 +1199,11 @@ EOF;
 }
 
 $diag = checkServerDiagnostics();
+$isDocker = isDockerEnvironment();
+$defaultDbHost = $isDocker ? 'db' : '127.0.0.1';
+$defaultDbName = $isDocker ? (getenv('DB_DATABASE') ?: 'bremspace_erp') : 'erp_pos_db';
+$defaultDbUser = $isDocker ? (getenv('DB_USERNAME') ?: 'bremspace') : 'root';
+$defaultDbPass = $isDocker ? (getenv('DB_PASSWORD') ?: 'bremspace_secret') : '';
 $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http').'://'.($_SERVER['HTTP_HOST'] ?? 'localhost');
 ?>
 <!DOCTYPE html>
@@ -1506,9 +1593,18 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
 
             <!-- MySQL Connection Fields -->
             <div id="mysql-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <?php if ($isDocker) { ?>
+                <div class="sm:col-span-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-300 text-[11px] flex items-center gap-2.5">
+                    <span class="text-base">🐳</span>
+                    <div>
+                        <div class="font-bold">Lingkungan Docker Terdeteksi</div>
+                        <div class="text-blue-300/80 mt-0.5">Host database disetel otomatis ke <code>db</code> (service container MySQL) dengan user <code><?= htmlspecialchars($defaultDbUser) ?></code>.</div>
+                    </div>
+                </div>
+                <?php } ?>
                 <div>
                     <label class="block font-bold text-slate-300 mb-1">Database Host</label>
-                    <input type="text" id="db_host" value="127.0.0.1" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
+                    <input type="text" id="db_host" value="<?= htmlspecialchars($defaultDbHost) ?>" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-300 mb-1">Port</label>
@@ -1516,15 +1612,15 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                 </div>
                 <div>
                     <label class="block font-bold text-slate-300 mb-1">Nama Database</label>
-                    <input type="text" id="db_name" value="erp_pos_db" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
+                    <input type="text" id="db_name" value="<?= htmlspecialchars($defaultDbName) ?>" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-300 mb-1">Username MySQL</label>
-                    <input type="text" id="db_user" value="root" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
+                    <input type="text" id="db_user" value="<?= htmlspecialchars($defaultDbUser) ?>" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
                 </div>
                 <div class="sm:col-span-2">
                     <label class="block font-bold text-slate-300 mb-1">Password MySQL</label>
-                    <input type="password" id="db_pass" placeholder="Kosongkan jika tanpa password" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
+                    <input type="password" id="db_pass" value="<?= htmlspecialchars($defaultDbPass) ?>" placeholder="Kosongkan jika tanpa password" class="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-white font-mono focus:border-indigo-500 outline-none">
                 </div>
                 <div class="sm:col-span-2 flex items-center gap-2">
                     <input type="checkbox" id="db_create" checked class="rounded text-indigo-600 focus:ring-0">
@@ -2209,13 +2305,31 @@ async function testDatabaseConnection() {
         const res = await fetch('install.php', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success) {
+            if (data.auto_switched_host) {
+                document.getElementById('db_host').value = data.auto_switched_host;
+            }
+            if (data.auto_switched_user && (!document.getElementById('db_user').value || document.getElementById('db_user').value === 'root')) {
+                document.getElementById('db_user').value = data.auto_switched_user;
+            }
+            if (data.auto_switched_pass && !document.getElementById('db_pass').value) {
+                document.getElementById('db_pass').value = data.auto_switched_pass;
+            }
             resBox.className = 'p-3 rounded-xl text-xs font-mono bg-emerald-500/10 border border-emerald-500/30 text-emerald-300';
             resBox.textContent = '✓ ' + data.message;
         } else {
             resBox.className = 'p-3 rounded-xl text-xs font-mono bg-rose-500/10 border border-rose-500/30 text-rose-300';
             let extraAction = '';
+            if (data.suggest_docker_switch) {
+                extraAction += `
+                    <div class="mt-2.5 pt-2 border-t border-rose-500/20 flex flex-wrap gap-2 items-center">
+                        <button type="button" onclick="setDockerDbDefaults(); testDatabaseConnection();" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-sans font-bold text-[11px] transition cursor-pointer">
+                            🐳 Pakai Host 'db' & Kredensial Docker Otomatis
+                        </button>
+                    </div>
+                `;
+            }
             if (driver === 'mysql') {
-                extraAction = `
+                extraAction += `
                     <div class="mt-2.5 pt-2 border-t border-rose-500/20 flex flex-wrap gap-2 items-center">
                         <button type="button" onclick="toggleDbDriver('sqlite'); testDatabaseConnection();" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-sans font-bold text-[11px] transition cursor-pointer">
                             ⚡ Beralih ke SQLite Otomatis (1-Klik Tanpa Perlu Setup MySQL)
@@ -2229,6 +2343,14 @@ async function testDatabaseConnection() {
         resBox.className = 'p-3 rounded-xl text-xs font-mono bg-rose-500/10 border border-rose-500/30 text-rose-300';
         resBox.textContent = '✕ Error request: ' + e.message;
     }
+}
+
+function setDockerDbDefaults() {
+    document.getElementById('db_host').value = 'db';
+    document.getElementById('db_port').value = '3306';
+    document.getElementById('db_name').value = 'bremspace_erp';
+    document.getElementById('db_user').value = 'bremspace';
+    document.getElementById('db_pass').value = 'bremspace_secret';
 }
 
 async function startExecution() {
