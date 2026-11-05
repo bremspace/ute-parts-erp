@@ -3,6 +3,7 @@
     x-data="{
         flexSet: {},
         searchOpen: false,
+        mobileFilterOpen: false,
         cartViewMode: localStorage.getItem('pos_cart_view_mode') || 'card',
         setCartViewMode(mode) {
             this.cartViewMode = mode;
@@ -128,7 +129,7 @@
     <!-- TOP CONTROL BAR: Scan/Search, Gudang, Pelanggan, Aksi Cepat & Big Total -->
     <div class="glass-panel p-3 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2.5">
         <div class="flex items-center gap-2.5 flex-wrap lg:flex-nowrap justify-between">
-            <!-- Search & Barcode Input with Floating Dropdown -->
+            <!-- Search & Barcode Input with Floating Dropdown (Desktop) / Fullscreen Search Sheet (Mobile) -->
             <div class="relative flex-1 min-w-[200px] sm:min-w-[260px]" @click.outside="searchOpen = false">
                 <x-prism.barcode-scan-input
                     placeholder="Scan Barcode / ketik nama barang (F2 / Kamera)..."
@@ -140,19 +141,126 @@
                     @input="searchOpen = true"
                 />
 
-                <!-- Floating Search Results Dropdown (MUNCUL OTOMATIS SAAT FOKUS / PENCARIAN) -->
+                <!-- Fullscreen Overlay on Mobile / Floating Dropdown on Desktop (Apple-Grade Tactile Transition) -->
                 <div
                     x-show="searchOpen"
-                    x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="opacity-0 translate-y-2 scale-[0.98]"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 translate-y-3 sm:translate-y-2 scale-[0.99] sm:scale-[0.98]"
                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                    x-transition:leave="transition ease-out duration-100"
+                    x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                    x-transition:leave-end="opacity-0 translate-y-2 scale-[0.98]"
-                    class="absolute left-0 right-0 sm:left-0 sm:right-auto sm:w-[580px] lg:w-[680px] top-full mt-2 z-50 origin-top bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border border-ink-200/90 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden max-h-[70vh] flex flex-col"
+                    x-transition:leave-end="opacity-0 translate-y-3 sm:translate-y-2 scale-[0.99] sm:scale-[0.98]"
+                    class="fixed inset-0 z-50 sm:absolute sm:inset-auto sm:left-0 sm:right-auto sm:w-[580px] lg:w-[680px] sm:top-full sm:mt-2 origin-top bg-white/98 dark:bg-[#0B1120]/98 sm:bg-white/95 sm:dark:bg-[#0B1120]/95 backdrop-blur-2xl border-0 sm:border border-ink-200/90 dark:border-white/15 rounded-none sm:rounded-2xl shadow-2xl overflow-hidden max-h-none sm:max-h-[70vh] flex flex-col"
                     x-cloak
                 >
-                    <div class="px-3.5 sm:px-4 py-2.5 bg-ink-50/90 dark:bg-white/[0.04] border-b border-ink-200/80 dark:border-white/10 flex items-center justify-between text-xs flex-shrink-0">
+                    <!-- Dedicated Mobile Search Header (sm:hidden) -->
+                    <div class="sm:hidden p-3 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-xl border-b border-ink-200/80 dark:border-white/10 flex flex-col gap-2 shrink-0">
+                        <div class="flex items-center gap-2">
+                            <button
+                                type="button"
+                                @click="searchOpen = false"
+                                class="w-10 h-10 rounded-xl text-ink-600 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition flex items-center justify-center cursor-pointer shrink-0"
+                                aria-label="Tutup pencarian"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+
+                            <div class="relative flex-1">
+                                <input
+                                    type="text"
+                                    wire:model.live.debounce.300ms="search"
+                                    wire:keydown.enter="scanEnter"
+                                    placeholder="Cari produk / scan barcode..."
+                                    class="w-full pl-9 pr-9 py-2 rounded-xl glass-input text-base font-medium min-h-[42px] focus:ring-2 focus:ring-up-primary/30"
+                                    autofocus
+                                />
+                                <div class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </div>
+                                @if(strlen($search) > 0)
+                                    <button
+                                        type="button"
+                                        wire:click="$set('search', '')"
+                                        class="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-ink-400 hover:text-ink-600 dark:hover:text-white"
+                                        aria-label="Bersihkan"
+                                    >✕</button>
+                                @endif
+                            </div>
+
+                            <!-- Mobile Camera Scanner Trigger -->
+                            <button
+                                type="button"
+                                @click="if (window.uteBarcode && window.uteBarcode.openCameraScanner) { window.uteBarcode.openCameraScanner({ title: 'Scan Barcode Produk', continuous: true, onScan: (code) => { if (typeof $wire !== 'undefined' && typeof $wire.scanBarcodeDirect === 'function') { $wire.scanBarcodeDirect(code); } else { $wire.set('search', code); } } }); }"
+                                class="w-10 h-10 rounded-xl bg-up-primary/10 text-up-primary border border-up-primary/25 hover:bg-up-primary/20 active:scale-95 transition flex items-center justify-center cursor-pointer shrink-0"
+                                title="Buka Kamera Barcode"
+                                aria-label="Scan barcode kamera"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                </svg>
+                            </button>
+
+                            <!-- Mobile Filter Bottom Sheet Trigger -->
+                            <button
+                                type="button"
+                                @click="mobileFilterOpen = true"
+                                class="w-10 h-10 rounded-xl border border-ink-200/80 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 transition flex items-center justify-center cursor-pointer relative shrink-0 text-ink-700 dark:text-ink-200"
+                                title="Buka Filter Katalog"
+                                aria-label="Filter"
+                            >
+                                <svg class="w-5 h-5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                                </svg>
+                                @if(collect($visibleFilters)->contains(true))
+                                    <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-up-primary ring-2 ring-white dark:ring-[#0B1120]"></span>
+                                @endif
+                            </button>
+                        </div>
+
+                        <!-- Mobile Active Filter Pills Strip -->
+                        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] pt-0.5">
+                            <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold tabular-nums shrink-0">
+                                {{ count($products) }} item
+                            </span>
+                            @if($filterKategoriId)
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 font-medium shrink-0">
+                                    Kat: {{ $kategoriList->flatMap(fn($k) => collect([$k])->merge($k->children))->firstWhere('id', $filterKategoriId)?->nama ?? 'Dipilih' }}
+                                    <button type="button" wire:click="$set('filterKategoriId', null)" class="text-ink-400 hover:text-up-red font-bold">✕</button>
+                                </span>
+                            @endif
+                            @if($filterBrandId)
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 font-medium shrink-0">
+                                    Brand: {{ $brandList->firstWhere('id', $filterBrandId)?->nama ?? 'Dipilih' }}
+                                    <button type="button" wire:click="$set('filterBrandId', null)" class="text-ink-400 hover:text-up-red font-bold">✕</button>
+                                </span>
+                            @endif
+                            @if($filterBrandKompatibel)
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 font-medium shrink-0">
+                                    HP: {{ $filterBrandKompatibel }}
+                                    <button type="button" wire:click="$set('filterBrandKompatibel', null)" class="text-ink-400 hover:text-up-red font-bold">✕</button>
+                                </span>
+                            @endif
+                            @if($filterModelKompatibel)
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 font-medium shrink-0">
+                                    Model: {{ $filterModelKompatibel }}
+                                    <button type="button" wire:click="$set('filterModelKompatibel', null)" class="text-ink-400 hover:text-up-red font-bold">✕</button>
+                                </span>
+                            @endif
+                            @if($filterStokStatus !== 'semua')
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold uppercase text-[10px] shrink-0">
+                                    Stok: {{ $filterStokStatus }}
+                                    <button type="button" wire:click="$set('filterStokStatus', 'semua')" class="text-emerald-500 hover:text-up-red font-bold">✕</button>
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <!-- Desktop Header (hidden sm:flex) -->
+                    <div class="hidden sm:flex px-3.5 sm:px-4 py-2.5 bg-ink-50/90 dark:bg-white/[0.04] border-b border-ink-200/80 dark:border-white/10 items-center justify-between text-xs flex-shrink-0">
                         <div class="flex items-center gap-2">
                             <span class="font-bold text-ink-900 dark:text-white flex items-center gap-1.5">
                                 <svg class="w-3.5 h-3.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,7 +281,7 @@
                         </button>
                     </div>
 
-                    <div class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-1.5 sm:p-2 space-y-1">
+                    <div class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1">
                         @forelse($products as $prod)
                             @php
                                 $stokTotal = $stokPerProduk[$prod->id] ?? (\App\Modules\Pos\Livewire\PosKasir::STOK_TANPA_GUDANG);
@@ -194,7 +302,7 @@
                                     aria-disabled="true"
                                     title="{{ $alasanTidakBisaDipilih }}"
                                 @endif
-                                class="p-2.5 sm:p-3 rounded-xl border border-transparent transition-all flex flex-col gap-2 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
+                                class="p-3 sm:p-3 rounded-2xl border border-transparent transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] flex flex-col gap-2 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
                             >
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="min-w-0 flex items-start gap-2.5 sm:gap-3 flex-1">
@@ -214,7 +322,7 @@
                                             @endif
                                         </div>
 
-                                        <!-- Title, SKU, Chips -->
+                                        <!-- Title, SKU, Chips & Apple-grade compatibility badge -->
                                         <div class="min-w-0 flex-1">
                                             <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
                                                 <span class="font-mono text-[10px] sm:text-[11px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
@@ -226,19 +334,25 @@
                                                 <span class="text-[10px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded uppercase">
                                                     Satuan: {{ $satuanDasar }}
                                                 </span>
-                                                @php
-                                                    $thModels = $prod->daftar_kompatibel;
-                                                @endphp
-                                                @if($thModels->isNotEmpty())
-                                                    <span class="text-[10px] text-up-primary font-medium bg-up-primary/10 px-1.5 py-0.5 rounded border border-up-primary/20" title="{{ $thModels->join(', ') }}">
-                                                        📱 {{ $thModels->take(3)->join(', ') }}{{ $thModels->count() > 3 ? ' (+'.($thModels->count() - 3).')' : '' }}
-                                                    </span>
-                                                @endif
                                             </div>
 
                                             <h4 class="font-bold text-xs sm:text-sm text-ink-900 dark:text-white leading-snug line-clamp-1">
                                                 {{ $prod->nama }}
                                             </h4>
+
+                                            @php
+                                                $thModels = $prod->daftar_kompatibel;
+                                            @endphp
+                                            @if($thModels->isNotEmpty())
+                                                <div class="flex items-center gap-1 flex-wrap mt-1">
+                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-up-primary bg-up-primary/10 px-2 py-0.5 rounded-lg border border-up-primary/20 tracking-tight" title="{{ $thModels->join(', ') }}">
+                                                        <svg class="w-3 h-3 text-up-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                        </svg>
+                                                        <span>{{ $thModels->take(2)->join(', ') }}{{ $thModels->count() > 2 ? ' (+'.($thModels->count() - 2).')' : '' }}</span>
+                                                    </span>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
 
@@ -294,14 +408,14 @@
                                         @endif
                                     </div>
 
-                                    <!-- Quick Add Buttons -->
+                                    <!-- Quick Add Buttons with Apple Tactile Feedback -->
                                     <div class="flex items-center gap-1.5 ml-auto">
                                         @if($stokKosong)
                                             <button
                                                 type="button"
                                                 disabled
                                                 title="{{ $alasanTidakBisaDipilih }}"
-                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-ink-200/50 dark:bg-white/5 text-ink-400 cursor-not-allowed select-none"
+                                                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-ink-200/50 dark:bg-white/5 text-ink-400 cursor-not-allowed select-none min-h-[38px] sm:min-h-[34px]"
                                             >
                                                 Stok Habis
                                             </button>
@@ -312,7 +426,7 @@
                                                 wire:click="addToCart({{ $prod->id }})"
                                                 @click="searchOpen = false"
                                                 title="Tambah 1 {{ $satuanDasar }}"
-                                                class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold bg-up-primary hover:bg-up-primary-dark text-white cursor-pointer transition active:scale-95 flex items-center gap-1 shadow-sm shadow-up-primary/20 min-h-[34px]"
+                                                class="px-3 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary hover:bg-up-primary-dark active:bg-indigo-700 text-white cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 shadow-sm shadow-up-primary/20 min-h-[38px] sm:min-h-[34px]"
                                             >
                                                 <span>+ {{ $satuanDasar }}</span>
                                             </button>
@@ -324,7 +438,7 @@
                                                     wire:click="addToCart({{ $prod->id }}, null, '{{ $sk->satuan_kode }}')"
                                                     @click="searchOpen = false"
                                                     title="Tambah 1 {{ strtoupper($sk->satuan_kode) }}"
-                                                    class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 cursor-pointer transition active:scale-95 flex items-center gap-1 min-h-[34px]"
+                                                    class="px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary/10 hover:bg-up-primary/20 active:bg-up-primary/30 text-up-primary border border-up-primary/30 cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 min-h-[38px] sm:min-h-[34px]"
                                                 >
                                                     <span>+ {{ strtoupper($sk->satuan_kode) }}</span>
                                                 </button>
@@ -349,7 +463,7 @@
                                 <button
                                     type="button"
                                     wire:click="muatLebihBanyak"
-                                    class="text-xs font-bold text-up-primary hover:underline cursor-pointer py-1 px-3 rounded-lg hover:bg-up-primary/10 transition"
+                                    class="text-xs font-bold text-up-primary hover:underline cursor-pointer py-1.5 px-3 rounded-xl hover:bg-up-primary/10 active:scale-95 transition"
                                 >
                                     Muat lebih banyak…
                                 </button>
@@ -359,17 +473,20 @@
                 </div>
             </div>
 
-            <!-- Filter Preferences Button -->
+            <!-- Filter Preferences Button (Desktop) & Filter Sheet Trigger (Mobile) -->
             <button
                 type="button"
-                wire:click="$toggle('showCustomFilterSettings')"
-                class="px-3.5 py-2.5 rounded-xl border border-ink-200/80 dark:border-white/10 text-xs font-semibold text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-white/5 transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer min-h-[44px]"
+                @click="if (window.innerWidth < 640) { mobileFilterOpen = true; } else { $wire.toggle('showCustomFilterSettings'); }"
+                class="px-3.5 py-2.5 rounded-xl border border-ink-200/80 dark:border-white/10 text-xs font-semibold text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-white/5 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center gap-1.5 whitespace-nowrap cursor-pointer min-h-[44px]"
                 title="Atur filter pencarian produk"
             >
                 <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                 </svg>
                 <span class="hidden sm:inline">Filter</span>
+                @if(collect($visibleFilters)->contains(true))
+                    <span class="w-2 h-2 rounded-full bg-up-primary"></span>
+                @endif
             </button>
 
             <!-- Kolom Pencarian Konsumen Optimal (Tanpa Dropdown CRM Berlebih) -->
@@ -472,13 +589,29 @@
         </div>
 
         <!-- BARIS 2: SHORTCUT AKSI KASIR (RETUR, RIWAYAT, ONLINE, SERVIS) & DATA KONSUMEN TERPILIH -->
-        <div class="flex items-center justify-between gap-2.5 pt-2 border-t border-ink-200/50 dark:border-white/5 flex-wrap">
-            <!-- Left: Shortcut Actions -->
-            <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none w-full sm:w-auto flex-nowrap sm:flex-wrap pb-0.5">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-ink-200/50 dark:border-white/5">
+            <!-- Left: Shortcut Actions (Horizontally Scrollable Action Pill Strip on Mobile) -->
+            <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 -mx-3 px-3 sm:mx-0 sm:px-0 flex-nowrap sm:flex-wrap w-full sm:w-auto shrink-0">
+                <!-- Mobile Filter Trigger Pill (sm:hidden) -->
+                <button
+                    type="button"
+                    @click="mobileFilterOpen = true"
+                    class="sm:hidden px-3 py-1.5 rounded-xl border border-up-primary/30 bg-up-primary/10 hover:bg-up-primary/20 text-xs font-bold text-up-primary transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
+                    title="Buka Filter Produk"
+                >
+                    <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                    </svg>
+                    <span>Filter</span>
+                    @if(collect($visibleFilters)->contains(true))
+                        <span class="w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
+                    @endif
+                </button>
+
                 @canany(['pos.view', 'pos.view-own', 'pos.create'])
                 <a
                     href="/app/pos/retur"
-                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-up-red/30 bg-up-red/10 hover:bg-up-red/20 text-xs font-bold text-up-red transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
+                    class="px-3 py-1.5 rounded-xl border border-up-red/30 bg-up-red/10 hover:bg-up-red/20 text-xs font-bold text-up-red transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
                     title="Buka Manajemen Retur Konsumen"
                 >
                     <svg class="w-4 h-4 text-up-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -491,7 +624,7 @@
                 <button
                     type="button"
                     wire:click="bukaRiwayatTransaksi"
-                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-ink-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 text-xs font-bold text-ink-700 dark:text-ink-200 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
+                    class="px-3 py-1.5 rounded-xl border border-ink-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 text-xs font-bold text-ink-700 dark:text-ink-200 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
                     title="Riwayat Transaksi Kasir Hari Ini"
                 >
                     <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -503,7 +636,7 @@
                 <button
                     type="button"
                     wire:click="bukaPesananOnlineModal"
-                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
+                    class="px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
                     title="Pesanan Online Pickup Cabang"
                 >
                     <svg class="w-4 h-4 text-up-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -518,7 +651,7 @@
                 <button
                     type="button"
                     wire:click="bukaBayarServisModal"
-                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-xs font-bold text-blue-500 dark:text-blue-400 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
+                    class="px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-xs font-bold text-blue-500 dark:text-blue-400 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
                     title="Bayar Tiket Servis di Kasir"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -531,7 +664,7 @@
                 <button
                     type="button"
                     wire:click="bukaMutasiKasModal('keluar')"
-                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
+                    class="px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
                     title="Catat Mutasi Kas Masuk / Keluar Laci"
                 >
                     <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -544,7 +677,7 @@
                 <button
                     type="button"
                     wire:click="bukaDitahanPanel"
-                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
+                    class="px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
                     title="Lihat & Lanjutkan Transaksi yang Ditahan"
                 >
                     <svg class="w-4 h-4 text-up-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -654,9 +787,9 @@
             </div>
         </div>
 
-        <!-- Custom Filter Drawer (Toggleable) -->
+        <!-- Custom Filter Drawer (Desktop Toggleable) -->
         @if($showCustomFilterSettings)
-            <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-200/80 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="hidden sm:flex p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-200/80 dark:border-white/10 flex-wrap items-center justify-between gap-3 text-xs">
                 <div class="flex items-center gap-3 flex-wrap">
                     <span class="font-bold text-ink-700 dark:text-ink-300">Tampilkan Filter:</span>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer">
@@ -706,9 +839,10 @@
             </div>
         @endif
 
-        <!-- Active Dinamis Filter Bar -->
+        <!-- Active Dinamis Filter Bar (Desktop & Mobile) -->
         @if(collect($visibleFilters)->contains(true))
-            <div class="flex items-center gap-2 flex-wrap pt-1 text-xs">
+            <!-- Desktop Filter Bar -->
+            <div class="hidden sm:flex items-center gap-2 flex-wrap pt-1 text-xs">
                 @if($visibleFilters['kategori'])
                     <div class="relative inline-flex items-center">
                         <select wire:model.live="filterKategoriId" class="px-2.5 py-1.5 {{ $filterKategoriId ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
@@ -888,6 +1022,42 @@
                         @endif
                     </div>
                 @endif
+            </div>
+
+            <!-- Mobile Active Filter Summary Chips (sm:hidden) -->
+            <div class="sm:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 text-[11px]">
+                <span class="text-[10px] uppercase font-bold text-ink-400 shrink-0">Filter:</span>
+                @if($filterKategoriId)
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary border border-up-primary/20 font-medium shrink-0">
+                        Kat: {{ $kategoriList->flatMap(fn($k) => collect([$k])->merge($k->children))->firstWhere('id', $filterKategoriId)?->nama ?? 'Dipilih' }}
+                        <button type="button" wire:click="$set('filterKategoriId', null)" class="text-up-primary hover:text-up-red font-bold">✕</button>
+                    </span>
+                @endif
+                @if($filterBrandId)
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary border border-up-primary/20 font-medium shrink-0">
+                        Brand: {{ $brandList->firstWhere('id', $filterBrandId)?->nama ?? 'Dipilih' }}
+                        <button type="button" wire:click="$set('filterBrandId', null)" class="text-up-primary hover:text-up-red font-bold">✕</button>
+                    </span>
+                @endif
+                @if($filterBrandKompatibel)
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary border border-up-primary/20 font-medium shrink-0">
+                        HP: {{ $filterBrandKompatibel }}
+                        <button type="button" wire:click="$set('filterBrandKompatibel', null)" class="text-up-primary hover:text-up-red font-bold">✕</button>
+                    </span>
+                @endif
+                @if($filterModelKompatibel)
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary border border-up-primary/20 font-medium shrink-0">
+                        Model: {{ $filterModelKompatibel }}
+                        <button type="button" wire:click="$set('filterModelKompatibel', null)" class="text-up-primary hover:text-up-red font-bold">✕</button>
+                    </span>
+                @endif
+                @if($filterStokStatus !== 'semua')
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold uppercase text-[10px] shrink-0">
+                        Stok: {{ $filterStokStatus }}
+                        <button type="button" wire:click="$set('filterStokStatus', 'semua')" class="text-emerald-500 hover:text-up-red font-bold">✕</button>
+                    </span>
+                @endif
+                <button type="button" wire:click="resetFilterValues" class="text-[10px] font-bold text-up-red hover:underline shrink-0">Reset</button>
             </div>
         @endif
     </div>
@@ -1807,4 +1977,220 @@
     @include('modules.pos.livewire.modals.transaksi-ditahan-modal')
     @include('modules.pos.livewire.modals.void-transaksi-modal')
     @include('partials.riwayat-modal')
+
+    <!-- MOBILE FILTER BOTTOM SHEET (Apple Design & Emil Kowalski) -->
+    <div
+        x-show="mobileFilterOpen"
+        x-cloak
+        class="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm sm:hidden"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @click.self="mobileFilterOpen = false"
+    >
+        <div
+            x-show="mobileFilterOpen"
+            x-transition:enter="transition ease-out duration-250 ease-[cubic-bezier(0.23,1,0.32,1)]"
+            x-transition:enter-start="translate-y-full"
+            x-transition:enter-end="translate-y-0"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="translate-y-0"
+            x-transition:leave-end="translate-y-full"
+            class="w-full max-h-[88vh] bg-white dark:bg-[#0B1120] border-t border-ink-200/80 dark:border-white/10 rounded-t-3xl shadow-2xl flex flex-col overflow-hidden"
+        >
+            <!-- Apple Drawer Handle -->
+            <div class="w-12 h-1.5 rounded-full bg-ink-300 dark:bg-white/20 mx-auto mt-3 mb-1 shrink-0"></div>
+
+            <!-- Sheet Header -->
+            <div class="px-5 py-3 border-b border-ink-200/80 dark:border-white/10 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2">
+                    <h3 class="font-bold text-base text-ink-900 dark:text-white">Filter Katalog Produk</h3>
+                    <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold text-xs tabular-nums border border-up-primary/20">
+                        {{ count($products) }} item
+                    </span>
+                </div>
+                <button
+                    type="button"
+                    @click="mobileFilterOpen = false"
+                    class="w-8 h-8 rounded-full bg-ink-100 dark:bg-white/10 text-ink-500 hover:text-ink-900 dark:hover:text-white flex items-center justify-center text-sm font-bold active:scale-95 transition cursor-pointer"
+                    aria-label="Tutup filter"
+                >
+                    ✕
+                </button>
+            </div>
+
+            <!-- Sheet Body (Scrollable) -->
+            <div class="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+                <!-- 1. Status Ketersediaan Stok (Segmented Control Chips) -->
+                <div>
+                    <label class="block font-bold text-ink-700 dark:text-ink-300 mb-2 text-xs">Ketersediaan Stok</label>
+                    <div class="grid grid-cols-4 gap-1.5 p-1 rounded-2xl bg-ink-100/80 dark:bg-white/5 border border-ink-200/60 dark:border-white/5">
+                        @foreach([
+                            'semua' => 'Semua',
+                            'ready' => 'Ready',
+                            'menipis' => 'Menipis',
+                            'habis' => 'Habis'
+                        ] as $val => $lbl)
+                            <button
+                                type="button"
+                                wire:click="$set('visibleFilters.stok', true); $set('filterStokStatus', '{{ $val }}')"
+                                class="py-2 px-1 text-center rounded-xl text-xs font-bold transition-all duration-150 active:scale-[0.97] {{ $filterStokStatus === $val ? 'bg-white dark:bg-ink-800 text-up-primary shadow-sm' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}"
+                            >
+                                {{ $lbl }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- 2. Kategori Produk -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Kategori Produk</label>
+                        @if($filterKategoriId)
+                            <button type="button" wire:click="$set('filterKategoriId', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
+                        @endif
+                    </div>
+                    <select
+                        wire:model.live="filterKategoriId"
+                        wire:change="$set('visibleFilters.kategori', true)"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
+                    >
+                        <option value="">Semua Kategori</option>
+                        @foreach($kategoriList as $parent)
+                            <option value="{{ $parent->id }}">{{ $parent->nama }}</option>
+                            @foreach($parent->children as $child)
+                                <option value="{{ $child->id }}">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
+                            @endforeach
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- 3. Brand Part -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Brand Part / Merk Sparepart</label>
+                        @if($filterBrandId)
+                            <button type="button" wire:click="$set('filterBrandId', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
+                        @endif
+                    </div>
+                    <select
+                        wire:model.live="filterBrandId"
+                        wire:change="$set('visibleFilters.brand', true)"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
+                    >
+                        <option value="">Semua Brand Part</option>
+                        @foreach($brandList as $b)
+                            <option value="{{ $b->id }}">{{ $b->nama }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- 4. Brand & Model Kompatibel (Handphone) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Merk HP Kompatibel</label>
+                            @if($filterBrandKompatibel)
+                                <button type="button" wire:click="$set('filterBrandKompatibel', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
+                            @endif
+                        </div>
+                        <select
+                            wire:model.live="filterBrandKompatibel"
+                            wire:change="$set('visibleFilters.brand_kompatibel', true)"
+                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
+                        >
+                            <option value="">Semua Merk HP</option>
+                            @foreach($brandKompatibelList as $bk)
+                                <option value="{{ $bk }}">{{ $bk }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Tipe / Model HP</label>
+                            @if($filterModelKompatibel)
+                                <button type="button" wire:click="$set('filterModelKompatibel', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
+                            @endif
+                        </div>
+                        <select
+                            wire:model.live="filterModelKompatibel"
+                            wire:change="$set('visibleFilters.model_kompatibel', true)"
+                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
+                        >
+                            <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Model HP' }}</option>
+                            @foreach($modelKompatibelList as $mk)
+                                <option value="{{ $mk }}">{{ $mk }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 5. Kualitas & Kondisi -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Kualitas</label>
+                            @if($filterKualitasId)
+                                <button type="button" wire:click="$set('filterKualitasId', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
+                            @endif
+                        </div>
+                        <select
+                            wire:model.live="filterKualitasId"
+                            wire:change="$set('visibleFilters.kualitas', true)"
+                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
+                        >
+                            <option value="">Semua Kualitas</option>
+                            @foreach($kualitasList as $k)
+                                <option value="{{ $k->id }}">{{ $k->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Kondisi</label>
+                            @if($filterKondisi)
+                                <button type="button" wire:click="$set('filterKondisi', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
+                            @endif
+                        </div>
+                        <select
+                            wire:model.live="filterKondisi"
+                            wire:change="$set('visibleFilters.kondisi', true)"
+                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
+                        >
+                            <option value="">Semua Kondisi</option>
+                            @foreach($kondisiList as $kd)
+                                <option value="{{ is_array($kd) ? $kd['kode'] : $kd }}">{{ is_array($kd) ? $kd['nama'] : ucfirst($kd) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sticky Sheet Footer -->
+            <div class="p-4 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-md border-t border-ink-200/80 dark:border-white/10 flex items-center gap-3 shrink-0">
+                <button
+                    type="button"
+                    wire:click="resetFilterValues"
+                    class="flex-1 py-3 px-4 rounded-xl border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs hover:bg-black/5 dark:hover:bg-white/5 active:scale-[0.97] transition cursor-pointer text-center min-h-[46px]"
+                >
+                    Reset Filter
+                </button>
+                <button
+                    type="button"
+                    @click="mobileFilterOpen = false"
+                    class="flex-1 py-3 px-4 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs active:scale-[0.97] transition shadow-md shadow-up-primary/20 cursor-pointer text-center min-h-[46px] flex items-center justify-center gap-1.5"
+                >
+                    <span>Terapkan</span>
+                    <span class="px-1.5 py-0.2 rounded-full bg-white/20 text-white text-[10px] tabular-nums">
+                        {{ count($products) }}
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>

@@ -3,6 +3,18 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-05 — POS Mobile Search & Transaction UI/UX Refactor ✅
+
+- **Mobile Search & Floating Overlay**:
+  - Transformed mobile product search into an iOS-grade responsive search view (`fixed inset-0` on mobile, smooth `sm:absolute` dropdown on desktop) with backdrop-blur, dedicated back navigation, quick camera barcode scanner, clear button, and auto-focused keyboard ergonomics.
+  - Aligned model compatibility badges using `$prod->daftar_kompatibel` (`{Merk} {Model}`).
+- **Mobile Quick Action Dock & Carousel**:
+  - Replaced multi-row button wrapping on mobile with a smooth, horizontally scrollable action pill strip (`overflow-x-auto no-scrollbar`) featuring tactile feedback (`active:scale-[0.97]`), Apple-inspired easing `cubic-bezier(0.23, 1, 0.32, 1)`, and pulsing notification badges for Online Orders and Parked/Held Transactions.
+- **Mobile Filter Drawer (Bottom Sheet)**:
+  - Eliminated the 10 raw inline select boxes and checkboxes that cluttered mobile viewports. Introduced an Apple/iOS style bottom sheet drawer with grab handle, quick category pills, brand & compatible device selectors, and sticky footer action bar with live product count.
+- **Mobile Transaction History Modal**:
+  - Overhauled `riwayat-transaksi-modal.blade.php` mobile cards into structured iOS-grade transaction cards with sticky search header, live today total summary, status indicators with colored dots, monospaced tabular figures, and full 44px touch targets for Detail/Struk, Retur, and Void actions.
+
 ## 2026-11-05 — Unlimited Phone Model Compatibility & POS Search Alignment ✅
 
 - **Database & Architecture**:
