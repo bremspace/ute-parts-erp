@@ -2496,7 +2496,7 @@
                             <li>• <strong class="text-up-mint">Kualitas:</strong> nama, brand, keterangan, is_active</li>
                             <li>• <strong class="text-up-mint">Satuan:</strong> kode, nama, is_active</li>
                             <li>• <strong class="text-up-mint">Rak:</strong> gudang, kode, nama, zona, is_active</li>
-                            <li>• <strong class="text-up-mint">Tipe HP:</strong> merk, model, nama, is_active</li>
+                            <li>• <strong class="text-up-mint">Tipe HP:</strong> merk, model, kode_produk (opsional), nama, is_active</li>
                         </ul>
                     </div>
                 </div>
@@ -2669,6 +2669,7 @@
                                         @elseif($atributActivePreviewTab === 'tipe_hp')
                                             <th class="py-2.5 px-3">Merk</th>
                                             <th class="py-2.5 px-3">Model</th>
+                                            <th class="py-2.5 px-3">Kode Produk</th>
                                             <th class="py-2.5 px-3">Nama Lengkap</th>
                                         @endif
                                         <th class="py-2.5 px-3 text-right">Status</th>
@@ -2702,6 +2703,7 @@
                                             @elseif($atributActivePreviewTab === 'tipe_hp')
                                                 <td class="py-2.5 px-3 font-bold text-up-primary">{{ $row['merk'] ?? '-' }}</td>
                                                 <td class="py-2.5 px-3 font-semibold text-ink-900 dark:text-white">{{ $row['model'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 font-mono text-ink-300">{{ $row['kode_produk'] ?? '-' }}</td>
                                                 <td class="py-2.5 px-3 text-ink-400">{{ $row['nama'] ?: '-' }}</td>
                                             @endif
                                             <td class="py-2.5 px-3 text-right">

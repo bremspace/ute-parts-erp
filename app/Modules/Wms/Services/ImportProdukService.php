@@ -1130,7 +1130,7 @@ class ImportProdukService
             'tipe_hp' => [
                 'label' => 'Tipe / Model HP Kompatibel',
                 'required' => false,
-                'description' => 'Model smartphone (cth: iPhone 13, iPhone 14 Pro Max, A54).',
+                'description' => 'Model smartphone (cth: iPhone 13, iPhone 16 (A3287), Galaxy A54). Mendukung varian kode produk.',
                 'group' => 'Kompatibilitas Smartphone',
             ],
             'kompatibilitas_hp' => [
@@ -1529,7 +1529,7 @@ class ImportProdukService
                 'multi_barcode' => 'ALT-QR-1301, ALT-QR-1302',
                 'satuan' => 'pcs', 'konversi_satuan' => 'box:10:12000000;pack:5:6200000', 'kategori' => 'LCD & Touchscreen', 'sub_kategori' => 'Fullset Assembly', 'brand' => 'Crown',
                 'kualitas' => 'Original', 'kondisi' => 'baru', 'supplier' => 'PT Supplier Jaya',
-                'merk_hp' => 'Apple', 'tipe_hp' => 'iPhone 13',
+                'merk_hp' => 'Apple', 'tipe_hp' => 'iPhone 16 (A3287)',
                 'harga_beli' => 850000, 'harga_jual' => 1250000,
                 'harga_reseller' => 1050000, 'harga_agen' => 1000000, 'min_stock' => 5, 'reorder_point' => 10,
                 'sn' => 'tidak', 'stok_awal' => 5, 'gudang' => 'Gudang Utama', 'rak' => 'Rak A1',
@@ -3985,15 +3985,20 @@ class ImportProdukService
             }
             $merk = trim((string) ($item['merk'] ?? ''));
             $model = trim((string) ($item['model'] ?? ''));
+            $kodeProduk = trim((string) ($item['kode_produk'] ?? ''));
             if ($merk === '' || $model === '') {
                 continue;
             }
-            $key = strtolower($merk.'|'.$model);
+            $key = strtolower($merk.'|'.$model.($kodeProduk !== '' ? '|'.$kodeProduk : ''));
             if (! isset($unique[$key])) {
-                $unique[$key] = [
+                $entry = [
                     'merk' => $merk,
                     'model' => $model,
                 ];
+                if ($kodeProduk !== '') {
+                    $entry['kode_produk'] = $kodeProduk;
+                }
+                $unique[$key] = $entry;
             }
         }
 
@@ -4038,9 +4043,14 @@ class ImportProdukService
                     }
                     $mRaw = trim((string) ($d['merk'] ?? ($d['nama'] ?? '')));
                     $merk = $this->normalizeMerkHp($mRaw ?: $normDefaultMerk) ?: 'Universal';
-                    $model = $this->normalizeModelHp(trim((string) ($d['model'] ?? '')));
-                    if ($model !== '') {
-                        $list[] = ['merk' => $merk, 'model' => $model];
+                    $modelRaw = trim((string) ($d['model'] ?? ''));
+                    $kodeRaw = trim((string) ($d['kode_produk'] ?? ''));
+                    if ($modelRaw !== '') {
+                        $parsedEntry = $this->extractModelDanKodeProduk($modelRaw, $merk);
+                        if ($kodeRaw !== '') {
+                            $parsedEntry['kode_produk'] = $kodeRaw;
+                        }
+                        $list[] = $parsedEntry;
                     }
                 }
                 if (! empty($list)) {
@@ -4105,10 +4115,7 @@ class ImportProdukService
                 foreach ($subModels as $sub) {
                     $sub = trim($sub);
                     if ($sub !== '') {
-                        $hasil[] = [
-                            'merk' => $merkCandidate,
-                            'model' => $this->normalizeModelHp($sub),
-                        ];
+                        $hasil[] = $this->extractModelDanKodeProduk($sub, $merkCandidate);
                     }
                 }
 
@@ -4135,21 +4142,12 @@ class ImportProdukService
                 if (isset($manufacturers[$candidateFirstWord])) {
                     $detectedMerk = $manufacturers[$candidateFirstWord];
                     $modelName = ! empty($candidateRest) ? $candidateRest : $item;
-                    $hasil[] = [
-                        'merk' => $detectedMerk,
-                        'model' => $this->normalizeModelHp($modelName),
-                    ];
+                    $hasil[] = $this->extractModelDanKodeProduk($modelName, $detectedMerk);
                 } elseif (isset($seriesToBrand[$candidateFirstWord])) {
                     $detectedMerk = $normDefaultMerk ?: $seriesToBrand[$candidateFirstWord];
-                    $hasil[] = [
-                        'merk' => $detectedMerk,
-                        'model' => $this->normalizeModelHp($item),
-                    ];
+                    $hasil[] = $this->extractModelDanKodeProduk($item, $detectedMerk);
                 } else {
-                    $hasil[] = [
-                        'merk' => $normDefaultMerk ?: 'Universal',
-                        'model' => $this->normalizeModelHp($item),
-                    ];
+                    $hasil[] = $this->extractModelDanKodeProduk($item, $normDefaultMerk ?: 'Universal');
                 }
             }
         }

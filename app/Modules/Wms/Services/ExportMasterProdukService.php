@@ -303,7 +303,8 @@ class ExportMasterProdukService
             if (is_array($p->kompatibilitas_hp)) {
                 foreach ($p->kompatibilitas_hp as $kh) {
                     if (is_array($kh) && ! empty($kh['model'])) {
-                        $daftarKompat->push(['merk' => $kh['merk'] ?? '', 'model' => $kh['model']]);
+                        $modelWithKode = ! empty($kh['kode_produk']) ? "{$kh['model']} ({$kh['kode_produk']})" : $kh['model'];
+                        $daftarKompat->push(['merk' => $kh['merk'] ?? '', 'model' => $modelWithKode]);
                     }
                 }
             }
@@ -498,7 +499,7 @@ class ExportMasterProdukService
             }
         }
 
-        $tipeHpPairs = TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->take(100)->get(['merk', 'model']);
+        $tipeHpPairs = TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->take(100)->get(['merk', 'model', 'kode_produk']);
 
         $max = max(
             count($merks), count($kategoris), count($brands), count($satuans),
@@ -519,7 +520,7 @@ class ExportMasterProdukService
                 $kategoriUtama[$i] ?? '',
                 $subKategoris[$i] ?? '',
                 $pair ? $pair->merk : '',
-                $pair ? $pair->model : '',
+                $pair ? (! empty($pair->kode_produk) ? "{$pair->model} ({$pair->kode_produk})" : $pair->model) : '',
                 $brands[$i] ?? '',
                 $kualitasList[$i] ?? '',
                 $gudangList[$i] ?? '',
@@ -545,6 +546,7 @@ class ExportMasterProdukService
             ['8. Kolom cabang (opsional): jika diisi, sistem memvalidasi data untuk cabang tersebut. Jika tidak diisi, otomatis menggunakan cabang aktif saat sesi impor.'],
             ['9. Multi Barcode: barcode_1 adalah barcode/QR utama produk. barcode_2, barcode_3, dst. serta multi_barcode adalah barcode alternatif/supplier. Seluruh barcode otomatis diindeks agar pemindaian langsung merujuk ke SKU produk.'],
             ['10. Round-trip: File hasil ekspor master produk memiliki struktur yang identik dan dapat langsung diimpor kembali ke sistem.'],
+            ['11. Kode Produk Tipe HP: Kolom tipe_hp mendukung varian kode produk dengan tanda kurung (misal: "iPhone 16 (A3287)") atau format multi-tipe "Apple:iPhone 16 (A3287); Samsung:Galaxy A54 (SM-A546B)".'],
         ];
     }
 

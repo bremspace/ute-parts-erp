@@ -342,7 +342,7 @@ class Produk extends Model
         if ($this->relationLoaded('tipeHps') && $this->tipeHps->isNotEmpty()) {
             $list = $this->tipeHps->map(fn ($t) => $t->nama_tampilan);
         } elseif (is_array($this->kompatibilitas_hp) && ! empty($this->kompatibilitas_hp)) {
-            $list = collect($this->kompatibilitas_hp)->map(fn ($t) => TipeHp::formatNamaTampilan($t['merk'] ?? '', $t['model'] ?? ''));
+            $list = collect($this->kompatibilitas_hp)->map(fn ($t) => TipeHp::formatNamaTampilan($t['merk'] ?? '', $t['model'] ?? '', $t['nama'] ?? null, $t['kode_produk'] ?? null));
         } elseif (! empty($this->model_kompatibel)) {
             $m = trim((string) ($this->brand_kompatibel ?? ''));
             $rawModels = array_filter(array_map('trim', explode(',', (string) $this->model_kompatibel)));
