@@ -147,11 +147,11 @@ npm run build
       git fetch origin && git pull origin main && git pull origin Unas
       ```
     - Push target harian: `origin/Unas`.
-    - Penggabungan ke `main`: wajib melalui PR (`Unas` -> `main`).
-  - **Aturan Mutlak Semua Branch**:
+    - Pengajuan ke `main`: jalankan `AUDIT_SYNC Unas` untuk review sebelum merge ke `main`.
+  - **Aturan Mutlak Semua Branch (Berlaku Global untuk Seluruh Kolaborator & AI Assistant)**:
     - DILARANG KERAS push atau merge langsung ke `main` tanpa persetujuan/izin eksplisit dari pemilik repositori (user).
   - **Protokol Khusus Review & Merge ke `main`**:
-    1. **Perintah Review**: Gunakan `AUDIT_SYNC <branch>` (atau permintaan audit sinkronisasi branch ke main).
+    1. **Perintah Review**: Gunakan `AUDIT_SYNC <branch>` (cth: `AUDIT_SYNC brem` atau `AUDIT_SYNC Unas`).
        - Agen wajib membedah diff (`git log origin/main..<branch>` dan `git diff --stat`), melaporkan:
          - **Impact Arsitektur**: Database migration (destructive/non-destructive), model constraints, API contract, scoping session cabang (`cabang_id`).
          - **Potensi Risiko**: Konflik file, breaking changes, atau regresi logic.
@@ -160,11 +160,11 @@ npm run build
        - Kata kunci mutlak: **`BREM_RELEASE_CONFIRMED`**.
        - Hanya jika pemilik repositori (user) memberikan kata kunci persis **`BREM_RELEASE_CONFIRMED`**, agen diizinkan:
          1. Checkout `main` & pull `origin main`.
-         2. Merge branch kerja (misal `brem`) ke `main`.
+         2. Merge target branch kerja (misal `brem` atau `Unas`) ke `main`.
          3. Jalankan automated test & migration check.
          4. Push ke `origin/main`.
-         5. Kembali ke branch kerja asal (`brem`).
-       - Tanpa kata kunci `BREM_RELEASE_CONFIRMED`, agen DILARANG KERAS menyentuh atau mem-push branch `main`.
+         5. Kembali ke branch kerja asal.
+       - Tanpa kata kunci `BREM_RELEASE_CONFIRMED`, agen manapun DILARANG KERAS menyentuh atau mem-push branch `main`.
 - **Model subagent = model main agent / orchestrator SAAT INI** — JANGAN pernah spawn subagent tanpa `model:` yang sama dengan model orkestrator. Saat ini orkestrator = **Big Pickle** → `model: "opencode/big-pickle"`. Setiap sesi baru: cek model orkestrator (jika berubah, ikuti perubahan itu; verifikasi via `opencode models` bila ragu). Berlaku untuk SEMUA subagent (explorer, fixer, designer, oracle, librarian).
 - **Implement-plan checklist flow**: untuk SETIAP plan/implement-plan → (1) baca plan, (2) verifikasi kebutuhan ke kode aktual, (3) eksekusi task, (4) review acceptance criteria, (5) centang checkbox `- [x]` di implement-plan.md HANYA jika sudah terverifikasi benar, (6) lanjut otomatis ke task/fase berikutnya. Jangan centang task yang belum diverifikasi.
 - **Izin akses**: user memberi izin penuh semua akses sesi kerja (per 2026-09-20) — lanjut tanpa minta konfirmasi berulang untuk eksekusi kode/deploy/dev.
