@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['merk', 'model', 'nama', 'is_active'])]
+#[Fillable(['merk', 'model', 'nama', 'is_active', 'is_default'])]
 class TipeHp extends Model
 {
     use CatatAktivitas;
@@ -25,14 +26,59 @@ class TipeHp extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_default' => 'boolean',
     ];
 
     public static ?array $cachedResolutionMap = null;
+
+    public static function getDefault(): self
+    {
+        return static::firstOrCreate(
+            ['merk' => 'Universal', 'model' => 'Semua Tipe HP'],
+            [
+                'nama' => 'Universal Semua Tipe HP',
+                'is_active' => true,
+                'is_default' => true,
+            ]
+        );
+    }
 
     protected static function booted(): void
     {
         static::saved(fn () => static::clearResolutionCache());
         static::deleted(fn () => static::clearResolutionCache());
+
+        static::deleting(function (self $model) {
+            if ($model->is_default || ($model->merk === 'Universal' && $model->model === 'Semua Tipe HP')) {
+                throw new \DomainException("Tipe HP '{$model->nama_tampilan}' adalah tipe HP default sistem dan tidak dapat dihapus.");
+            }
+
+            $default = static::getDefault();
+
+            // Ambil semua produk yang terhubung ke tipe_hp yang akan dihapus
+            $productIds = DB::table('kompatibilitas_produk_tipe_hp')
+                ->where('tipe_hp_id', $model->id)
+                ->pluck('produk_id');
+
+            // Hapus relasi pivot tipe_hp ini
+            DB::table('kompatibilitas_produk_tipe_hp')
+                ->where('tipe_hp_id', $model->id)
+                ->delete();
+
+            // Jika produk tidak lagi memiliki tipe HP sama sekali, hubungkan ke default Universal
+            foreach ($productIds as $pId) {
+                $hasOther = DB::table('kompatibilitas_produk_tipe_hp')
+                    ->where('produk_id', $pId)
+                    ->exists();
+
+                if (! $hasOther) {
+                    DB::table('kompatibilitas_produk_tipe_hp')->insertOrIgnore([
+                        'produk_id' => $pId,
+                        'tipe_hp_id' => $default->id,
+                    ]);
+                }
+            }
+        });
     }
 
     public static function clearResolutionCache(): void

@@ -15,34 +15,38 @@ class MasterDataSeeder extends Seeder
 
     public function run(): void
     {
-        // 1. Satuan Unit
+        // 1. Satuan Unit (Default: pcs)
+        SatuanUnit::getDefault();
         $satuan = ['pcs', 'box', 'unit', 'set', 'pasang', 'botol', 'roll', 'meter', 'lembar', 'liter'];
         foreach ($satuan as $s) {
             SatuanUnit::firstOrCreate(
                 ['kode' => $s],
-                ['nama' => ucfirst($s), 'is_active' => true]
+                ['nama' => ucfirst($s), 'is_active' => true, 'is_default' => ($s === 'pcs')]
             );
         }
 
-        // 2. Brands
+        // 2. Brands (Default: Tanpa Merek)
+        Brand::getDefault();
         $brands = ['Apple', 'Samsung', 'Xiaomi', 'Oppo', 'Vivo', 'Realme', 'Infinix', 'Tecno', 'Google', 'Huawei', 'Universal', 'OEM', 'Umum'];
         foreach ($brands as $b) {
             Brand::firstOrCreate(
                 ['nama' => $b],
-                ['is_active' => true]
+                ['is_active' => true, 'is_default' => false]
             );
         }
 
-        // 3. Kualitas Produk
+        // 3. Kualitas Produk (Default: Standar)
+        KualitasProduk::getDefault();
         $kualitas = ['Original', 'Grade A', 'Grade B', 'Refurbished', 'Compatible'];
         foreach ($kualitas as $k) {
             KualitasProduk::firstOrCreate(
                 ['nama' => $k],
-                ['is_active' => true]
+                ['is_active' => true, 'is_default' => false]
             );
         }
 
-        // 4. Tipe HP
+        // 4. Tipe HP (Default: Universal Semua Tipe HP)
+        TipeHp::getDefault();
         $tipeHp = [
             ['Apple', 'iPhone 15'], ['Apple', 'iPhone 14'], ['Apple', 'iPhone 13'], ['Apple', 'iPhone 12'], ['Apple', 'iPhone 11'],
             ['Samsung', 'Galaxy A54'], ['Samsung', 'Galaxy S23'], ['Samsung', 'Galaxy A13'], ['Samsung', 'Galaxy S24'],
@@ -59,7 +63,11 @@ class MasterDataSeeder extends Seeder
         foreach ($tipeHp as [$merk, $model]) {
             TipeHp::firstOrCreate(
                 ['merk' => $merk, 'model' => $model],
-                ['nama' => "{$merk} {$model}", 'is_active' => true]
+                [
+                    'nama' => "{$merk} {$model}",
+                    'is_active' => true,
+                    'is_default' => ($merk === 'Universal' && $model === 'Semua Tipe HP'),
+                ]
             );
         }
     }

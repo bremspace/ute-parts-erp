@@ -1874,22 +1874,27 @@ class SettingsRbac extends Component
 
         $jenis = JenisServis::findOrFail($id);
 
-        $referensi = DB::table('tiket_servis')->where('jenis_servis_id', $id)->count()
-            + DB::table('tiket_servis_estimasi_item')->where('jenis_servis_id', $id)->count();
-
-        if ($referensi > 0) {
-            $jenis->update(['is_active' => false]);
+        if ($jenis->is_default || $jenis->kode === 'SVC-UMUM') {
             $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => "Jenis servis '{$jenis->kode}' dipakai oleh {$referensi} data tiket servis/estimasi. Status dinonaktifkan (tidak dihapus permanen).",
+                'type' => 'error',
+                'message' => "Jenis servis '{$jenis->nama}' adalah jenis servis default sistem dan tidak dapat dihapus.",
             ]);
 
             return;
         }
 
+        $referensi = DB::table('tiket_servis')->where('jenis_servis_id', $id)->count()
+            + DB::table('tiket_servis_estimasi_item')->where('jenis_servis_id', $id)->count();
+
         $kode = $jenis->kode;
         $jenis->delete();
-        $this->dispatch('alert', ['type' => 'success', 'message' => "Jenis servis '{$kode}' berhasil dihapus"]);
+
+        $pesan = "Jenis servis '{$kode}' berhasil dihapus.";
+        if ($referensi > 0) {
+            $pesan .= " {$referensi} tiket/estimasi terkait otomatis dialihkan ke jenis servis default SVC-UMUM.";
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
     public function getCoaListProperty()
@@ -2252,6 +2257,12 @@ class SettingsRbac extends Component
         }
 
         $kat = KategoriProduk::findOrFail($id);
+        if ($kat->is_default && $kat->is_active) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Kategori default Umum harus tetap aktif sebagai fallback produk.']);
+
+            return;
+        }
+
         $kat->update(['is_active' => ! $kat->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status kategori diubah']);
     }
@@ -2264,18 +2275,25 @@ class SettingsRbac extends Component
 
         $kat = KategoriProduk::withCount(['produk', 'children'])->findOrFail($id);
 
-        if ($kat->produk_count > 0 || $kat->children_count > 0) {
-            $kat->update(['is_active' => false]);
+        if ($kat->is_default || $kat->slug === 'umum') {
             $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => "Kategori memiliki {$kat->produk_count} produk / {$kat->children_count} sub-kategori. Status dinonaktifkan (tidak dihapus permanen).",
+                'type' => 'error',
+                'message' => "Kategori '{$kat->nama}' adalah kategori default sistem dan tidak dapat dihapus.",
             ]);
 
             return;
         }
 
+        $pCount = $kat->produk_count;
+        $nama = $kat->nama;
         $kat->delete();
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Kategori berhasil dihapus']);
+
+        $pesan = "Kategori '{$nama}' berhasil dihapus.";
+        if ($pCount > 0) {
+            $pesan .= " {$pCount} produk terkait otomatis dialihkan ke kategori default Umum.";
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
     // 2. Brand
@@ -2348,6 +2366,12 @@ class SettingsRbac extends Component
         }
 
         $brand = Brand::findOrFail($id);
+        if ($brand->is_default && $brand->is_active) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Brand default Tanpa Merek harus tetap aktif sebagai fallback produk.']);
+
+            return;
+        }
+
         $brand->update(['is_active' => ! $brand->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status brand diubah']);
     }
@@ -2359,18 +2383,25 @@ class SettingsRbac extends Component
         }
 
         $brand = Brand::withCount('produk')->findOrFail($id);
-        if ($brand->produk_count > 0) {
-            $brand->update(['is_active' => false]);
+        if ($brand->is_default || $brand->nama === 'Tanpa Merek') {
             $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => "Brand terkait dengan {$brand->produk_count} produk. Status dinonaktifkan.",
+                'type' => 'error',
+                'message' => "Brand '{$brand->nama}' adalah brand default sistem dan tidak dapat dihapus.",
             ]);
 
             return;
         }
 
+        $pCount = $brand->produk_count;
+        $nama = $brand->nama;
         $brand->delete();
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Brand berhasil dihapus']);
+
+        $pesan = "Brand '{$nama}' berhasil dihapus.";
+        if ($pCount > 0) {
+            $pesan .= " {$pCount} produk terkait otomatis dialihkan ke brand default Tanpa Merek.";
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
     // 3. Kualitas
@@ -2455,6 +2486,12 @@ class SettingsRbac extends Component
         }
 
         $k = KualitasProduk::findOrFail($id);
+        if ($k->is_default && $k->is_active) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Kualitas default Standar harus tetap aktif sebagai fallback produk.']);
+
+            return;
+        }
+
         $k->update(['is_active' => ! $k->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status kualitas diubah']);
     }
@@ -2466,18 +2503,25 @@ class SettingsRbac extends Component
         }
 
         $k = KualitasProduk::withCount('produk')->findOrFail($id);
-        if ($k->produk_count > 0) {
-            $k->update(['is_active' => false]);
+        if ($k->is_default || ($k->nama === 'Standar' && $k->brand_id === null)) {
             $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => "Kualitas terkait dengan {$k->produk_count} produk. Status dinonaktifkan.",
+                'type' => 'error',
+                'message' => "Kualitas '{$k->nama}' adalah kualitas default sistem dan tidak dapat dihapus.",
             ]);
 
             return;
         }
 
+        $pCount = $k->produk_count;
+        $nama = $k->nama;
         $k->delete();
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Kualitas berhasil dihapus']);
+
+        $pesan = "Kualitas '{$nama}' berhasil dihapus.";
+        if ($pCount > 0) {
+            $pesan .= " {$pCount} produk terkait otomatis dialihkan ke kualitas default Standar.";
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
     // 4. Satuan
@@ -2561,6 +2605,12 @@ class SettingsRbac extends Component
         }
 
         $s = SatuanUnit::findOrFail($id);
+        if ($s->is_default && $s->is_active) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Satuan default pcs harus tetap aktif sebagai fallback produk.']);
+
+            return;
+        }
+
         $s->update(['is_active' => ! $s->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status satuan diubah']);
     }
@@ -2572,19 +2622,25 @@ class SettingsRbac extends Component
         }
 
         $s = SatuanUnit::findOrFail($id);
-        $terpakai = Produk::where('satuan', $s->kode)->count();
-        if ($terpakai > 0) {
-            $s->update(['is_active' => false]);
+        if ($s->is_default || strtolower($s->kode) === 'pcs') {
             $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => "Satuan '{$s->kode}' digunakan oleh {$terpakai} produk. Status dinonaktifkan.",
+                'type' => 'error',
+                'message' => "Satuan '{$s->kode}' adalah satuan default sistem dan tidak dapat dihapus.",
             ]);
 
             return;
         }
 
+        $terpakai = Produk::where('satuan', $s->kode)->orWhere('satuan_beli', $s->kode)->count();
+        $kode = $s->kode;
         $s->delete();
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Satuan berhasil dihapus']);
+
+        $pesan = "Satuan '{$kode}' berhasil dihapus.";
+        if ($terpakai > 0) {
+            $pesan .= " {$terpakai} produk terkait otomatis dialihkan ke satuan default pcs.";
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
     // 5. Kondisi (JSON via KonfigurasiService)
@@ -2714,6 +2770,12 @@ class SettingsRbac extends Component
             return;
         }
 
+        if (strtolower($kode) === 'baru') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Kondisi default Baru harus tetap aktif sebagai fallback produk.']);
+
+            return;
+        }
+
         $list = $this->getKondisiList();
         $statusBaru = null;
         foreach ($list as &$item) {
@@ -2743,23 +2805,31 @@ class SettingsRbac extends Component
             return;
         }
 
-        $terpakai = Produk::where('kondisi', $kode)->count();
-        if ($terpakai > 0) {
-            $this->setKondisiAktif($kode, false);
+        if (strtolower($kode) === 'baru') {
             $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => "Kondisi '{$kode}' dipakai pada {$terpakai} produk. Status dinonaktifkan.",
+                'type' => 'error',
+                'message' => "Kondisi 'Baru' adalah kondisi default sistem dan tidak dapat dihapus.",
             ]);
 
             return;
         }
 
+        $terpakai = Produk::where('kondisi', $kode)->count();
+        if ($terpakai > 0) {
+            Produk::where('kondisi', $kode)->update(['kondisi' => 'baru']);
+        }
+
         $list = collect($this->getKondisiList())->reject(fn ($i) => $i['kode'] === $kode)->values()->all();
         app(KonfigurasiService::class)->set('master_produk_kondisi_list', $list);
 
-        app(AuditService::class)->catat('KondisiProduk', 'delete', null, "Kondisi produk '{$kode}' dihapus");
+        app(AuditService::class)->catat('KondisiProduk', 'delete', null, "Kondisi produk '{$kode}' dihapus. {$terpakai} produk dialihkan ke 'baru'.");
 
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Kondisi berhasil dihapus']);
+        $pesan = "Kondisi '{$kode}' berhasil dihapus.";
+        if ($terpakai > 0) {
+            $pesan .= " {$terpakai} produk terkait otomatis dialihkan ke kondisi default Baru.";
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
     /**
@@ -2796,29 +2866,37 @@ class SettingsRbac extends Component
         $saved = $config->get('master_produk_kondisi_list');
 
         $defaultKondisi = [
-            ['kode' => 'baru', 'nama' => 'Baru', 'warna' => 'emerald', 'hex' => '#10b981', 'keterangan' => 'Baru (Segel Pabrik / Fresh Stock)', 'is_active' => true],
-            ['kode' => 'oem', 'nama' => 'OEM', 'warna' => 'blue', 'hex' => '#3b82f6', 'keterangan' => 'OEM (Original Equipment Manufacturer)', 'is_active' => true],
-            ['kode' => 'compatible', 'nama' => 'Compatible', 'warna' => 'cyan', 'hex' => '#06b6d4', 'keterangan' => 'Compatible (Part Pihak Ketiga Berkualitas)', 'is_active' => true],
-            ['kode' => 'bekas', 'nama' => 'Bekas / Copotan', 'warna' => 'amber', 'hex' => '#f59e0b', 'keterangan' => 'Bekas / Copotan Unit Mesin Normal', 'is_active' => true],
-            ['kode' => 'rusak', 'nama' => 'Rusak / Kanibal', 'warna' => 'rose', 'hex' => '#ef4444', 'keterangan' => 'Rusak / Bahan Kanibal Part Teknisi', 'is_active' => true],
+            ['kode' => 'baru', 'nama' => 'Baru', 'warna' => 'emerald', 'hex' => '#10b981', 'keterangan' => 'Baru (Segel Pabrik / Fresh Stock)', 'is_active' => true, 'is_default' => true],
+            ['kode' => 'oem', 'nama' => 'OEM', 'warna' => 'blue', 'hex' => '#3b82f6', 'keterangan' => 'OEM (Original Equipment Manufacturer)', 'is_active' => true, 'is_default' => false],
+            ['kode' => 'compatible', 'nama' => 'Compatible', 'warna' => 'cyan', 'hex' => '#06b6d4', 'keterangan' => 'Compatible (Part Pihak Ketiga Berkualitas)', 'is_active' => true, 'is_default' => false],
+            ['kode' => 'bekas', 'nama' => 'Bekas / Copotan', 'warna' => 'amber', 'hex' => '#f59e0b', 'keterangan' => 'Bekas / Copotan Unit Mesin Normal', 'is_active' => true, 'is_default' => false],
+            ['kode' => 'rusak', 'nama' => 'Rusak / Kanibal', 'warna' => 'rose', 'hex' => '#ef4444', 'keterangan' => 'Rusak / Bahan Kanibal Part Teknisi', 'is_active' => true, 'is_default' => false],
         ];
 
         $defMap = collect($defaultKondisi)->keyBy('kode');
 
-        return (is_array($saved) && ! empty($saved))
+        $list = (is_array($saved) && ! empty($saved))
             ? array_values(array_map(function ($k) use ($defMap) {
-                $def = $defMap->get($k['kode'] ?? '');
+                $kode = $k['kode'] ?? 'baru';
+                $def = $defMap->get($kode);
 
                 return [
-                    'kode' => $k['kode'] ?? 'baru',
+                    'kode' => $kode,
                     'nama' => $k['nama'] ?? 'Baru',
                     'warna' => $k['warna'] ?? ($def['warna'] ?? 'emerald'),
                     'hex' => $k['hex'] ?? ($def['hex'] ?? '#10b981'),
                     'keterangan' => $k['keterangan'] ?? ($def['keterangan'] ?? 'Kondisi Suku Cadang'),
                     'is_active' => (bool) ($k['is_active'] ?? true),
+                    'is_default' => $kode === 'baru' || (bool) ($k['is_default'] ?? false),
                 ];
             }, $saved))
             : $defaultKondisi;
+
+        if (! collect($list)->contains('kode', 'baru')) {
+            array_unshift($list, $defaultKondisi[0]);
+        }
+
+        return $list;
     }
 
     // 5b. Master Merk HP
@@ -2876,18 +2954,28 @@ class SettingsRbac extends Component
             return;
         }
 
-        $tipes = TipeHp::withCount('produk')->where('merk', $merk)->get();
-        $totalProduk = $tipes->sum('produk_count');
-
-        if ($totalProduk > 0) {
-            TipeHp::where('merk', $merk)->update(['is_active' => false]);
-            $this->dispatch('alert', ['type' => 'warning', 'message' => "Merk '{$merk}' dinonaktifkan karena memiliki {$totalProduk} produk terkait."]);
+        if (strtolower(trim($merk)) === 'universal') {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Merk HP 'Universal' adalah merk default sistem dan tidak dapat dihapus.",
+            ]);
 
             return;
         }
 
-        TipeHp::where('merk', $merk)->delete();
-        $this->dispatch('alert', ['type' => 'success', 'message' => "Merk HP '{$merk}' berhasil dihapus."]);
+        $tipes = TipeHp::where('merk', $merk)->get();
+        $totalProduk = 0;
+        foreach ($tipes as $tipe) {
+            $totalProduk += DB::table('kompatibilitas_produk_tipe_hp')->where('tipe_hp_id', $tipe->id)->count();
+            $tipe->delete();
+        }
+
+        $pesan = "Merk HP '{$merk}' beserta {$tipes->count()} tipe HP berhasil dihapus.";
+        if ($totalProduk > 0) {
+            $pesan .= ' Seluruh produk terkait otomatis dialihkan ke tipe HP default Universal.';
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
     // 6. Tipe HP
@@ -2998,6 +3086,12 @@ class SettingsRbac extends Component
         }
 
         $t = TipeHp::findOrFail($id);
+        if ($t->is_default && $t->is_active) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tipe HP default Universal harus tetap aktif sebagai fallback produk.']);
+
+            return;
+        }
+
         $t->update(['is_active' => ! $t->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status tipe HP diubah']);
     }
@@ -3009,18 +3103,25 @@ class SettingsRbac extends Component
         }
 
         $t = TipeHp::withCount('produk')->findOrFail($id);
-        if ($t->produk_count > 0) {
-            $t->update(['is_active' => false]);
+        if ($t->is_default || ($t->merk === 'Universal' && $t->model === 'Semua Tipe HP')) {
             $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => "Tipe HP ini terhubung ke {$t->produk_count} produk. Status dinonaktifkan.",
+                'type' => 'error',
+                'message' => 'Tipe HP default sistem tidak dapat dihapus.',
             ]);
 
             return;
         }
 
+        $pCount = $t->produk_count;
+        $nama = $t->nama_tampilan;
         $t->delete();
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Tipe HP berhasil dihapus']);
+
+        $pesan = "Tipe HP '{$nama}' berhasil dihapus.";
+        if ($pCount > 0) {
+            $pesan .= " {$pCount} produk terkait otomatis dialihkan ke tipe HP default Universal.";
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
     // -------------------------------------------------------------
@@ -3078,25 +3179,44 @@ class SettingsRbac extends Component
 
         switch ($sub) {
             case 'kategori':
-                $count = KategoriProduk::whereIn('id', $this->selectedKategoriIds)->update(['is_active' => $status]);
+                $q = KategoriProduk::whereIn('id', $this->selectedKategoriIds);
+                if (! $status) {
+                    $q->where('is_default', false)->where('slug', '!=', 'umum');
+                }
+                $count = $q->update(['is_active' => $status]);
                 $this->selectedKategoriIds = [];
                 break;
             case 'brand':
-                $count = Brand::whereIn('id', $this->selectedBrandIds)->update(['is_active' => $status]);
+                $q = Brand::whereIn('id', $this->selectedBrandIds);
+                if (! $status) {
+                    $q->where('is_default', false)->where('nama', '!=', 'Tanpa Merek');
+                }
+                $count = $q->update(['is_active' => $status]);
                 $this->selectedBrandIds = [];
                 break;
             case 'kualitas':
-                $count = KualitasProduk::whereIn('id', $this->selectedKualitasIds)->update(['is_active' => $status]);
+                $q = KualitasProduk::whereIn('id', $this->selectedKualitasIds);
+                if (! $status) {
+                    $q->where('is_default', false)->whereNot(fn ($sq) => $sq->where('nama', 'Standar')->whereNull('brand_id'));
+                }
+                $count = $q->update(['is_active' => $status]);
                 $this->selectedKualitasIds = [];
                 break;
             case 'satuan':
-                $count = SatuanUnit::whereIn('id', $this->selectedSatuanIds)->update(['is_active' => $status]);
+                $q = SatuanUnit::whereIn('id', $this->selectedSatuanIds);
+                if (! $status) {
+                    $q->where('is_default', false)->whereRaw('LOWER(kode) != ?', ['pcs']);
+                }
+                $count = $q->update(['is_active' => $status]);
                 $this->selectedSatuanIds = [];
                 break;
             case 'kondisi':
                 $list = $this->getKondisiList();
                 foreach ($list as &$item) {
                     if (in_array($item['kode'], $this->selectedKondisiKodes, true)) {
+                        if (! $status && ($item['kode'] === 'baru' || ! empty($item['is_default']))) {
+                            continue;
+                        }
                         $item['is_active'] = $status;
                         $count++;
                     }
@@ -3105,7 +3225,11 @@ class SettingsRbac extends Component
                 $this->selectedKondisiKodes = [];
                 break;
             case 'tipe_hp':
-                $count = TipeHp::whereIn('id', $this->selectedTipeHpIds)->update(['is_active' => $status]);
+                $q = TipeHp::whereIn('id', $this->selectedTipeHpIds);
+                if (! $status) {
+                    $q->where('is_default', false)->whereNot(fn ($sq) => $sq->where('merk', 'Universal')->where('model', 'Semua Tipe HP'));
+                }
+                $count = $q->update(['is_active' => $status]);
                 $this->selectedTipeHpIds = [];
                 break;
         }
@@ -3122,47 +3246,47 @@ class SettingsRbac extends Component
 
         $sub = $this->masterProdukSubTab;
         $deleted = 0;
-        $deactivated = 0;
+        $skippedDefault = 0;
 
         switch ($sub) {
             case 'kategori':
-                $kats = KategoriProduk::withCount(['produk', 'children'])->whereIn('id', $this->selectedKategoriIds)->get();
+                $kats = KategoriProduk::whereIn('id', $this->selectedKategoriIds)->get();
                 foreach ($kats as $kat) {
-                    if ($kat->produk_count > 0 || $kat->children_count > 0) {
-                        $kat->update(['is_active' => false]);
-                        $deactivated++;
-                    } else {
-                        $kat->delete();
-                        $deleted++;
+                    if ($kat->is_default || $kat->slug === 'umum') {
+                        $skippedDefault++;
+
+                        continue;
                     }
+                    $kat->delete();
+                    $deleted++;
                 }
                 $this->selectedKategoriIds = [];
                 break;
 
             case 'brand':
-                $brands = Brand::withCount('produk')->whereIn('id', $this->selectedBrandIds)->get();
+                $brands = Brand::whereIn('id', $this->selectedBrandIds)->get();
                 foreach ($brands as $brand) {
-                    if ($brand->produk_count > 0) {
-                        $brand->update(['is_active' => false]);
-                        $deactivated++;
-                    } else {
-                        $brand->delete();
-                        $deleted++;
+                    if ($brand->is_default || $brand->nama === 'Tanpa Merek') {
+                        $skippedDefault++;
+
+                        continue;
                     }
+                    $brand->delete();
+                    $deleted++;
                 }
                 $this->selectedBrandIds = [];
                 break;
 
             case 'kualitas':
-                $listK = KualitasProduk::withCount('produk')->whereIn('id', $this->selectedKualitasIds)->get();
+                $listK = KualitasProduk::whereIn('id', $this->selectedKualitasIds)->get();
                 foreach ($listK as $k) {
-                    if ($k->produk_count > 0) {
-                        $k->update(['is_active' => false]);
-                        $deactivated++;
-                    } else {
-                        $k->delete();
-                        $deleted++;
+                    if ($k->is_default || ($k->nama === 'Standar' && $k->brand_id === null)) {
+                        $skippedDefault++;
+
+                        continue;
                     }
+                    $k->delete();
+                    $deleted++;
                 }
                 $this->selectedKualitasIds = [];
                 break;
@@ -3170,14 +3294,13 @@ class SettingsRbac extends Component
             case 'satuan':
                 $satuans = SatuanUnit::whereIn('id', $this->selectedSatuanIds)->get();
                 foreach ($satuans as $s) {
-                    $terpakai = Produk::where('satuan', $s->kode)->count();
-                    if ($terpakai > 0) {
-                        $s->update(['is_active' => false]);
-                        $deactivated++;
-                    } else {
-                        $s->delete();
-                        $deleted++;
+                    if ($s->is_default || strtolower($s->kode) === 'pcs') {
+                        $skippedDefault++;
+
+                        continue;
                     }
+                    $s->delete();
+                    $deleted++;
                 }
                 $this->selectedSatuanIds = [];
                 break;
@@ -3187,14 +3310,14 @@ class SettingsRbac extends Component
                 $newList = [];
                 foreach ($list as $item) {
                     if (in_array($item['kode'], $this->selectedKondisiKodes, true)) {
-                        $terpakai = Produk::where('kondisi', $item['kode'])->count();
-                        if ($terpakai > 0) {
-                            $item['is_active'] = false;
+                        if ($item['kode'] === 'baru' || ! empty($item['is_default'])) {
                             $newList[] = $item;
-                            $deactivated++;
-                        } else {
-                            $deleted++;
+                            $skippedDefault++;
+
+                            continue;
                         }
+                        Produk::where('kondisi', $item['kode'])->update(['kondisi' => 'baru']);
+                        $deleted++;
                     } else {
                         $newList[] = $item;
                     }
@@ -3204,23 +3327,23 @@ class SettingsRbac extends Component
                 break;
 
             case 'tipe_hp':
-                $tipes = TipeHp::withCount('produk')->whereIn('id', $this->selectedTipeHpIds)->get();
+                $tipes = TipeHp::whereIn('id', $this->selectedTipeHpIds)->get();
                 foreach ($tipes as $t) {
-                    if ($t->produk_count > 0) {
-                        $t->update(['is_active' => false]);
-                        $deactivated++;
-                    } else {
-                        $t->delete();
-                        $deleted++;
+                    if ($t->is_default || ($t->merk === 'Universal' && $t->model === 'Semua Tipe HP')) {
+                        $skippedDefault++;
+
+                        continue;
                     }
+                    $t->delete();
+                    $deleted++;
                 }
                 $this->selectedTipeHpIds = [];
                 break;
         }
 
-        $pesan = "Batch hapus selesai: {$deleted} item dihapus permanen";
-        if ($deactivated > 0) {
-            $pesan .= ", {$deactivated} dinonaktifkan (karena terkait data produk)";
+        $pesan = "Batch hapus selesai: {$deleted} item berhasil dihapus dan produk terkait dialihkan ke atribut default.";
+        if ($skippedDefault > 0) {
+            $pesan .= " ({$skippedDefault} item default sistem dilindungi dan tidak dihapus).";
         }
         $this->dispatch('alert', ['type' => $deleted > 0 ? 'success' : 'warning', 'message' => $pesan]);
     }

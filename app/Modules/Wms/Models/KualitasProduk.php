@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['nama', 'keterangan', 'is_active', 'brand_id'])]
+#[Fillable(['nama', 'keterangan', 'is_active', 'brand_id', 'is_default'])]
 class KualitasProduk extends Model
 {
     use CatatAktivitas;
@@ -26,8 +27,36 @@ class KualitasProduk extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_default' => 'boolean',
         'brand_id' => 'integer',
     ];
+
+    public static function getDefault(): self
+    {
+        return static::firstOrCreate(
+            ['nama' => 'Standar', 'brand_id' => null],
+            [
+                'keterangan' => 'Kualitas default sistem',
+                'is_active' => true,
+                'is_default' => true,
+            ]
+        );
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (self $model) {
+            if ($model->is_default || ($model->nama === 'Standar' && $model->brand_id === null)) {
+                throw new \DomainException("Kualitas '{$model->nama}' adalah kualitas default sistem dan tidak dapat dihapus.");
+            }
+
+            $default = static::getDefault();
+
+            DB::table('produk')->where('kualitas_id', $model->id)->update([
+                'kualitas_id' => $default->id,
+            ]);
+        });
+    }
 
     public function brand(): BelongsTo
     {

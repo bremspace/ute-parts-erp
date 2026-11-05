@@ -6,13 +6,14 @@ use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
     'nama', 'kode', 'durasi_garansi_hari', 'kategori', 'estimasi_durasi', 'biaya_jasa',
     'batas_waktu_menit', 'peringatan_menit', 'auto_cancel_jika_overdue',
-    'butuh_part', 'is_part_original', 'is_active',
+    'butuh_part', 'is_part_original', 'is_active', 'is_default',
 ])]
 class JenisServis extends Model
 {
@@ -36,7 +37,42 @@ class JenisServis extends Model
         'is_part_original' => 'boolean',
         'butuh_part' => 'boolean',
         'is_active' => 'boolean',
+        'is_default' => 'boolean',
     ];
+
+    public static function getDefault(): self
+    {
+        return static::firstOrCreate(
+            ['kode' => 'SVC-UMUM'],
+            [
+                'nama' => 'Servis Umum (Software & Sistem)',
+                'biaya_jasa' => 50000,
+                'durasi_garansi_hari' => 30,
+                'is_part_original' => false,
+                'is_active' => true,
+                'is_default' => true,
+            ]
+        );
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (self $model) {
+            if ($model->is_default || $model->kode === 'SVC-UMUM') {
+                throw new \DomainException("Jenis servis '{$model->nama}' adalah jenis servis default sistem dan tidak dapat dihapus.");
+            }
+
+            $default = static::getDefault();
+
+            DB::table('tiket_servis')->where('jenis_servis_id', $model->id)->update([
+                'jenis_servis_id' => $default->id,
+            ]);
+
+            DB::table('tiket_servis_estimasi_item')->where('jenis_servis_id', $model->id)->update([
+                'jenis_servis_id' => $default->id,
+            ]);
+        });
+    }
 
     public function tiketServis(): HasMany
     {

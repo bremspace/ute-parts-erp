@@ -2486,7 +2486,9 @@
                                         </div>
 
                                         <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                            @if($k->parent)
+                                            @if($k->is_default || $k->slug === 'umum')
+                                                <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-[10px] text-emerald-400 font-semibold border border-emerald-500/20">Default</span>
+                                            @elseif($k->parent)
                                                 <span class="px-2 py-0.5 rounded bg-white/5 text-[10px] text-ink-300">Sub dari {{ $k->parent->nama }}</span>
                                             @else
                                                 <span class="px-2 py-0.5 rounded bg-up-primary/15 text-[10px] text-up-primary font-semibold">Kategori Utama</span>
@@ -2501,7 +2503,11 @@
                                             </span>
                                             <div class="flex items-center gap-3">
                                                 <button wire:click="openKategoriModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
-                                                <button wire:click="hapusKategori({{ $k->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan kategori ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @if($k->is_default || $k->slug === 'umum')
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Kategori default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusKategori({{ $k->id }})" wire:confirm="Hapus kategori ini? Semua produk terkait otomatis dialihkan ke kategori default Umum." class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -2588,7 +2594,11 @@
                                             </td>
                                             <td class="py-2.5 px-3 text-right space-x-2">
                                                 <button wire:click="openKategoriModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                                <button wire:click="hapusKategori({{ $k->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan kategori ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @if($k->is_default || $k->slug === 'umum')
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Kategori default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusKategori({{ $k->id }})" wire:confirm="Hapus kategori ini? Semua produk terkait otomatis dialihkan ke kategori default Umum." class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
@@ -2664,6 +2674,9 @@
                                             <div class="flex items-center gap-1.5 truncate">
                                                 <span class="text-sm">🏷️</span>
                                                 <span class="font-bold text-white text-xs truncate">{{ $b->nama }}</span>
+                                                @if($b->is_default || $b->nama === 'Tanpa Merek')
+                                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Default</span>
+                                                @endif
                                             </div>
                                             <button wire:click="toggleBrandStatus({{ $b->id }})" class="cursor-pointer flex-shrink-0">
                                                 <x-prism.status-pill :status="$b->is_active ? 'active' : 'inactive'" :label="$b->is_active ? 'Aktif' : 'Nonaktif'" size="xs" />
@@ -2680,7 +2693,11 @@
                                             </span>
                                             <div class="flex items-center gap-3">
                                                 <button wire:click="openBrandModal({{ $b->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
-                                                <button wire:click="hapusBrand({{ $b->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan brand part ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @if($b->is_default || $b->nama === 'Tanpa Merek')
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Brand default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusBrand({{ $b->id }})" wire:confirm="Hapus brand part ini? Semua produk terkait otomatis dialihkan ke brand default Tanpa Merek." class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -2733,7 +2750,12 @@
                                                            class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
                                                 </label>
                                             </td>
-                                            <td class="py-2.5 px-3 font-bold text-white">{{ $b->nama }}</td>
+                                            <td class="py-2.5 px-3 font-bold text-white">
+                                                {{ $b->nama }}
+                                                @if($b->is_default || $b->nama === 'Tanpa Merek')
+                                                    <span class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Default</span>
+                                                @endif
+                                            </td>
                                             <td class="py-2.5 px-3 text-ink-400">{{ $b->keterangan ?? '—' }}</td>
                                             <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $b->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
                                                 {{ $b->produk_count }}
@@ -2745,7 +2767,11 @@
                                             </td>
                                             <td class="py-2.5 px-3 text-right space-x-2">
                                                 <button wire:click="openBrandModal({{ $b->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                                <button wire:click="hapusBrand({{ $b->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan brand part ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @if($b->is_default || $b->nama === 'Tanpa Merek')
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Brand default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusBrand({{ $b->id }})" wire:confirm="Hapus brand part ini? Semua produk terkait otomatis dialihkan ke brand default Tanpa Merek." class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
@@ -2849,7 +2875,11 @@
                                             </span>
                                             <div class="flex items-center gap-3">
                                                 <button wire:click="openKualitasModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
-                                                <button wire:click="hapusKualitas({{ $k->id }})" wire:confirm="Yakin ingin menghapus kualitas ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @if($k->is_default || ($k->nama === 'Standar' && $k->brand_id === null))
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Kualitas default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusKualitas({{ $k->id }})" wire:confirm="Hapus kualitas ini? Semua produk terkait otomatis dialihkan ke kualitas default Standar." class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -2903,7 +2933,12 @@
                                                            class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
                                                 </label>
                                             </td>
-                                            <td class="py-2.5 px-3 font-bold text-white">{{ $k->nama }}</td>
+                                            <td class="py-2.5 px-3 font-bold text-white">
+                                                {{ $k->nama }}
+                                                @if($k->is_default || ($k->nama === 'Standar' && $k->brand_id === null))
+                                                    <span class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Default</span>
+                                                @endif
+                                            </td>
                                             <td class="py-2.5 px-3">
                                                 @if($k->brand)
                                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-up-primary/20 text-up-primary border border-up-primary/30">
@@ -2926,7 +2961,11 @@
                                             </td>
                                             <td class="py-2.5 px-3 text-right space-x-2">
                                                 <button wire:click="openKualitasModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                                <button wire:click="hapusKualitas({{ $k->id }})" wire:confirm="Yakin ingin menghapus kualitas ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @if($k->is_default || ($k->nama === 'Standar' && $k->brand_id === null))
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Kualitas default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusKualitas({{ $k->id }})" wire:confirm="Hapus kualitas ini? Semua produk terkait otomatis dialihkan ke kualitas default Standar." class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
@@ -3002,6 +3041,9 @@
                                             <div class="flex items-center gap-2 truncate">
                                                 <span class="px-2 py-0.5 rounded bg-up-primary/15 font-mono font-bold text-up-primary text-xs">{{ $s->kode }}</span>
                                                 <span class="font-bold text-white text-xs truncate">{{ $s->nama }}</span>
+                                                @if($s->is_default || strtolower($s->kode) === 'pcs')
+                                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Default</span>
+                                                @endif
                                             </div>
                                             <button wire:click="toggleSatuanStatus({{ $s->id }})" class="cursor-pointer flex-shrink-0">
                                                 <x-prism.status-pill :status="$s->is_active ? 'active' : 'inactive'" :label="$s->is_active ? 'Aktif' : 'Nonaktif'" size="xs" />
@@ -3010,7 +3052,11 @@
 
                                         <div class="flex items-center justify-end gap-3 pt-2.5 mt-2.5 border-t border-white/5">
                                             <button wire:click="openSatuanModal({{ $s->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
-                                            <button wire:click="hapusSatuan({{ $s->id }})" wire:confirm="Hapus satuan ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                            @if($s->is_default || strtolower($s->kode) === 'pcs')
+                                                <span class="text-ink-500 text-xs cursor-not-allowed" title="Satuan default sistem dilindungi">🔒 Default</span>
+                                            @else
+                                                <button wire:click="hapusSatuan({{ $s->id }})" wire:confirm="Hapus satuan ini? Semua produk terkait otomatis dialihkan ke satuan default pcs." class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
@@ -3061,7 +3107,12 @@
                                                            class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
                                                 </label>
                                             </td>
-                                            <td class="py-2.5 px-3 font-mono font-bold text-up-primary">{{ $s->kode }}</td>
+                                            <td class="py-2.5 px-3 font-mono font-bold text-up-primary">
+                                                {{ $s->kode }}
+                                                @if($s->is_default || strtolower($s->kode) === 'pcs')
+                                                    <span class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Default</span>
+                                                @endif
+                                            </td>
                                             <td class="py-2.5 px-3 text-white font-medium">{{ $s->nama }}</td>
                                             <td class="py-2.5 px-3 text-center">
                                                 <button wire:click="toggleSatuanStatus({{ $s->id }})" class="cursor-pointer">
@@ -3070,7 +3121,11 @@
                                             </td>
                                             <td class="py-2.5 px-3 text-right space-x-2">
                                                 <button wire:click="openSatuanModal({{ $s->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                                <button wire:click="hapusSatuan({{ $s->id }})" wire:confirm="Hapus satuan ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @if($s->is_default || strtolower($s->kode) === 'pcs')
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Satuan default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusSatuan({{ $s->id }})" wire:confirm="Hapus satuan ini? Semua produk terkait otomatis dialihkan ke satuan default pcs." class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
@@ -3179,7 +3234,11 @@
                                             </div>
                                             <div class="flex items-center gap-3">
                                                 <button wire:click="openKondisiModal('{{ $c['kode'] }}')" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
-                                                <button wire:click="hapusKondisi('{{ $c['kode'] }}')" wire:confirm="Hapus kondisi ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @if($c['kode'] === 'baru' || ! empty($c['is_default']))
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Kondisi default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusKondisi('{{ $c['kode'] }}')" wire:confirm="Hapus kondisi ini? Semua produk terkait otomatis dialihkan ke kondisi default Baru." class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -3267,7 +3326,11 @@
                                             </td>
                                             <td class="py-2.5 px-3 text-right space-x-2">
                                                 <button wire:click="openKondisiModal('{{ $c['kode'] }}')" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                                <button wire:click="hapusKondisi('{{ $c['kode'] }}')" wire:confirm="Hapus kondisi ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @if($c['kode'] === 'baru' || ! empty($c['is_default']))
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Kondisi default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusKondisi('{{ $c['kode'] }}')" wire:confirm="Hapus kondisi ini? Semua produk terkait otomatis dialihkan ke kondisi default Baru." class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
@@ -3299,7 +3362,11 @@
                                 </div>
                                 <div class="flex items-center justify-end gap-3 pt-2.5 mt-2.5 border-t border-white/5">
                                     <button wire:click="openMerkHpModal('{{ $m->merk }}')" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Ubah Nama</button>
-                                    <button wire:click="hapusMerkHp('{{ $m->merk }}')" wire:confirm="Hapus atau nonaktifkan semua tipe dengan merk '{{ $m->merk }}'?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                    @if(strtolower(trim($m->merk)) === 'universal')
+                                        <span class="text-ink-500 text-xs cursor-not-allowed" title="Merk HP default sistem dilindungi">🔒 Default</span>
+                                    @else
+                                        <button wire:click="hapusMerkHp('{{ $m->merk }}')" wire:confirm="Hapus merk HP ini? Semua produk terkait otomatis dialihkan ke tipe HP default Universal." class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                    @endif
                                 </div>
                             </div>
                         @empty
@@ -3334,7 +3401,11 @@
                                             </td>
                                             <td class="py-2.5 px-3 text-right space-x-2">
                                                 <button wire:click="openMerkHpModal('{{ $m->merk }}')" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Ubah Nama</button>
-                                                <button wire:click="hapusMerkHp('{{ $m->merk }}')" wire:confirm="Hapus atau nonaktifkan semua tipe dengan merk '{{ $m->merk }}'?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @if(strtolower(trim($m->merk)) === 'universal')
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Merk HP default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusMerkHp('{{ $m->merk }}')" wire:confirm="Hapus merk HP ini? Semua produk terkait otomatis dialihkan ke tipe HP default Universal." class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
@@ -3435,6 +3506,9 @@
                                         <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                                             <span class="px-2 py-0.5 rounded bg-up-primary/15 text-[10px] text-up-primary font-semibold">{{ $t->merk }}</span>
                                             <span class="font-mono text-[10px] text-ink-300">{{ $t->model }}</span>
+                                            @if($t->is_default || ($t->merk === 'Universal' && $t->model === 'Semua Tipe HP'))
+                                                <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Default</span>
+                                            @endif
                                         </div>
 
                                         <div class="flex items-center justify-between pt-2.5 mt-2.5 border-t border-white/5">
@@ -3443,7 +3517,11 @@
                                             </span>
                                             <div class="flex items-center gap-3">
                                                 <button wire:click="openTipeHpModal({{ $t->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
-                                                <button wire:click="hapusTipeHp({{ $t->id }})" wire:confirm="Hapus tipe HP ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @if($t->is_default || ($t->merk === 'Universal' && $t->model === 'Semua Tipe HP'))
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Tipe HP default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusTipeHp({{ $t->id }})" wire:confirm="Hapus tipe HP ini? Semua produk terkait otomatis dialihkan ke tipe HP default Universal." class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -3497,7 +3575,12 @@
                                                            class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
                                                 </label>
                                             </td>
-                                            <td class="py-2.5 px-3 font-semibold text-white">{{ $t->merk }}</td>
+                                            <td class="py-2.5 px-3 font-semibold text-white">
+                                                {{ $t->merk }}
+                                                @if($t->is_default || ($t->merk === 'Universal' && $t->model === 'Semua Tipe HP'))
+                                                    <span class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Default</span>
+                                                @endif
+                                            </td>
                                             <td class="py-2.5 px-3 font-mono text-ink-300">{{ $t->model }}</td>
                                             <td class="py-2.5 px-3 text-white">{{ $t->nama }}</td>
                                             <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $t->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
@@ -3510,7 +3593,11 @@
                                             </td>
                                             <td class="py-2.5 px-3 text-right space-x-2">
                                                 <button wire:click="openTipeHpModal({{ $t->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                                <button wire:click="hapusTipeHp({{ $t->id }})" wire:confirm="Hapus tipe HP ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @if($t->is_default || ($t->merk === 'Universal' && $t->model === 'Semua Tipe HP'))
+                                                    <span class="text-ink-500 text-xs cursor-not-allowed" title="Tipe HP default sistem dilindungi">🔒 Default</span>
+                                                @else
+                                                    <button wire:click="hapusTipeHp({{ $t->id }})" wire:confirm="Hapus tipe HP ini? Semua produk terkait otomatis dialihkan ke tipe HP default Universal." class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
@@ -3920,7 +4007,12 @@
                     @foreach($jenisServis as $j)
                         <div class="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                             <div>
-                                <p class="text-xs font-bold text-white">{{ $j->nama }}</p>
+                                <div class="flex items-center gap-2">
+                                    <p class="text-xs font-bold text-white">{{ $j->nama }}</p>
+                                    @if($j->is_default || $j->kode === 'SVC-UMUM')
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Default</span>
+                                    @endif
+                                </div>
                                 <p class="text-[10px] text-ink-400 font-mono">
                                     {{ $j->kode }} · {{ $j->kategori }} · est. {{ $j->estimasi_durasi }} mnt · Rp {{ number_format($j->biaya_jasa ?? 0, 0, ',', '.') }}
                                 </p>
@@ -3933,7 +4025,11 @@
                                     <span class="text-[9px] text-up-primary bg-up-primary/10 px-1.5 py-0.5 rounded">part</span>
                                 @endif
                                 <button wire:click="openJenisServisModal({{ $j->id }})" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Edit</button>
-                                <button wire:click="hapusJenisServis({{ $j->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan jenis servis ini?" class="text-up-red hover:underline text-[11px] cursor-pointer">Hapus</button>
+                                @if($j->is_default || $j->kode === 'SVC-UMUM')
+                                    <span class="text-ink-500 text-[11px] cursor-not-allowed" title="Jenis servis default sistem dilindungi">🔒 Default</span>
+                                @else
+                                    <button wire:click="hapusJenisServis({{ $j->id }})" wire:confirm="Hapus jenis servis ini? Tiket atau estimasi terkait otomatis dialihkan ke jenis servis default SVC-UMUM." class="text-up-red hover:underline text-[11px] cursor-pointer">Hapus</button>
+                                @endif
                             </div>
                         </div>
                     @endforeach

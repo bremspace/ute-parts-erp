@@ -6,10 +6,17 @@ use App\Models\User;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Servis\Models\JenisServis;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Rak;
+use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\TipeHp;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\KategoriProdukSeeder;
+use Database\Seeders\MasterDataSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\RoleUserSeeder;
 use Database\Seeders\TierMembershipSeeder;
@@ -399,12 +406,15 @@ class DatabaseManagementService
                 $label = 'Reset Transaksi + Katalog & Pelanggan';
                 $clearedCount = $this->truncateTables(array_merge($transactionTables, $masterTables));
 
-                // Pastikan tier membership CRM tetap ada dan setelan default-nya dipulihkan
+                // Pastikan tier membership CRM dan master default dipulihkan
                 try {
                     (new TierMembershipSeeder)->run();
                     (new KategoriProdukSeeder)->run();
+                    (new MasterDataSeeder)->run();
                 } catch (Throwable $e) {
                 }
+
+                $this->ensureDefaultMasterAttributes();
 
                 if (! empty($options['reset_password'])) {
                     $defaultPassword = 'Password123!';
@@ -471,6 +481,7 @@ class DatabaseManagementService
                     ['nama' => 'Cabang Pusat', 'is_active' => true]
                 );
                 $this->ensureDefaultWarehouseAndShelf($cabangUtama->id);
+                $this->ensureDefaultMasterAttributes();
                 foreach (User::all() as $u) {
                     if (! $u->cabangs()->where('cabang_id', $cabangUtama->id)->exists()) {
                         $u->cabangs()->attach($cabangUtama->id, ['is_default' => true]);
@@ -543,11 +554,14 @@ class DatabaseManagementService
                     (new RolesAndPermissionsSeeder)->run();
                     (new AkunCoaSeeder)->run();
                     (new TierMembershipSeeder)->run();
+                    (new MasterDataSeeder)->run();
+                    (new KategoriProdukSeeder)->run();
                     $cabang = Cabang::firstOrCreate(
                         ['kode' => 'CBG-01'],
                         ['nama' => 'Cabang Pusat', 'is_active' => true]
                     );
                     $this->ensureDefaultWarehouseAndShelf($cabang->id);
+                    $this->ensureDefaultMasterAttributes();
                     if ($admin) {
                         $admin->syncRoles($savedRoles);
                         $admin->cabangs()->syncWithoutDetaching([$cabang->id => ['is_default' => true]]);
@@ -650,6 +664,48 @@ class DatabaseManagementService
     }
 
     /**
+     * Auto-provisioning atribut master produk & servis default sistem.
+     * Menjamin atribut default permanen tidak hilang bahkan saat full_wipe atau factory reset.
+     */
+    public function ensureDefaultMasterAttributes(): void
+    {
+        try {
+            KategoriProduk::getDefault();
+            Brand::getDefault();
+            KualitasProduk::getDefault();
+            SatuanUnit::getDefault();
+            TipeHp::getDefault();
+            JenisServis::getDefault();
+
+            // Pastikan kondisi produk default 'baru' selalu terdaftar di konfigurasi
+            $konfig = app(KonfigurasiService::class);
+            $kondisiList = $konfig->get('master_produk_kondisi_list', []);
+            $hasBaru = false;
+            foreach ($kondisiList as &$k) {
+                if (($k['kode'] ?? '') === 'baru') {
+                    $k['is_default'] = true;
+                    $hasBaru = true;
+                    break;
+                }
+            }
+            if (! $hasBaru) {
+                array_unshift($kondisiList, [
+                    'kode' => 'baru',
+                    'nama' => 'Baru',
+                    'warna' => 'emerald',
+                    'hex' => '#10b981',
+                    'keterangan' => 'Kondisi default sistem',
+                    'is_active' => true,
+                    'is_default' => true,
+                ]);
+            }
+            $konfig->set('master_produk_kondisi_list', array_values($kondisiList));
+        } catch (Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Gagal ensureDefaultMasterAttributes: '.$e->getMessage());
+        }
+    }
+
+    /**
      * Cek kesehatan database & Auto-Restore jika terdeteksi crash/hilang.
      */
     public function checkHealthAndAutoRestore(): array
@@ -662,6 +718,7 @@ class DatabaseManagementService
             DB::table('users')->count();
             DB::table('cabang')->count();
             DB::table('produk')->count();
+            $this->ensureDefaultMasterAttributes();
         } catch (Throwable $e) {
             $status = 'crashed';
             $issues[] = $e->getMessage();

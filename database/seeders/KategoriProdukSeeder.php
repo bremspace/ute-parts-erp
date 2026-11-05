@@ -57,6 +57,7 @@ class KategoriProdukSeeder extends Seeder
         $urutanRoot = 1;
 
         foreach (self::defaultTree() as $rootData) {
+            $isUmum = Str::slug($rootData['nama']) === 'umum';
             $root = KategoriProduk::updateOrCreate(
                 ['slug' => Str::slug($rootData['nama'])],
                 [
@@ -64,6 +65,7 @@ class KategoriProdukSeeder extends Seeder
                     'nama' => $rootData['nama'],
                     'urutan' => $urutanRoot++,
                     'is_active' => true,
+                    'is_default' => $isUmum,
                 ],
             );
 
@@ -76,6 +78,7 @@ class KategoriProdukSeeder extends Seeder
                         'nama' => $nama,
                         'urutan' => $urutanChild++,
                         'is_active' => true,
+                        'is_default' => false,
                     ],
                 );
             }

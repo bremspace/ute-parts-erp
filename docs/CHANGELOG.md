@@ -3,6 +3,21 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-05 — Master Product Attribute Permanent Default Fallback & Safe Full CRUD ✅
+
+- **Database & Model Fallback Protection**:
+  - Added migration `2026_11_05_110000_add_is_default_to_master_attribute_tables.php` introducing `is_default` boolean flag across `kategori_produk`, `brands`, `kualitas_produk`, `satuan_unit`, `tipe_hp`, and `jenis_servis`.
+  - Implemented `getDefault()` and `deleting` model event hooks on `KategoriProduk`, `Brand`, `KualitasProduk`, `SatuanUnit`, `TipeHp`, and `JenisServis` to strictly forbid deleting default system fallbacks.
+  - Deleting non-default master attributes automatically cascades and reassigns all referencing products and tickets to permanent defaults (`Umum`, `Tanpa Merek`, `Standar`, `pcs`, `Universal / Semua Tipe HP`, `SVC-UMUM`) without violating foreign key constraints or losing product records.
+- **Enterprise Reset & Self-Healing Resiliency**:
+  - Added `ensureDefaultMasterAttributes()` in `DatabaseManagementService.php` wired into `full_wipe`, `factory_reset`, `master_and_transaksi`, and `checkHealthAndAutoRestore()`.
+  - Updated `MasterDataSeeder`, `KategoriProdukSeeder`, and `JenisServisSeeder` to permanently guarantee system fallback attribute provisioning.
+- **Backoffice Settings UI/UX**:
+  - Updated `SettingsRbac.php` single and batch deletion methods, toggles, and status updates to guard default attributes.
+  - Added "Default" badges and action locks (`🔒 Default`) in `settings-rbac.blade.php` across Kategori, Brand, Kualitas, Satuan, Kondisi, Merk HP, Tipe HP, and Jenis Servis.
+- **Testing**:
+  - Added `tests/Feature/MasterAttributeFallbackTest.php` covering direct deletion blockage, automatic reference migration across all attribute types, and auto-provisioning verification (8 passed, 24 assertions).
+
 ## 2026-11-05 — Unified Phone Model Filter Dropdown & Brand Label Resolution ✅
 
 - **TipeHp Canonical Label Resolution**:

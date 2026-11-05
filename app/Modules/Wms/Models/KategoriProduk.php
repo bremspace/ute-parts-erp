@@ -9,12 +9,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
-    'parent_id', 'nama', 'slug', 'icon', 'urutan', 'is_active',
+    'parent_id', 'nama', 'slug', 'icon', 'urutan', 'is_active', 'is_default',
 ])]
 class KategoriProduk extends Model
 {
@@ -30,9 +31,24 @@ class KategoriProduk extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_default' => 'boolean',
         'urutan' => 'integer',
         'parent_id' => 'integer',
     ];
+
+    public static function getDefault(): self
+    {
+        return static::firstOrCreate(
+            ['slug' => 'umum'],
+            [
+                'nama' => 'Umum',
+                'parent_id' => null,
+                'urutan' => 0,
+                'is_active' => true,
+                'is_default' => true,
+            ]
+        );
+    }
 
     protected static function booted(): void
     {
@@ -46,6 +62,30 @@ class KategoriProduk extends Model
                 }
                 $model->slug = $slug;
             }
+        });
+
+        static::deleting(function (self $model) {
+            if ($model->is_default || $model->slug === 'umum') {
+                throw new \DomainException("Kategori '{$model->nama}' adalah kategori default sistem dan tidak dapat dihapus.");
+            }
+
+            $default = static::getDefault();
+
+            // 1. Alihkan seluruh sub-kategori ke parent kategori yang dihapus
+            static::where('parent_id', $model->id)->update([
+                'parent_id' => $model->parent_id,
+            ]);
+
+            // 2. Alihkan seluruh produk yang terhubung ke kategori default 'Umum'
+            DB::table('produk')->where('kategori_id', $model->id)->update([
+                'kategori_id' => $default->id,
+                'kategori' => $default->nama,
+            ]);
+
+            DB::table('produk')->where('kategori', $model->nama)->whereNull('kategori_id')->update([
+                'kategori_id' => $default->id,
+                'kategori' => $default->nama,
+            ]);
         });
     }
 
