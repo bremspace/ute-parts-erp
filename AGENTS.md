@@ -132,16 +132,24 @@ npm run build
 - Context7 MCP for current Laravel 13 / Livewire / Spatie Permission docs
 
 ## Workflow Rules (user-mandated, 2026-09-20 — WAJIB diingat)
-- **Git & Multi-Collaborator Workflow (Active Branch: `brem`)**:
-  - Semua perubahan lokal HARUS dikerjakan dan di-commit di branch `brem`.
-  - **Pull wajib sebelum ubah kode**: Setiap awal sesi dan sebelum memodifikasi kode apapun, WAJIB pull pembaruan terkini dari `main` dan `brem`:
-    ```sh
-    git fetch origin
-    git pull origin main
-    git pull origin brem
-    ```
-  - **Branch kolaborator (`Unas`)**: Branch teman bernama `Unas`. Kita bertindak sebagai reviewer atas perubahan yang di-push teman ke branch `Unas`.
-  - **Strict Push Permission ke `main`**: DILARANG KERAS push atau merge langsung ke `main` tanpa izin eksplisit dari user. Push harian hanya boleh ditujukan ke `origin/brem`.
+- **Git Multi-Collaborator Workflow**:
+  - Deteksi branch aktif sebelum bekerja (`git branch --show-current`).
+  - **Jika berada di branch `brem`**:
+    - Sebelum ubah kode, wajib tarik update:
+      ```sh
+      git fetch origin && git pull origin main && git pull origin brem
+      ```
+    - Push target harian: `origin/brem`.
+    - Peran: Reviewer PR dari branch `Unas` sebelum masuk ke `main`.
+  - **Jika berada di branch `Unas`**:
+    - Sebelum ubah kode, wajib tarik update:
+      ```sh
+      git fetch origin && git pull origin main && git pull origin Unas
+      ```
+    - Push target harian: `origin/Unas`.
+    - Penggabungan ke `main`: wajib melalui PR (`Unas` -> `main`).
+  - **Aturan Mutlak Semua Branch**:
+    - DILARANG KERAS push atau merge langsung ke `main` tanpa persetujuan/izin eksplisit dari pemilik repositori (user).
 - **Model subagent = model main agent / orchestrator SAAT INI** — JANGAN pernah spawn subagent tanpa `model:` yang sama dengan model orkestrator. Saat ini orkestrator = **Big Pickle** → `model: "opencode/big-pickle"`. Setiap sesi baru: cek model orkestrator (jika berubah, ikuti perubahan itu; verifikasi via `opencode models` bila ragu). Berlaku untuk SEMUA subagent (explorer, fixer, designer, oracle, librarian).
 - **Implement-plan checklist flow**: untuk SETIAP plan/implement-plan → (1) baca plan, (2) verifikasi kebutuhan ke kode aktual, (3) eksekusi task, (4) review acceptance criteria, (5) centang checkbox `- [x]` di implement-plan.md HANYA jika sudah terverifikasi benar, (6) lanjut otomatis ke task/fase berikutnya. Jangan centang task yang belum diverifikasi.
 - **Izin akses**: user memberi izin penuh semua akses sesi kerja (per 2026-09-20) — lanjut tanpa minta konfirmasi berulang untuk eksekusi kode/deploy/dev.
