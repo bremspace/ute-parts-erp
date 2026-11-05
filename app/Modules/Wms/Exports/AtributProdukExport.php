@@ -290,27 +290,29 @@ class AtributProdukExport implements Export, WithMultipleSheets
 
                 public function headings(): array
                 {
-                    return ['merk', 'model', 'nama', 'is_active'];
+                    return ['merk', 'model', 'kode_produk', 'nama', 'is_active'];
                 }
 
                 public function collection(): Collection
                 {
                     if ($this->mode === 'template') {
                         return collect([
-                            ['merk' => 'Apple', 'model' => 'iPhone 11', 'nama' => 'Apple iPhone 11', 'is_active' => 'ya'],
-                            ['merk' => 'Apple', 'model' => 'iPhone 12 Pro', 'nama' => 'Apple iPhone 12 Pro', 'is_active' => 'ya'],
-                            ['merk' => 'Samsung', 'model' => 'Galaxy A52', 'nama' => 'Samsung Galaxy A52', 'is_active' => 'ya'],
-                            ['merk' => 'Samsung', 'model' => 'Galaxy S21', 'nama' => 'Samsung Galaxy S21', 'is_active' => 'ya'],
-                            ['merk' => 'Xiaomi', 'model' => 'Redmi Note 10', 'nama' => 'Xiaomi Redmi Note 10 4G', 'is_active' => 'ya'],
-                            ['merk' => 'Oppo', 'model' => 'Reno 6', 'nama' => 'Oppo Reno 6 4G', 'is_active' => 'ya'],
-                            ['merk' => 'Vivo', 'model' => 'Y20', 'nama' => 'Vivo Y20 / Y20s', 'is_active' => 'ya'],
-                            ['merk' => 'Universal', 'model' => 'Semua HP', 'nama' => 'Universal Model', 'is_active' => 'ya'],
+                            ['merk' => 'Apple', 'model' => 'iPhone 16', 'kode_produk' => 'A3287', 'nama' => 'Apple iPhone 16 (A3287)', 'is_active' => 'ya'],
+                            ['merk' => 'Apple', 'model' => 'iPhone 11', 'kode_produk' => 'A2221', 'nama' => 'Apple iPhone 11 (A2221)', 'is_active' => 'ya'],
+                            ['merk' => 'Apple', 'model' => 'iPhone 12 Pro', 'kode_produk' => '', 'nama' => 'Apple iPhone 12 Pro', 'is_active' => 'ya'],
+                            ['merk' => 'Samsung', 'model' => 'Galaxy A52', 'kode_produk' => 'SM-A525F', 'nama' => 'Samsung Galaxy A52 (SM-A525F)', 'is_active' => 'ya'],
+                            ['merk' => 'Samsung', 'model' => 'Galaxy S21', 'kode_produk' => '', 'nama' => 'Samsung Galaxy S21', 'is_active' => 'ya'],
+                            ['merk' => 'Xiaomi', 'model' => 'Redmi Note 10', 'kode_produk' => '', 'nama' => 'Xiaomi Redmi Note 10 4G', 'is_active' => 'ya'],
+                            ['merk' => 'Oppo', 'model' => 'Reno 6', 'kode_produk' => '', 'nama' => 'Oppo Reno 6 4G', 'is_active' => 'ya'],
+                            ['merk' => 'Vivo', 'model' => 'Y20', 'kode_produk' => '', 'nama' => 'Vivo Y20 / Y20s', 'is_active' => 'ya'],
+                            ['merk' => 'Universal', 'model' => 'Semua HP', 'kode_produk' => '', 'nama' => 'Universal Model', 'is_active' => 'ya'],
                         ]);
                     }
 
                     return TipeHp::orderBy('merk')->orderBy('model')->get()->map(fn ($t) => [
                         'merk' => $t->merk,
                         'model' => $t->model,
+                        'kode_produk' => $t->kode_produk ?? '',
                         'nama' => $t->nama ?? '',
                         'is_active' => $t->is_active ? 'ya' : 'tidak',
                     ]);

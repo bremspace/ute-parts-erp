@@ -2501,11 +2501,7 @@
                                                        class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30"
                                                        {{ $sudahTerdaftar ? 'disabled' : '' }}>
                                                 @php
-                                                    $optLabel = str_starts_with(strtolower($opt->model), strtolower($opt->merk))
-                                                        ? $opt->model
-                                                        : (strcasecmp($opt->merk, 'Apple') === 0 && preg_match('/^\d+/i', $opt->model)
-                                                            ? 'iPhone ' . $opt->model
-                                                            : $opt->merk . ' ' . $opt->model);
+                                                    $optLabel = $opt->nama_tampilan;
                                                 @endphp
                                                 <span class="truncate flex-1">{{ $optLabel }}</span>
                                                 @if($sudahTerdaftar)
@@ -2548,7 +2544,7 @@
                                     @foreach($selectedCreateTipeHps as $th)
                                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-up-primary/15 text-up-primary border border-up-primary/30 transition hover:bg-up-primary/25">
                                             <span class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
-                                            <strong class="font-bold">{{ $th->merk }}</strong> {{ $th->model }}
+                                            <strong class="font-bold">{{ $th->merk }}</strong> {{ $th->model }}@if(!empty($th->kode_produk)) <span class="text-[10px] text-up-mint font-mono">({{ $th->kode_produk }})</span>@endif
                                             <button type="button"
                                                     wire:click="hapusKompatibelDariForm({{ $th->id }}, 'create')"
                                                     class="ml-1 text-ink-400 hover:text-up-red transition cursor-pointer"
@@ -3479,11 +3475,7 @@
                                                        class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30"
                                                        {{ $sudahTerdaftar ? 'disabled' : '' }}>
                                                 @php
-                                                    $optLabel = str_starts_with(strtolower($opt->model), strtolower($opt->merk))
-                                                        ? $opt->model
-                                                        : (strcasecmp($opt->merk, 'Apple') === 0 && preg_match('/^\d+/i', $opt->model)
-                                                            ? 'iPhone ' . $opt->model
-                                                            : $opt->merk . ' ' . $opt->model);
+                                                    $optLabel = $opt->nama_tampilan;
                                                 @endphp
                                                 <span class="truncate flex-1">{{ $optLabel }}</span>
                                                 @if($sudahTerdaftar)
@@ -3526,7 +3518,7 @@
                                     @foreach($selectedEditTipeHps as $th)
                                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-up-primary/15 text-up-primary border border-up-primary/30 transition hover:bg-up-primary/25">
                                             <span class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
-                                            <strong class="font-bold">{{ $th->merk }}</strong> {{ $th->model }}
+                                            <strong class="font-bold">{{ $th->merk }}</strong> {{ $th->model }}@if(!empty($th->kode_produk)) <span class="text-[10px] text-up-mint font-mono">({{ $th->kode_produk }})</span>@endif
                                             <button type="button"
                                                     wire:click="hapusKompatibelDariForm({{ $th->id }}, 'edit')"
                                                     class="ml-1 text-ink-400 hover:text-up-red transition cursor-pointer"
@@ -4274,17 +4266,30 @@
                             @error('quickAddForm.model') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
 
-                        <!-- 3. NAMA LENGKAP TAMPILAN (OPSIONAL) -->
+                        <!-- 3. KODE PRODUK / PART NO. (OPSIONAL) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Produk / Part No. HP (Opsional)</label>
+                            <input
+                                type="text"
+                                wire:model="quickAddForm.kode_produk"
+                                placeholder="cth: A3287, A2221, SM-G998B (jika ada varian kode)"
+                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium font-mono focus:ring-2 focus:ring-up-mint/30"
+                            />
+                            <p class="text-[10px] text-ink-500 mt-1">Gunakan bila tipe HP memiliki varian kode fisik (cth: iPhone 16 dengan kode A3287).</p>
+                            @error('quickAddForm.kode_produk') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        </div>
+
+                        <!-- 4. NAMA LENGKAP TAMPILAN (OPSIONAL) -->
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Lengkap Tampilan (Opsional)</label>
                             <input
                                 type="text"
                                 wire:model="quickAddForm.nama"
                                 wire:keydown.enter="simpanQuickAdd"
-                                placeholder="Kosongkan jika otomatis: [Merk] [Model]..."
+                                placeholder="Kosongkan jika otomatis: [Merk] [Model] ([Kode Produk])..."
                                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium focus:ring-2 focus:ring-up-mint/30"
                             />
-                            <p class="text-[10px] text-ink-500 mt-1">Otomatis diisi: "{{ trim(($quickAddForm['merk'] ?? '') . ' ' . ($quickAddForm['model'] ?? '')) }}" jika kosong</p>
+                            <p class="text-[10px] text-ink-500 mt-1">Otomatis diisi: "{{ trim(($quickAddForm['merk'] ?? '') . ' ' . ($quickAddForm['model'] ?? '') . (!empty($quickAddForm['kode_produk']) ? ' (' . $quickAddForm['kode_produk'] . ')' : '')) }}" jika kosong</p>
                         </div>
                     @else
                         <div>

@@ -307,4 +307,80 @@ class WmsImportExportAtributTest extends TestCase
             'nama' => 'Kategori WMS',
         ]);
     }
+
+    public function test_atribut_tipe_hp_kode_produk_export_import_and_crud(): void
+    {
+        // 1. Export template tipe_hp
+        $export = new AtributProdukExport('template', 'tipe_hp', $this->cabang->id);
+        $sheet = $export->sheets()[0];
+        $this->assertEquals(['merk', 'model', 'kode_produk', 'nama', 'is_active'], $sheet->headings());
+        $col = $sheet->collection();
+        $this->assertTrue($col->contains(fn ($r) => ($r['kode_produk'] ?? '') === 'A3287'));
+
+        // 2. Import tipe_hp dengan kode_produk (dua record tipe sama, beda kode produk)
+        $service = new ImportAtributService;
+        $items = [
+            'tipe_hp' => [
+                [
+                    'merk' => 'Apple',
+                    'model' => 'iPhone 16',
+                    'kode_produk' => 'A3287',
+                    'nama' => 'Apple iPhone 16 (A3287)',
+                    'is_active' => 'ya',
+                    'status' => 'baru',
+                ],
+                [
+                    'merk' => 'Apple',
+                    'model' => 'iPhone 16',
+                    'kode_produk' => 'A3081',
+                    'nama' => 'Apple iPhone 16 (A3081)',
+                    'is_active' => 'ya',
+                    'status' => 'baru',
+                ],
+            ],
+        ];
+
+        $res = $service->execute($items, $this->cabang->id);
+        $this->assertEquals(2, $res['tipe_hp']['sukses']);
+
+        $t1 = TipeHp::where('merk', 'Apple')->where('model', 'iPhone 16')->where('kode_produk', 'A3287')->first();
+        $t2 = TipeHp::where('merk', 'Apple')->where('model', 'iPhone 16')->where('kode_produk', 'A3081')->first();
+        $this->assertNotNull($t1);
+        $this->assertNotNull($t2);
+        $this->assertEquals('Apple iPhone 16 (A3287)', $t1->nama_tampilan);
+        $this->assertEquals('Apple iPhone 16 (A3081)', $t2->nama_tampilan);
+
+        // 3. Export data mencantumkan kode_produk
+        $exportData = new AtributProdukExport('data', 'tipe_hp', $this->cabang->id);
+        $dataCol = $exportData->sheets()[0]->collection();
+        $this->assertTrue($dataCol->contains(fn ($r) => $r['kode_produk'] === 'A3287'));
+        $this->assertTrue($dataCol->contains(fn ($r) => $r['kode_produk'] === 'A3081'));
+
+        // 4. Livewire SettingsRbac CRUD modal tipe_hp dengan kode_produk
+        $this->actingAs($this->admin);
+        session(['cabang_id' => $this->cabang->id]);
+
+        Livewire::test(SettingsRbac::class)
+            ->call('openTipeHpModal')
+            ->set('tipeHpForm.merk', 'Samsung')
+            ->set('tipeHpForm.model', 'Galaxy S24')
+            ->set('tipeHpForm.kode_produk', 'SM-S921B')
+            ->call('simpanTipeHp')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('tipe_hp', [
+            'merk' => 'Samsung',
+            'model' => 'Galaxy S24',
+            'kode_produk' => 'SM-S921B',
+        ]);
+
+        // Coba simpan duplikat merk + model + kode_produk yang sama -> harus dicegah
+        Livewire::test(SettingsRbac::class)
+            ->call('openTipeHpModal')
+            ->set('tipeHpForm.merk', 'Samsung')
+            ->set('tipeHpForm.model', 'Galaxy S24')
+            ->set('tipeHpForm.kode_produk', 'SM-S921B')
+            ->call('simpanTipeHp')
+            ->assertHasErrors(['tipeHpForm.model']);
+    }
 }

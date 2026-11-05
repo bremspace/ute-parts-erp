@@ -294,6 +294,7 @@ class ProdukTab extends Component
         'keterangan' => '',
         'merk' => '',
         'model' => '',
+        'kode_produk' => '',
     ];
 
     // Tambah Stok Modal (pembelian — sinkron Akunting)
@@ -1969,6 +1970,7 @@ class ProdukTab extends Component
             'brand_id' => $defaultBrandId,
             'merk' => $defaultMerk,
             'model' => $defaultModel,
+            'kode_produk' => '',
             'telepon' => '',
             'kontak' => '',
             'alamat' => '',
@@ -2009,6 +2011,7 @@ class ProdukTab extends Component
             $this->validate([
                 'quickAddForm.merk' => 'required|string|max:100',
                 'quickAddForm.model' => 'required|string|max:100',
+                'quickAddForm.kode_produk' => 'nullable|string|max:100',
             ]);
         } else {
             $this->validate([
@@ -2022,12 +2025,21 @@ class ProdukTab extends Component
             case 'tipe_hp':
                 $merk = trim($this->quickAddForm['merk']);
                 $model = trim($this->quickAddForm['model']);
-                $namaLengkap = $nama ?: "{$merk} {$model}";
+                $kodeProduk = trim((string) ($this->quickAddForm['kode_produk'] ?? '')) ?: null;
+                $namaLengkap = $nama ?: TipeHp::formatNamaTampilan($merk, $model, null, $kodeProduk);
 
-                $existingTipe = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ?', [strtolower($merk), strtolower($model)])->first();
+                $query = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ?', [strtolower($merk), strtolower($model)]);
+                if ($kodeProduk) {
+                    $query->whereRaw('LOWER(TRIM(kode_produk)) = ?', [strtolower($kodeProduk)]);
+                } else {
+                    $query->where(fn ($q) => $q->whereNull('kode_produk')->orWhere('kode_produk', ''));
+                }
+                $existingTipe = $query->first();
+
                 $tipe = $existingTipe ?? TipeHp::create([
                     'merk' => $merk,
                     'model' => $model,
+                    'kode_produk' => $kodeProduk,
                     'nama' => $namaLengkap,
                     'is_active' => true,
                 ]);

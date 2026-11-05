@@ -3191,10 +3191,7 @@ class ImportProdukService
             foreach ($daftarTipe as $t) {
                 $cacheKey = $t['merk'].'|'.$t['model'];
                 if (! isset($this->tipeHpCache[$cacheKey])) {
-                    $this->tipeHpCache[$cacheKey] = TipeHp::firstOrCreate(
-                        ['merk' => $t['merk'], 'model' => $t['model']],
-                        ['nama' => $t['merk'].' '.$t['model'], 'is_active' => true]
-                    )->id;
+                    $this->tipeHpCache[$cacheKey] = $this->resolveOrCreateTipeHpId($t['merk'], $t['model']);
                 }
                 $ids[] = $this->tipeHpCache[$cacheKey];
             }
@@ -3430,10 +3427,7 @@ class ImportProdukService
             foreach ($daftarTipe as $t) {
                 $cacheKey = $t['merk'].'|'.$t['model'];
                 if (! isset($this->tipeHpCache[$cacheKey])) {
-                    $this->tipeHpCache[$cacheKey] = TipeHp::firstOrCreate(
-                        ['merk' => $t['merk'], 'model' => $t['model']],
-                        ['nama' => $t['merk'].' '.$t['model'], 'is_active' => true]
-                    )->id;
+                    $this->tipeHpCache[$cacheKey] = $this->resolveOrCreateTipeHpId($t['merk'], $t['model']);
                 }
                 $ids[] = $this->tipeHpCache[$cacheKey];
             }
@@ -3702,10 +3696,7 @@ class ImportProdukService
             foreach ($daftarTipe as $t) {
                 $cacheKey = $t['merk'].'|'.$t['model'];
                 if (! isset($this->tipeHpCache[$cacheKey])) {
-                    $this->tipeHpCache[$cacheKey] = TipeHp::firstOrCreate(
-                        ['merk' => $t['merk'], 'model' => $t['model']],
-                        ['nama' => $t['merk'].' '.$t['model'], 'is_active' => true]
-                    )->id;
+                    $this->tipeHpCache[$cacheKey] = $this->resolveOrCreateTipeHpId($t['merk'], $t['model']);
                 }
                 $ids[] = $this->tipeHpCache[$cacheKey];
             }
@@ -4219,5 +4210,51 @@ class ImportProdukService
                 ]
             );
         }
+    }
+
+    protected function resolveOrCreateTipeHpId(string $merk, string $model): int
+    {
+        $merk = trim($merk);
+        $model = trim($model);
+
+        // 1. Cek exact match merk + model
+        $th = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ?', [strtolower($merk), strtolower($model)])->first();
+        if ($th) {
+            return $th->id;
+        }
+
+        // 2. Cek apakah ada kode produk dalam tanda kurung, misal: "iPhone 16 (A3287)"
+        $extractedKode = null;
+        $baseModel = $model;
+        if (preg_match('/^(.*?)\s*\(([^)]+)\)$/', $model, $matches)) {
+            $baseModel = trim($matches[1]);
+            $extractedKode = trim($matches[2]);
+
+            $thKode = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ? AND LOWER(TRIM(kode_produk)) = ?', [
+                strtolower($merk),
+                strtolower($baseModel),
+                strtolower($extractedKode),
+            ])->first();
+
+            if ($thKode) {
+                return $thKode->id;
+            }
+        }
+
+        // 3. Cek by nama tampilan lengkap
+        $namaLengkap = TipeHp::formatNamaTampilan($merk, $baseModel, null, $extractedKode);
+        $thNama = TipeHp::whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($namaLengkap)])->first();
+        if ($thNama) {
+            return $thNama->id;
+        }
+
+        // 4. Buat record baru jika belum ada
+        return TipeHp::create([
+            'merk' => $merk,
+            'model' => $baseModel,
+            'kode_produk' => $extractedKode,
+            'nama' => $namaLengkap,
+            'is_active' => true,
+        ])->id;
     }
 }

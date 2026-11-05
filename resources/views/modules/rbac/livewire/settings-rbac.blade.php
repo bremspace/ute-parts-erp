@@ -3506,6 +3506,9 @@
                                         <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                                             <span class="px-2 py-0.5 rounded bg-up-primary/15 text-[10px] text-up-primary font-semibold">{{ $t->merk }}</span>
                                             <span class="font-mono text-[10px] text-ink-300">{{ $t->model }}</span>
+                                            @if(!empty($t->kode_produk))
+                                                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-up-mint/15 text-up-mint border border-up-mint/20">{{ $t->kode_produk }}</span>
+                                            @endif
                                             @if($t->is_default || ($t->merk === 'Universal' && $t->model === 'Semua Tipe HP'))
                                                 <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Default</span>
                                             @endif
@@ -3548,6 +3551,7 @@
                                         </th>
                                         <th class="py-2.5 px-3">Merek Perangkat</th>
                                         <th class="py-2.5 px-3">Model</th>
+                                        <th class="py-2.5 px-3">Kode Produk</th>
                                         <th class="py-2.5 px-3">Nama Lengkap</th>
                                         <th class="py-2.5 px-3 text-center">Jml Part Terkait</th>
                                         <th class="py-2.5 px-3 text-center">Status</th>
@@ -3582,6 +3586,13 @@
                                                 @endif
                                             </td>
                                             <td class="py-2.5 px-3 font-mono text-ink-300">{{ $t->model }}</td>
+                                            <td class="py-2.5 px-3 font-mono text-ink-300">
+                                                @if(!empty($t->kode_produk))
+                                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-up-mint/15 text-up-mint border border-up-mint/20">{{ $t->kode_produk }}</span>
+                                                @else
+                                                    <span class="text-ink-600">—</span>
+                                                @endif
+                                            </td>
                                             <td class="py-2.5 px-3 text-white">{{ $t->nama }}</td>
                                             <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $t->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
                                                 {{ $t->produk_count }}
@@ -3602,7 +3613,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="7" class="py-6 text-center text-ink-500">Belum ada data tipe HP.</td>
+                                            <td colspan="8" class="py-6 text-center text-ink-500">Belum ada data tipe HP.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -3691,7 +3702,7 @@
                                 <li>• <strong class="text-up-mint">Kualitas:</strong> nama, brand, keterangan, is_active</li>
                                 <li>• <strong class="text-up-mint">Satuan:</strong> kode, nama, is_active</li>
                                 <li>• <strong class="text-up-mint">Rak:</strong> gudang, kode, nama, zona, is_active</li>
-                                <li>• <strong class="text-up-mint">Tipe HP:</strong> merk, model, nama, is_active</li>
+                                <li>• <strong class="text-up-mint">Tipe HP:</strong> merk, model, kode_produk (opsional), nama, is_active</li>
                             </ul>
                         </div>
                     </div>
@@ -3864,6 +3875,7 @@
                                             @elseif(($atributActivePreviewTab ?? 'kategori') === 'tipe_hp')
                                                 <th class="py-2.5 px-3">Merk</th>
                                                 <th class="py-2.5 px-3">Model</th>
+                                                <th class="py-2.5 px-3">Kode Produk</th>
                                                 <th class="py-2.5 px-3">Nama Lengkap</th>
                                             @endif
                                             <th class="py-2.5 px-3 text-right">Status</th>
@@ -3897,6 +3909,7 @@
                                                 @elseif(($atributActivePreviewTab ?? 'kategori') === 'tipe_hp')
                                                     <td class="py-2.5 px-3 font-bold text-up-primary">{{ $row['merk'] ?? '-' }}</td>
                                                     <td class="py-2.5 px-3 font-semibold text-ink-900 dark:text-white">{{ $row['model'] ?? '-' }}</td>
+                                                    <td class="py-2.5 px-3 font-mono text-ink-300">{{ $row['kode_produk'] ?? '-' }}</td>
                                                     <td class="py-2.5 px-3 text-ink-400">{{ $row['nama'] ?: '-' }}</td>
                                                 @endif
                                                 <td class="py-2.5 px-3 text-right">
@@ -5249,11 +5262,26 @@
                         @error('tipeHpForm.model') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                     </div>
 
-                    <!-- 3. Nama Lengkap (Opsional) -->
+                    <!-- 3. Kode Produk (Opsional, cth: A3287, A2221) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">
+                            Kode Produk / Part No. HP (Opsional)
+                        </label>
+                        <input
+                            type="text"
+                            wire:model="tipeHpForm.kode_produk"
+                            placeholder="cth: A3287, A2221, SM-G998B (jika tipe sama tapi beda varian regional/kode)"
+                            class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono"
+                        />
+                        <p class="text-[10px] text-ink-500 mt-1">Gunakan bila tipe HP memiliki varian kode fisik berbeda (cth: iPhone 16 dengan kode A3287).</p>
+                        @error('tipeHpForm.kode_produk') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    <!-- 4. Nama Lengkap (Opsional) -->
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Lengkap Tampilan (Opsional)</label>
-                        <input type="text" wire:model="tipeHpForm.nama" placeholder="Otomatis diisi: [Merk] [Model] jika kosong" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
-                        <p class="text-[10px] text-ink-500 mt-1">Otomatis gabungan: "{{ trim(($tipeHpForm['merk'] ?? '') . ' ' . ($tipeHpForm['model'] ?? '')) }}" jika dikosongkan.</p>
+                        <input type="text" wire:model="tipeHpForm.nama" placeholder="Otomatis diisi: [Merk] [Model] ([Kode Produk]) jika kosong" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        <p class="text-[10px] text-ink-500 mt-1">Otomatis gabungan: "{{ trim(($tipeHpForm['merk'] ?? '') . ' ' . ($tipeHpForm['model'] ?? '') . (!empty($tipeHpForm['kode_produk']) ? ' (' . $tipeHpForm['kode_produk'] . ')' : '')) }}" jika dikosongkan.</p>
                     </div>
 
                     <div>

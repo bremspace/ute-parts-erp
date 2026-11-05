@@ -335,15 +335,24 @@ class ImportAtributService
                 }
                 $merk = trim($item['merk'] ?? '');
                 $model = trim($item['model'] ?? '');
+                $kodeProduk = trim((string) ($item['kode_produk'] ?? '')) ?: null;
                 $nama = trim($item['nama'] ?? '');
                 $isActive = $this->parseBoolean($item['is_active'] ?? true);
 
-                $th = TipeHp::whereRaw('LOWER(merk) = ?', [strtolower($merk)])
-                    ->whereRaw('LOWER(model) = ?', [strtolower($model)])
-                    ->first();
+                $query = TipeHp::whereRaw('LOWER(merk) = ?', [strtolower($merk)])
+                    ->whereRaw('LOWER(model) = ?', [strtolower($model)]);
+
+                if ($kodeProduk) {
+                    $query->whereRaw('LOWER(kode_produk) = ?', [strtolower($kodeProduk)]);
+                } else {
+                    $query->where(fn ($q) => $q->whereNull('kode_produk')->orWhere('kode_produk', ''));
+                }
+
+                $th = $query->first();
 
                 if ($th) {
                     $th->update([
+                        'kode_produk' => $kodeProduk,
                         'nama' => $nama ?: $th->nama,
                         'is_active' => $isActive,
                     ]);
@@ -352,7 +361,8 @@ class ImportAtributService
                     TipeHp::create([
                         'merk' => $merk,
                         'model' => $model,
-                        'nama' => $nama ?: "{$merk} {$model}",
+                        'kode_produk' => $kodeProduk,
+                        'nama' => $nama ?: TipeHp::formatNamaTampilan($merk, $model, null, $kodeProduk),
                         'is_active' => $isActive,
                     ]);
                     $hasil['tipe_hp']['sukses']++;
@@ -453,7 +463,7 @@ class ImportAtributService
         $existingBrands = Brand::pluck('id', 'nama')->mapWithKeys(fn ($id, $n) => [strtolower($n) => $id])->all();
         $existingSatuans = SatuanUnit::pluck('id', 'kode')->mapWithKeys(fn ($id, $k) => [strtolower($k) => $id])->all();
         $existingKategoriUtama = KategoriProduk::whereNull('parent_id')->pluck('id', 'nama')->mapWithKeys(fn ($id, $n) => [strtolower($n) => $id])->all();
-        $existingTipeHp = TipeHp::get()->mapWithKeys(fn ($t) => [strtolower("{$t->merk}|{$t->model}") => $t->id])->all();
+        $existingTipeHp = TipeHp::get()->mapWithKeys(fn ($t) => [strtolower("{$t->merk}|{$t->model}|".trim((string) $t->kode_produk)) => $t->id])->all();
 
         foreach ($rows as $index => $row) {
             $rowNum = $index + 2; // Mengingat baris 1 adalah heading
@@ -540,14 +550,17 @@ class ImportAtributService
                 case 'tipe_hp':
                     $merk = $row['merk'] ?? ($row['brand'] ?? '');
                     $model = $row['model'] ?? ($row['tipe'] ?? '');
+                    $kodeProduk = trim((string) ($row['kode_produk'] ?? ($row['kode'] ?? ($row['product_code'] ?? ($row['kode_hp'] ?? '')))));
                     if (empty($merk) || empty($model)) {
                         $status = 'error';
                         $errorMsg = 'Merk dan Model HP wajib diisi (misal: Apple | iPhone 11).';
                     } else {
-                        $status = isset($existingTipeHp[strtolower("{$merk}|{$model}")]) ? 'update' : 'baru';
+                        $keyWithKode = strtolower("{$merk}|{$model}|{$kodeProduk}");
+                        $status = isset($existingTipeHp[$keyWithKode]) ? 'update' : 'baru';
                     }
                     $row['merk'] = $merk;
                     $row['model'] = $model;
+                    $row['kode_produk'] = $kodeProduk;
                     break;
             }
 

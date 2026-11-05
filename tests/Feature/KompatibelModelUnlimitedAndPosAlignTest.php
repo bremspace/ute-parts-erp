@@ -246,6 +246,14 @@ class KompatibelModelUnlimitedAndPosAlignTest extends TestCase
 
         $this->assertEquals('Apple iPhone 11 (A2221)', TipeHp::resolveLabelForModel('iPhone 11'));
         $this->assertEquals('Apple iPhone 11 (A2221)', TipeHp::resolveLabelForModel('iPhone 11', 'Apple'));
+
+        // 8. Tipe HP dengan kode_produk opsional
+        $this->assertEquals('Apple iPhone 16 (A3287)', TipeHp::formatNamaTampilan('Apple', 'iPhone 16', null, 'A3287'));
+        $t16 = TipeHp::create(['merk' => 'Apple', 'model' => 'iPhone 16', 'kode_produk' => 'A3287']);
+        $this->assertEquals('Apple iPhone 16 (A3287)', $t16->nama_tampilan);
+
+        $t16b = TipeHp::create(['merk' => 'Apple', 'model' => 'iPhone 16', 'kode_produk' => 'A3081']);
+        $this->assertEquals('Apple iPhone 16 (A3081)', $t16b->nama_tampilan);
     }
 
     public function test_filter_dropdown_tipe_hp_includes_brand_in_pos_kasir(): void

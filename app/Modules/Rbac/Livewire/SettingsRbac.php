@@ -1309,7 +1309,7 @@ class SettingsRbac extends Component
 
     public ?string $tipeHpSelectedModel = '';
 
-    public array $tipeHpForm = ['id' => null, 'merk' => '', 'model' => '', 'nama' => '', 'is_active' => true];
+    public array $tipeHpForm = ['id' => null, 'merk' => '', 'model' => '', 'kode_produk' => '', 'nama' => '', 'is_active' => true];
 
     // Master Merk HP
     public bool $showMerkHpModal = false;
@@ -2991,13 +2991,14 @@ class SettingsRbac extends Component
                 'id' => $t->id,
                 'merk' => $t->merk,
                 'model' => $t->model,
+                'kode_produk' => $t->kode_produk ?? '',
                 'nama' => $t->nama ?? '',
                 'is_active' => (bool) $t->is_active,
             ];
             $this->tipeHpSelectedMerk = $t->merk;
             $this->tipeHpSelectedModel = $t->model;
         } else {
-            $this->tipeHpForm = ['id' => null, 'merk' => '', 'model' => '', 'nama' => '', 'is_active' => true];
+            $this->tipeHpForm = ['id' => null, 'merk' => '', 'model' => '', 'kode_produk' => '', 'nama' => '', 'is_active' => true];
             $this->tipeHpSelectedMerk = '';
             $this->tipeHpSelectedModel = '';
         }
@@ -3040,29 +3041,43 @@ class SettingsRbac extends Component
         $this->validate([
             'tipeHpForm.merk' => 'required|string|max:100',
             'tipeHpForm.model' => 'required|string|max:100',
+            'tipeHpForm.kode_produk' => 'nullable|string|max:100',
         ]);
 
         $merk = trim($this->tipeHpForm['merk']);
         $model = trim($this->tipeHpForm['model']);
+        $kodeProduk = trim((string) ($this->tipeHpForm['kode_produk'] ?? '')) ?: null;
         $id = $this->tipeHpForm['id'] ? (int) $this->tipeHpForm['id'] : null;
 
-        $duplikat = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ?', [strtolower($merk), strtolower($model)])
-            ->when($id, fn ($q) => $q->where('id', '!=', $id))
-            ->exists();
+        $duplikatQuery = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ?', [strtolower($merk), strtolower($model)])
+            ->when($id, fn ($q) => $q->where('id', '!=', $id));
+
+        if ($kodeProduk) {
+            $duplikatQuery->whereRaw('LOWER(TRIM(kode_produk)) = ?', [strtolower($kodeProduk)]);
+        } else {
+            $duplikatQuery->where(fn ($q) => $q->whereNull('kode_produk')->orWhere('kode_produk', ''));
+        }
+
+        $duplikat = $duplikatQuery->exists();
 
         if ($duplikat) {
-            $this->addError('tipeHpForm.model', "Tipe HP '{$merk} {$model}' sudah terdaftar.");
-            $this->dispatch('alert', ['type' => 'error', 'message' => "Tipe HP '{$merk} {$model}' sudah terdaftar"]);
+            $labelDuplikat = $kodeProduk ? "{$merk} {$model} ({$kodeProduk})" : "{$merk} {$model}";
+            $this->addError('tipeHpForm.model', "Tipe HP '{$labelDuplikat}' sudah terdaftar.");
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Tipe HP '{$labelDuplikat}' sudah terdaftar"]);
 
             return;
         }
 
-        $nama = trim($this->tipeHpForm['nama']) ?: "{$merk} {$model}";
+        $nama = trim($this->tipeHpForm['nama']);
+        if ($nama === '') {
+            $nama = TipeHp::formatNamaTampilan($merk, $model, null, $kodeProduk);
+        }
 
         if ($this->tipeHpForm['id']) {
             TipeHp::findOrFail($this->tipeHpForm['id'])->update([
                 'merk' => $this->tipeHpForm['merk'],
                 'model' => $this->tipeHpForm['model'],
+                'kode_produk' => $kodeProduk,
                 'nama' => $nama,
                 'is_active' => (bool) $this->tipeHpForm['is_active'],
             ]);
@@ -3070,6 +3085,7 @@ class SettingsRbac extends Component
             TipeHp::create([
                 'merk' => $this->tipeHpForm['merk'],
                 'model' => $this->tipeHpForm['model'],
+                'kode_produk' => $kodeProduk,
                 'nama' => $nama,
                 'is_active' => (bool) $this->tipeHpForm['is_active'],
             ]);

@@ -295,7 +295,8 @@ class ExportMasterProdukService
             if ($p->tipeHps && $p->tipeHps->isNotEmpty()) {
                 foreach ($p->tipeHps as $th) {
                     if (! empty($th->model)) {
-                        $daftarKompat->push(['merk' => $th->merk ?: '', 'model' => $th->model]);
+                        $modelLabel = ! empty($th->kode_produk) ? "{$th->model} ({$th->kode_produk})" : $th->model;
+                        $daftarKompat->push(['merk' => $th->merk ?: '', 'model' => $modelLabel]);
                     }
                 }
             }
