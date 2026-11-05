@@ -1088,7 +1088,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 flex-wrap mb-1">
                                 <span class="font-mono text-[10px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
-                                    {{ $item['sku'] ?? $key }}
+                                    {{ !empty($item['sku']) ? $item['sku'] : (!empty($item['kode']) ? $item['kode'] : '-') }}
                                 </span>
                                 @if(($item['varian'] ?? 'Standar') !== 'Standar')
                                     <span class="px-1.5 py-0.5 rounded bg-ink-200/70 dark:bg-white/10 text-ink-700 dark:text-ink-300 text-[10px] font-medium">
@@ -1331,7 +1331,7 @@
                     <div class="flex items-center justify-between gap-2">
                         <div class="min-w-0 flex items-center gap-1.5 flex-1">
                             <span class="font-mono text-[9px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded flex-shrink-0">
-                                {{ $item['sku'] ?? $key }}
+                                {{ !empty($item['sku']) ? $item['sku'] : (!empty($item['kode']) ? $item['kode'] : '-') }}
                             </span>
                             <h5 class="text-xs font-semibold text-ink-900 dark:text-white truncate" title="{{ $item['nama'] }}">
                                 {{ $item['nama'] }}
@@ -1478,7 +1478,7 @@
                             </td>
                             <td class="py-2.5 px-3">
                                 <span class="font-mono text-[11px] font-semibold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-2 py-0.5 rounded-md border border-ink-200/60 dark:border-white/5">
-                                    {{ $item['sku'] ?? $key }}
+                                    {{ !empty($item['sku']) ? $item['sku'] : (!empty($item['kode']) ? $item['kode'] : '-') }}
                                 </span>
                             </td>
                             <td class="py-2.5 px-3">

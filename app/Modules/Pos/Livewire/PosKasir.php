@@ -454,7 +454,16 @@ class PosKasir extends Component
             return;
         }
 
-        $this->cart = $draft['cart'] ?? [];
+        $restoredCart = $draft['cart'] ?? [];
+        foreach ($restoredCart as $k => $item) {
+            if (empty($item['sku']) && ! empty($item['produk_id'])) {
+                $p = Produk::with('skuVariants')->find($item['produk_id']);
+                $v = ! empty($item['sku_variant_id']) ? SkuVariant::find($item['sku_variant_id']) : null;
+                $restoredCart[$k]['sku'] = $v?->sku ?: ($p?->sku ?: ($p?->barcode ?: ($p?->kode_lama ?: 'PRD-'.str_pad((string) $item['produk_id'], 6, '0', STR_PAD_LEFT))));
+            }
+        }
+
+        $this->cart = $restoredCart;
         $this->selectedCustomerId = $draft['selectedCustomerId'] ?? null;
         if (! empty($draft['selectedGudangId'])) {
             $this->selectedGudangId = $draft['selectedGudangId'];
@@ -1327,8 +1336,9 @@ class PosKasir extends Component
 
     public function addToCart(int $produkId, ?int $variantId = null, ?string $satuanKode = null)
     {
-        $produk = Produk::with('satuanKonversi')->findOrFail($produkId);
+        $produk = Produk::with(['satuanKonversi', 'skuVariants'])->findOrFail($produkId);
         $variant = $variantId ? SkuVariant::find($variantId) : null;
+        $itemSku = $variant?->sku ?: ($produk->sku ?: ($produk->barcode ?: ($produk->kode_lama ?: 'PRD-'.str_pad((string) $produk->id, 6, '0', STR_PAD_LEFT))));
 
         // [B-02/P1-2] Gudang terpilih wajib milik cabang aktif (anti tamper lintas cabang)
         $this->validasiGudangCabang();
@@ -1434,10 +1444,14 @@ class PosKasir extends Component
             $this->cart[$itemKey]['qty'] += 1;
             $this->cart[$itemKey]['subtotal'] = $this->cart[$itemKey]['qty'] * $harga;
             $this->cart[$itemKey]['stok_max'] = $stokMaxSatuan;
+            if (empty($this->cart[$itemKey]['sku'])) {
+                $this->cart[$itemKey]['sku'] = $itemSku;
+            }
         } else {
             $this->cart[$itemKey] = [
                 'produk_id' => $produkId,
                 'sku_variant_id' => $variantId,
+                'sku' => $itemSku,
                 'nama' => $produk->nama,
                 'varian' => $variant?->nama_varian ?? 'Standar',
                 'satuan' => $satuanTarget,

@@ -109,15 +109,21 @@ trait ManagesHoldTransactions
             $pId = (int) ($item['produk_id'] ?? 0);
             $vId = $item['sku_variant_id'] ?? null;
             $satuanItem = $item['satuan'] ?? null;
-            $produk = $pId ? Produk::find($pId) : null;
+            $produk = $pId ? Produk::with('skuVariants')->find($pId) : null;
+            $variant = $vId ? SkuVariant::find($vId) : null;
             $satuanDasar = $produk?->satuan ?: 'pcs';
             $satuanSuffix = ($satuanItem && $satuanItem !== $satuanDasar) ? "-{$satuanItem}" : '';
 
             $key = ($vId ? "{$pId}-{$vId}" : "{$pId}-0").$satuanSuffix;
+            $itemSku = $item['sku'] ?? null;
+            if (empty($itemSku) && $produk) {
+                $itemSku = $variant?->sku ?: ($produk->sku ?: ($produk->barcode ?: ($produk->kode_lama ?: 'PRD-'.str_pad((string) $pId, 6, '0', STR_PAD_LEFT))));
+            }
             // [F2-3][P2-3] Compat keranjang lama — flag sn SELALU di-derive ulang
             // dari produk (server-side). Array + mempertahankan key kiri (payload
             // lama), jadi pakai array_merge agar 'sn' selalu nilai segar.
             $this->cart[$key] = array_merge($item, [
+                'sku' => $itemSku,
                 'sn' => $this->snProdukDariItem($item),
                 'sn_list' => $item['sn_list'] ?? [],
             ]);

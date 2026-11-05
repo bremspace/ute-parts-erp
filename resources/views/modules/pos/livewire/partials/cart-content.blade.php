@@ -28,6 +28,13 @@
             >
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0 flex-1">
+                        @if(!empty($item['sku']))
+                            <div class="mb-1">
+                                <span class="font-mono text-[10px] font-bold text-ink-600 dark:text-ink-400 bg-ink-200/60 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
+                                    {{ $item['sku'] }}
+                                </span>
+                            </div>
+                        @endif
                         <h5 class="text-xs sm:text-sm font-semibold text-ink-900 dark:text-white truncate leading-snug">
                             {{ $item['nama'] }}
                         </h5>

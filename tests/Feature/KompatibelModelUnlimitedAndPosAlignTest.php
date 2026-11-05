@@ -10,6 +10,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\AkunCoaSeeder;
@@ -296,5 +297,44 @@ class KompatibelModelUnlimitedAndPosAlignTest extends TestCase
 
         Livewire::test(ShopPage::class)
             ->assertSeeHtml('Apple iPhone 11 (A2221)');
+    }
+
+    public function test_pos_kasir_cart_renders_actual_sku_instead_of_internal_cart_key(): void
+    {
+        $produk = Produk::create([
+            'nama' => 'Baterai Hippo iPhone 11',
+            'kategori' => 'Baterai',
+            'satuan' => 'PCS',
+            'harga_beli' => 100000,
+            'harga_jual_retail' => 175000,
+            'barcode' => 'UTP-008487',
+            'is_active' => true,
+        ]);
+
+        $variant = SkuVariant::create([
+            'produk_id' => $produk->id,
+            'sku' => '008487',
+            'nama_varian' => 'Standar',
+            'harga_jual' => 175000,
+            'is_active' => true,
+        ]);
+
+        StokItem::create([
+            'produk_id' => $produk->id,
+            'sku_variant_id' => $variant->id,
+            'gudang_id' => $this->gudang->id,
+            'jumlah' => 10,
+        ]);
+
+        $this->actingAs($this->user);
+        session(['cabang_id' => $this->cabang->id]);
+
+        $internalKey = "{$produk->id}-0";
+
+        Livewire::test(PosKasir::class)
+            ->set('selectedGudangId', $this->gudang->id)
+            ->call('addToCart', $produk->id)
+            ->assertSeeHtml('008487')
+            ->assertDontSeeHtml(">{$internalKey}<");
     }
 }
