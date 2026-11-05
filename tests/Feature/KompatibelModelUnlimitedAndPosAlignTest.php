@@ -415,4 +415,62 @@ class KompatibelModelUnlimitedAndPosAlignTest extends TestCase
         $this->assertContains($p1->id, $results);
         $this->assertContains($p2->id, $results);
     }
+
+    public function test_tipe_hp_filter_sorted_alphabetically_with_brand_as_primary_reference(): void
+    {
+        TipeHp::firstOrCreate(['merk' => 'Xiaomi', 'model' => 'Redmi Note 10 Pro'], ['nama' => 'Redmi Note 10 Pro', 'is_active' => true]);
+        TipeHp::firstOrCreate(['merk' => 'Apple', 'model' => 'iPhone 13'], ['nama' => 'iPhone 13', 'is_active' => true]);
+        TipeHp::firstOrCreate(['merk' => 'Apple', 'model' => 'iPhone 11'], ['nama' => 'iPhone 11', 'is_active' => true]);
+        TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy A52'], ['nama' => 'Galaxy A52', 'is_active' => true]);
+        TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy A11'], ['nama' => 'Galaxy A11', 'is_active' => true]);
+
+        $rawModels = ['Redmi Note 10 Pro', 'iPhone 13', 'Galaxy A52', 'iPhone 11', 'Galaxy A11'];
+        $sorted = TipeHp::sortModelsByBrandAndAlphabet($rawModels);
+
+        $this->assertSame([
+            'iPhone 11',
+            'iPhone 13',
+            'Galaxy A11',
+            'Galaxy A52',
+            'Redmi Note 10 Pro',
+        ], array_values($sorted));
+
+        $grouped = TipeHp::groupModelsByBrand($rawModels);
+        $this->assertSame(['Apple', 'Samsung', 'Xiaomi'], array_keys($grouped));
+        $this->assertSame(['iPhone 11', 'iPhone 13'], array_values($grouped['Apple']));
+        $this->assertSame(['Galaxy A11', 'Galaxy A52'], array_values($grouped['Samsung']));
+        $this->assertSame(['Redmi Note 10 Pro'], array_values($grouped['Xiaomi']));
+    }
+
+    public function test_shop_and_pos_render_optgroup_for_brand_referenced_models(): void
+    {
+        $thApple = TipeHp::firstOrCreate(['merk' => 'Apple', 'model' => 'iPhone 11'], ['is_active' => true]);
+        $thSamsung = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy A52'], ['is_active' => true]);
+
+        Produk::create([
+            'nama' => 'LCD iPhone 11',
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11',
+            'harga_jual_retail' => 100000,
+            'is_active' => true,
+        ]);
+
+        Produk::create([
+            'nama' => 'Baterai Galaxy A52',
+            'brand_kompatibel' => 'Samsung',
+            'model_kompatibel' => 'Galaxy A52',
+            'harga_jual_retail' => 80000,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(PosKasir::class)
+            ->call('toggleFilter', 'model_kompatibel')
+            ->assertSeeHtml('optgroup label="Apple"')
+            ->assertSeeHtml('optgroup label="Samsung"');
+
+        Livewire::test(ShopPage::class)
+            ->assertSeeHtml('optgroup label="Apple"')
+            ->assertSeeHtml('optgroup label="Samsung"');
+    }
 }

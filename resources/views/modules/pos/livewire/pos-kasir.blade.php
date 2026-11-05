@@ -889,9 +889,19 @@
                     <div class="relative inline-flex items-center">
                         <select wire:model.live="filterTipeHpId" class="px-2.5 py-1.5 {{ $filterTipeHpId ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                             <option value="">Semua Tipe HP</option>
-                            @foreach($tipeHpList as $th)
-                                <option value="{{ $th->id }}">{{ $th->nama_tampilan }}</option>
-                            @endforeach
+                            @if(empty($filterBrandKompatibel))
+                                @foreach($tipeHpList->groupBy('merk') as $merk => $tipes)
+                                    <optgroup label="{{ $merk }}">
+                                        @foreach($tipes as $th)
+                                            <option value="{{ $th->id }}">{{ $th->nama_tampilan }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            @else
+                                @foreach($tipeHpList as $th)
+                                    <option value="{{ $th->id }}">{{ $th->nama_tampilan }}</option>
+                                @endforeach
+                            @endif
                         </select>
                         @if($filterTipeHpId)
                             <button type="button" wire:click="$set('filterTipeHpId', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Tipe HP">✕</button>
@@ -912,12 +922,25 @@
                     </div>
                 @endif
                 @if($visibleFilters['model_kompatibel'])
+                    @php
+                        $groupedMkPos = \App\Modules\Wms\Models\TipeHp::groupModelsByBrand($modelKompatibelList, $filterBrandKompatibel ?: null);
+                    @endphp
                     <div class="relative inline-flex items-center">
                         <select wire:model.live="filterModelKompatibel" class="px-2.5 py-1.5 {{ $filterModelKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                             <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Model Kompatibel' }}</option>
-                            @foreach($modelKompatibelList as $mk)
-                                <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
-                            @endforeach
+                            @if(empty($filterBrandKompatibel) && count($groupedMkPos) > 1)
+                                @foreach($groupedMkPos as $brandName => $models)
+                                    <optgroup label="{{ $brandName }}">
+                                        @foreach($models as $mk)
+                                            <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $brandName) }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            @else
+                                @foreach($modelKompatibelList as $mk)
+                                    <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
+                                @endforeach
+                            @endif
                         </select>
                         @if($filterModelKompatibel)
                             <button type="button" wire:click="$set('filterModelKompatibel', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Model Kompatibel">✕</button>
@@ -2076,9 +2099,22 @@
                             class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
                         >
                             <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Model HP' }}</option>
-                            @foreach($modelKompatibelList as $mk)
-                                <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
-                            @endforeach
+                            @php
+                                $groupedMkPosMobile = \App\Modules\Wms\Models\TipeHp::groupModelsByBrand($modelKompatibelList, $filterBrandKompatibel ?: null);
+                            @endphp
+                            @if(empty($filterBrandKompatibel) && count($groupedMkPosMobile) > 1)
+                                @foreach($groupedMkPosMobile as $brandName => $models)
+                                    <optgroup label="{{ $brandName }}">
+                                        @foreach($models as $mk)
+                                            <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $brandName) }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            @else
+                                @foreach($modelKompatibelList as $mk)
+                                    <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
+                                @endforeach
+                            @endif
                         </select>
                     </div>
                 </div>

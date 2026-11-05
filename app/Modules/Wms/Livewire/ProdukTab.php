@@ -4236,14 +4236,15 @@ class ProdukTab extends Component
                 }
             }
 
-            return $modelHpDariProduk
+            $rawModels = $modelHpDariProduk
                 ->merge($modelHpDariRelasi)
                 ->merge($modelHpJson)
                 ->filter()
                 ->unique()
-                ->sort()
                 ->values()
                 ->all();
+
+            return TipeHp::sortModelsByBrandAndAlphabet($rawModels, $selectedMerk);
         });
 
         // 3. Filter data pendukung agar seluruh master data aktif terintegrasi penuh

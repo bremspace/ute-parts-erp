@@ -153,4 +153,129 @@ class TipeHp extends Model
 
         return static::formatNamaTampilan($brandHint, $cleanModel, null);
     }
+
+    /**
+     * Resolusi nama merk/brand HP untuk model ponsel tertentu.
+     */
+    public static function resolveBrandForModel(string $model, ?string $brandHint = null): string
+    {
+        $cleanModel = trim($model);
+        if ($cleanModel === '') {
+            return $brandHint ? trim($brandHint) : '';
+        }
+
+        $lowerModel = strtolower($cleanModel);
+        if (in_array($lowerModel, ['universal', 'semua tipe hp', 'all devices', 'multi-brand', 'multi-brand qualcomm'], true)) {
+            return 'Universal';
+        }
+
+        if ($brandHint && ! in_array(strtolower(trim($brandHint)), ['universal', 'semua', 'all', ''], true)) {
+            return trim($brandHint);
+        }
+
+        if (static::$cachedResolutionMap === null) {
+            static::resolveLabelForModel('dummy');
+        }
+
+        $entries = static::$cachedResolutionMap[$lowerModel] ?? null;
+        if (! empty($entries)) {
+            return (string) $entries[0]['merk'];
+        }
+
+        return Cache::remember('tipe_hp_brand_for_'.md5($lowerModel), 300, function () use ($cleanModel, $lowerModel) {
+            $p = Produk::where('model_kompatibel', $cleanModel)
+                ->orWhere('model_kompatibel', 'like', "%{$cleanModel}%")
+                ->whereNotNull('brand_kompatibel')
+                ->where('brand_kompatibel', '!=', '')
+                ->first();
+
+            if ($p && $p->brand_kompatibel) {
+                return trim($p->brand_kompatibel);
+            }
+
+            $knownBrands = [
+                'Apple' => ['iphone', 'ipad', 'ipod', 'watch'],
+                'Samsung' => ['galaxy', 'samsung'],
+                'Xiaomi' => ['redmi', 'mi ', 'poco', 'blackshark'],
+                'Oppo' => ['oppo', 'find', 'reno'],
+                'Vivo' => ['vivo', 'iqoo'],
+                'Realme' => ['realme'],
+                'Infinix' => ['infinix', 'hot ', 'smart ', 'note '],
+                'Tecno' => ['tecno', 'spark', 'camon', 'pova'],
+                'Asus' => ['asus', 'zenfone', 'rog'],
+                'Huawei' => ['huawei', 'mate', 'nova', 'p30', 'p40', 'p50'],
+                'Google' => ['pixel'],
+                'Nokia' => ['nokia'],
+                'Sony' => ['xperia', 'sony'],
+            ];
+
+            foreach ($knownBrands as $bName => $prefixes) {
+                foreach ($prefixes as $prf) {
+                    if (str_starts_with($lowerModel, $prf) || str_contains($lowerModel, $prf)) {
+                        return $bName;
+                    }
+                }
+            }
+
+            return 'Lainnya';
+        });
+    }
+
+    /**
+     * Urutkan daftar model HP berdasarkan abjad dengan acuan utama Merek HP (A-Z).
+     *
+     * @param  iterable<string>  $models
+     * @return array<string>
+     */
+    public static function sortModelsByBrandAndAlphabet(iterable $models, ?string $brandHint = null): array
+    {
+        $items = collect($models)
+            ->map(fn ($m) => trim((string) $m))
+            ->filter()
+            ->unique()
+            ->map(function ($m) use ($brandHint) {
+                $brand = static::resolveBrandForModel($m, $brandHint);
+                $label = static::resolveLabelForModel($m, $brand);
+
+                return [
+                    'model' => $m,
+                    'brand' => $brand,
+                    'label' => $label,
+                ];
+            })
+            ->all();
+
+        usort($items, function ($a, $b) {
+            $brandA = (strcasecmp($a['brand'], 'Universal') === 0) ? 'ZZZ' : $a['brand'];
+            $brandB = (strcasecmp($b['brand'], 'Universal') === 0) ? 'ZZZ' : $b['brand'];
+
+            $cmp = strcasecmp($brandA, $brandB);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strnatcasecmp($a['label'], $b['label']);
+        });
+
+        return array_column($items, 'model');
+    }
+
+    /**
+     * Kelompokkan model HP berdasarkan Merek HP (A-Z) dan diurutkan abjad di dalam setiap grup.
+     *
+     * @param  iterable<string>  $models
+     * @return array<string, array<string>>
+     */
+    public static function groupModelsByBrand(iterable $models, ?string $brandHint = null): array
+    {
+        $sorted = static::sortModelsByBrandAndAlphabet($models, $brandHint);
+        $grouped = [];
+
+        foreach ($sorted as $m) {
+            $brand = static::resolveBrandForModel($m, $brandHint);
+            $grouped[$brand][] = $m;
+        }
+
+        return $grouped;
+    }
 }

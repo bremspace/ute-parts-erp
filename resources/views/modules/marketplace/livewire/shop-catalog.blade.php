@@ -713,17 +713,44 @@
 
             <!-- Model HP -->
             <div class="relative min-w-0 w-full">
+                @php
+                    $groupedModelsShop = [];
+                    foreach ($hpModelList as $key => $val) {
+                        $m = is_numeric($key) ? $val : $key;
+                        $cnt = is_numeric($key) ? null : $val;
+                        $b = \App\Modules\Wms\Models\TipeHp::resolveBrandForModel($m, $filterHpMerk ?: null);
+                        $groupedModelsShop[$b][$m] = $cnt;
+                    }
+                    uksort($groupedModelsShop, function ($a, $b) {
+                        $brandA = (strcasecmp($a, 'Universal') === 0) ? 'ZZZ' : $a;
+                        $brandB = (strcasecmp($b, 'Universal') === 0) ? 'ZZZ' : $b;
+                        return strcasecmp($brandA, $brandB);
+                    });
+                @endphp
                 <select wire:model.live="filterHpModel"
                         class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
                     <option value="">{{ !empty($filterHpMerk) ? 'Semua Model ' . $filterHpMerk : 'Model Gadget' }}</option>
-                    @foreach($hpModelList as $key => $val)
-                        @php
-                            $m = is_numeric($key) ? $val : $key;
-                            $count = is_numeric($key) ? null : $val;
-                            $mLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($m, $filterHpMerk ?: null);
-                        @endphp
-                        <option value="{{ $m }}">{{ $mLabel }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
-                    @endforeach
+                    @if(empty($filterHpMerk) && count($groupedModelsShop) > 1)
+                        @foreach($groupedModelsShop as $brandName => $models)
+                            <optgroup label="{{ $brandName }}">
+                                @foreach($models as $m => $count)
+                                    @php
+                                        $mLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($m, $brandName);
+                                    @endphp
+                                    <option value="{{ $m }}">{{ $mLabel }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                    @else
+                        @foreach($hpModelList as $key => $val)
+                            @php
+                                $m = is_numeric($key) ? $val : $key;
+                                $count = is_numeric($key) ? null : $val;
+                                $mLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($m, $filterHpMerk ?: null);
+                            @endphp
+                            <option value="{{ $m }}">{{ $mLabel }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
+                        @endforeach
+                    @endif
                 </select>
                 @if(!empty($filterHpModel))
                     <button type="button" wire:click="$set('filterHpModel', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Model">✕</button>

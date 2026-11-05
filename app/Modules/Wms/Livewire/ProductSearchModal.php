@@ -426,7 +426,7 @@ class ProductSearchModal extends Component
                 });
         }
 
-        $modelKompatibelList = TipeHp::where('is_active', true)
+        $rawModelList = TipeHp::where('is_active', true)
             ->when($selectedMerk, fn ($q) => $q->where('merk', $selectedMerk))
             ->distinct()
             ->pluck('model')
@@ -437,9 +437,10 @@ class ProductSearchModal extends Component
             )
             ->filter()
             ->unique()
-            ->sort()
             ->values()
             ->all();
+
+        $modelKompatibelList = TipeHp::sortModelsByBrandAndAlphabet($rawModelList, $selectedMerk);
 
         $config = app(KonfigurasiService::class);
         $kondisiList = $config->get('master_produk_kondisi_list') ?? [

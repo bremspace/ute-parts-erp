@@ -263,9 +263,19 @@
                                 <div class="relative inline-flex items-center w-40 sm:w-48">
                                     <select wire:model.live="filterTipeHpId" class="w-full px-2.5 py-1.5 {{ $filterTipeHpId ? 'pr-7' : '' }} rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
                                         <option value="">Semua Tipe HP</option>
-                                        @foreach($tipeHpList as $th)
-                                            <option value="{{ $th->id }}" class="bg-ink-900">{{ $th->nama_tampilan }}</option>
-                                        @endforeach
+                                        @if(empty($filterBrandKompatibel))
+                                            @foreach($tipeHpList->groupBy('merk') as $merk => $tipes)
+                                                <optgroup label="{{ $merk }}" class="bg-ink-900 text-white font-bold">
+                                                    @foreach($tipes as $th)
+                                                        <option value="{{ $th->id }}" class="bg-ink-900 font-normal text-ink-200">{{ $th->nama_tampilan }}</option>
+                                                    @endforeach
+                                                </optgroup>
+                                            @endforeach
+                                        @else
+                                            @foreach($tipeHpList as $th)
+                                                <option value="{{ $th->id }}" class="bg-ink-900">{{ $th->nama_tampilan }}</option>
+                                            @endforeach
+                                        @endif
                                     </select>
                                     @if($filterTipeHpId)
                                         <button type="button" wire:click="$set('filterTipeHpId', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Tipe HP">✕</button>
@@ -288,12 +298,25 @@
                             @endif
 
                             @if($visibleFilters['model_kompatibel'])
+                                @php
+                                    $groupedMkModal = \App\Modules\Wms\Models\TipeHp::groupModelsByBrand($modelKompatibelList, $filterBrandKompatibel ?: null);
+                                @endphp
                                 <div class="relative inline-flex items-center w-36 sm:w-44">
                                     <select wire:model.live="filterModelKompatibel" class="w-full px-2.5 py-1.5 {{ $filterModelKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
                                         <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Model Kompatibel' }}</option>
-                                        @foreach($modelKompatibelList as $mk)
-                                            <option value="{{ $mk }}" class="bg-ink-900">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
-                                        @endforeach
+                                        @if(empty($filterBrandKompatibel) && count($groupedMkModal) > 1)
+                                            @foreach($groupedMkModal as $brandName => $models)
+                                                <optgroup label="{{ $brandName }}" class="bg-ink-900 text-white font-bold">
+                                                    @foreach($models as $mk)
+                                                        <option value="{{ $mk }}" class="bg-ink-900 font-normal text-ink-200">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $brandName) }}</option>
+                                                    @endforeach
+                                                </optgroup>
+                                            @endforeach
+                                        @else
+                                            @foreach($modelKompatibelList as $mk)
+                                                <option value="{{ $mk }}" class="bg-ink-900">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
+                                            @endforeach
+                                        @endif
                                     </select>
                                     @if($filterModelKompatibel)
                                         <button type="button" wire:click="$set('filterModelKompatibel', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Model Kompatibel">✕</button>

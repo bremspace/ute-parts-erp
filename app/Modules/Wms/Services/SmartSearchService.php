@@ -827,7 +827,23 @@ class SmartSearchService
                 }
             }
         }
-        ksort($hpModelResult);
+        uksort($hpModelResult, function ($a, $b) use ($selectedHpMerk) {
+            $brandA = TipeHp::resolveBrandForModel($a, $selectedHpMerk);
+            $brandB = TipeHp::resolveBrandForModel($b, $selectedHpMerk);
+
+            $brandKeyA = (strcasecmp($brandA, 'Universal') === 0) ? 'ZZZ' : $brandA;
+            $brandKeyB = (strcasecmp($brandB, 'Universal') === 0) ? 'ZZZ' : $brandB;
+
+            $cmp = strcasecmp($brandKeyA, $brandKeyB);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            $labelA = TipeHp::resolveLabelForModel($a, $brandA);
+            $labelB = TipeHp::resolveLabelForModel($b, $brandB);
+
+            return strnatcasecmp($labelA, $labelB);
+        });
 
         // 5. Dapatkan opsi Kualitas (difilter oleh search + kategori + brand + hp + harga + stok, tanpa filter kualitas)
         $kualitasFilteredQuery = $this->buildBaseFilteredQuery($activeFilters, $search, ['kualitas']);
