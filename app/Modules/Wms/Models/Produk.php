@@ -53,6 +53,55 @@ class Produk extends Model
                 $model->slug = $slug;
             }
         });
+
+        static::saving(function (self $model) {
+            if (empty($model->kategori_id) && ! empty($model->kategori)) {
+                $kat = KategoriProduk::where('nama', $model->kategori)
+                    ->orWhere('slug', Str::slug($model->kategori))
+                    ->first();
+
+                if (! $kat) {
+                    $katStr = strtolower($model->kategori);
+                    $allKat = KategoriProduk::where('is_active', true)->get();
+                    foreach ($allKat as $k) {
+                        $kNama = strtolower($k->nama);
+                        if (str_contains($katStr, 'lcd') && str_contains($kNama, 'lcd')) {
+                            $kat = $k;
+                            break;
+                        }
+                        if (str_contains($katStr, 'baterai') && str_contains($kNama, 'baterai')) {
+                            $kat = $k;
+                            break;
+                        }
+                        if ((str_contains($katStr, 'flex') || str_contains($katStr, 'board')) && (str_contains($kNama, 'flex') || str_contains($kNama, 'fleksibel') || str_contains($kNama, 'board'))) {
+                            $kat = $k;
+                            break;
+                        }
+                        if (str_contains($katStr, 'kamera') && str_contains($kNama, 'kamera')) {
+                            $kat = $k;
+                            break;
+                        }
+                        if (str_contains($katStr, 'ic') && str_contains($kNama, 'ic')) {
+                            $kat = $k;
+                            break;
+                        }
+                        if (str_contains($katStr, 'tools') && str_contains($kNama, 'tools')) {
+                            $kat = $k;
+                            break;
+                        }
+                    }
+                }
+
+                if ($kat) {
+                    $model->kategori_id = $kat->id;
+                }
+            } elseif (! empty($model->kategori_id) && empty($model->kategori)) {
+                $kat = KategoriProduk::find($model->kategori_id);
+                if ($kat) {
+                    $model->kategori = $kat->nama;
+                }
+            }
+        });
     }
 
     public function getActivitylogOptions(): LogOptions

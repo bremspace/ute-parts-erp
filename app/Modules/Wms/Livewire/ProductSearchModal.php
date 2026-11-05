@@ -460,7 +460,7 @@ class ProductSearchModal extends Component
             'curatedSupplier' => $curatedSupplier,
             'curatedProductCount' => $curatedProductCount,
             'supplierScope' => $this->supplierScope,
-            'kategoriList' => KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get(),
+            'kategoriList' => KategoriProduk::getTree(),
             'brandList' => Brand::where('is_active', true)->orderBy('nama')->get(),
             'kualitasList' => KualitasProduk::with('brand')
                 ->where('is_active', true)

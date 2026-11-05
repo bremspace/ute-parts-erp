@@ -377,10 +377,20 @@ class SmartSearchService
             if (is_numeric($katVal)) {
                 $kat = KategoriProduk::find($katVal);
                 $ids = $kat ? $kat->semuaKeturunanIds() : [(int) $katVal];
-                $query->whereIn('kategori_id', $ids);
+                $names = $kat ? KategoriProduk::whereIn('id', $ids)->pluck('nama')->all() : [];
+                $query->where(function ($q) use ($ids, $names) {
+                    $q->whereIn('kategori_id', $ids);
+                    if (! empty($names)) {
+                        $q->orWhereIn('kategori', $names);
+                        foreach ($names as $n) {
+                            $q->orWhere('kategori', 'like', "%{$n}%");
+                        }
+                    }
+                });
             } else {
                 $query->where(function ($q) use ($katVal) {
                     $q->where('kategori', $katVal)
+                        ->orWhere('kategori', 'like', "%{$katVal}%")
                         ->orWhereHas('kategoriRelasi', fn ($kq) => $kq->where('nama', $katVal)->orWhere('slug', $katVal));
                 });
             }
@@ -569,6 +579,14 @@ class SmartSearchService
      */
     public function getFacetedOptions(array $activeFilters, ?string $search = null): array
     {
+        $hasActiveSearch = ! empty(trim((string) $search));
+        $isStrictFilterActive = $hasActiveSearch
+            || ! empty($activeFilters['brand'] ?? null)
+            || ! empty($activeFilters['hpMerk'] ?? null)
+            || ! empty($activeFilters['hpModel'] ?? null)
+            || ! empty($activeFilters['kualitas'] ?? null)
+            || ! empty($activeFilters['kondisi'] ?? null);
+
         // 1. Dapatkan opsi Kategori (difilter oleh search + brand + hp + kualitas + harga + stok, tanpa filter kategori itu sendiri)
         $catFilteredQuery = $this->buildBaseFilteredQuery($activeFilters, $search, ['kategori']);
         $catCounts = (clone $catFilteredQuery)
@@ -578,6 +596,37 @@ class SmartSearchService
             ->pluck('aggregate', 'kategori_id')
             ->all();
 
+        // Hitung juga produk yang belum memiliki kategori_id tapi memiliki string kategori
+        $unlinkedKats = (clone $catFilteredQuery)
+            ->whereNull('kategori_id')
+            ->whereNotNull('kategori')
+            ->where('kategori', '!=', '')
+            ->groupBy('kategori')
+            ->select('kategori', DB::raw('count(*) as aggregate'))
+            ->pluck('aggregate', 'kategori')
+            ->all();
+
+        if (! empty($unlinkedKats)) {
+            $katMap = KategoriProduk::where('is_active', true)->pluck('id', 'nama')->all();
+            foreach ($unlinkedKats as $katName => $agg) {
+                $katLower = strtolower(trim((string) $katName));
+                $tokens1 = array_filter(preg_split('/[\s\/&,-]+/', $katLower), fn ($t) => strlen($t) >= 3);
+                foreach ($katMap as $masterName => $mId) {
+                    $mLower = strtolower($masterName);
+                    $tokens2 = array_filter(preg_split('/[\s\/&,-]+/', $mLower), fn ($t) => strlen($t) >= 3);
+                    if (
+                        strcasecmp($katName, $masterName) === 0
+                        || str_contains($katLower, $mLower)
+                        || str_contains($mLower, $katLower)
+                        || ! empty(array_intersect($tokens1, $tokens2))
+                    ) {
+                        $catCounts[$mId] = ($catCounts[$mId] ?? 0) + $agg;
+                        break;
+                    }
+                }
+            }
+        }
+
         // Bangun pohon kategori terfilter secara rekursif
         $allCategories = KategoriProduk::where('is_active', true)
             ->orderBy('urutan')
@@ -586,7 +635,7 @@ class SmartSearchService
 
         $categoriesResult = [];
         if ($allCategories->isNotEmpty()) {
-            $grouped = $allCategories->groupBy('parent_id');
+            $grouped = $allCategories->groupBy(fn ($k) => (int) ($k->parent_id ?? 0));
 
             $calcSubtreeCount = function ($catId) use (&$calcSubtreeCount, $grouped, $catCounts): int {
                 $count = $catCounts[$catId] ?? 0;
@@ -598,10 +647,10 @@ class SmartSearchService
                 return $count;
             };
 
-            $roots = $grouped->get(null, collect());
+            $roots = $grouped->get(0, collect());
 
             foreach ($roots as $r) {
-                $children = $grouped->get($r->id, collect())->map(function ($c) use ($calcSubtreeCount) {
+                $childrenCollection = $grouped->get($r->id, collect())->map(function ($c) use ($calcSubtreeCount) {
                     $count = $calcSubtreeCount($c->id);
 
                     return [
@@ -610,17 +659,42 @@ class SmartSearchService
                         'slug' => (string) $c->slug,
                         'count' => $count,
                     ];
-                })->filter(fn ($c) => $c['count'] > 0)->values()->all();
+                });
 
+                if ($isStrictFilterActive) {
+                    $childrenCollection = $childrenCollection->filter(fn ($c) => $c['count'] > 0);
+                }
+
+                $children = $childrenCollection->values()->all();
                 $totalCount = $calcSubtreeCount($r->id);
 
-                if ($totalCount > 0 || empty($activeFilters['brand'] ?? null)) {
+                if ($totalCount > 0 || ! $isStrictFilterActive) {
                     $categoriesResult[] = [
                         'id' => (string) $r->id,
                         'nama' => (string) $r->nama,
                         'slug' => (string) $r->slug,
                         'count' => $totalCount,
                         'children' => $children,
+                    ];
+                }
+            }
+
+            // Sertakan juga kategori yatim/flat jika ada
+            $handledRootIds = $roots->pluck('id')->all();
+            $orphans = $allCategories->filter(function ($c) use ($handledRootIds) {
+                $pId = (int) ($c->parent_id ?? 0);
+
+                return $pId !== 0 && ! in_array($pId, $handledRootIds, true);
+            });
+            foreach ($orphans as $orphan) {
+                $cnt = $catCounts[$orphan->id] ?? 0;
+                if ($cnt > 0 || ! $isStrictFilterActive) {
+                    $categoriesResult[] = [
+                        'id' => (string) $orphan->id,
+                        'nama' => (string) $orphan->nama,
+                        'slug' => (string) $orphan->slug,
+                        'count' => $cnt,
+                        'children' => [],
                     ];
                 }
             }

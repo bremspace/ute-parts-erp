@@ -476,7 +476,7 @@
             <!-- Filter Preferences Button (Desktop) & Filter Sheet Trigger (Mobile) -->
             <button
                 type="button"
-                @click="if (window.innerWidth < 640) { mobileFilterOpen = true; } else { $wire.toggle('showCustomFilterSettings'); }"
+                @click="if (window.innerWidth < 640) { mobileFilterOpen = true; } else { $wire.showCustomFilterSettings = !$wire.showCustomFilterSettings; }"
                 class="px-3.5 py-2.5 rounded-xl border border-ink-200/80 dark:border-white/10 text-xs font-semibold text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-white/5 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center gap-1.5 whitespace-nowrap cursor-pointer min-h-[44px]"
                 title="Atur filter pencarian produk"
             >

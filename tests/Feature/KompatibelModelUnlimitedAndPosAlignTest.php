@@ -7,6 +7,7 @@ use App\Modules\Marketplace\Livewire\ShopPage;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
@@ -336,5 +337,82 @@ class KompatibelModelUnlimitedAndPosAlignTest extends TestCase
             ->call('addToCart', $produk->id)
             ->assertSeeHtml('008487')
             ->assertDontSeeHtml(">{$internalKey}<");
+    }
+
+    public function test_pos_kasir_toggle_method_and_settings_toggle_without_500(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(PosKasir::class)
+            ->call('toggle', 'showCustomFilterSettings')
+            ->assertSet('showCustomFilterSettings', true)
+            ->call('toggle', 'showCustomFilterSettings')
+            ->assertSet('showCustomFilterSettings', false)
+            ->call('toggleFilter', 'kategori')
+            ->assertSet('visibleFilters.kategori', true)
+            ->assertOk();
+    }
+
+    public function test_pos_kasir_and_shop_renders_full_category_tree(): void
+    {
+        $parentKat = KategoriProduk::create([
+            'nama' => 'Komponen Sparepart Mesin',
+            'slug' => 'komponen-sparepart-mesin',
+            'parent_id' => null,
+            'urutan' => 1,
+            'is_active' => true,
+        ]);
+
+        $subKat = KategoriProduk::create([
+            'nama' => 'Konektor Fleksibel Antena',
+            'slug' => 'konektor-fleksibel-antena',
+            'parent_id' => $parentKat->id,
+            'urutan' => 1,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(PosKasir::class)
+            ->assertSeeHtml('Komponen Sparepart Mesin')
+            ->assertSeeHtml('Konektor Fleksibel Antena');
+
+        Livewire::test(ShopPage::class)
+            ->assertSeeHtml('Komponen Sparepart Mesin')
+            ->assertSeeHtml('Konektor Fleksibel Antena');
+    }
+
+    public function test_smart_search_category_filter_matches_both_id_and_unlinked_name(): void
+    {
+        $parentKat = KategoriProduk::create([
+            'nama' => 'Baterai Master',
+            'slug' => 'baterai-master',
+            'parent_id' => null,
+            'urutan' => 1,
+            'is_active' => true,
+        ]);
+
+        $p1 = Produk::create([
+            'nama' => 'Baterai Model X',
+            'kategori' => 'Baterai Master',
+            'kategori_id' => $parentKat->id,
+            'harga_jual_retail' => 50000,
+            'is_active' => true,
+        ]);
+
+        $p2 = Produk::withoutEvents(function () {
+            return Produk::create([
+                'nama' => 'Baterai Model Y Unlinked',
+                'slug' => 'baterai-model-y-unlinked',
+                'kategori' => 'Baterai Master',
+                'kategori_id' => null,
+                'harga_jual_retail' => 60000,
+                'is_active' => true,
+            ]);
+        });
+
+        $query = Produk::query()->filterKatalog(['kategori_id' => $parentKat->id]);
+        $results = $query->pluck('id')->all();
+
+        $this->assertContains($p1->id, $results);
+        $this->assertContains($p2->id, $results);
     }
 }

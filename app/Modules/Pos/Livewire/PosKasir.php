@@ -525,6 +525,13 @@ class PosKasir extends Component
         $this->simpanPreferensi();
     }
 
+    public function toggle(string $property): void
+    {
+        if (property_exists($this, $property)) {
+            $this->$property = ! $this->$property;
+        }
+    }
+
     public function toggleFilter(string $key): void
     {
         if (array_key_exists($key, $this->visibleFilters)) {
@@ -3770,7 +3777,7 @@ class PosKasir extends Component
             ['kode' => 'bekas', 'nama' => 'Bekas / Copotan'],
         ];
 
-        $kategoriList = KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get();
+        $kategoriList = KategoriProduk::getTree();
         $brandList = Brand::where('is_active', true)->orderBy('nama')->get();
         $kualitasList = KualitasProduk::with('brand')
             ->where('is_active', true)

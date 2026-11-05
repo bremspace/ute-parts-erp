@@ -71,7 +71,10 @@ class KategoriProduk extends Model
 
     public function scopeRoot(Builder $query): Builder
     {
-        return $query->whereNull('parent_id')->where('is_active', true)->orderBy('urutan')->orderBy('nama');
+        return $query->where(fn ($q) => $q->whereNull('parent_id')->orWhere('parent_id', 0))
+            ->where('is_active', true)
+            ->orderBy('urutan')
+            ->orderBy('nama');
     }
 
     public function scopeAktif(Builder $query): Builder
@@ -111,13 +114,34 @@ class KategoriProduk extends Model
     }
 
     /**
-     * Dapatkan pohon kategori (tree) lengkap dengan cache.
+     * Dapatkan pohon kategori (tree) lengkap dengan penanganan kategori yatim/flat.
      */
     public static function getTree(): Collection
     {
-        return static::root()
-            ->with(['children' => fn ($q) => $q->where('is_active', true)->orderBy('urutan')->orderBy('nama')])
+        $all = static::where('is_active', true)
+            ->with('parent')
+            ->orderBy('urutan')
+            ->orderBy('nama')
             ->get();
+
+        $byParent = $all->groupBy(fn ($k) => (int) ($k->parent_id ?? 0));
+        $roots = $byParent->get(0, collect());
+
+        foreach ($roots as $root) {
+            $root->setRelation('children', $byParent->get($root->id, collect()));
+        }
+
+        // Tangani kategori yatim (orphaned categories)
+        $rootIds = $roots->pluck('id')->all();
+        $handledIds = array_merge($rootIds, $roots->flatMap(fn ($r) => $r->children->pluck('id'))->all());
+        $orphans = $all->whereNotIn('id', $handledIds);
+
+        foreach ($orphans as $orphan) {
+            $orphan->setRelation('children', collect());
+            $roots->push($orphan);
+        }
+
+        return $roots;
     }
 
     /**
