@@ -1118,13 +1118,14 @@ EOF;
                             }
                         }
                     }
-                    $resMigrate = runCommand("{$phpBin} -d memory_limit=512M artisan migrate --force");
+                    $artisanPath = '"'.$baseDir.'/artisan"';
+                    $resMigrate = runCommand("{$phpBin} -d memory_limit=512M {$artisanPath} migrate --force");
                     if ($resMigrate['status'] !== 0) {
                         throw new RuntimeException('Migrasi skema database gagal: '.$resMigrate['output']);
                     }
 
                     if ($step === 'migrate_seed') {
-                        $resSeed = runCommand("{$phpBin} -d memory_limit=512M artisan db:seed --force");
+                        $resSeed = runCommand("{$phpBin} -d memory_limit=512M {$artisanPath} db:seed --force");
                         if ($resSeed['status'] !== 0) {
                             throw new RuntimeException('Seeder data master gagal: '.$resSeed['output']);
                         }
@@ -1143,7 +1144,8 @@ EOF;
                         break;
                     }
 
-                    $resSeed = runCommand("{$phpBin} -d memory_limit=512M artisan db:seed --force");
+                    $artisanPath = '"'.$baseDir.'/artisan"';
+                    $resSeed = runCommand("{$phpBin} -d memory_limit=512M {$artisanPath} db:seed --force");
                     if ($resSeed['status'] !== 0) {
                         throw new RuntimeException('Seeder data master gagal: '.$resSeed['output']);
                     }
@@ -1151,18 +1153,20 @@ EOF;
                     break;
 
                 case 'storage_link':
-                    runCommand("{$phpBin} artisan storage:link 2>&1");
+                    $artisanPath = '"'.$baseDir.'/artisan"';
+                    runCommand("{$phpBin} {$artisanPath} storage:link 2>&1");
                     echo json_encode(['success' => true, 'message' => 'Symlink storage media berhasil disiapkan.']);
                     break;
 
                 case 'optimize_cache':
-                    runCommand("{$phpBin} artisan optimize:clear");
+                    $artisanPath = '"'.$baseDir.'/artisan"';
+                    runCommand("{$phpBin} {$artisanPath} optimize:clear");
                     if (! file_exists($baseDir.'/public/build/manifest.json')) {
                         if (runCommand('which npm')['status'] === 0) {
                             runCommand('npm run build');
                         }
                     }
-                    runCommand("{$phpBin} artisan view:cache");
+                    runCommand("{$phpBin} {$artisanPath} view:cache");
                     @file_put_contents($baseDir.'/storage/installed.lock', json_encode([
                         'installed_at' => date('Y-m-d H:i:s'),
                         'app_role' => $_POST['app_role'] ?? 'server',

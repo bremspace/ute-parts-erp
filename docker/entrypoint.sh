@@ -72,5 +72,16 @@ fi
 # 6. Auto-discover packages Laravel
 php artisan package:discover --ansi 2>/dev/null || true
 
-# 7. Jalankan perintah container utama (CMD)
+# 7. Jika container adalah worker antrean (queue), tunggu hingga migrasi database selesai
+case "$*" in
+    *"queue:work"*)
+        echo "[INFO] Menunggu inisialisasi database dan tabel migrasi sebelum memulai queue:work..."
+        while ! php artisan migrate:status >/dev/null 2>&1; do
+            sleep 4
+        done
+        echo "[OK] Database dan tabel migrasi siap. Memulai queue:work..."
+        ;;
+esac
+
+# 8. Jalankan perintah container utama (CMD)
 exec "$@"

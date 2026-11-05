@@ -3,6 +3,7 @@
 # Brand: Bremspace
 # Port Default: 1741 (Akses Localhost & Multi-Device LAN)
 # ==============================================================================
+name: bremspace-erp
 
 services:
   # 1. Aplikasi Core PHP 8.5+ FPM
@@ -18,10 +19,16 @@ services:
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - BREMSPACE_HOST_CHALLENGE=${BREMSPACE_HOST_CHALLENGE:-}
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-bremspace_erp}
+      - DB_USERNAME=${DB_USERNAME:-bremspace}
+      - DB_PASSWORD=${DB_PASSWORD:-bremspace_secret}
     volumes:
       - .:/var/www/html
       - ./storage:/var/www/html/storage
       - ./database:/var/www/html/database
+      - ./docker/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     networks:
       - bremspace-network
     depends_on:
@@ -52,7 +59,7 @@ services:
     restart: unless-stopped
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-bremspace_root_secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-${DB_PASSWORD:-bremspace_root_secret}}
       MYSQL_DATABASE: ${DB_DATABASE:-bremspace_erp}
       MYSQL_USER: ${DB_USERNAME:-bremspace}
       MYSQL_PASSWORD: ${DB_PASSWORD:-bremspace_secret}
@@ -73,9 +80,16 @@ services:
     command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3"]
     environment:
       - TZ=Asia/Jakarta
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-bremspace_erp}
+      - DB_USERNAME=${DB_USERNAME:-bremspace}
+      - DB_PASSWORD=${DB_PASSWORD:-bremspace_secret}
     volumes:
       - .:/var/www/html
       - ./storage:/var/www/html/storage
+      - ./database:/var/www/html/database
+      - ./docker/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     networks:
       - bremspace-network
     depends_on:
