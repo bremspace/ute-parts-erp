@@ -250,7 +250,7 @@ class DatabaseManagement extends Component
     }
 
     /**
-     * Cek update dari GitHub.
+     * Cek update sistem dari server rilis.
      */
     public function checkAppUpdates(AppUpdateService $updateService): void
     {
@@ -271,7 +271,7 @@ class DatabaseManagement extends Component
             $this->showUpdateModal = true;
             $this->dispatch('alert', [
                 'type' => 'error',
-                'message' => 'Terjadi kesalahan saat mengecek pembaruan GitHub: '.$e->getMessage(),
+                'message' => 'Terjadi kesalahan saat mengecek pembaruan sistem: '.$e->getMessage(),
             ]);
         } finally {
             $this->isCheckingUpdate = false;
@@ -279,7 +279,7 @@ class DatabaseManagement extends Component
     }
 
     /**
-     * Simpan token private repository GitHub ke .env.
+     * Simpan token private repository ke .env (opsional/developer).
      */
     public function saveGitToken(AppUpdateService $updateService): void
     {
@@ -287,7 +287,7 @@ class DatabaseManagement extends Component
         $updateService->updateEnv(['GITHUB_DEPLOY_TOKEN' => trim($this->gitDeployToken)]);
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Token autentikasi GitHub Private Repo berhasil disimpan ke .env!',
+            'message' => 'Token autentikasi repositori berhasil disimpan ke .env!',
         ]);
     }
 
@@ -314,7 +314,40 @@ class DatabaseManagement extends Component
     }
 
     /**
-     * Pasang pembaruan terbaru dari GitHub.
+     * Sinkronkan skema database & optimasi cache (terutama untuk Docker atau pasca-update).
+     */
+    public function syncDatabaseSchema(AppUpdateService $updateService): void
+    {
+        $this->authorizeSuperAdminOnly();
+        $this->isInstallingUpdate = true;
+        try {
+            $res = $updateService->syncDatabaseSchema();
+            $this->updateLogs = $res['logs'] ?? [];
+            $this->currentVersionInfo = $res['current'] ?? $updateService->getCurrentVersionInfo();
+
+            if ($res['success']) {
+                $this->dispatch('alert', [
+                    'type' => 'success',
+                    'message' => $res['message'],
+                ]);
+            } else {
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => $res['message'],
+                ]);
+            }
+        } catch (Throwable $e) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Gagal menyinkronkan skema basis data: '.$e->getMessage(),
+            ]);
+        } finally {
+            $this->isInstallingUpdate = false;
+        }
+    }
+
+    /**
+     * Pasang pembaruan terbaru dari server rilis.
      */
     public function applyAppUpdate(AppUpdateService $updateService): void
     {

@@ -261,7 +261,7 @@ class RiwayatAktivitas extends Component
 
     public function getBaseQuery()
     {
-        $query = AktivitasLog::query()->orderByDesc('id');
+        $query = AktivitasLog::query()->with(['causer', 'cabang'])->orderByDesc('id');
 
         // [Dual-Indexing] Jika melihat riwayat produk, sertakan transaksi yang menyangkut produk ini
         if ($this->tipe === 'produk' && $this->entityId !== null) {

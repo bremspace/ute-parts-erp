@@ -23,8 +23,8 @@
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span wire:loading.remove wire:target="checkAppUpdates">Cek Pembaruan (GitHub)</span>
-                <span wire:loading wire:target="checkAppUpdates">Menghubungi GitHub...</span>
+                <span wire:loading.remove wire:target="checkAppUpdates">Cek Pembaruan Sistem</span>
+                <span wire:loading wire:target="checkAppUpdates">Menghubungi Cloud Rilis...</span>
             </button>
 
             <button type="button" wire:click="clearCacheServer" wire:loading.attr="disabled"
@@ -431,7 +431,7 @@
         </div>
     @endif
 
-    <!-- MODAL POPUP: CEK & PASANG UPDATE GITHUB -->
+    <!-- MODAL POPUP: PUSAT PEMBARUAN SISTEM BREMSPACE (1-CLICK COMMERCIAL RELEASE) -->
     @if($showUpdateModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <div class="relative w-full max-w-2xl p-6 rounded-3xl bg-[#0D111E] border border-white/10 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
@@ -442,8 +442,14 @@
                             🔄
                         </div>
                         <div>
-                            <h3 class="text-base font-black text-white">Pembaruan Sistem &amp; Sinkronisasi GitHub</h3>
-                            <p class="text-xs text-ink-400">Source of Truth: <code class="text-indigo-400">bremspace/ute-parts-erp</code> (branch main)</p>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-base font-black text-white">Pusat Pembaruan Sistem Bremspace</h3>
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/20 text-up-mint border border-up-mint/30">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-up-mint animate-pulse"></span>
+                                    Cloud Rilis Resmi
+                                </span>
+                            </div>
+                            <p class="text-xs text-ink-400 mt-0.5">Saluran pembaruan resmi otomatis — aman, terverifikasi, dan menjaga keutuhan basis data.</p>
                         </div>
                     </div>
                     <button type="button" wire:click="$set('showUpdateModal', false)" class="text-ink-400 hover:text-white text-lg p-1 cursor-pointer">
@@ -451,19 +457,28 @@
                     </button>
                 </div>
 
-                <!-- Status Versi Saat Ini -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                        <div class="text-[10px] text-ink-400 uppercase font-bold">Commit Lokal</div>
-                        <div class="font-mono font-bold text-white mt-0.5">{{ $currentVersionInfo['commit'] ?? '-' }}</div>
+                <!-- Status Versi Sistem Saat Ini -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                        <div class="text-[10px] text-ink-400 uppercase font-bold tracking-wider">Versi Sistem</div>
+                        <div class="font-mono font-black text-white text-sm">v{{ ltrim($currentVersionInfo['version'] ?? '1.0.0', 'v') }}</div>
+                        <div class="text-[10px] text-ink-400">Rilis Publik Stabil</div>
                     </div>
-                    <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                        <div class="text-[10px] text-ink-400 uppercase font-bold">Branch</div>
-                        <div class="font-mono font-bold text-up-mint mt-0.5">{{ $currentVersionInfo['branch'] ?? 'main' }}</div>
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                        <div class="text-[10px] text-ink-400 uppercase font-bold tracking-wider">Mode Lingkungan</div>
+                        <div class="font-bold text-up-mint text-xs flex items-center gap-1.5">
+                            @if($currentVersionInfo['is_docker'] ?? false)
+                                <span>🐳 Docker Container (Aman)</span>
+                            @else
+                                <span>⚡ Standalone / Native</span>
+                            @endif
+                        </div>
+                        <div class="text-[10px] text-ink-400">Database Terisolasi Lokal</div>
                     </div>
-                    <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 sm:col-span-2">
-                        <div class="text-[10px] text-ink-400 uppercase font-bold">Pesan Terakhir</div>
-                        <div class="truncate text-ink-200 mt-0.5">{{ $currentVersionInfo['message'] ?? '-' }}</div>
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                        <div class="text-[10px] text-ink-400 uppercase font-bold tracking-wider">Pembaruan Terakhir</div>
+                        <div class="font-bold text-white text-xs truncate">{{ $currentVersionInfo['date'] ?? '-' }}</div>
+                        <div class="text-[10px] text-ink-400">Status sinkronisasi aktif</div>
                     </div>
                 </div>
 
@@ -471,34 +486,36 @@
                 @if($updateCheckResult)
                     @if($updateCheckResult['status'] === 'update_available')
                         <div class="p-4 rounded-2xl bg-up-primary/10 border border-up-primary/30 space-y-3">
-                            <div class="flex items-center justify-between">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
                                 <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-up-primary text-white flex items-center gap-1.5 shadow-sm">
                                     <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-                                    {{ $updateCheckResult['commits_behind'] }} Pembaruan Baru Tersedia!
+                                    🎉 {{ $updateCheckResult['commits_behind'] ?? 1 }} Pembaruan Baru Tersedia!
                                 </span>
-                                <span class="text-xs text-ink-400 font-mono">Target: {{ $updateCheckResult['latest_hash'] }}</span>
+                                <span class="text-xs text-ink-300">Siap dipasang ke sistem Anda</span>
                             </div>
 
-                            <div>
-                                <h4 class="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
-                                    <span>📋</span>
-                                    <span>Apa yang Berubah (Changelog Terbaru):</span>
-                                </h4>
-                                <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                                    @foreach($updateCheckResult['changelog'] as $log)
-                                        <div class="p-2.5 rounded-xl bg-black/40 border border-white/5 text-xs flex items-start gap-2">
-                                            <span class="font-mono text-indigo-400 font-bold shrink-0 text-[11px]">{{ $log['hash'] }}</span>
-                                            <div class="flex-1 min-w-0">
-                                                <div class="text-white font-medium text-xs leading-snug">{{ $log['subject'] }}</div>
-                                                <div class="text-[10px] text-ink-400 mt-0.5">{{ $log['author'] }} &bull; {{ $log['date'] }}</div>
+                            @if(!empty($updateCheckResult['changelog']))
+                                <div>
+                                    <h4 class="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
+                                        <span>📋</span>
+                                        <span>Ringkasan Peningkatan Fitur &amp; Perbaikan:</span>
+                                    </h4>
+                                    <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                        @foreach($updateCheckResult['changelog'] as $log)
+                                            <div class="p-2.5 rounded-xl bg-black/40 border border-white/5 text-xs flex items-start gap-2.5">
+                                                <span class="text-up-mint text-xs mt-0.5">✔</span>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-white font-medium text-xs leading-snug">{{ $log['subject'] }}</div>
+                                                    <div class="text-[10px] text-ink-400 mt-0.5">{{ $log['date'] }}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    @endforeach
+                                        @endforeach
+                                    </div>
                                 </div>
-                            </div>
+                            @endif
                         </div>
 
-                        <!-- Action / Panduan Pembaruan -->
+                        <!-- Action / Panduan Pembaruan Sesuai Lingkungan -->
                         @if($updateCheckResult['is_docker'] ?? false)
                             <div class="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 space-y-3">
                                 <div class="flex items-center gap-2 text-cyan-400 font-bold text-xs">
@@ -506,12 +523,12 @@
                                     <span>Lingkungan Docker Container Terdeteksi (Model B Protected)</span>
                                 </div>
                                 <p class="text-[11px] text-ink-300 leading-relaxed">
-                                    Sistem Anda terpasang di dalam kontainer Docker terisolasi. Kode aplikasi terlindungi dan database Anda aman tersimpan di storage lokal.
+                                    Sistem Anda terpasang dalam kontainer Docker terisolasi. Seluruh basis data transaksi Anda tersimpan aman secara persisten di penyimpanan lokal dan tidak akan hilang.
                                 </p>
-                                <div class="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2.5 text-xs">
+                                <div class="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2 text-xs">
                                     <div class="text-[11px] font-bold text-white flex items-center gap-1.5">
                                         <span>⚡</span>
-                                        <span>Langkah Mudah Memperbarui Kontainer ke Versi Ini:</span>
+                                        <span>Cara Memperbarui Kontainer ke Rilis Terbaru:</span>
                                     </div>
                                     <div class="flex items-start gap-2 text-[11px] text-ink-200">
                                         <span class="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-mono text-[10px] font-bold uppercase shrink-0">Windows</span>
@@ -522,116 +539,77 @@
                                         <span>Buka terminal di folder instalasi lalu jalankan <code class="text-white bg-white/10 px-1.5 py-0.5 rounded font-mono font-bold">./update-system.sh</code></span>
                                     </div>
                                 </div>
-                                <p class="text-[10px] text-ink-400 italic">
-                                    * Skrip otomatis menarik image kontainer terbaru dari GitHub Container Registry &amp; mengeksekusi migrasi database tanpa mengubah data transaksi Anda.
-                                </p>
+                                <div class="pt-1 flex items-center justify-between flex-wrap gap-2">
+                                    <span class="text-[10px] text-ink-400 italic">* Skrip otomatis menarik kontainer rilis resmi &amp; migrasi skema database.</span>
+                                    <button type="button" wire:click="syncDatabaseSchema" wire:loading.attr="disabled"
+                                        class="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                                        <span wire:loading.remove wire:target="syncDatabaseSchema">⚡ Sinkronkan Skema Database &amp; Cache</span>
+                                        <span wire:loading wire:target="syncDatabaseSchema">Menyinkronkan...</span>
+                                    </button>
+                                </div>
                             </div>
                         @else
                             <div class="pt-2">
                                 <button type="button" wire:click="applyAppUpdate" wire:loading.attr="disabled"
-                                    wire:confirm="Pasang pembaruan sekarang? Sistem akan menarik kode terbaru dari GitHub, menjalankan composer install, migrasi database, dan membersihkan cache."
-                                    class="w-full py-3 px-6 rounded-2xl bg-gradient-to-r from-up-primary to-orange-500 hover:opacity-95 text-white font-black text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer transition">
+                                    wire:confirm="Pasang pembaruan sekarang? Seluruh modul dan skema database akan disinkronkan otomatis tanpa mengubah data transaksi Anda."
+                                    class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-up-primary via-indigo-600 to-orange-500 hover:opacity-95 text-white font-black text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer transition">
                                     <span wire:loading.remove wire:target="applyAppUpdate">🚀 Pasang Pembaruan Sekarang</span>
                                     <span wire:loading wire:target="applyAppUpdate">Sedang Mengunduh &amp; Memasang Pembaruan...</span>
                                 </button>
                             </div>
                         @endif
                     @elseif($updateCheckResult['status'] === 'up_to_date')
-                        <div class="p-4 rounded-2xl bg-up-mint/10 border border-up-mint/30 text-center space-y-1.5">
-                            <div class="text-2xl">✓</div>
+                        <div class="p-5 rounded-2xl bg-up-mint/10 border border-up-mint/30 text-center space-y-2">
+                            <div class="w-10 h-10 rounded-full bg-up-mint/20 text-up-mint border border-up-mint/40 flex items-center justify-center mx-auto text-lg font-bold">
+                                ✓
+                            </div>
                             <h4 class="text-xs font-bold text-up-mint">Aplikasi Anda Sudah Menggunakan Versi Terbaru</h4>
-                            <p class="text-[11px] text-ink-400">Kode lokal sinkron sempurna dengan repositori GitHub branch main.</p>
+                            <p class="text-[11px] text-ink-300 max-w-md mx-auto">
+                                Seluruh modul bisnis, komponen kasir, dan skema basis data berjalan pada rilis resmi paling mutakhir.
+                            </p>
+                            <div class="pt-2">
+                                <button type="button" wire:click="checkAppUpdates" wire:loading.attr="disabled"
+                                    class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition cursor-pointer">
+                                    <span wire:loading.remove wire:target="checkAppUpdates">🔄 Periksa Ulang Pembaruan</span>
+                                    <span wire:loading wire:target="checkAppUpdates">Memeriksa...</span>
+                                </button>
+                            </div>
                         </div>
                     @else
-                        <div class="p-4 rounded-2xl bg-up-red/10 border border-up-red/30 text-xs text-up-red">
-                            <div class="font-bold mb-1">Gagal Menghubungi GitHub:</div>
-                            <div class="font-mono text-[11px]">{{ $updateCheckResult['message'] }}</div>
+                        <div class="p-4 rounded-2xl bg-up-red/10 border border-up-red/30 text-xs text-up-red space-y-2">
+                            <div class="font-bold flex items-center gap-1.5">
+                                <span>⚠️</span>
+                                <span>Gagal Menghubungi Server Pembaruan:</span>
+                            </div>
+                            <div class="text-[11px] text-ink-300">
+                                {{ $updateCheckResult['message'] ?? 'Pastikan koneksi internet server aktif.' }}
+                            </div>
+                            <button type="button" wire:click="checkAppUpdates" wire:loading.attr="disabled"
+                                class="px-3.5 py-1.5 rounded-lg bg-up-red/20 hover:bg-up-red/30 text-up-red border border-up-red/30 text-xs font-bold transition cursor-pointer">
+                                <span>Coba Lagi</span>
+                            </button>
                         </div>
                     @endif
                 @endif
 
                 <!-- Log Eksekusi Pembaruan jika ada -->
                 @if(!empty($updateLogs))
-                    <div class="p-3 rounded-2xl bg-black/60 border border-white/5 space-y-1 text-xs font-mono">
-                        <div class="text-[10px] font-bold text-ink-400 uppercase">Riwayat Tahapan Instalasi:</div>
+                    <div class="p-3.5 rounded-2xl bg-black/60 border border-white/5 space-y-1.5 text-xs font-mono">
+                        <div class="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Tahapan Proses Pembaruan:</div>
                         @foreach($updateLogs as $ulog)
-                            <div class="text-up-mint text-[11px]">{{ $ulog }}</div>
+                            <div class="text-up-mint text-[11px] flex items-center gap-1.5">
+                                <span>✔</span>
+                                <span>{{ $ulog }}</span>
+                            </div>
                         @endforeach
                     </div>
                 @endif
 
-                <!-- Mitigasi Private Repository GitHub: SSH Deploy Key & Token PAT -->
-                <div class="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
-                    <div class="flex items-center justify-between">
-                        <div class="font-bold text-xs text-ink-200 flex items-center gap-2">
-                            <span>🔐</span>
-                            <span>Mitigasi Repositori Private (Pilih Opsi 1 atau 2)</span>
-                        </div>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-ink-400">Khusus Private Repo</span>
-                    </div>
-
-                    <!-- Opsi A: SSH Deploy Key (Sangat Direkomendasikan) -->
-                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <div class="font-bold text-xs text-white flex items-center gap-2">
-                                    <span>🔑</span>
-                                    <span>Opsi 1: SSH Deploy Key (Generate Langsung di Sini)</span>
-                                </div>
-                                <p class="text-[11px] text-ink-400 mt-0.5">
-                                    Klik tombol untuk generate pasangan SSH key lokal. Salin <strong>Public Key</strong> dan kirim ke developer untuk didaftarkan di GitHub.
-                                </p>
-                            </div>
-                            <button type="button" wire:click="generateSshKey" wire:loading.attr="disabled"
-                                wire:confirm="Buat kunci SSH Key baru sekarang? Kunci lama (jika ada) akan diperbarui."
-                                class="px-3.5 py-2 rounded-xl bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer">
-                                <span>⚡</span>
-                                <span wire:loading.remove wire:target="generateSshKey">{{ $sshPublicKey ? 'Regenerate SSH Key' : 'Generate SSH Key' }}</span>
-                                <span wire:loading wire:target="generateSshKey">Membuat Key...</span>
-                            </button>
-                        </div>
-
-                        @if($sshPublicKey)
-                            <div class="space-y-2 pt-1" x-data="{ copied: false }">
-                                <label class="block text-[11px] font-semibold text-ink-300">Public Key (Kirim teks ini ke Developer):</label>
-                                <div class="relative">
-                                    <textarea readonly rows="2" class="w-full px-3 py-2 pr-24 rounded-xl bg-black/60 border border-white/10 text-[11px] text-up-mint font-mono select-all focus:ring-0">{{ $sshPublicKey }}</textarea>
-                                    <button type="button"
-                                        @click="navigator.clipboard.writeText('{{ addslashes($sshPublicKey) }}'); copied = true; setTimeout(() => copied = false, 2500)"
-                                        class="absolute right-2 top-2 px-3 py-1.5 rounded-lg bg-up-mint/20 hover:bg-up-mint/30 text-up-mint border border-up-mint/30 text-[11px] font-bold transition cursor-pointer">
-                                        <span x-show="!copied">📋 Salin Key</span>
-                                        <span x-show="copied" x-cloak>✓ Tersalin!</span>
-                                    </button>
-                                </div>
-                                <div class="text-[10px] text-ink-400 leading-relaxed bg-black/30 p-2.5 rounded-xl border border-white/5">
-                                    <strong>Langkah Developer di GitHub:</strong> Masuk ke <em>Repo &gt; Settings &gt; Deploy Keys &gt; Add deploy key</em> &rarr; Beri judul (contoh: <code>POS-Kasir-Cabang-A</code>) &rarr; Paste public key &rarr; Centang hanya <em>Read access</em> (jangan centang allow write).
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- Opsi B: Personal Access Token (PAT) -->
-                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2">
-                        <div>
-                            <div class="font-bold text-xs text-white flex items-center gap-2">
-                                <span>🎫</span>
-                                <span>Opsi 2: GitHub Personal Access Token (PAT)</span>
-                            </div>
-                            <p class="text-[11px] text-ink-400 mt-0.5">
-                                Alternatif token HTTPS dengan scope <code class="text-indigo-400">repo:read</code> / <code class="text-indigo-400">contents:read</code>.
-                            </p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <input type="password" wire:model="gitDeployToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" class="flex-1 px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs text-white font-mono focus:border-up-primary focus:ring-0">
-                            <button type="button" wire:click="saveGitToken" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition shrink-0 cursor-pointer">
-                                Simpan Token
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex justify-end pt-2 border-t border-white/10">
-                    <button type="button" wire:click="$set('showUpdateModal', false)" class="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition cursor-pointer">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/10">
+                    <p class="text-[10px] text-ink-400">
+                        * Seluruh data transaksi, pelanggan, dan keuangan terproteksi aman selama proses pembaruan.
+                    </p>
+                    <button type="button" wire:click="$set('showUpdateModal', false)" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition cursor-pointer text-center">
                         Tutup
                     </button>
                 </div>

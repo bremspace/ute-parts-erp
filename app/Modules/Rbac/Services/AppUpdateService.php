@@ -141,7 +141,7 @@ class AppUpdateService
     }
 
     /**
-     * Dapatkan konfigurasi token private GitHub jika tersimpan di .env atau embedded read-only fallback.
+     * Dapatkan konfigurasi token private jika tersimpan di .env atau embedded read-only fallback.
      */
     public function getGitToken(): string
     {
@@ -160,8 +160,8 @@ class AppUpdateService
     }
 
     /**
-     * Cek apakah ada pembaruan baru di GitHub.
-     * Menggunakan strategi ganda: GitHub REST API (cepat, zero filesystem-write)
+     * Cek apakah ada pembaruan baru dari server rilis.
+     * Menggunakan strategi ganda: REST API (cepat, zero filesystem-write)
      * dengan fallback otomatis ke Git CLI jika API tidak dapat dihubungi.
      */
     public function checkForUpdates(): array
@@ -170,7 +170,7 @@ class AppUpdateService
         $branch = $currentInfo['branch'] ?: 'main';
         $token = $this->getGitToken();
 
-        // 1. Coba jalur GitHub REST API (ringan, tidak butuh write ke .git/FETCH_HEAD)
+        // 1. Coba jalur REST API (ringan, tidak butuh write ke .git/FETCH_HEAD)
         try {
             $apiResult = $this->checkUpdatesViaGitHubApi($currentInfo, $branch, $token);
             if ($apiResult !== null) {
@@ -179,7 +179,7 @@ class AppUpdateService
                 return $apiResult;
             }
         } catch (Throwable $e) {
-            Log::info('GitHub REST API update check fallback ke Git CLI: '.$e->getMessage());
+            Log::info('REST API update check fallback ke Git CLI: '.$e->getMessage());
         }
 
         // 2. Fallback ke Git CLI
@@ -198,7 +198,7 @@ class AppUpdateService
         $currentCommit = $currentInfo['commit'];
 
         $headers = [
-            'User-Agent' => 'UteParts-ERP-Updater/1.0',
+            'User-Agent' => 'Bremspace-ERP-Updater/1.0',
             'Accept' => 'application/vnd.github+json',
         ];
         if (! empty($token)) {
@@ -245,7 +245,7 @@ class AppUpdateService
                 return [
                     'has_update' => true,
                     'status' => 'update_available',
-                    'message' => "Ditemukan {$totalCommits} pembaruan terbaru di GitHub.",
+                    'message' => "Ditemukan {$totalCommits} pembaruan terbaru di server rilis.",
                     'current' => $currentInfo,
                     'latest_hash' => substr($latestSha, 0, 7) ?: '-',
                     'commits_behind' => $totalCommits,
@@ -279,7 +279,7 @@ class AppUpdateService
             return [
                 'has_update' => true,
                 'status' => 'update_available',
-                'message' => 'Pembaruan versi terbaru tersedia di GitHub.',
+                'message' => 'Pembaruan versi terbaru tersedia di server rilis.',
                 'current' => $currentInfo,
                 'latest_hash' => $remoteShort,
                 'commits_behind' => 1,
@@ -319,7 +319,7 @@ class AppUpdateService
             return [
                 'has_update' => false,
                 'status' => 'error',
-                'message' => 'Gagal terhubung ke remote GitHub: '.trim($cleanOutput),
+                'message' => 'Gagal terhubung ke server pembaruan: '.trim($cleanOutput),
                 'current' => $currentInfo,
                 'changelog' => [],
                 'commits_behind' => 0,
@@ -364,7 +364,7 @@ class AppUpdateService
         return [
             'has_update' => true,
             'status' => 'update_available',
-            'message' => "Ditemukan {$commitsBehind} pembaruan terbaru di GitHub.",
+            'message' => "Ditemukan {$commitsBehind} pembaruan terbaru di server rilis.",
             'current' => $currentInfo,
             'latest_hash' => trim($latestRemoteHash['output'] ?: '-'),
             'commits_behind' => $commitsBehind,
@@ -373,15 +373,15 @@ class AppUpdateService
     }
 
     /**
-     * Pasang pembaruan terbaru dari GitHub (git pull, composer, migrate, clear cache).
+     * Pasang pembaruan terbaru dari server rilis (git pull, composer, migrate, clear cache).
      */
     public function applyUpdate(): array
     {
         if ($this->isDocker()) {
             return [
                 'success' => false,
-                'message' => 'Aplikasi berjalan di dalam lingkungan Docker Container. Pembaruan diterapkan melalui komputer host menggunakan update-system.bat (Windows) atau update-system.sh (Linux).',
-                'logs' => ['[1/1] Mode Docker aktif: Penarikan image terbaru dilakukan dari host untuk menjaga persistensi data.'],
+                'message' => 'Aplikasi berjalan di dalam lingkungan Docker Container terisolasi. Gunakan skrip pembaruan kontainer (update-system.bat atau update-system.sh) untuk memperbarui image aplikasi.',
+                'logs' => ['[1/1] Mode Docker aktif: Pembaruan image kontainer dilakukan via host untuk menjaga persistensi basis data.'],
             ];
         }
 
@@ -396,11 +396,11 @@ class AppUpdateService
             : ['pull', '--no-rebase', 'origin', $branch];
 
         $pullRes = $this->runGit($pullArgs);
-        $logs[] = '[1/4] Git Pull: '.($pullRes['status'] === 0 ? 'Sukses' : 'Gagal ('.$pullRes['output'].')');
+        $logs[] = '[1/4] Sinkronisasi Berkas Aplikasi: '.($pullRes['status'] === 0 ? 'Sukses' : 'Gagal ('.$pullRes['output'].')');
         if ($pullRes['status'] !== 0) {
             return [
                 'success' => false,
-                'message' => 'Gagal menarik kode dari GitHub: '.$pullRes['output'],
+                'message' => 'Gagal mengunduh pembaruan dari server: '.$pullRes['output'],
                 'logs' => $logs,
             ];
         }
@@ -444,6 +444,38 @@ class AppUpdateService
         return [
             'success' => true,
             'message' => 'Pembaruan aplikasi berhasil diterapkan secara sempurna!',
+            'logs' => $logs,
+            'current' => $this->getCurrentVersionInfo(),
+        ];
+    }
+
+    /**
+     * Jalankan sinkronisasi skema database dan pembersihan cache.
+     */
+    public function syncDatabaseSchema(): array
+    {
+        $logs = [];
+
+        try {
+            Artisan::call('migrate', ['--force' => true]);
+            $logs[] = '[1/2] Migrasi Skema Basis Data: '.trim(Artisan::output() ?: 'Selesai.');
+        } catch (Throwable $e) {
+            $logs[] = '[1/2] Migrasi Skema Basis Data: '.$e->getMessage();
+        }
+
+        try {
+            Artisan::call('optimize:clear');
+            Artisan::call('config:clear');
+            Artisan::call('cache:clear');
+            Artisan::call('view:clear');
+            $logs[] = '[2/2] Optimasi & Bersihkan Cache Server: Sukses.';
+        } catch (Throwable $e) {
+            $logs[] = '[2/2] Bersihkan Cache: '.$e->getMessage();
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Skema basis data dan cache server berhasil disinkronkan!',
             'logs' => $logs,
             'current' => $this->getCurrentVersionInfo(),
         ];
