@@ -343,9 +343,6 @@ class KompatibelModelUnlimitedAndPosAlignTest extends TestCase
     {
         Livewire::actingAs($this->user)
             ->test(PosKasir::class)
-            ->call('toggle', 'showCustomFilterSettings')
-            ->assertSet('showCustomFilterSettings', true)
-            ->call('toggle', 'showCustomFilterSettings')
             ->assertSet('showCustomFilterSettings', false)
             ->call('toggleFilter', 'kategori')
             ->assertSet('visibleFilters.kategori', true)
@@ -463,9 +460,11 @@ class KompatibelModelUnlimitedAndPosAlignTest extends TestCase
             'is_active' => true,
         ]);
 
+        // POS: toggleFilter('model_kompatibel') now covers the unified Tipe / Model HP
         Livewire::actingAs($this->user)
             ->test(PosKasir::class)
             ->call('toggleFilter', 'model_kompatibel')
+            ->assertSet('visibleFilters.model_kompatibel', true)
             ->assertSeeHtml('optgroup label="Apple"')
             ->assertSeeHtml('optgroup label="Samsung"');
 

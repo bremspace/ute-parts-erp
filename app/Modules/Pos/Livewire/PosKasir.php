@@ -534,16 +534,25 @@ class PosKasir extends Component
 
     public function toggleFilter(string $key): void
     {
+        if ($key === 'tipe_hp') {
+            $key = 'model_kompatibel';
+        }
+
         if (array_key_exists($key, $this->visibleFilters)) {
             $this->visibleFilters[$key] = ! $this->visibleFilters[$key];
+            if ($key === 'model_kompatibel') {
+                $this->visibleFilters['tipe_hp'] = false;
+            }
             if (! $this->visibleFilters[$key]) {
                 match ($key) {
                     'kategori' => $this->filterKategoriId = null,
                     'brand' => $this->filterBrandId = null,
                     'kualitas' => $this->filterKualitasId = null,
-                    'tipe_hp' => $this->filterTipeHpId = null,
+                    'tipe_hp', 'model_kompatibel' => [
+                        $this->filterTipeHpId = null,
+                        $this->filterModelKompatibel = null,
+                    ],
                     'brand_kompatibel' => $this->filterBrandKompatibel = null,
-                    'model_kompatibel' => $this->filterModelKompatibel = null,
                     'kondisi' => $this->filterKondisi = null,
                     'satuan' => $this->filterSatuan = null,
                     'abc_class' => $this->filterAbcClass = null,
@@ -696,14 +705,9 @@ class PosKasir extends Component
     {
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
         if (! empty($val) && empty($this->filterBrandKompatibel)) {
-            $th = TipeHp::where('model', $val)->first();
-            if ($th) {
-                $this->filterBrandKompatibel = $th->merk;
-            } else {
-                $prod = Produk::where('model_kompatibel', $val)->first();
-                if ($prod && $prod->brand_kompatibel) {
-                    $this->filterBrandKompatibel = $prod->brand_kompatibel;
-                }
+            $brand = TipeHp::resolveBrandForModel($val);
+            if ($brand && ! in_array(strtolower($brand), ['universal', 'lainnya'], true)) {
+                $this->filterBrandKompatibel = $brand;
             }
         }
     }
@@ -3688,7 +3692,7 @@ class PosKasir extends Component
             'kualitas_id' => $this->visibleFilters['kualitas'] ? $this->filterKualitasId : null,
             'tipe_hp_id' => $this->visibleFilters['tipe_hp'] ? $this->filterTipeHpId : null,
             'brand_kompatibel' => $this->visibleFilters['brand_kompatibel'] ? $this->filterBrandKompatibel : null,
-            'model_kompatibel' => $this->visibleFilters['model_kompatibel'] ? $this->filterModelKompatibel : null,
+            'model_kompatibel' => ($this->visibleFilters['model_kompatibel'] || $this->visibleFilters['tipe_hp']) ? $this->filterModelKompatibel : null,
             'kondisi' => $this->visibleFilters['kondisi'] ? $this->filterKondisi : null,
             'satuan' => $this->visibleFilters['satuan'] ? $this->filterSatuan : null,
             'abc_class' => $this->visibleFilters['abc_class'] ? $this->filterAbcClass : null,

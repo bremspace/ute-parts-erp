@@ -4,6 +4,7 @@
         flexSet: {},
         searchOpen: false,
         mobileFilterOpen: false,
+        desktopFilterDrawerOpen: false,
         cartViewMode: localStorage.getItem('pos_cart_view_mode') || 'card',
         setCartViewMode(mode) {
             this.cartViewMode = mode;
@@ -240,13 +241,13 @@
                             @endif
                             @if($filterBrandKompatibel)
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 font-medium shrink-0">
-                                    HP: {{ $filterBrandKompatibel }}
+                                    Merk HP: {{ $filterBrandKompatibel }}
                                     <button type="button" wire:click="$set('filterBrandKompatibel', null)" class="text-ink-400 hover:text-up-red font-bold">✕</button>
                                 </span>
                             @endif
                             @if($filterModelKompatibel)
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-ink-200 font-medium shrink-0">
-                                    Model: {{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($filterModelKompatibel, $filterBrandKompatibel ?? null) }}
+                                    Tipe HP: {{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($filterModelKompatibel, $filterBrandKompatibel ?? null) }}
                                     <button type="button" wire:click="$set('filterModelKompatibel', null)" class="text-ink-400 hover:text-up-red font-bold">✕</button>
                                 </span>
                             @endif
@@ -476,7 +477,8 @@
             <!-- Filter Preferences Button (Desktop) & Filter Sheet Trigger (Mobile) -->
             <button
                 type="button"
-                @click="if (window.innerWidth < 640) { mobileFilterOpen = true; } else { $wire.showCustomFilterSettings = !$wire.showCustomFilterSettings; }"
+                @click="if (window.innerWidth < 640) { mobileFilterOpen = !mobileFilterOpen; } else { desktopFilterDrawerOpen = !desktopFilterDrawerOpen; }"
+                :class="(desktopFilterDrawerOpen || mobileFilterOpen) ? 'bg-up-primary/10 border-up-primary/40 text-up-primary dark:text-up-primary' : ''"
                 class="px-3.5 py-2.5 rounded-xl border border-ink-200/80 dark:border-white/10 text-xs font-semibold text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-white/5 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center gap-1.5 whitespace-nowrap cursor-pointer min-h-[44px]"
                 title="Atur filter pencarian produk"
             >
@@ -787,9 +789,15 @@
             </div>
         </div>
 
-        <!-- Custom Filter Drawer (Desktop Toggleable) -->
-        @if($showCustomFilterSettings)
-            <div class="hidden sm:flex p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-200/80 dark:border-white/10 flex-wrap items-center justify-between gap-3 text-xs">
+        <!-- Custom Filter Drawer (Desktop Toggleable) — instant Alpine state, no Livewire roundtrip -->
+        <div x-show="desktopFilterDrawerOpen" x-cloak
+             x-transition:enter="transition ease-out duration-150"
+             x-transition:enter-start="opacity-0 -translate-y-1"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-100"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0 -translate-y-1"
+             class="hidden sm:flex p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-200/80 dark:border-white/10 flex-wrap items-center justify-between gap-3 text-xs">
                 <div class="flex items-center gap-3 flex-wrap">
                     <span class="font-bold text-ink-700 dark:text-ink-300">Tampilkan Filter:</span>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer">
@@ -798,23 +806,19 @@
                     </label>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" wire:key="pos-chk-brand-{{ $visibleFilters['brand'] ? '1' : '0' }}" wire:click="toggleFilter('brand')" @checked($visibleFilters['brand']) class="rounded border-ink-300 text-up-primary">
-                        <span>Brand Part</span>
+                        <span>Merek Part</span>
                     </label>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" wire:key="pos-chk-kualitas-{{ $visibleFilters['kualitas'] ? '1' : '0' }}" wire:click="toggleFilter('kualitas')" @checked($visibleFilters['kualitas']) class="rounded border-ink-300 text-up-primary">
                         <span>Kualitas</span>
                     </label>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" wire:key="pos-chk-tipe_hp-{{ $visibleFilters['tipe_hp'] ? '1' : '0' }}" wire:click="toggleFilter('tipe_hp')" @checked($visibleFilters['tipe_hp']) class="rounded border-ink-300 text-up-primary">
-                        <span>Tipe HP</span>
-                    </label>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" wire:key="pos-chk-brand_kompatibel-{{ $visibleFilters['brand_kompatibel'] ? '1' : '0' }}" wire:click="toggleFilter('brand_kompatibel')" @checked($visibleFilters['brand_kompatibel']) class="rounded border-ink-300 text-up-primary">
-                        <span>Brand Kompatibel</span>
+                        <span>Merk HP</span>
                     </label>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" wire:key="pos-chk-model_kompatibel-{{ $visibleFilters['model_kompatibel'] ? '1' : '0' }}" wire:click="toggleFilter('model_kompatibel')" @checked($visibleFilters['model_kompatibel']) class="rounded border-ink-300 text-up-primary">
-                        <span>Model Kompatibel</span>
+                        <input type="checkbox" wire:key="pos-chk-model_kompatibel-{{ ($visibleFilters['model_kompatibel'] || $visibleFilters['tipe_hp']) ? '1' : '0' }}" wire:click="toggleFilter('model_kompatibel')" @checked($visibleFilters['model_kompatibel'] || $visibleFilters['tipe_hp']) class="rounded border-ink-300 text-up-primary">
+                        <span>Tipe / Model HP</span>
                     </label>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" wire:key="pos-chk-kondisi-{{ $visibleFilters['kondisi'] ? '1' : '0' }}" wire:click="toggleFilter('kondisi')" @checked($visibleFilters['kondisi']) class="rounded border-ink-300 text-up-primary">
@@ -837,7 +841,6 @@
                     Reset Filter
                 </button>
             </div>
-        @endif
 
         <!-- Active Dinamis Filter Bar (Desktop & Mobile) -->
         @if(collect($visibleFilters)->contains(true))
@@ -862,7 +865,7 @@
                 @if($visibleFilters['brand'])
                     <div class="relative inline-flex items-center">
                         <select wire:model.live="filterBrandId" class="px-2.5 py-1.5 {{ $filterBrandId ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Brand Part</option>
+                            <option value="">Semua Merek Part</option>
                             @foreach($brandList as $b)
                                 <option value="{{ $b->id }}">{{ $b->nama }}</option>
                             @endforeach
@@ -885,49 +888,26 @@
                         @endif
                     </div>
                 @endif
-                @if($visibleFilters['tipe_hp'])
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterTipeHpId" class="px-2.5 py-1.5 {{ $filterTipeHpId ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Tipe HP</option>
-                            @if(empty($filterBrandKompatibel))
-                                @foreach($tipeHpList->groupBy('merk') as $merk => $tipes)
-                                    <optgroup label="{{ $merk }}">
-                                        @foreach($tipes as $th)
-                                            <option value="{{ $th->id }}">{{ $th->nama_tampilan }}</option>
-                                        @endforeach
-                                    </optgroup>
-                                @endforeach
-                            @else
-                                @foreach($tipeHpList as $th)
-                                    <option value="{{ $th->id }}">{{ $th->nama_tampilan }}</option>
-                                @endforeach
-                            @endif
-                        </select>
-                        @if($filterTipeHpId)
-                            <button type="button" wire:click="$set('filterTipeHpId', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Tipe HP">✕</button>
-                        @endif
-                    </div>
-                @endif
                 @if($visibleFilters['brand_kompatibel'])
                     <div class="relative inline-flex items-center">
                         <select wire:model.live="filterBrandKompatibel" class="px-2.5 py-1.5 {{ $filterBrandKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Brand Kompatibel</option>
+                            <option value="">Semua Merk HP</option>
                             @foreach($brandKompatibelList as $bk)
                                 <option value="{{ $bk }}">{{ $bk }}</option>
                             @endforeach
                         </select>
                         @if($filterBrandKompatibel)
-                            <button type="button" wire:click="$set('filterBrandKompatibel', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Brand Kompatibel">✕</button>
+                            <button type="button" wire:click="$set('filterBrandKompatibel', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Merk HP">✕</button>
                         @endif
                     </div>
                 @endif
-                @if($visibleFilters['model_kompatibel'])
+                @if($visibleFilters['model_kompatibel'] || $visibleFilters['tipe_hp'])
                     @php
                         $groupedMkPos = \App\Modules\Wms\Models\TipeHp::groupModelsByBrand($modelKompatibelList, $filterBrandKompatibel ?: null);
                     @endphp
                     <div class="relative inline-flex items-center">
                         <select wire:model.live="filterModelKompatibel" class="px-2.5 py-1.5 {{ $filterModelKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Model Kompatibel' }}</option>
+                            <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe / Model HP' }}</option>
                             @if(empty($filterBrandKompatibel) && count($groupedMkPos) > 1)
                                 @foreach($groupedMkPos as $brandName => $models)
                                     <optgroup label="{{ $brandName }}">
@@ -943,7 +923,7 @@
                             @endif
                         </select>
                         @if($filterModelKompatibel)
-                            <button type="button" wire:click="$set('filterModelKompatibel', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Model Kompatibel">✕</button>
+                            <button type="button" wire:click="$set('filterModelKompatibel', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Tipe / Model HP">✕</button>
                         @endif
                     </div>
                 @endif
@@ -2048,7 +2028,7 @@
                 <!-- 3. Brand Part -->
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
-                        <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Brand Part / Merk Sparepart</label>
+                        <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Merek Part (Sparepart)</label>
                         @if($filterBrandId)
                             <button type="button" wire:click="$set('filterBrandId', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
                         @endif
@@ -2065,11 +2045,11 @@
                     </select>
                 </div>
 
-                <!-- 4. Brand & Model Kompatibel (Handphone) -->
+                <!-- 4. Merk HP & Tipe/Model HP (Gadget Kompatibel) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
-                            <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Merk HP Kompatibel</label>
+                            <label class="font-bold text-ink-700 dark:text-ink-300 text-xs">Merk HP (Gadget)</label>
                             @if($filterBrandKompatibel)
                                 <button type="button" wire:click="$set('filterBrandKompatibel', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
                             @endif

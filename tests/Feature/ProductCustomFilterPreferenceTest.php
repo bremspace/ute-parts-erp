@@ -162,7 +162,6 @@ class ProductCustomFilterPreferenceTest extends TestCase
             ->assertSet('visibleFilters.kategori', true)
             ->assertSet('visibleFilters.brand', true)
             ->assertSet('visibleFilters.kualitas', false)
-            ->set('showCustomFilterSettings', true)
             ->assertSeeHtml('wire:key="pos-chk-kategori-1"')
             ->assertSeeHtml('wire:key="pos-chk-kualitas-0"')
             ->call('resetCustomFilters')
