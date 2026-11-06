@@ -137,6 +137,30 @@ func main() {
 	prepareEnv(filepath.Join(baseDir, "config", ".env.desktop.template"), filepath.Join(appDir, ".env"), dbPort, appPort, configDir, dataDir)
 	prepareCaddyfile(filepath.Join(baseDir, "config", "Caddyfile.desktop"), caddyfilePath, appPort, cgiPort, appDir)
 
+	// 3.5 Native Anti-Tamper & Hardware License Security Guard
+	integrityOk, integrityErr := verifyCoreFilesIntegrity(appDir)
+	if !integrityOk {
+		fmt.Printf("[Bremspace Security] Integrity Violation: %s\n", integrityErr)
+		ShowNativeMessageBox("Bremspace ERP - Keamanan Terlanggar",
+			fmt.Sprintf("Sistem mendeteksi modifikasi atau berkas sistem yang hilang:\n%s\n\nInstalasi tidak dapat dilanjutkan.", integrityErr),
+			MB_ICONERROR)
+		os.Exit(1)
+	}
+
+	installedLockPath := filepath.Join(storageDir, "installed.lock")
+	licenseKeyPath := filepath.Join(configDir, "license.key")
+	if _, err := os.Stat(installedLockPath); err == nil {
+		isLicensed, challenge, errMsg := verifyLicense(licenseKeyPath, storageDir)
+		if !isLicensed {
+			fmt.Printf("[Bremspace License Guard] License Invalid: %s\n", errMsg)
+			ShowNativeMessageBox("Bremspace ERP - Lisensi Terkunci",
+				fmt.Sprintf("Sistem Terkunci: Lisensi Tidak Sah.\n\n%s\n\nChallenge Code Mesin: %s\nSilakan hubungi WhatsApp Developer Bremspace untuk aktivasi lisensi.", errMsg, challenge),
+				MB_ICONERROR)
+			os.Exit(1)
+		}
+		fmt.Printf("[Bremspace License Guard] Hardware License Verified (Challenge: %s)\n", challenge)
+	}
+
 	// 4. Initialize Database if needed
 	if isDirEmpty(dataDir) {
 		fmt.Println("[Bremspace Launcher] Initializing database data directory...")

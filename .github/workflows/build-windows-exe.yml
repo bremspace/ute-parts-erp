@@ -60,7 +60,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path ..\payload | Out-Null
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
-          go build -ldflags "-H windowsgui -s -w" -o ..\payload\launcher.exe main.go
+          go build -ldflags "-H windowsgui -s -w" -o ..\payload\launcher.exe .
 
       - name: Assemble Installer Payload
         run: |
@@ -69,6 +69,9 @@ jobs:
           robocopy . $PayloadApp /MIR /XD .git node_modules tests tools dist /XF *.log /NDL /NFL /NJH /NJS
           if ($LASTEXITCODE -ge 8) { throw "Robocopy failed with code $LASTEXITCODE" } else { $global:LASTEXITCODE = 0 }
           
+          # Execute Bytecode Encryption / Source Code Hardening on Payload
+          php tools\security\protect-code.php $PayloadApp
+
           # Copy Engines
           New-Item -ItemType Directory -Force -Path "tools\windows\payload\php" | Out-Null
           Copy-Item "tools\windows\binaries\php\*" "tools\windows\payload\php" -Recurse -Force
