@@ -1416,6 +1416,11 @@ class SettingsRbac extends Component
                 'label' => 'Ubah Status Pengerjaan Servis',
                 'deskripsi' => 'Mengupdate progres servis (pemeriksaan, pengerjaan teknisi, selesai).',
             ],
+            'servis.payment' => [
+                'modul' => 'Servis & Reparasi',
+                'label' => 'Proses Pembayaran Servis',
+                'deskripsi' => 'Mencatat pelunasan tagihan servis (kas, split, subledger piutang).',
+            ],
             'servis.input-sparepart' => [
                 'modul' => 'Servis & Reparasi',
                 'label' => 'Pasang Sparepart & Jasa Servis',

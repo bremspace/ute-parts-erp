@@ -115,6 +115,14 @@ class ServisService
             throw new \Exception('Cabang aktif belum dipilih');
         }
 
+        // [P2-3/T-06] `cabang_id` eksplisit dari caller (API request / form)
+        // wajib lolos akses cabang user — pola `ServisController::resolveCabangId`
+        // (`bisaAksesCabang`: cabang aktif + ditugaskan, kecuali role HQ).
+        // Dulu: staff bebas membuat tiket lintas cabang lewat parameter.
+        if (isset($data['cabang_id']) && ! $user->bisaAksesCabang((int) $data['cabang_id'])) {
+            throw new \Exception('Anda tidak memiliki akses ke cabang ini');
+        }
+
         $pelanggan = ! empty($data['pelanggan_id']) ? Pelanggan::find($data['pelanggan_id']) : null;
         $namaPelanggan = $data['nama_pelanggan'] ?? $pelanggan?->nama;
         $teleponPelanggan = $data['telepon_pelanggan'] ?? $pelanggan?->telepon;
@@ -1135,7 +1143,12 @@ class ServisService
             $pendapatanPart = (float) $itemsServis->where('tipe', 'part')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
             $jualLegacy = (float) $sparepartsLegacy->sum(fn ($sp) => (float) $sp->harga_satuan * (int) $sp->jumlah);
 
-            $jasaServis = $pendapatanJasa > 0 ? $pendapatanJasa : (float) ($tiket->estimasi_biaya ?? 0);
+            // [P2-2/T-05] Fallback estimasi hanya untuk tiket legacy TANPA
+            // riwayat item jasa. Jika jasa pernah ada namun semua dibatalkan →
+            // jasa = 0 (menagih estimasi = overbill).
+            $jasaServis = $pendapatanJasa > 0 || $tiket->punyaRiwayatJasaEksplisit()
+                ? $pendapatanJasa
+                : (float) ($tiket->estimasi_biaya ?? 0);
             $totalJualSparepart = $pendapatanPart + $jualLegacy;
             $totalTagihan = $jasaServis + $totalJualSparepart;
 
@@ -1682,7 +1695,11 @@ class ServisService
         try {
             $jurnalService = app(JurnalService::class);
 
-            $jasaServis = (float) ($tiket->estimasi_biaya ?? 0);
+            // [P2-2/T-05] Fallback estimasi hanya untuk tiket legacy TANPA
+            // riwayat item jasa (lihat bayar()).
+            $jasaServis = $tiket->punyaRiwayatJasaEksplisit()
+                ? 0.0
+                : (float) ($tiket->estimasi_biaya ?? 0);
 
             // [T-04] Baris part yang SUDAH dibatalkan (reversal saat tiket
             // ditolak) TIDAK ikut dihitung — kalau tidak, HPP 510-02 & Persediaan

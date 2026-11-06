@@ -97,6 +97,19 @@ class TiketServis extends Model
         return $this->hasMany(TiketServisItem::class); // [T-17] split part & jasa
     }
 
+    /**
+     * [P2-2/T-05] Apakah tiket pernah dibuatkan baris jasa eksplisit
+     * (`TiketServisItem` tipe jasa, termasuk yang sudah dibatalkan)?
+     *
+     * Fallback `estimasi_biaya` hanya sah untuk tiket LEGACY yang tidak pernah
+     * punya item jasa. Kalau item jasa pernah ada lalu SEMUA dibatalkan, jasa
+     * = 0 — menagih `estimasi_biaya` adalah overbill (pekerjaan tidak jadi).
+     */
+    public function punyaRiwayatJasaEksplisit(): bool
+    {
+        return $this->items()->where('tipe', 'jasa')->exists();
+    }
+
     public function estimasiItems(): HasMany
     {
         return $this->hasMany(TiketServisEstimasiItem::class);
@@ -228,7 +241,8 @@ class TiketServis extends Model
                     ];
                 }
             } else {
-                $estimasi = (float) ($this->estimasi_biaya ?? 0);
+                // [P2-2/T-05] Fallback estimasi hanya tiket legacy tanpa item jasa.
+                $estimasi = ! $this->punyaRiwayatJasaEksplisit() ? (float) ($this->estimasi_biaya ?? 0) : 0.0;
                 if ($estimasi > 0 && $pekerjaanItems->where('tipe', 'part')->isEmpty()) {
                     $totalJasa += $estimasi;
                     $rincian[] = [
@@ -315,7 +329,8 @@ class TiketServis extends Model
                 }
             }
         } else {
-            $biaya = (float) ($this->estimasi_biaya ?? 0);
+            // [P2-2/T-05] Fallback estimasi hanya tiket legacy tanpa item jasa.
+            $biaya = ! $this->punyaRiwayatJasaEksplisit() ? (float) ($this->estimasi_biaya ?? 0) : 0.0;
             $totalJasa = $biaya;
             if ($biaya > 0) {
                 $rincian[] = [

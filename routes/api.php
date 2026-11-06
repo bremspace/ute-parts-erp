@@ -156,7 +156,7 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::post('/', [ServisController::class, 'store'])->middleware('permission:servis.create');
             Route::get('/{id}', [ServisController::class, 'show'])->middleware('permission:servis.view');
             Route::put('/{id}/status', [ServisController::class, 'updateStatus'])->middleware('permission:servis.update-status');
-            Route::post('/{id}/bayar', [ServisController::class, 'bayar'])->middleware('permission:servis.update-status'); // [T-12]
+            Route::post('/{id}/bayar', [ServisController::class, 'bayar'])->middleware('permission:servis.payment'); // [T-12][P2-1/T-04] pelunasan ada permission sendiri
             Route::post('/{id}/estimasi', [ServisController::class, 'setEstimasi'])->middleware('permission:servis.update-status');
             Route::post('/{id}/sparepart', [ServisController::class, 'inputSparepart'])->middleware('permission:servis.input-sparepart');
             Route::post('/{id}/pekerjaan', [ServisController::class, 'inputPekerjaan'])->middleware('permission:servis.input-sparepart'); // [T-17]

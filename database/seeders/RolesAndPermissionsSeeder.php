@@ -26,7 +26,10 @@ class RolesAndPermissionsSeeder extends Seeder
             // SERVIS
             // SERVIS — `servis.manage` = permission resmi master jenis servis
             // (pengganti ekuivalen sementara `servis.update-status`).
-            'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status', 'servis.manage',
+            // [P2-1/T-04] `servis.payment` terpisah dari `servis.update-status`:
+            // pelunasan servis (jurnal kas, subledger piutang) adalah tugas
+            // pembayaran — naik-turun status pengerjaan tidak berhak menagih.
+            'servis.view', 'servis.create', 'servis.update-status', 'servis.payment', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status', 'servis.manage',
             // CRM
             'crm.view', 'crm.create', 'crm.edit', 'crm.delete', 'crm.broadcast',
             // TIER
@@ -91,7 +94,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminToko->givePermissionTo([
             'pos.create', 'pos.view', 'pos.view-own', 'pos.void',
             'wms.view', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'wms.receive-po',
-            'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status',
+            'servis.view', 'servis.create', 'servis.update-status', 'servis.payment', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status',
             // admin-toko = bagian terkait servis → boleh kelola master jenis servis
             'servis.manage',
             'crm.view',
@@ -107,6 +110,9 @@ class RolesAndPermissionsSeeder extends Seeder
         $kasir = Role::findOrCreate('kasir');
         $kasir->givePermissionTo([
             'pos.create', 'pos.view-own', 'wms.view',
+            // [P2-1/T-04] Pelunasan servis adalah tugas meja kasir (POS pelunasan
+            // servis dulu tanpa gate sama sekali).
+            'servis.payment',
             // [B-14] Keputusan owner atas B-06 tertunda: kasir (meja kasir /
             // loket terima unit) perlu membuka tiket servis — termasuk kunci
             // gadget saat unit diserahkan / diambil. READ-ONLY: `servis.create` &
@@ -122,7 +128,10 @@ class RolesAndPermissionsSeeder extends Seeder
             // `POST /api/servis` (`permission:servis.create`). Sebelum ini teknisi
             // sudah bisa menerima unit lewat papan kanban (route hanya
             // `servis.view`) — jadi ini KONSISTENSI, bukan perluasan akses.
-            'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart',
+            // [P2-1/T-04] `servis.payment` diberikan sementara untuk
+            // KOMPATIBILITAS (teknisi dulu bayar lewat `servis.update-status`);
+            // owner dapat mencabut agar pembayaran murni tugas kasir/admin.
+            'servis.view', 'servis.create', 'servis.update-status', 'servis.payment', 'servis.input-sparepart',
         ]);
 
         $staffGudang = Role::findOrCreate('staff-gudang');

@@ -3166,6 +3166,14 @@ class PosKasir extends Component
 
     public function prosesBayarServis(): void
     {
+        // [P2-1/T-04] Pelunasan servis di kasir POS dibguard sama dengan
+        // ServisBoard: permission `servis.payment` (dulu TANPA gate sama sekali).
+        if (! auth()->user()?->can('servis.payment')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin memproses pembayaran servis']);
+
+            return;
+        }
+
         if (! $this->selectedServisDetail || ! $this->selectedServisId) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih tiket servis terlebih dahulu']);
 

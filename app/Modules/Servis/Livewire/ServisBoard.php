@@ -1539,7 +1539,9 @@ class ServisBoard extends Component
 
     public function prosesBayar(): void
     {
-        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin memproses pembayaran servis')) {
+        // [P2-1/T-04] Pembayaran punya permission sendiri — `servis.update-status`
+        // (pengerjaan) tidak lagi memaksa hak menagih.
+        if (! $this->boleh('servis.payment', 'Anda tidak punya izin memproses pembayaran servis')) {
             return;
         }
 

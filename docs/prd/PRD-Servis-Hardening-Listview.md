@@ -77,10 +77,27 @@ Pola yang sudah mapan di codebase ini — implementasi baru HARUS meniru:
 
 ---
 
-## 4. Fase 2 (P2) — setelah konfirmasi user
-- Permission `servis.payment` terpisah (SettingsRbac + Livewire gate + middleware).
-- `bayar()` tidak memakai `estimasi_biaya` bila baris jasa eksplisit pernah ada dan semuanya dibatalkan.
-- Validasi `cabang_id` request vs akses cabang user pada `terimaUnit` (align `resolveCabangId`).
+## 4. Fase 2 (P2) — setelah konfirmasi user (AKTIF)
+Permission `servis.payment` terpisah (SettingsRbac + Livewire gate + middleware):
+- Seeder: permission `servis.payment` baru; diberikan ke super-admin/owner (all), admin-toko, teknisi (kompatibilitas — dulu bayar via `servis.update-status`), dan `kasir` (jalur pelunasan POS adalah tugas meja kasir; dulu tanpa gate sama sekali). Owner dapat mengetatkan (mis. cabut dari teknisi) tanpa code change.
+- Gate: `ServisBoard::prosesBayar()` + `PosKasir::prosesBayarServis()` (dulu TANPA gate sama sekali) + route API `/{id}/bayar` middleware `permission:servis.payment` (dulu `servis.update-status`).
+- Katalog permission di `SettingsRbac` untuk UI settings.
+
+- [x] T-04a — permission `servis.payment` di catalogue + seeder (5 role) + route middleware
+- [x] T-04b — Livewire gates: ServisBoard::prosesBayar + PosKasir::prosesBayarServis
+- [x] T-04c — test: user dengan `servis.update-status` TANPA `servis.payment` ditolak 403 di API bayar (decoupling terbukti); user dengan payment lolos
+
+`bayar()` tidak memakai `estimasi_biaya` bila baris jasa eksplisit pernah ada dan semuanya dibatalkan:
+- Helper `TiketServis::punyaRiwayatJasaEksplisit()` (ada baris `TiketServisItem` tipe jasa, termasuk yang dibatalkan).
+- Fallback estimasi hanya dipakai bila tiket TIDAK PERNAH punya item jasa (tiket legacy); jurnal `onSelesai` + pelunasan `bayar` + tampilan `getRincianBiayaLengkap` konsisten.
+
+- [x] T-05a — helper + guard di `onSelesai`, `bayar`, `getRincianBiayaLengkap`
+- [x] T-05b — test: semua item jasa dibatalkan → jasa = 0 (bukan estimasi); tiket legacy tanpa item jasa masih ditagih estimasi
+
+Validasi `cabang_id` request vs akses cabang user pada `terimaUnit` (align `resolveCabangId`):
+
+- [x] T-06a — guard cabang di `ServisService::terimaUnit` (bisaAksesCabang + role HQ)
+- [x] T-06b — test: staff cabang A intake ke cabang B → exception; super-admin lintas cabang → lolos
 
 ## 5. Fase 3 (UI-1) — List View papan servis (designer-driven)
 - Toggle `view-mode: kanban | list` (persist ke localStorage + preferensi user, sama pola ADR 0008 theme).

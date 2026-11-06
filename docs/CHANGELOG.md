@@ -3,6 +3,13 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-06 — Servis: P2 Hardening (Permission Pembayaran Terpisah, Fallback Estimasi, Validasi Cabang Intake)
+
+- **[P2-1/T-04] Permission `servis.payment` terpisah** — Pembayaran servis dulu berkuda pada `servis.update-status` (dan jalur PosKasir tanpa gate sama sekali). Kini: permission katalog baru di `RolesAndPermissionsSeeder` + `SettingsRbac`; diberikan ke super-admin/owner (all), admin-toko, teknisi (kompatibilitas — dulu bayar via update-status; owner bisa cabut tanpa code change), dan `kasir` (pelunasan di meja kasir POS memang tugasnya). Gate: `ServisBoard::prosesBayar()`, `PosKasir::prosesBayarServis()` (baru), route API `POST /servis/{id}/bayar` middleware `permission:servis.payment`. Decoupling terbukti di test: pemegang `servis.update-status` tanpa `servis.payment` → 403.
+- **[P2-2/T-05] Fallback `estimasi_biaya` dibungkus `punyaRiwayatJasaEksplisit()`** — Dulu bila SEMUA item jasa dibatalkan (`dibatalkan_at` terisi), jurnal `onSelesai`/pelunasan `bayar`/tampilan modal bayar tetap menagih `estimasi_biaya` → overbill. Kini fallback estimasi hanya sah untuk tiket legacy yang TIDAK PERNAH punya item jasa; jasa dibatalkan semua → jasa = 0 (tidak posting jurnal dari estimasi). Tiga titik konsisten: `ServisService::onSelesai()`, `bayar()`, `TiketServis::getRincianBiayaLengkap()`.
+- **[P2-3/T-06] Validasi cabang pada `terimaUnit()`** — `cabang_id` eksplisit dari request sebelumnya tanpa cek akses → staff bebas membuat tiket lintas cabang. Kini wajib lolos `User::bisaAksesCabang()` (pola `ServisController::resolveCabangId`: cabang aktif + ditugaskan, kecuali role HQ super-admin/owner/finance/marketing/kelola-hr).
+- **Testing**: `tests/Feature/ServisP2HardeningTest.php` baru — 10/10 pass (34 assertions). Regression 11 file servis+POS: 68/71 pass; 3 fail SEMUA pre-existing (diverifikasi stash-replay di baseline `brem`): `ServisTerimaUnitTest::test_modal_pola_kunci` (copy blade) + 2× `PosBayarServisIntegrationTest` (kas sesi POS, baris 111). Pint bersih.
+
 ## 2026-11-06 — Servis: P1 Hardening (Nomor Tiket Race-Safe, Aktor Sistem SLA, Referensi Subledger AR)
 
 - **[P1-1/T-01] ServisService::terimaUnit()/bookingOnline()** — Nomor tiket `SRV-*` dibuat dari `count()+1` tanpa lock → dua intake paralel bisa menghasilkan nomor sama (exception mentah dari unique index). Kini memakai pola house `JurnalService::generateNoJurnal`: `DB::transaction` + `lockForUpdate` + LIKE-prefix (WAJIB menyertakan `cabangId` untuk `SRV-C{cc}`) + `max($seq)+1`, dengan retry ≤3 hanya untuk duplicate-key (`adalahDuplicateKey()`; exception lain tetap di-throw). Format `SRV-C{cc}-{Ymd}-{seq}` / `SRV-ONL-{Ymd}-{seq}` TIDAK berubah (kontrak).
