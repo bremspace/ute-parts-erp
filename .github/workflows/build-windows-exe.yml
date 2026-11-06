@@ -51,12 +51,13 @@ jobs:
           npm ci --ignore-scripts
           npm run build
 
-      - name: Download Windows Runtimes (FrankPHP, MariaDB Portable, WebView2)
+      - name: Download Windows Runtimes (PHP 8.4 NTS, Caddy, MariaDB Portable, WebView2)
         run: .\tools\windows\scripts\download-binaries.ps1
 
       - name: Compile Launcher Executable (Go)
         run: |
           cd tools\windows\launcher
+          New-Item -ItemType Directory -Force -Path ..\payload | Out-Null
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
           go build -ldflags "-H windowsgui -s -w" -o ..\payload\launcher.exe main.go
@@ -65,10 +66,15 @@ jobs:
         run: |
           $PayloadApp = "tools\windows\payload\app"
           New-Item -ItemType Directory -Force -Path $PayloadApp | Out-Null
-          robocopy . $PayloadApp /MIR /XD .git node_modules tests tools dist /XF *.log /NDL /NFL /NJH /NJS | Out-Null
+          robocopy . $PayloadApp /MIR /XD .git node_modules tests tools dist /XF *.log /NDL /NFL /NJH /NJS
+          if ($LASTEXITCODE -ge 8) { throw "Robocopy failed with code $LASTEXITCODE" } else { $global:LASTEXITCODE = 0 }
           
           # Copy Engines
-          Copy-Item "tools\windows\binaries\frankphp\*" "tools\windows\payload\engine" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "tools\windows\payload\php" | Out-Null
+          Copy-Item "tools\windows\binaries\php\*" "tools\windows\payload\php" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "tools\windows\payload\caddy" | Out-Null
+          Copy-Item "tools\windows\binaries\caddy\*" "tools\windows\payload\caddy" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "tools\windows\payload\db_engine" | Out-Null
           Copy-Item "tools\windows\binaries\mariadb\*" "tools\windows\payload\db_engine" -Recurse -Force
           New-Item -ItemType Directory -Force -Path "tools\windows\payload\webview" | Out-Null
           Copy-Item "tools\windows\binaries\webview2\MicrosoftEdgeWebview2Setup.exe" "tools\windows\payload\webview\" -Force
@@ -94,8 +100,8 @@ jobs:
           body: |
             Automated build of Bremspace ERP Windows Standalone (.exe).
             - Embedded MariaDB Portable (zero conflict port 13307)
-            - FrankPHP runtime (PHP 8.5)
-            - Single-click desktop launcher
+            - Official PHP 8.4 NTS + Caddy Web Server (FastCGI)
+            - Single-click desktop launcher (WebView2 App Mode)
           files: dist/windows/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

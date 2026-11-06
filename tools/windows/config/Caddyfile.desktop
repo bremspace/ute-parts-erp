@@ -11,11 +11,9 @@
     root * "{{APP_DIR}}/public"
     encode zstd gzip
 
+    # FastCGI proxy to local PHP-CGI daemon
+    php_fastcgi 127.0.0.1:{{CGI_PORT}}
+
     # Serve static assets directly
     file_server
-
-    # FrankPHP native worker for Laravel
-    php_server {
-        resolve_root_symlink false
-    }
 }

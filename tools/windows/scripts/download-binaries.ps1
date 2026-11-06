@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Downloads Windows x64 portable runtimes (FrankPHP, MariaDB, WebView2) on Windows.
+    Downloads Windows x64 portable runtimes (PHP 8.4 NTS, Caddy Web Server, MariaDB 11.4 LTS, WebView2) on Windows.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -8,19 +8,26 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BaseDir = Split-Path -Parent $ScriptDir
 $DestDir = Join-Path $BaseDir "binaries"
 
-New-Item -ItemType Directory -Force -Path (Join-Path $DestDir "frankphp") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $DestDir "php") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $DestDir "caddy") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $DestDir "mariadb") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $DestDir "webview2") | Out-Null
 
-Write-Host "==> [1/3] Downloading FrankPHP Windows x64..." -ForegroundColor Cyan
-$FrankPhpUrl = "https://github.com/dunglas/frankphp/releases/latest/download/frankphp-windows-x86_64.zip"
-$FrankPhpZip = Join-Path $DestDir "frankphp.zip"
-Invoke-WebRequest -Uri $FrankPhpUrl -OutFile $FrankPhpZip
-Expand-Archive -Path $FrankPhpZip -DestinationPath (Join-Path $DestDir "frankphp") -Force
-Remove-Item -Force $FrankPhpZip
-Write-Host "    FrankPHP downloaded successfully." -ForegroundColor Green
+Write-Host "==> [1/4] Downloading Official PHP 8.4 NTS Windows x64..." -ForegroundColor Cyan
+$PhpUrl = "https://windows.php.net/downloads/releases/php-8.4.27-1-nts-Win32-vs17-x64.zip"
+$PhpZip = Join-Path $DestDir "php.zip"
+Invoke-WebRequest -Uri $PhpUrl -OutFile $PhpZip
+Expand-Archive -Path $PhpZip -DestinationPath (Join-Path $DestDir "php") -Force
+Remove-Item -Force $PhpZip
+Write-Host "    PHP 8.4 NTS downloaded successfully." -ForegroundColor Green
 
-Write-Host "==> [2/3] Downloading MariaDB Portable 11.4 LTS Windows x64..." -ForegroundColor Cyan
+Write-Host "==> [2/4] Downloading Official Caddy Server Windows x64..." -ForegroundColor Cyan
+$CaddyUrl = "https://caddyserver.com/api/download?os=windows&arch=amd64"
+$CaddyExe = Join-Path (Join-Path $DestDir "caddy") "caddy.exe"
+Invoke-WebRequest -Uri $CaddyUrl -OutFile $CaddyExe
+Write-Host "    Caddy Server downloaded successfully." -ForegroundColor Green
+
+Write-Host "==> [3/4] Downloading MariaDB Portable 11.4 LTS Windows x64..." -ForegroundColor Cyan
 $MariaDbVersion = "11.4.5"
 $MariaDbUrl = "https://archive.mariadb.org/mariadb-$MariaDbVersion/winx64-packages/mariadb-$MariaDbVersion-winx64.zip"
 $MariaDbZip = Join-Path $DestDir "mariadb.zip"
@@ -48,7 +55,7 @@ Remove-Item -Recurse -Force $TempExtract
 Remove-Item -Force $MariaDbZip
 Write-Host "    MariaDB minimal runtime prepared successfully." -ForegroundColor Green
 
-Write-Host "==> [3/3] Downloading Microsoft Edge WebView2 Evergreen Bootstrapper..." -ForegroundColor Cyan
+Write-Host "==> [4/4] Downloading Microsoft Edge WebView2 Evergreen Bootstrapper..." -ForegroundColor Cyan
 $WebView2Url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
 $WebView2Exe = Join-Path (Join-Path $DestDir "webview2") "MicrosoftEdgeWebview2Setup.exe"
 Invoke-WebRequest -Uri $WebView2Url -OutFile $WebView2Exe

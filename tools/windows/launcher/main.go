@@ -19,7 +19,7 @@ var (
 	procCreateMutex = kernel32.NewProc("CreateMutexW")
 	procCloseHandle = kernel32.NewProc("CloseHandle")
 
-	procCreateJobObject       = kernel32.NewProc("CreateJobObjectW")
+	procCreateJobObject         = kernel32.NewProc("CreateJobObjectW")
 	procSetInformationJobObject = kernel32.NewProc("SetInformationJobObject")
 	procAssignProcessToJobObject = kernel32.NewProc("AssignProcessToJobObject")
 
@@ -33,9 +33,13 @@ const (
 	APP_TITLE            = "Bremspace ERP"
 	DEFAULT_APP_PORT     = 1741
 	DEFAULT_DB_PORT      = 13307
+	DEFAULT_CGI_PORT     = 9000
 
 	JobObjectExtendedLimitInformation = 9
 	JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000
+
+	PROCESS_TERMINATE = 0x0001
+	PROCESS_SET_QUOTA = 0x0100
 )
 
 type IO_COUNTERS struct {
@@ -73,7 +77,6 @@ func main() {
 	mutexNamePtr, _ := syscall.UTF16PtrFromString(MUTEX_NAME)
 	hMutex, _, err := procCreateMutex.Call(0, 1, uintptr(unsafe.Pointer(mutexNamePtr)))
 	if hMutex == 0 || err == syscall.Errno(ERROR_ALREADY_EXISTS) {
-		// App already running -> focus existing window and exit cleanly
 		bringExistingWindowToFront()
 		os.Exit(0)
 	}
@@ -104,19 +107,28 @@ func main() {
 		defer procCloseHandle.Call(hJob)
 	}
 
-	// 3. Negotiate Database & App Port (User Configurable via config/ports.ini or arguments)
+	// 3. Negotiate Ports
 	userAppPort, userDbPort := loadUserConfiguredPorts(baseDir, configDir)
 	dbPort := findAvailablePort(userDbPort, userDbPort+50)
 	appPort := findAvailablePort(userAppPort, userAppPort+50)
+	cgiPort := findAvailablePort(DEFAULT_CGI_PORT, DEFAULT_CGI_PORT+50)
 
-	fmt.Printf("[Bremspace Launcher] DB Port: %d, App Port: %d\n", dbPort, appPort)
+	fmt.Printf("[Bremspace Launcher] DB Port: %d, App Port: %d, FastCGI Port: %d\n", dbPort, appPort, cgiPort)
 
 	// Prepare local config files
 	engineDir := filepath.Join(baseDir, "db_engine")
+	phpDir := filepath.Join(baseDir, "php")
+	caddyDir := filepath.Join(baseDir, "caddy")
 	appDir := filepath.Join(baseDir, "app")
+
 	myIniPath := filepath.Join(configDir, "my.ini")
+	phpIniPath := filepath.Join(configDir, "php.ini")
+	caddyfilePath := filepath.Join(configDir, "Caddyfile")
+
 	prepareMyIni(filepath.Join(baseDir, "config", "my.ini.template"), myIniPath, dbPort, engineDir, dataDir)
+	preparePhpIni(filepath.Join(baseDir, "config", "php.desktop.ini"), phpIniPath, phpDir, storageDir)
 	prepareEnv(filepath.Join(baseDir, "config", ".env.desktop.template"), filepath.Join(appDir, ".env"), dbPort, appPort, configDir, dataDir)
+	prepareCaddyfile(filepath.Join(baseDir, "config", "Caddyfile.desktop"), caddyfilePath, appPort, cgiPort, appDir)
 
 	// 4. Initialize Database if needed
 	if isDirEmpty(dataDir) {
@@ -138,32 +150,43 @@ func main() {
 		assignProcessToJob(hJob, cmdMysqld.Process)
 	}
 
-	// Wait for MariaDB to accept connections
 	waitForPort(dbPort, 15*time.Second)
 
-	// 6. First Run Migrations
+	// 6. Run Database Migrations
+	phpExe := filepath.Join(phpDir, "php.exe")
+	phpCgiExe := filepath.Join(phpDir, "php-cgi.exe")
 	artisanPath := filepath.Join(appDir, "artisan")
-	frankPhpExe := filepath.Join(baseDir, "engine", "frankphp.exe")
-	cmdMigrate := exec.Command(frankPhpExe, "php", artisanPath, "migrate", "--force")
+	cmdMigrate := exec.Command(phpExe, "-c", phpIniPath, artisanPath, "migrate", "--force")
 	cmdMigrate.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	_ = cmdMigrate.Run()
 
-	// 7. Start FrankPHP Web Server
-	fmt.Println("[Bremspace Launcher] Starting FrankPHP...")
-	caddyfilePath := filepath.Join(configDir, "Caddyfile")
-	prepareCaddyfile(filepath.Join(baseDir, "config", "Caddyfile.desktop"), caddyfilePath, appPort, appDir)
-	cmdFrank := exec.Command(frankPhpExe, "run", "--config", caddyfilePath)
-	cmdFrank.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	if err := cmdFrank.Start(); err != nil {
-		fmt.Printf("[Error] Failed to start FrankPHP: %v\n", err)
+	// 7. Start PHP-CGI FastCGI Daemon
+	fmt.Println("[Bremspace Launcher] Starting PHP-CGI daemon...")
+	cmdPhpCgi := exec.Command(phpCgiExe, "-b", fmt.Sprintf("127.0.0.1:%d", cgiPort), "-c", phpIniPath)
+	cmdPhpCgi.Env = append(os.Environ(), "PHP_FCGI_CHILDREN=4", "PHP_FCGI_MAX_REQUESTS=1000")
+	cmdPhpCgi.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	if err := cmdPhpCgi.Start(); err != nil {
+		fmt.Printf("[Error] Failed to start PHP-CGI: %v\n", err)
 	} else if hJob != 0 {
-		assignProcessToJob(hJob, cmdFrank.Process)
+		assignProcessToJob(hJob, cmdPhpCgi.Process)
 	}
 
-	// Wait for FrankPHP to accept connections
+	waitForPort(cgiPort, 10*time.Second)
+
+	// 8. Start Caddy Web Server
+	fmt.Println("[Bremspace Launcher] Starting Caddy Server...")
+	caddyExe := filepath.Join(caddyDir, "caddy.exe")
+	cmdCaddy := exec.Command(caddyExe, "run", "--config", caddyfilePath, "--adapter", "caddyfile")
+	cmdCaddy.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	if err := cmdCaddy.Start(); err != nil {
+		fmt.Printf("[Error] Failed to start Caddy: %v\n", err)
+	} else if hJob != 0 {
+		assignProcessToJob(hJob, cmdCaddy.Process)
+	}
+
 	waitForPort(appPort, 10*time.Second)
 
-	// 8. Launch WebView2 App Mode
+	// 9. Launch WebView2 App Mode
 	appUrl := fmt.Sprintf("http://127.0.0.1:%d", appPort)
 	fmt.Printf("[Bremspace Launcher] Opening App: %s\n", appUrl)
 	msedgePath := findEdgeExecutable()
@@ -171,18 +194,15 @@ func main() {
 	if msedgePath != "" {
 		cmdUi = exec.Command(msedgePath, fmt.Sprintf("--app=%s", appUrl), "--window-size=1280,800")
 	} else {
-		// Fallback to default browser
 		cmdUi = exec.Command("cmd", "/c", "start", appUrl)
 	}
 	if err := cmdUi.Start(); err == nil && hJob != 0 {
 		assignProcessToJob(hJob, cmdUi.Process)
 	}
 
-	// Setup Graceful Shutdown trap
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	// Wait for either window close or kill signal
 	doneChan := make(chan struct{})
 	go func() {
 		if cmdUi != nil && cmdUi.Process != nil {
@@ -198,14 +218,13 @@ func main() {
 		fmt.Println("[Bremspace Launcher] User closed window.")
 	}
 
-	// 9. Graceful MariaDB Shutdown
+	// 10. Graceful MariaDB Shutdown
 	fmt.Println("[Bremspace Launcher] Shutting down MariaDB...")
 	mysqladminExe := filepath.Join(engineDir, "bin", "mysqladmin.exe")
 	cmdShutdown := exec.Command(mysqladminExe, "-u", "root", fmt.Sprintf("-P%d", dbPort), "shutdown")
 	cmdShutdown.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	_ = cmdShutdown.Run()
 
-	// Allow brief moment for buffer flush
 	time.Sleep(1 * time.Second)
 	fmt.Println("[Bremspace Launcher] Goodbye.")
 }
@@ -230,11 +249,6 @@ func createKillOnCloseJobObject() (uintptr, error) {
 	}
 	return hJob, nil
 }
-
-const (
-	PROCESS_TERMINATE = 0x0001
-	PROCESS_SET_QUOTA = 0x0100
-)
 
 func assignProcessToJob(hJob uintptr, proc *os.Process) {
 	if proc == nil || hJob == 0 {
@@ -271,7 +285,6 @@ func loadUserConfiguredPorts(baseDir, configDir string) (int, int) {
 	appPort := DEFAULT_APP_PORT
 	dbPort := DEFAULT_DB_PORT
 
-	// Check config/ports.ini in user config dir first, then baseDir/config/ports.ini
 	candidates := []string{
 		filepath.Join(configDir, "ports.ini"),
 		filepath.Join(baseDir, "config", "ports.ini"),
@@ -357,6 +370,17 @@ func prepareMyIni(templatePath, destPath string, port int, engineDir, dataDir st
 	_ = os.WriteFile(destPath, []byte(s), 0644)
 }
 
+func preparePhpIni(templatePath, destPath string, phpDir, storageDir string) {
+	content, err := os.ReadFile(templatePath)
+	if err != nil {
+		return
+	}
+	s := string(content)
+	s = strings.ReplaceAll(s, "{{PHP_DIR}}", filepath.ToSlash(phpDir))
+	s = strings.ReplaceAll(s, "{{STORAGE_DIR}}", filepath.ToSlash(storageDir))
+	_ = os.WriteFile(destPath, []byte(s), 0644)
+}
+
 func prepareEnv(templatePath, destPath string, dbPort, appPort int, configDir, dataDir string) {
 	content, err := os.ReadFile(templatePath)
 	if err != nil {
@@ -371,13 +395,14 @@ func prepareEnv(templatePath, destPath string, dbPort, appPort int, configDir, d
 	_ = os.WriteFile(destPath, []byte(s), 0644)
 }
 
-func prepareCaddyfile(templatePath, destPath string, appPort int, appDir string) {
+func prepareCaddyfile(templatePath, destPath string, appPort, cgiPort int, appDir string) {
 	content, err := os.ReadFile(templatePath)
 	if err != nil {
 		return
 	}
 	s := string(content)
 	s = strings.ReplaceAll(s, "{{APP_PORT}}", fmt.Sprintf("%d", appPort))
+	s = strings.ReplaceAll(s, "{{CGI_PORT}}", fmt.Sprintf("%d", cgiPort))
 	s = strings.ReplaceAll(s, "{{APP_DIR}}", filepath.ToSlash(appDir))
 	_ = os.WriteFile(destPath, []byte(s), 0644)
 }

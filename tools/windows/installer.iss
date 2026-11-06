@@ -47,14 +47,18 @@ Source: "payload\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 ; Laravel Application Code (Production Assets)
 Source: "payload\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; FrankPHP Web Server Engine
-Source: "payload\engine\*"; DestDir: "{app}\engine"; Flags: ignoreversion recursesubdirs createallsubdirs
+; PHP 8.4 Runtime Engine
+Source: "payload\php\*"; DestDir: "{app}\php"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Caddy Web Server
+Source: "payload\caddy\*"; DestDir: "{app}\caddy"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Embedded MariaDB Portable
 Source: "payload\db_engine\*"; DestDir: "{app}\db_engine"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Configuration Templates
 Source: "config\*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "config\.env.desktop.template"; DestDir: "{app}\config"; Flags: ignoreversion
 
 ; WebView2 Bootstrapper (Temporary payload)
 Source: "payload\webview\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
