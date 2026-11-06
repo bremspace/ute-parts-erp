@@ -45,3 +45,7 @@ BARANG.xlsx
 opencode-migration-pack.tar.gz
 Bremspace-ERP-Release.zip
 Bremspace-ERP-Installer.zip
+/dist/*.tar.gz
+/dist/**/*.tar.gz
+/dist/*.exe
+/dist/**/*.exe

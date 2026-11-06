@@ -84,4 +84,17 @@ class WindowsDesktopLicenseTest extends TestCase
         $fallbackChallenge = HardwareIdentifier::getHostChallenge();
         $this->assertSame($mockChallenge, $fallbackChallenge);
     }
+
+    public function test_raw_hardware_identifier_returns_non_empty_string(): void
+    {
+        $raw = HardwareIdentifier::getRawHardwareIdentifier();
+        $this->assertNotEmpty($raw);
+        $this->assertIsString($raw);
+
+        $machineHash = HardwareIdentifier::getMachineHash();
+        $this->assertSame(64, strlen($machineHash)); // SHA-256 is 64 hex characters
+
+        $challenge = HardwareIdentifier::getChallengeCode();
+        $this->assertMatchesRegularExpression('/^BREM-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/', $challenge);
+    }
 }

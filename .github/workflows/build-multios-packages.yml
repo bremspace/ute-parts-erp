@@ -1,0 +1,114 @@
+name: Build Linux & macOS Standalone Packages
+
+on:
+  push:
+    branches: [main, brem]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-package:
+    name: Build Linux Standalone (.tar.gz)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath, zip, gd, fileinfo
+          coverage: none
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Composer Dependencies (No Dev)
+        run: composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+
+      - name: Install NPM & Build Vite Assets
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      - name: Package Linux Standalone with Bytecode Protection
+        run: ./tools/linux/scripts/build-linux-package.sh
+
+      - name: Upload Linux Package as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BremspaceERP-Linux-x64
+          path: dist/linux/*.tar.gz
+          retention-days: 30
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest-multios
+          name: Bremspace ERP Multi-OS Standalone (Latest Build)
+          files: dist/linux/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos-package:
+    name: Build macOS Standalone (.tar.gz / .app)
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath, zip, gd, fileinfo
+          coverage: none
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Composer Dependencies (No Dev)
+        run: composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+
+      - name: Install NPM & Build Vite Assets
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      - name: Package macOS Standalone with Bytecode Protection
+        run: ./tools/macos/scripts/build-macos-package.sh
+
+      - name: Upload macOS Package as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BremspaceERP-macOS-Universal
+          path: dist/macos/*.tar.gz
+          retention-days: 30
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest-multios
+          name: Bremspace ERP Multi-OS Standalone (Latest Build)
+          files: dist/macos/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

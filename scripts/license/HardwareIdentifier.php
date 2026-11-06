@@ -163,7 +163,12 @@ final class HardwareIdentifier
             return self::getWindowsIdentifier();
         }
 
-        // 3. Linux / macOS
+        // 3. macOS (Darwin)
+        if ($os === 'Darwin') {
+            return self::getDarwinIdentifier();
+        }
+
+        // 4. Linux / BSD
         return self::getLinuxIdentifier();
     }
 
@@ -190,6 +195,29 @@ final class HardwareIdentifier
         return gethostname() ?: 'WIN-GENERIC';
     }
 
+    private static function getDarwinIdentifier(): string
+    {
+        // 1. Query IOPlatformUUID via ioreg
+        $out = @shell_exec("ioreg -rd1 -c IOPlatformExpertDevice 2>/dev/null | awk -F'\"' '/IOPlatformUUID/{print $4}'");
+        if (! empty($out)) {
+            $cleaned = trim((string) preg_replace('/[^A-Za-z0-9\-]/', '', $out));
+            if (! empty($cleaned)) {
+                return $cleaned;
+            }
+        }
+
+        // 2. Fallback via system_profiler
+        $sp = @shell_exec("system_profiler SPHardwareDataType 2>/dev/null | awk -F': ' '/Hardware UUID/{print $2}'");
+        if (! empty($sp)) {
+            $cleaned = trim((string) preg_replace('/[^A-Za-z0-9\-]/', '', $sp));
+            if (! empty($cleaned)) {
+                return $cleaned;
+            }
+        }
+
+        return gethostname() ?: 'MAC-GENERIC';
+    }
+
     private static function getLinuxIdentifier(): string
     {
         // 1. /etc/machine-id (Canonical machine ID on all systemd Linux)
@@ -203,6 +231,14 @@ final class HardwareIdentifier
         // 2. /var/lib/dbus/machine-id (Fallback on D-Bus systems)
         if (file_exists('/var/lib/dbus/machine-id')) {
             $id = trim((string) @file_get_contents('/var/lib/dbus/machine-id'));
+            if (! empty($id)) {
+                return $id;
+            }
+        }
+
+        // 3. /sys/class/dmi/id/product_uuid (DMI UUID fallback)
+        if (file_exists('/sys/class/dmi/id/product_uuid')) {
+            $id = trim((string) @file_get_contents('/sys/class/dmi/id/product_uuid'));
             if (! empty($id)) {
                 return $id;
             }
