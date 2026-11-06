@@ -58,13 +58,20 @@ class AppUpdateService
     }
 
     /**
+     * Deteksi apakah aplikasi berjalan di desktop Windows standalone.
+     */
+    public function isWindowsDesktop(): bool
+    {
+        return env('BREMSPACE_RUNTIME') === 'windows_desktop'
+            || PHP_OS_FAMILY === 'Windows';
+    }
+
+    /**
      * Deteksi apakah aplikasi berjalan di dalam lingkungan kontainer Docker.
      */
     public function isDocker(): bool
     {
-        return file_exists('/.dockerenv')
-            || env('RUNNING_IN_DOCKER', false) === true
-            || (! File::isDirectory($this->getBasePath().'/.git') && File::exists($this->getBasePath().'/version.json'));
+        return false;
     }
 
     /**
@@ -390,19 +397,33 @@ class AppUpdateService
         $token = $this->getGitToken();
         $logs = [];
 
-        // 1. Git Pull
-        $pullArgs = ! empty($token)
-            ? ['-c', "http.extraheader=AUTHORIZATION: bearer {$token}", 'pull', '--no-rebase', 'origin', $branch]
-            : ['pull', '--no-rebase', 'origin', $branch];
+        // 1. Sinkronisasi Berkas Aplikasi
+        $hasGit = File::isDirectory($this->getBasePath().'/.git');
+        if ($hasGit) {
+            $pullArgs = ! empty($token)
+                ? ['-c', "http.extraheader=AUTHORIZATION: bearer {$token}", 'pull', '--no-rebase', 'origin', $branch]
+                : ['pull', '--no-rebase', 'origin', $branch];
 
-        $pullRes = $this->runGit($pullArgs);
-        $logs[] = '[1/4] Sinkronisasi Berkas Aplikasi: '.($pullRes['status'] === 0 ? 'Sukses' : 'Gagal ('.$pullRes['output'].')');
-        if ($pullRes['status'] !== 0) {
-            return [
-                'success' => false,
-                'message' => 'Gagal mengunduh pembaruan dari server: '.$pullRes['output'],
-                'logs' => $logs,
-            ];
+            $pullRes = $this->runGit($pullArgs);
+            $logs[] = '[1/4] Sinkronisasi Berkas Aplikasi: '.($pullRes['status'] === 0 ? 'Sukses' : 'Gagal ('.$pullRes['output'].')');
+            if ($pullRes['status'] !== 0) {
+                return [
+                    'success' => false,
+                    'message' => 'Gagal mengunduh pembaruan dari server: '.$pullRes['output'],
+                    'logs' => $logs,
+                ];
+            }
+        } else {
+            // Standalone desktop mode: download update archive via GitHub API
+            $archiveRes = $this->downloadAndExtractReleaseArchive($branch, $token);
+            $logs[] = '[1/4] Unduh & Pasang Pembaruan Sistem: '.($archiveRes['success'] ? 'Sukses' : 'Gagal ('.$archiveRes['message'].')');
+            if (! $archiveRes['success']) {
+                return [
+                    'success' => false,
+                    'message' => 'Gagal mengunduh pembaruan rilis: '.$archiveRes['message'],
+                    'logs' => $logs,
+                ];
+            }
         }
 
         // 2. Composer install (hanya jika ada composer di sistem)
@@ -659,6 +680,111 @@ class AppUpdateService
         array_unshift($arguments, 'git');
 
         return $this->runProcess($arguments);
+    }
+
+    /**
+     * Unduh arsip pembaruan dari GitHub REST API dan ekstrak ke direktori aplikasi (Desktop Standalone).
+     * Menjaga file sensitif lokal (.env, license.key, database) agar tidak tertimpa.
+     */
+    protected function downloadAndExtractReleaseArchive(string $branch, string $token = ''): array
+    {
+        [$owner, $repo] = $this->getRepoOwnerAndName();
+        $zipUrl = "https://api.github.com/repos/{$owner}/{$repo}/zipball/{$branch}";
+
+        $headers = [
+            'User-Agent' => 'Bremspace-ERP-Updater/1.0',
+            'Accept' => 'application/vnd.github+json',
+        ];
+        if (! empty($token)) {
+            $headers['Authorization'] = 'Bearer '.$token;
+        }
+
+        $tempZip = storage_path('framework/update_' . uniqid() . '.zip');
+        $extractDir = storage_path('framework/update_extracted_' . uniqid());
+
+        try {
+            $response = Http::withHeaders($headers)
+                ->timeout(180)
+                ->sink($tempZip)
+                ->get($zipUrl);
+
+            if (! $response->successful() || ! File::exists($tempZip) || filesize($tempZip) === 0) {
+                @File::delete($tempZip);
+                return [
+                    'success' => false,
+                    'message' => 'Gagal mengunduh berkas arsip rilis dari GitHub (Status: ' . $response->status() . ').',
+                ];
+            }
+
+            $zip = new \ZipArchive();
+            if ($zip->open($tempZip) !== true) {
+                @File::delete($tempZip);
+                return [
+                    'success' => false,
+                    'message' => 'Berkas unduhan bukan arsip ZIP yang valid.',
+                ];
+            }
+
+            File::makeDirectory($extractDir, 0755, true);
+            $zip->extractTo($extractDir);
+            $zip->close();
+            @File::delete($tempZip);
+
+            // Dapatkan subfolder hasil ekstraksi GitHub (misal: bremspace-ute-parts-erp-3b7d1f3)
+            $subdirs = File::directories($extractDir);
+            $sourceDir = ! empty($subdirs) ? $subdirs[0] : $extractDir;
+
+            $basePath = $this->getBasePath();
+
+            // Salin berkas rilis baru ke direktori aplikasi tanpa menimpa .env dan storage data
+            $excludedPatterns = [
+                '.env',
+                'storage/license.key',
+                'storage/framework/updater.json',
+            ];
+
+            $allFiles = File::allFiles($sourceDir, true);
+            foreach ($allFiles as $file) {
+                $relativePath = substr($file->getPathname(), strlen($sourceDir) + 1);
+
+                // Skip file konfigurasi dan data state lokal
+                $skip = false;
+                foreach ($excludedPatterns as $pattern) {
+                    if (str_starts_with($relativePath, $pattern)) {
+                        $skip = true;
+                        break;
+                    }
+                }
+                if ($skip) {
+                    continue;
+                }
+
+                $targetPath = $basePath . DIRECTORY_SEPARATOR . $relativePath;
+                $targetDir = dirname($targetPath);
+                if (! File::isDirectory($targetDir)) {
+                    File::makeDirectory($targetDir, 0755, true);
+                }
+                File::copy($file->getPathname(), $targetPath);
+            }
+
+            File::deleteDirectory($extractDir);
+
+            return [
+                'success' => true,
+                'message' => 'Berkas aplikasi berhasil disinkronkan.',
+            ];
+        } catch (Throwable $e) {
+            if (File::exists($tempZip)) {
+                @File::delete($tempZip);
+            }
+            if (File::isDirectory($extractDir)) {
+                @File::deleteDirectory($extractDir);
+            }
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
     }
 
     /**
