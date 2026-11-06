@@ -99,10 +99,15 @@ Validasi `cabang_id` request vs akses cabang user pada `terimaUnit` (align `reso
 - [x] T-06a — guard cabang di `ServisService::terimaUnit` (bisaAksesCabang + role HQ)
 - [x] T-06b — test: staff cabang A intake ke cabang B → exception; super-admin lintas cabang → lolos
 
-## 5. Fase 3 (UI-1) — List View papan servis (designer-driven)
-- Toggle `view-mode: kanban | list` (persist ke localStorage + preferensi user, sama pola ADR 0008 theme).
-- List view: tabel desktop (DataTable pattern `PRD-Frontend §3`) / kartu aksi di mobile; kolom sama dgn kartu Kanban; swipe/akses kolom drilldown; dark-mode default backoffice; mobile-first list.
-- Desain diserahkan maupun flow keminter ke @designer; dilarang shadcn/tailwind-ui default tanpa custom (PRD-Frontend §3).
+## 5. Fase 3 (UI-1) — List View papan servis (designer-driven, AKTIF)
+- Toggle `view-mode: kanban | list` (persist ke localStorage, pola ADR 0008).
+- List view: tabel desktop (DataTable pattern `PRD-Frontend §3`) / kartu aksi di mobile; kolom sama dgn kartu Kanban; akses drilldown tetap modal detail; dark-mode default backoffice; mobile-first list.
+- Desain diserahkan ke @designer; dilarang shadcn/tailwind-ui default tanpa custom (PRD-Frontend §3).
+
+- [x] T-07a — properti Livewire `viewMode` (kanban|list) + persist localStorage + pass eksplisit di `render()`
+- [x] T-07b — UI toolbar toggle (aktif hanya satu) + list view desktop (tabel Ute Prism) responsif
+- [x] T-07c — list view mobile (kartu aksi, min-h 44px, dark-mode default) — tampilan tidak memecah test render board yang ada
+- [x] T-07d — regression: board render test suite pass; CHANGELOG + push `origin/brem`
 
 ---
 

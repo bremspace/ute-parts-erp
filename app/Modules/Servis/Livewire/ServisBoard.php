@@ -74,6 +74,11 @@ class ServisBoard extends Component
     // [Kanban Histori] Manajemen Histori Transaksi di Kanban: '7_hari' (default), 'hari_ini', '30_hari', 'semua'
     public string $periodeHistori = '7_hari';
 
+    // [T-07a] Mode tampilan papan servis: 'kanban' | 'list'.
+    // Persist ke localStorage (kunci 'servis-board-view-mode') dilakukan sisi browser
+    // di toolbar toggle (Alpine -> $wire.viewMode), nilai dinormalkan di updatedViewMode().
+    public string $viewMode = 'kanban';
+
     // Terima Unit Modal
     public bool $showTerimaModal = false;
 
@@ -607,6 +612,30 @@ class ServisBoard extends Component
         }
 
         return $grouped;
+    }
+
+    /**
+     * [T-07a] Normalisasi viewMode — hanya menerima 'kanban' | 'list'.
+     * Persist ke localStorage dilakukan di sisi browser (toggle toolbar).
+     */
+    public function updatedViewMode($value): void
+    {
+        if (! in_array($value, ['kanban', 'list'], true)) {
+            $this->viewMode = 'kanban';
+        }
+    }
+
+    /**
+     * [T-07] Koleksi datar untuk list view — TANPA query baru (kontrak B-07):
+     * menggabungkan kembali koleksi kolom `groupedTikets` yang sudah ter-hydrate
+     * (eager load lengkap), diurutkan tiket terbaru di atas.
+     */
+    public function getListTiketsProperty()
+    {
+        return collect($this->groupedTikets)
+            ->flatMap(fn ($kolom) => $kolom)
+            ->sortByDesc('created_at')
+            ->values();
     }
 
     /**
@@ -1930,6 +1959,9 @@ class ServisBoard extends Component
             'produkEstimasiList' => $this->produkEstimasiList,
             'stateMachineColumns' => $this->stateMachineColumns,
             'groupedTikets' => $this->groupedTikets,
+            // [T-07] Pass eksplisit (aturan proyek: computed property WAJIB di-pass di render())
+            'viewMode' => $this->viewMode,
+            'listTikets' => $this->listTikets,
             'selectedTiket' => $this->selectedTiket,
             'fotoCount' => $this->fotoCount,
             'canEditHargaPart' => $this->canEditHargaPart,

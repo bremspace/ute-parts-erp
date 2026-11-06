@@ -37,6 +37,43 @@
                 </div>
             @endcan
 
+            <!-- [T-07a/b] Toggle Mode Tampilan: Kanban ↔ List (persist localStorage, pola ADR 0008) -->
+            <div
+                class="flex items-center gap-0.5 rounded-xl bg-white/5 border border-white/10 p-0.5 flex-shrink-0"
+                role="tablist"
+                aria-label="Mode tampilan papan servis"
+                x-init="(() => { const saved = localStorage.getItem('servis-board-view-mode'); if (saved === 'list' || saved === 'kanban') { $wire.viewMode = saved; } })()"
+            >
+                <button
+                    type="button"
+                    wire:key="view-kanban"
+                    @click="localStorage.setItem('servis-board-view-mode', 'kanban'); $wire.viewMode = 'kanban'"
+                    role="tab"
+                    aria-selected="{{ $viewMode === 'kanban' ? 'true' : 'false' }}"
+                    title="Tampilan Papan Kanban"
+                    class="min-h-[44px] px-2.5 sm:px-3 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-[background-color,color,box-shadow] duration-100 {{ $viewMode === 'kanban' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/10' }}"
+                >
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 4h4v16H5zM10 4h4v16h-4zM15 4h4v16h-4z" />
+                    </svg>
+                    <span class="hidden sm:inline">Kanban</span>
+                </button>
+                <button
+                    type="button"
+                    wire:key="view-list"
+                    @click="localStorage.setItem('servis-board-view-mode', 'list'); $wire.viewMode = 'list'"
+                    role="tab"
+                    aria-selected="{{ $viewMode === 'list' ? 'true' : 'false' }}"
+                    title="Tampilan Daftar Tiket"
+                    class="min-h-[44px] px-2.5 sm:px-3 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-[background-color,color,box-shadow] duration-100 {{ $viewMode === 'list' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/10' }}"
+                >
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10" />
+                    </svg>
+                    <span class="hidden sm:inline">List</span>
+                </button>
+            </div>
+
             @can('servis.create')
                 <button
                     type="button"
@@ -50,16 +87,18 @@
         </div>
     </div>
 
-    <!-- Mobile Kanban Swipe Hint -->
-    <div class="sm:hidden flex items-center justify-between text-[11px] text-ink-400 mb-1.5 px-0.5 flex-shrink-0">
-        <span class="inline-flex items-center gap-1">
-            <svg class="w-3.5 h-3.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            Geser horizontal untuk melihat alur status
-        </span>
-        <span class="text-[10px] font-mono text-ink-500">{{ count($stateMachineColumns) }} Kolom</span>
-    </div>
+    @if($viewMode === 'kanban')
+        <!-- Mobile Kanban Swipe Hint -->
+        <div class="sm:hidden flex items-center justify-between text-[11px] text-ink-400 mb-1.5 px-0.5 flex-shrink-0">
+            <span class="inline-flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Geser horizontal untuk melihat alur status
+            </span>
+            <span class="text-[10px] font-mono text-ink-500">{{ count($stateMachineColumns) }} Kolom</span>
+        </div>
+    @endif
 
     <!-- ===== ANTREAN BOOKING ONLINE ===== -->
     @if(count($bookingOnline ?? []) > 0)
@@ -123,8 +162,421 @@
         </div>
     @endif
 
+    <!-- ===== [T-07b/c] LIST VIEW BOARD (data re-use groupedTikets — TANPA query baru, kontrak B-07) ===== -->
+    @if($viewMode === 'list')
+        <div wire:key="board-list" class="flex-1 min-h-0 flex flex-col min-w-0 rounded-2xl glass-panel overflow-hidden">
+            <!-- Panel Header -->
+            <div class="px-4 py-2.5 flex items-center justify-between border-b border-white/5 bg-white/[0.02] flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-up-primary"></span>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Daftar Tiket</h3>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    @if($filterStatus)
+                        <span class="text-[9px] font-semibold text-ink-300 bg-white/10 px-1.5 py-0.5 rounded border border-white/5">
+                            {{ $stateMachineColumns[$filterStatus]['label'] ?? ucfirst($filterStatus) }}
+                        </span>
+                    @endif
+                    <span class="text-[10px] font-mono text-ink-400 tabular-nums bg-white/5 px-1.5 py-0.5 rounded">{{ $listTikets->count() }} Tiket</span>
+                </div>
+            </div>
+
+            <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                @if($listTikets->isEmpty())
+                    <!-- Empty state (gaya sama dgn kolom Kanban) -->
+                    <div class="text-center py-12 px-4 text-[10px] text-ink-500">
+                        <svg class="w-6 h-6 mx-auto mb-1.5 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        <p>Kosong — belum ada tiket pada filter ini<br><span class="text-ink-400">Terima unit baru atau ubah filter status / periode</span></p>
+                    </div>
+                @else
+                    <!-- ===== Desktop (md+): tabel horizontal-scrollable — DataTable pattern Ute Prism ===== -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full min-w-[62rem] text-left">
+                            <thead>
+                                <tr class="text-[10px] uppercase tracking-wider font-semibold text-ink-400">
+                                    <th class="px-3 py-2.5 bg-ink-900 sticky top-0 z-10 whitespace-nowrap border-b border-white/5">No Tiket</th>
+                                    <th class="px-3 py-2.5 bg-ink-900 sticky top-0 z-10 whitespace-nowrap border-b border-white/5">Pelanggan</th>
+                                    <th class="px-3 py-2.5 bg-ink-900 sticky top-0 z-10 whitespace-nowrap border-b border-white/5">Unit</th>
+                                    <th class="px-3 py-2.5 bg-ink-900 sticky top-0 z-10 whitespace-nowrap border-b border-white/5 text-center">Status</th>
+                                    <th class="px-3 py-2.5 bg-ink-900 sticky top-0 z-10 whitespace-nowrap border-b border-white/5 text-center">Pembayaran</th>
+                                    <th class="px-3 py-2.5 bg-ink-900 sticky top-0 z-10 whitespace-nowrap border-b border-white/5 text-right">Estimasi / Total</th>
+                                    <th class="px-3 py-2.5 bg-ink-900 sticky top-0 z-10 whitespace-nowrap border-b border-white/5">Deadline / SLA</th>
+                                    <th class="px-3 py-2.5 bg-ink-900 sticky top-0 z-10 whitespace-nowrap border-b border-white/5">Teknisi</th>
+                                    <th class="px-3 py-2.5 bg-ink-900 sticky top-0 z-10 whitespace-nowrap border-b border-white/5 text-right">Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($listTikets as $tiket)
+                                    @php
+                                        // WarStatusPill — warna match PERSIS warna kolom Kanban (stateMachineColumns)
+                                        $stConf = ['label' => ucfirst($tiket->status), 'color' => 'ink-400'];
+                                        if (isset($stateMachineColumns[$tiket->status])) {
+                                            $stConf = $stateMachineColumns[$tiket->status];
+                                        }
+                                        $pillCls = match($stConf['color']) {
+                                            'up-primary' => 'bg-up-primary/15 text-up-primary border-up-primary/30',
+                                            'up-amber' => 'bg-up-amber/15 text-up-amber border-up-amber/30',
+                                            'up-red' => 'bg-up-red/15 text-up-red border-up-red/30',
+                                            'up-mint' => 'bg-up-mint/15 text-up-mint border-up-mint/30',
+                                            'up-accent' => 'bg-up-accent/15 text-up-accent border-up-accent/30',
+                                            'ink-100' => 'bg-white/10 text-ink-100 border-white/20',
+                                            default => 'bg-white/10 text-ink-300 border-white/20',
+                                        };
+                                        $stDot = match($stConf['color']) {
+                                            'up-primary' => 'bg-up-primary',
+                                            'up-amber' => 'bg-up-amber',
+                                            'up-red' => 'bg-up-red',
+                                            'up-mint' => 'bg-up-mint',
+                                            'up-accent' => 'bg-up-accent',
+                                            'ink-100' => 'bg-ink-100',
+                                            default => 'bg-ink-400',
+                                        };
+                                        $stLabel = $stConf['label'];
+                                        $namaPelanggan = $tiket->nama_pelanggan ?? $tiket->pelanggan?->nama ?? 'Anonim';
+                                        $teleponPelanggan = $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? '';
+                                        $nextStatuses = \App\Modules\Servis\Services\ServisStateMachine::nextValidStatuses($tiket->status);
+                                        // SLA timeline — kalkulasi sama persis dgn kartu Kanban
+                                        $isOverdue = false; $diffMnt = 0; $slaTeks = ''; $adaDeadline = false;
+                                        if (in_array($tiket->status, ['dikerjakan', 'qc']) && $tiket->pengerjaan_deadline_at) {
+                                            $adaDeadline = true;
+                                            $isOverdue = now()->greaterThan($tiket->pengerjaan_deadline_at);
+                                            $diffMnt = abs((int) now()->diffInMinutes($tiket->pengerjaan_deadline_at, false));
+                                            if ($diffMnt >= 1440) {
+                                                $hari = floor($diffMnt / 1440);
+                                                $sisaJam = floor(($diffMnt % 1440) / 60);
+                                                $slaTeks = "{$hari} hari" . ($sisaJam > 0 ? " {$sisaJam} jam" : "");
+                                            } elseif ($diffMnt >= 60) {
+                                                $jam = floor($diffMnt / 60);
+                                                $sisaMnt = $diffMnt % 60;
+                                                $slaTeks = "{$jam} jam" . ($sisaMnt > 0 ? " {$sisaMnt} mnt" : "");
+                                            } else {
+                                                $slaTeks = "{$diffMnt} mnt";
+                                            }
+                                        }
+                                    @endphp
+                                    <tr
+                                        wire:key="list-row-{{ $tiket->id }}"
+                                        @click="$wire.openDetail({{ $tiket->id }})"
+                                        class="cursor-pointer border-b border-white/5 odd:bg-white/[0.015] hover:bg-white/[0.03] transition-[background-color] duration-100"
+                                    >
+                                        <td class="px-3 py-2.5 whitespace-nowrap">
+                                            <span class="font-mono text-[11px] text-up-primary font-bold">{{ $tiket->no_tiket }}</span>
+                                            <p class="text-[9px] text-ink-500 tabular-nums mt-0.5">
+                                                {{ $tiket->status === 'diambil'
+                                                    ? 'Diambil: ' . ($tiket->tanggal_diambil ?? $tiket->updated_at)?->format('d/m/Y H:i')
+                                                    : 'Masuk: ' . $tiket->created_at?->format('d/m/Y H:i') }}
+                                            </p>
+                                        </td>
+                                        <td class="px-3 py-2.5 whitespace-nowrap max-w-[12rem]">
+                                            <p class="text-xs font-semibold text-white truncate">{{ $namaPelanggan }}</p>
+                                            <p class="text-[10px] text-ink-400 tabular-nums">{{ $teleponPelanggan ?: '—' }}</p>
+                                        </td>
+                                        <td class="px-3 py-2.5 whitespace-nowrap max-w-[11rem]">
+                                            <p class="text-xs font-bold text-white truncate">{{ $tiket->jenis_hp }}</p>
+                                            <p class="text-[10px] text-ink-400 truncate">{{ $tiket->jenisServis?->nama ?? '—' }}</p>
+                                        </td>
+                                        <td class="px-3 py-2.5 text-center">
+                                            <span class="inline-flex items-center gap-1.5 rounded-full font-medium whitespace-nowrap px-2.5 py-0.5 text-xs border {{ $pillCls }}">
+                                                <span class="w-1.5 h-1.5 rounded-full {{ $stDot }}"></span>
+                                                {{ $stLabel }}
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2.5 text-center">
+                                            @if($tiket->status_pembayaran === 'lunas')
+                                                <span class="inline-flex bg-up-mint/20 text-up-mint text-[9px] font-bold px-1.5 py-0.5 rounded">LUNAS</span>
+                                            @else
+                                                <span class="inline-flex bg-white/5 text-ink-400 text-[9px] font-semibold px-1.5 py-0.5 rounded border border-white/10">Belum</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2.5 text-right whitespace-nowrap">
+                                            @if($tiket->estimasi_biaya)
+                                                <span class="tabular-nums font-semibold text-up-mint text-xs">Rp {{ number_format($tiket->estimasi_biaya, 0, ',', '.') }}</span>
+                                            @else
+                                                <span class="text-[10px] text-ink-500">Belum ada estimasi</span>
+                                            @endif
+                                            @if($tiket->spareparts_count > 0)
+                                                <p class="text-[9px] text-up-amber font-mono leading-none mt-0.5">&#128295; {{ $tiket->spareparts_count }} part</p>
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2.5 whitespace-nowrap">
+                                            @if($adaDeadline)
+                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border {{ $isOverdue ? 'bg-up-red/15 border-up-red/30 text-up-red' : ($diffMnt <= 30 ? 'bg-up-amber/15 border-up-amber/30 text-up-amber' : 'bg-up-primary/10 border-up-primary/20 text-up-primary') }}">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    {{ $isOverdue ? "Terlambat ({$slaTeks})" : ($diffMnt <= 30 ? "Segera (~{$slaTeks})" : "SLA ~{$slaTeks}") }}
+                                                </span>
+                                            @elseif(in_array($tiket->status, ['dikerjakan', 'qc']))
+                                                <span class="text-[10px] text-ink-500">Tanpa deadline</span>
+                                            @else
+                                                <span class="text-ink-600">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2.5 whitespace-nowrap">
+                                            @if($tiket->teknisi)
+                                                <span class="text-[11px] text-ink-200">{{ $tiket->teknisi->name }}</span>
+                                            @else
+                                                <span class="text-[11px] text-ink-600">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2.5">
+                                            <div class="flex items-center gap-1.5 flex-wrap justify-end" @click.stop>
+                                                <button
+                                                    type="button"
+                                                    wire:click="openDetail({{ $tiket->id }})"
+                                                    title="Lihat Detail Tiket"
+                                                    class="w-7 h-7 min-h-[36px] px-2 inline-flex items-center justify-center rounded-lg bg-white/5 hover:bg-up-primary/20 text-ink-300 hover:text-up-primary border border-white/10 cursor-pointer transition-[background-color,color] duration-100 font-bold text-xs"
+                                                >↗</button>
+                                                <button
+                                                    type="button"
+                                                    wire:click="bukaStrukServis({{ $tiket->id }})"
+                                                    title="Cetak Struk SPK / Kwitansi"
+                                                    class="min-h-[36px] px-2 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white border border-white/10 cursor-pointer transition-[background-color,color] duration-100 text-[10px] font-semibold"
+                                                >🖨 Struk</button>
+                                                @if($tiket->status_pembayaran !== 'lunas' && in_array($tiket->status, ['selesai', 'diambil'], true))
+                                                    @canany(['pos.view', 'pos.view-own', 'pos.create'])
+                                                        <a
+                                                            href="/app/pos?bayar_servis_id={{ $tiket->id }}"
+                                                            @click.stop
+                                                            class="inline-flex items-center min-h-[36px] px-2 rounded-lg bg-up-primary text-white text-[10px] font-bold hover:bg-up-primary/80 cursor-pointer whitespace-nowrap"
+                                                            title="Bayar di Kasir POS"
+                                                        >Bayar Kasir</a>
+                                                    @endcanany
+                                                @endif
+                                                @if($tiket->status === 'ditolak')
+                                                    <button type="button" wire:click="revisiEstimasiDitolak({{ $tiket->id }})" title="Ajukan revisi estimasi"
+                                                        class="min-h-[36px] px-2 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] transition-[background-color] duration-100 cursor-pointer">Revisi Estimasi</button>
+                                                    <button type="button" wire:click="openBatalReturModal({{ $tiket->id }})" title="Batalkan servis & kembalikan unit"
+                                                        class="min-h-[36px] px-2 rounded-lg bg-up-red/10 hover:bg-up-red text-up-red hover:text-white font-bold text-[10px] border border-up-red/30 transition-[background-color,color] duration-100 cursor-pointer">Kembalikan Unit</button>
+                                                @elseif(count($nextStatuses) > 0)
+                                                    @foreach($nextStatuses as $ns)
+                                                        @if($ns === 'menunggu_approval')
+                                                            <button type="button" wire:click="openEstimasiModal({{ $tiket->id }})" title="Buat estimasi biaya"
+                                                                class="min-h-[36px] px-2 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] transition-[background-color] duration-100 cursor-pointer">+ Estimasi</button>
+                                                        @elseif($ns === 'disetujui' || $ns === 'ditolak')
+                                                            <button type="button" wire:click="openApproveModal({{ $tiket->id }})" title="{{ $ns === 'disetujui' ? 'Setujui estimasi' : 'Tolak estimasi' }}"
+                                                                class="min-h-[36px] px-2 rounded-lg {{ $ns === 'disetujui' ? 'bg-up-mint hover:opacity-90 text-ink-950' : 'bg-up-red hover:opacity-90 text-white' }} font-bold text-[10px] transition-[opacity] duration-100 cursor-pointer">{{ $ns === 'disetujui' ? 'Setujui' : 'Tolak' }}</button>
+                                                        @else
+                                                            @php
+                                                                $label = match ($ns) {
+                                                                    'diterima'   => 'Terima',
+                                                                    'diagnosa'   => 'Diagnosa',
+                                                                    'dikerjakan' => 'Kerjakan',
+                                                                    'qc'         => 'Ke QC',
+                                                                    'selesai'    => 'Selesai',
+                                                                    'diambil'    => 'Diambil',
+                                                                    default      => ucfirst($ns),
+                                                                };
+                                                            @endphp
+                                                            <button type="button" wire:click="updateStatus({{ $tiket->id }}, '{{ $ns }}')" title="Alihkan ke status {{ $label }}"
+                                                                class="min-h-[36px] px-2 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white font-semibold text-[10px] border border-white/10 transition-[background-color,color] duration-100 cursor-pointer">{{ $label }}</button>
+                                                        @endif
+                                                    @endforeach
+                                                @endif
+                                                @if($adaDeadline)
+                                                    <button type="button" wire:click="openProgressModal({{ $tiket->id }})" title="Update progress pengerjaan teknisi"
+                                                        class="min-h-[36px] px-2 rounded-lg bg-up-primary/10 hover:bg-up-primary/25 text-up-primary hover:text-white font-bold text-[10px] border border-up-primary/20 transition-[background-color,color] duration-100 cursor-pointer">+ Update</button>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ===== Mobile (< md): kartu vertikal, 1 tiket/kartu, grid info 2 kolom ===== -->
+                    <div class="md:hidden p-2.5 space-y-2.5">
+                        @foreach($listTikets as $tiket)
+                            @php
+                                $stConf = ['label' => ucfirst($tiket->status), 'color' => 'ink-400'];
+                                if (isset($stateMachineColumns[$tiket->status])) {
+                                    $stConf = $stateMachineColumns[$tiket->status];
+                                }
+                                $pillCls = match($stConf['color']) {
+                                    'up-primary' => 'bg-up-primary/15 text-up-primary border-up-primary/30',
+                                    'up-amber' => 'bg-up-amber/15 text-up-amber border-up-amber/30',
+                                    'up-red' => 'bg-up-red/15 text-up-red border-up-red/30',
+                                    'up-mint' => 'bg-up-mint/15 text-up-mint border-up-mint/30',
+                                    'up-accent' => 'bg-up-accent/15 text-up-accent border-up-accent/30',
+                                    'ink-100' => 'bg-white/10 text-ink-100 border-white/20',
+                                    default => 'bg-white/10 text-ink-300 border-white/20',
+                                };
+                                $stDot = match($stConf['color']) {
+                                    'up-primary' => 'bg-up-primary',
+                                    'up-amber' => 'bg-up-amber',
+                                    'up-red' => 'bg-up-red',
+                                    'up-mint' => 'bg-up-mint',
+                                    'up-accent' => 'bg-up-accent',
+                                    'ink-100' => 'bg-ink-100',
+                                    default => 'bg-ink-400',
+                                };
+                                $stLabel = $stConf['label'];
+                                $namaPelanggan = $tiket->nama_pelanggan ?? $tiket->pelanggan?->nama ?? 'Anonim';
+                                $teleponPelanggan = $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? '';
+                                $nextStatuses = \App\Modules\Servis\Services\ServisStateMachine::nextValidStatuses($tiket->status);
+                                $isOverdue = false; $diffMnt = 0; $slaTeks = ''; $adaDeadline = false;
+                                if (in_array($tiket->status, ['dikerjakan', 'qc']) && $tiket->pengerjaan_deadline_at) {
+                                    $adaDeadline = true;
+                                    $isOverdue = now()->greaterThan($tiket->pengerjaan_deadline_at);
+                                    $diffMnt = abs((int) now()->diffInMinutes($tiket->pengerjaan_deadline_at, false));
+                                    if ($diffMnt >= 1440) {
+                                        $hari = floor($diffMnt / 1440);
+                                        $sisaJam = floor(($diffMnt % 1440) / 60);
+                                        $slaTeks = "{$hari} hari" . ($sisaJam > 0 ? " {$sisaJam} jam" : "");
+                                    } elseif ($diffMnt >= 60) {
+                                        $jam = floor($diffMnt / 60);
+                                        $sisaMnt = $diffMnt % 60;
+                                        $slaTeks = "{$jam} jam" . ($sisaMnt > 0 ? " {$sisaMnt} mnt" : "");
+                                    } else {
+                                        $slaTeks = "{$diffMnt} mnt";
+                                    }
+                                }
+                            @endphp
+                            <div
+                                wire:key="list-card-{{ $tiket->id }}"
+                                @click="$wire.openDetail({{ $tiket->id }})"
+                                class="glass-panel glass-panel-hover rounded-xl p-3.5 cursor-pointer hover:border-up-primary/40 active:scale-[0.99] transition-[border-color,transform,background-color] duration-100"
+                            >
+                                <!-- Header: no tiket + status -->
+                                <div class="flex items-start justify-between gap-2 mb-2.5">
+                                    <div class="min-w-0">
+                                        <span class="font-mono text-[11px] text-up-primary font-bold truncate block">{{ $tiket->no_tiket }}</span>
+                                        <p class="text-[9px] text-ink-500 tabular-nums mt-0.5">
+                                            {{ $tiket->status === 'diambil'
+                                                ? 'Diambil: ' . ($tiket->tanggal_diambil ?? $tiket->updated_at)?->format('d/m/Y H:i')
+                                                : 'Masuk: ' . $tiket->created_at?->format('d/m/Y H:i') }}
+                                        </p>
+                                    </div>
+                                    <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                                        <span class="inline-flex items-center gap-1.5 rounded-full font-medium whitespace-nowrap px-2 py-0.5 text-[10px] border {{ $pillCls }}">
+                                            <span class="w-1.5 h-1.5 rounded-full {{ $stDot }}"></span>
+                                            {{ $stLabel }}
+                                        </span>
+                                        @if($tiket->status_pembayaran === 'lunas')
+                                            <span class="bg-up-mint/20 text-up-mint text-[9px] font-bold px-1.5 py-0.5 rounded">LUNAS</span>
+                                        @else
+                                            <span class="bg-white/5 text-ink-400 text-[9px] font-semibold px-1.5 py-0.5 rounded border border-white/10">Belum</span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <!-- Info grid 2 kolom -->
+                                <div class="grid grid-cols-2 gap-x-3 gap-y-2 mb-2.5">
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] uppercase font-semibold text-ink-500 tracking-wide">Pelanggan</p>
+                                        <p class="text-[11px] font-semibold text-white truncate">{{ $namaPelanggan }}</p>
+                                        <p class="text-[10px] text-ink-400 tabular-nums truncate">{{ $teleponPelanggan ?: '—' }}</p>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] uppercase font-semibold text-ink-500 tracking-wide">Unit</p>
+                                        <p class="text-[11px] font-semibold text-white truncate">{{ $tiket->jenis_hp }}</p>
+                                        <p class="text-[10px] text-ink-400 truncate">{{ $tiket->jenisServis?->nama ?? '—' }}</p>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] uppercase font-semibold text-ink-500 tracking-wide">Estimasi</p>
+                                        @if($tiket->estimasi_biaya)
+                                            <p class="text-[11px] tabular-nums font-semibold text-up-mint">Rp {{ number_format($tiket->estimasi_biaya, 0, ',', '.') }}</p>
+                                        @else
+                                            <p class="text-[10px] text-ink-500">Belum ada estimasi</p>
+                                        @endif
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-[9px] uppercase font-semibold text-ink-500 tracking-wide">Teknisi</p>
+                                        @if($tiket->teknisi)
+                                            <p class="text-[11px] text-ink-200 truncate">{{ $tiket->teknisi->name }}</p>
+                                        @else
+                                            <p class="text-[11px] text-ink-600">—</p>
+                                        @endif
+                                        @if($tiket->spareparts_count > 0)
+                                            <p class="text-[10px] text-up-amber font-mono leading-tight">&#128295; {{ $tiket->spareparts_count }} part</p>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <!-- SLA strip (dikerjakan/qc) — indikator sama dgn kartu Kanban -->
+                                @if($adaDeadline)
+                                    <div class="mb-2.5 p-1.5 rounded-lg {{ $isOverdue ? 'bg-up-red/15 border border-up-red/30' : ($diffMnt <= 30 ? 'bg-up-amber/15 border border-up-amber/30' : 'bg-up-primary/10 border border-up-primary/20') }} flex items-center justify-between text-[9px]">
+                                        <span class="flex items-center gap-1 font-semibold {{ $isOverdue ? 'text-up-red' : ($diffMnt <= 30 ? 'text-up-amber' : 'text-up-primary') }}">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            {{ $isOverdue ? "Terlambat ({$slaTeks})" : ($diffMnt <= 30 ? "Segera Habis (~{$slaTeks})" : "SLA: ~{$slaTeks}") }}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            @click.stop
+                                            wire:click="openProgressModal({{ $tiket->id }})"
+                                            class="font-bold underline text-ink-200 hover:text-white cursor-pointer px-2 py-1.5 min-h-[44px] inline-flex items-center rounded hover:bg-white/10"
+                                        >
+                                            + Update
+                                        </button>
+                                    </div>
+                                @endif
+
+                                <!-- Aksi cepat (target sentuh ≥44px) -->
+                                <div class="pt-2.5 border-t border-white/5 flex flex-wrap items-center gap-1.5" @click.stop>
+                                    <button
+                                        type="button"
+                                        wire:click="openDetail({{ $tiket->id }})"
+                                        class="min-h-[44px] px-3 rounded-lg bg-white/5 hover:bg-up-primary/20 text-ink-200 hover:text-up-primary font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer transition-[background-color,color] duration-100 border border-white/10"
+                                    >Detail ↗</button>
+                                    <button
+                                        type="button"
+                                        wire:click="bukaStrukServis({{ $tiket->id }})"
+                                        class="min-h-[44px] px-3 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-[background-color,color] duration-100 border border-white/10"
+                                    >🖨 Struk</button>
+                                    @if($tiket->status_pembayaran !== 'lunas' && in_array($tiket->status, ['selesai', 'diambil'], true))
+                                        @canany(['pos.view', 'pos.view-own', 'pos.create'])
+                                            <a
+                                                href="/app/pos?bayar_servis_id={{ $tiket->id }}"
+                                                @click.stop
+                                                class="inline-flex items-center min-h-[44px] px-3 rounded-lg bg-up-primary text-white text-xs font-bold hover:bg-up-primary/80 cursor-pointer"
+                                            >Bayar Kasir</a>
+                                        @endcanany
+                                    @endif
+                                    @if($tiket->status === 'ditolak')
+                                        <button type="button" wire:click="revisiEstimasiDitolak({{ $tiket->id }})"
+                                            class="min-h-[44px] px-3 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-[background-color] duration-100 cursor-pointer">Revisi Estimasi</button>
+                                        <button type="button" wire:click="openBatalReturModal({{ $tiket->id }})"
+                                            class="min-h-[44px] px-3 rounded-lg bg-up-red/10 hover:bg-up-red text-up-red hover:text-white font-bold text-xs border border-up-red/30 transition-[background-color,color] duration-100 cursor-pointer">Kembalikan Unit</button>
+                                    @elseif(count($nextStatuses) > 0)
+                                        @foreach($nextStatuses as $ns)
+                                            @if($ns === 'menunggu_approval')
+                                                <button type="button" wire:click="openEstimasiModal({{ $tiket->id }})"
+                                                    class="min-h-[44px] px-3 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-[background-color] duration-100 cursor-pointer">+ Estimasi</button>
+                                            @elseif($ns === 'disetujui' || $ns === 'ditolak')
+                                                <button type="button" wire:click="openApproveModal({{ $tiket->id }})"
+                                                    class="min-h-[44px] px-3 rounded-lg {{ $ns === 'disetujui' ? 'bg-up-mint hover:opacity-90 text-ink-950' : 'bg-up-red hover:opacity-90 text-white' }} font-bold text-xs transition-[opacity] duration-100 cursor-pointer">{{ $ns === 'disetujui' ? 'Setujui' : 'Tolak' }}</button>
+                                            @else
+                                                @php
+                                                    $label = match ($ns) {
+                                                        'diterima'   => 'Terima',
+                                                        'diagnosa'   => 'Diagnosa',
+                                                        'dikerjakan' => 'Kerjakan',
+                                                        'qc'         => 'Ke QC',
+                                                        'selesai'    => 'Selesai',
+                                                        'diambil'    => 'Diambil',
+                                                        default      => ucfirst($ns),
+                                                    };
+                                                @endphp
+                                                <button type="button" wire:click="updateStatus({{ $tiket->id }}, '{{ $ns }}')"
+                                                    class="min-h-[44px] px-3 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white font-semibold text-xs border border-white/10 transition-[background-color,color] duration-100 cursor-pointer">{{ $label }}</button>
+                                            @endif
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </div>
+    @else
     <!-- ===== KANBAN BOARD ===== -->
-    <x-prism.dual-scroll class="flex-1 min-h-0 overflow-y-hidden pb-1 touch-pan-x">
+    <x-prism.dual-scroll wire:key="board-kanban" class="flex-1 min-h-0 overflow-y-hidden pb-1 touch-pan-x">
         <div class="flex gap-3 sm:gap-4 h-full min-w-max px-0.5 items-start">
             @foreach($stateMachineColumns as $status => $col)
                 <div class="w-[82vw] sm:w-[320px] lg:w-[280px] snap-center flex-shrink-0 flex flex-col rounded-2xl glass-panel overflow-hidden h-[calc(100dvh-13.5rem)] sm:h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-11.5rem)] min-h-[380px]"
@@ -423,6 +875,7 @@
             @endforeach
         </div>
     </x-prism.dual-scroll>
+    @endif
 
     <!-- ===== PELANGGAN SAAT INI & PERMISSION GUARD ===== -->
 

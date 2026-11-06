@@ -3,6 +3,14 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-06 — Servis: Phase 3 — List View Papan Servis (Toggle Kanban ↔ List, Responsif)
+
+- **Toggle mode tampilan** — segmented control di toolbar (aria-selected, min-h 44px, ikon+label di sm+): Kanban ↔ List, persist `localStorage('servis-board-view-mode')` pola ADR 0008 (Alpine `x-init` → `$wire.viewMode`, ditulis ulang saat klik), normalisasi `updatedViewMode()` hanya menerima `kanban|list`.
+- **List desktop (md+)** — tabel `glass-panel` horizontal-scrollable (min-w-[62rem], header sticky, zebra + hover): kolom No Tiket, Pelanggan, Unit, StatusPill (warna identik kolom Kanban via `stateMachineColumns`), Pembayaran, Estimasi/Total (`tabular-nums`, format ribuan dot), SLA/Deadline (Terlambat/Segera/SLA — kalkulasi sama dengan kartu Kanban), Teknisi, Tindakan. Klik baris → modal detail existing.
+- **List mobile (<md)** — kartu vertikal per tiket: header tiket+pill, grid info 2 kolom, strip SLA, baris aksi cepat semuanya min-h-44px (Detail/Struk/Bayar Kasir/Estimasi/set-status/Revisi/Kembalikan). Empty state gaya kolom Kanban.
+- **Backend minim**: `ServisBoard` +32 baris — `viewMode`, `updatedViewMode()`, computed `listTikets` yang menggabungkan kembali koleksi `groupedTikets` yang sudah ter-hydrate (flatMap + sortByDesc) → **NOL query baru (kontrak B-07 / KOLOM_KANBAN tidak tersentuh)**; pass eksplisit di `render()` (aturan Livewire computed).
+- **Testing**: regresi 9 file board+servis = **61/62 pass**; satu-satunya gagal pre-existing (`ServisTerimaUnitTest` copy blade, terdokumentasi). Pint bersih, blade compile (`view:cache`) exit 0. Desain oleh @designer sesuai komponen proyek (GlassCard/StatusPill/PrismButton); tanpa template Tailwind UI/shadcn default.
+
 ## 2026-11-06 — Servis: P2 Hardening (Permission Pembayaran Terpisah, Fallback Estimasi, Validasi Cabang Intake)
 
 - **[P2-1/T-04] Permission `servis.payment` terpisah** — Pembayaran servis dulu berkuda pada `servis.update-status` (dan jalur PosKasir tanpa gate sama sekali). Kini: permission katalog baru di `RolesAndPermissionsSeeder` + `SettingsRbac`; diberikan ke super-admin/owner (all), admin-toko, teknisi (kompatibilitas — dulu bayar via update-status; owner bisa cabut tanpa code change), dan `kasir` (pelunasan di meja kasir POS memang tugasnya). Gate: `ServisBoard::prosesBayar()`, `PosKasir::prosesBayarServis()` (baru), route API `POST /servis/{id}/bayar` middleware `permission:servis.payment`. Decoupling terbukti di test: pemegang `servis.update-status` tanpa `servis.payment` → 403.
