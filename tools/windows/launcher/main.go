@@ -104,9 +104,10 @@ func main() {
 		defer procCloseHandle.Call(hJob)
 	}
 
-	// 3. Negotiate Database Port
-	dbPort := findAvailablePort(DEFAULT_DB_PORT, 13320)
-	appPort := findAvailablePort(DEFAULT_APP_PORT, 1755)
+	// 3. Negotiate Database & App Port (User Configurable via config/ports.ini or arguments)
+	userAppPort, userDbPort := loadUserConfiguredPorts(baseDir, configDir)
+	dbPort := findAvailablePort(userDbPort, userDbPort+50)
+	appPort := findAvailablePort(userAppPort, userAppPort+50)
 
 	fmt.Printf("[Bremspace Launcher] DB Port: %d, App Port: %d\n", dbPort, appPort)
 
@@ -230,11 +231,16 @@ func createKillOnCloseJobObject() (uintptr, error) {
 	return hJob, nil
 }
 
+const (
+	PROCESS_TERMINATE = 0x0001
+	PROCESS_SET_QUOTA = 0x0100
+)
+
 func assignProcessToJob(hJob uintptr, proc *os.Process) {
 	if proc == nil || hJob == 0 {
 		return
 	}
-	hProcess, err := syscall.OpenProcess(syscall.PROCESS_SET_QUOTA|syscall.PROCESS_TERMINATE, false, uint32(proc.Pid))
+	hProcess, err := syscall.OpenProcess(PROCESS_SET_QUOTA|PROCESS_TERMINATE, false, uint32(proc.Pid))
 	if err == nil && hProcess != 0 {
 		_, _, _ = procAssignProcessToJobObject.Call(hJob, uintptr(hProcess))
 		_ = syscall.CloseHandle(hProcess)
@@ -259,6 +265,45 @@ func findAvailablePort(startPort, endPort int) int {
 		}
 	}
 	return startPort
+}
+
+func loadUserConfiguredPorts(baseDir, configDir string) (int, int) {
+	appPort := DEFAULT_APP_PORT
+	dbPort := DEFAULT_DB_PORT
+
+	// Check config/ports.ini in user config dir first, then baseDir/config/ports.ini
+	candidates := []string{
+		filepath.Join(configDir, "ports.ini"),
+		filepath.Join(baseDir, "config", "ports.ini"),
+	}
+
+	for _, p := range candidates {
+		data, err := os.ReadFile(p)
+		if err == nil {
+			lines := strings.Split(string(data), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "#") || !strings.Contains(line, "=") {
+					continue
+				}
+				parts := strings.SplitN(line, "=", 2)
+				key := strings.ToLower(strings.TrimSpace(parts[0]))
+				val := strings.TrimSpace(parts[1])
+
+				var intVal int
+				if n, _ := fmt.Sscanf(val, "%d", &intVal); n == 1 && intVal > 1024 && intVal < 65535 {
+					if key == "app_port" {
+						appPort = intVal
+					} else if key == "db_port" {
+						dbPort = intVal
+					}
+				}
+			}
+			break
+		}
+	}
+
+	return appPort, dbPort
 }
 
 func waitForPort(port int, timeout time.Duration) bool {

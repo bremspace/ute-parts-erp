@@ -35,13 +35,41 @@ function Test-PortAvailable([int]$port) {
     }
 }
 
-$DbPort = 13307
-while (-not (Test-PortAvailable $DbPort) -and $DbPort -le 13320) {
+# Load User Configured Ports
+$UserAppPort = 1741
+$UserDbPort = 13307
+
+$CandidatePorts = @(
+    (Join-Path $ConfigDir "ports.ini"),
+    (Join-Path $BaseDir "config\ports.ini"),
+    (Join-Path $BaseDir "tools\windows\config\ports.ini")
+)
+foreach ($p in $CandidatePorts) {
+    if (Test-Path $p) {
+        $lines = Get-Content $p
+        foreach ($line in $lines) {
+            $line = $line.Trim()
+            if ($line.StartsWith("#") -or -not $line.Contains("=")) { continue }
+            $parts = $line.Split("=", 2)
+            $key = $parts[0].Trim().ToLower()
+            $val = $parts[1].Trim()
+            $intVal = 0
+            if ([int]::TryParse($val, [ref]$intVal) -and $intVal -gt 1024 -and $intVal -lt 65535) {
+                if ($key -eq "app_port") { $UserAppPort = $intVal }
+                elseif ($key -eq "db_port") { $UserDbPort = $intVal }
+            }
+        }
+        break
+    }
+}
+
+$DbPort = $UserDbPort
+while (-not (Test-PortAvailable $DbPort) -and $DbPort -le ($UserDbPort + 50)) {
     $DbPort++
 }
 
-$AppPort = 1741
-while (-not (Test-PortAvailable $AppPort) -and $AppPort -le 1755) {
+$AppPort = $UserAppPort
+while (-not (Test-PortAvailable $AppPort) -and $AppPort -le ($UserAppPort + 50)) {
     $AppPort++
 }
 
