@@ -1,0 +1,101 @@
+name: Build Windows Desktop Installer (.exe)
+
+on:
+  push:
+    branches: [main, brem]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-exe:
+    name: Build & Release Windows Setup (.exe)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath, zip, gd
+          coverage: none
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Go 1.22
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Install Composer Dependencies (No Dev)
+        run: composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+
+      - name: Install NPM & Build Vite Assets
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      - name: Download Windows Runtimes (FrankPHP & MariaDB Portable)
+        run: .\tools\windows\scripts\download-binaries.ps1
+
+      - name: Compile Launcher Executable (Go)
+        run: |
+          cd tools\windows\launcher
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          go build -ldflags "-H windowsgui -s -w" -o ..\payload\launcher.exe main.go
+
+      - name: Assemble Installer Payload
+        run: |
+          $PayloadApp = "tools\windows\payload\app"
+          New-Item -ItemType Directory -Force -Path $PayloadApp | Out-Null
+          robocopy . $PayloadApp /MIR /XD .git node_modules tests tools dist /XF *.log /NDL /NFL /NJH /NJS | Out-Null
+          
+          # Copy Engines
+          Copy-Item "tools\windows\binaries\frankphp\*" "tools\windows\payload\engine" -Recurse -Force
+          Copy-Item "tools\windows\binaries\mariadb\*" "tools\windows\payload\db_engine" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "tools\windows\payload\webview" | Out-Null
+          Copy-Item "tools\windows\binaries\webview2\MicrosoftEdgeWebview2Setup.exe" "tools\windows\payload\webview\" -Force
+
+      - name: Compile Inno Setup Installer
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist\windows" | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" tools\windows\installer.iss
+
+      - name: Upload Installer as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BremspaceERP-Windows-Setup
+          path: dist\windows\*.exe
+          retention-days: 30
+
+      - name: Create / Update GitHub Release (Tag or Latest)
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest-windows
+          name: Bremspace ERP Windows Desktop (Latest Build)
+          body: |
+            Automated build of Bremspace ERP Windows Standalone (.exe).
+            - Embedded MariaDB Portable (zero conflict port 13307)
+            - FrankPHP runtime (PHP 8.5)
+            - Single-click desktop launcher
+          files: dist/windows/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
