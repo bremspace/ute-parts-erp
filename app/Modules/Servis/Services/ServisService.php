@@ -30,6 +30,7 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\StokDeductionService;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -42,6 +43,69 @@ class ServisService
     ) {}
 
     /**
+     * [P1-1/T-01] Nomor tiket race-safe — pola `JurnalService::generateNoJurnal`:
+     * transaksi + `lockForUpdate` + `max($suffix) + 1`. LIKE WAJIB menyertakan
+     * cabang (SESSION-STATE: counter tanpa cabang berbenturan lintas cabang).
+     * Unique index `no_tiket` = jaring pengaman terakhir; pemanggil me-retry
+     * duplicate key via `adalahDuplicateKey()`.
+     */
+    private function buatNoTiket(int $cabangId): string
+    {
+        $date = now()->format('Ymd');
+        $like = sprintf('SRV-C%02d-%s-%%', $cabangId, $date);
+
+        return DB::transaction(function () use ($cabangId, $date, $like) {
+            $terpakai = TiketServis::where('no_tiket', 'like', $like)
+                ->lockForUpdate()
+                ->pluck('no_tiket')
+                ->map(fn ($no) => (int) substr((string) $no, strrpos((string) $no, '-') + 1))
+                ->all();
+
+            $next = ($terpakai ? max($terpakai) : 0) + 1;
+
+            return sprintf('SRV-C%02d-%s-%04d', $cabangId, $date, $next);
+        }, 3);
+    }
+
+    /**
+     * [P1-1/T-01] Nomor booking online (SRV-ONL-{Ymd}-{seq}) — counter global
+     * harian dengan lock yang sama. Cabang booking tidak dipakai dalam nomor
+     * (kontrak format tidak diubah).
+     */
+    private function buatNoTiketOnline(): string
+    {
+        $date = now()->format('Ymd');
+        $like = sprintf('SRV-ONL-%s-%%', $date);
+
+        return DB::transaction(function () use ($date, $like) {
+            $terpakai = TiketServis::where('no_tiket', 'like', $like)
+                ->lockForUpdate()
+                ->pluck('no_tiket')
+                ->map(fn ($no) => (int) substr((string) $no, strrpos((string) $no, '-') + 1))
+                ->all();
+
+            $next = ($terpakai ? max($terpakai) : 0) + 1;
+
+            return sprintf('SRV-ONL-%s-%04d', $date, $next);
+        }, 3);
+    }
+
+    /**
+     * [P1-1/T-01] Deteksi duplicate-key lintas driver (MySQL 1062 / SQLite
+     * SQLITE_CONSTRAINT) — hanya ini yang boleh me-trigger retry nomor tiket;
+     * exception lain harus di-throw ulang agar bug nyata tidak tersembunyi.
+     */
+    private function adalahDuplicateKey(QueryException $e): bool
+    {
+        if (($e->errorInfo[0] ?? '') === '23000') {
+            return true;
+        }
+
+        return str_contains($e->getMessage(), 'UNIQUE constraint failed')
+            || str_contains($e->getMessage(), 'Duplicate entry');
+    }
+
+    /**
      * [SERVICE-01] Terima unit servis baru.
      */
     public function terimaUnit(array $data, User $user): TiketServis
@@ -50,12 +114,6 @@ class ServisService
         if (! $cabangId) {
             throw new \Exception('Cabang aktif belum dipilih');
         }
-
-        $today = now()->format('Ymd');
-        $count = TiketServis::whereDate('created_at', now()->toDateString())
-            ->where('cabang_id', $cabangId)
-            ->count() + 1;
-        $noTiket = sprintf('SRV-C%02d-%s-%04d', $cabangId, $today, $count);
 
         $pelanggan = ! empty($data['pelanggan_id']) ? Pelanggan::find($data['pelanggan_id']) : null;
         $namaPelanggan = $data['nama_pelanggan'] ?? $pelanggan?->nama;
@@ -96,26 +154,39 @@ class ServisService
             $teleponPelanggan = $pelanggan->telepon ?: $teleponPelanggan;
         }
 
-        $tiket = TiketServis::create([
-            'no_tiket' => $noTiket,
-            'cabang_id' => $cabangId,
-            'jenis_servis_id' => $data['jenis_servis_id'] ?? null,
-            'pelanggan_id' => $data['pelanggan_id'] ?? null,
-            'nama_pelanggan' => $namaPelanggan,
-            'telepon_pelanggan' => $teleponPelanggan,
-            'jenis_hp' => $data['jenis_hp'],
-            'seri_hp' => $data['seri_hp'] ?? null,
-            // [T-19] kunci gadget: terenkripsi at-rest (cast encrypted)
-            'tipe_kunci' => $data['tipe_kunci'] ?? null,
-            'kunci_terenkripsi' => $data['kunci_terenkripsi'] ?? null,
-            'keluhan' => $data['keluhan'],
-            'kondisi_fisik' => $data['kondisi_fisik'] ?? null,
-            'foto_unit' => $data['foto_unit'] ?? null,
-            'status' => 'diterima',
-            'sumber' => $data['sumber'] ?? 'walkin',
-            'token_approval' => Str::random(64),
-            'tanggal_terima' => now(),
-        ]);
+        // [P1-1/T-01] Race-safe: generation LIKE-locked + retry duplicate-key
+        // (unique index `no_tiket` = jaring pengaman terakhir).
+        $tiket = null;
+        $attempts = 0;
+
+        while ($tiket === null) {
+            try {
+                $tiket = TiketServis::create([
+                    'no_tiket' => $this->buatNoTiket((int) $cabangId),
+                    'cabang_id' => $cabangId,
+                    'jenis_servis_id' => $data['jenis_servis_id'] ?? null,
+                    'pelanggan_id' => $data['pelanggan_id'] ?? null,
+                    'nama_pelanggan' => $namaPelanggan,
+                    'telepon_pelanggan' => $teleponPelanggan,
+                    'jenis_hp' => $data['jenis_hp'],
+                    'seri_hp' => $data['seri_hp'] ?? null,
+                    // [T-19] kunci gadget: terenkripsi at-rest (cast encrypted)
+                    'tipe_kunci' => $data['tipe_kunci'] ?? null,
+                    'kunci_terenkripsi' => $data['kunci_terenkripsi'] ?? null,
+                    'keluhan' => $data['keluhan'],
+                    'kondisi_fisik' => $data['kondisi_fisik'] ?? null,
+                    'foto_unit' => $data['foto_unit'] ?? null,
+                    'status' => 'diterima',
+                    'sumber' => $data['sumber'] ?? 'walkin',
+                    'token_approval' => Str::random(64),
+                    'tanggal_terima' => now(),
+                ]);
+            } catch (QueryException $e) {
+                if (! $this->adalahDuplicateKey($e) || $attempts++ >= 2) {
+                    throw $e;
+                }
+            }
+        }
 
         $this->logStatus($tiket, null, 'diterima', $user, 'transisi', 'Unit servis diterima');
 
@@ -161,10 +232,6 @@ class ServisService
     {
         $cabangId = $data['cabang_id'] ?? Cabang::where('is_active', true)->first()?->id;
 
-        $today = now()->format('Ymd');
-        $count = TiketServis::whereDate('created_at', now()->toDateString())->count() + 1;
-        $noTiket = sprintf('SRV-ONL-%s-%04d', $today, $count);
-
         $pelanggan = ! empty($data['pelanggan_id']) ? Pelanggan::find($data['pelanggan_id']) : null;
         $namaPelanggan = $data['nama'] ?? ($data['nama_pelanggan'] ?? $pelanggan?->nama);
         $teleponPelanggan = $data['telepon'] ?? ($data['telepon_pelanggan'] ?? $pelanggan?->telepon);
@@ -204,27 +271,39 @@ class ServisService
             $teleponPelanggan = $pelanggan->telepon ?: $teleponPelanggan;
         }
 
-        $tiket = TiketServis::create([
-            'no_tiket' => $noTiket,
-            'cabang_id' => $cabangId,
-            'jenis_servis_id' => $data['jenis_servis_id'] ?? null,
-            'pelanggan_id' => $data['pelanggan_id'] ?? null,
-            'nama_pelanggan' => $namaPelanggan,
-            'telepon_pelanggan' => $teleponPelanggan,
-            'jenis_hp' => $data['jenis_hp'],
-            'seri_hp' => $data['seri_hp'] ?? null,
-            'tipe_kunci' => $data['tipe_kunci'] ?? null,
-            'kunci_terenkripsi' => is_array($data['kunci_terenkripsi'] ?? null)
-                ? implode('-', $data['kunci_terenkripsi'])
-                : ($data['kunci_terenkripsi'] ?? null),
-            'keluhan' => $data['keluhan'],
-            'kondisi_fisik' => $data['kondisi_fisik'] ?? null,
-            'foto_unit' => $data['foto_unit'] ?? null,
-            'catatan_admin' => $data['catatan_booking'] ?? ($data['catatan_admin'] ?? null),
-            'status' => 'diajukan_online',
-            'sumber' => 'online',
-            'token_approval' => Str::random(64),
-        ]);
+        // [P1-1/T-01] Race-safe booking: pola sama dengan terimaUnit().
+        $tiket = null;
+        $attempts = 0;
+
+        while ($tiket === null) {
+            try {
+                $tiket = TiketServis::create([
+                    'no_tiket' => $this->buatNoTiketOnline(),
+                    'cabang_id' => $cabangId,
+                    'jenis_servis_id' => $data['jenis_servis_id'] ?? null,
+                    'pelanggan_id' => $data['pelanggan_id'] ?? null,
+                    'nama_pelanggan' => $namaPelanggan,
+                    'telepon_pelanggan' => $teleponPelanggan,
+                    'jenis_hp' => $data['jenis_hp'],
+                    'seri_hp' => $data['seri_hp'] ?? null,
+                    'tipe_kunci' => $data['tipe_kunci'] ?? null,
+                    'kunci_terenkripsi' => is_array($data['kunci_terenkripsi'] ?? null)
+                        ? implode('-', $data['kunci_terenkripsi'])
+                        : ($data['kunci_terenkripsi'] ?? null),
+                    'keluhan' => $data['keluhan'],
+                    'kondisi_fisik' => $data['kondisi_fisik'] ?? null,
+                    'foto_unit' => $data['foto_unit'] ?? null,
+                    'catatan_admin' => $data['catatan_booking'] ?? ($data['catatan_admin'] ?? null),
+                    'status' => 'diajukan_online',
+                    'sumber' => 'online',
+                    'token_approval' => Str::random(64),
+                ]);
+            } catch (QueryException $e) {
+                if (! $this->adalahDuplicateKey($e) || $attempts++ >= 2) {
+                    throw $e;
+                }
+            }
+        }
 
         $this->logStatus($tiket, null, 'diajukan_online', null, 'transisi', 'Booking servis online');
 
@@ -242,6 +321,12 @@ class ServisService
     /**
      * [SERVICE-03] Update status tiket (state machine enforced).
      * $user nullable — untuk approval publik via token (tanpa login).
+     *
+     * [P1-2/T-02] Mode `sumber = 'sistem'`: aksi otomatis dari scheduler SLA.
+     * Aktor = SISTEM (user WAJIB null — no masquerade); hanya menarget
+     * 'ditolak' dari zona kerja (`dikerjakan|qc`), alasan wajib, log
+     * `aksi = 'auto_batal_sistem'`, user_id NULL. Tidak ter-expose HTTP.
+     * Selain itu semua jalur identik dengan `manual`.
      *
      * [B-10a / P0-4] Fail-closed: perubahan status + side effect (termasuk
      * jurnal `onSelesai`) dibungkus SATU DB::transaction. Sebelumnya status
@@ -263,15 +348,37 @@ class ServisService
      *
      * State machine TIDAK berubah: himpunan & aturan transisi tetap sama.
      */
-    public function updateStatus(TiketServis $tiket, string $statusBaru, ?User $user = null, string $alasan = ''): TiketServis
+    public function updateStatus(TiketServis $tiket, string $statusBaru, ?User $user = null, string $alasan = '', string $sumber = 'manual'): TiketServis
     {
+        $sistemAutoCancel = $sumber === 'sistem';
+
+        // [P1-2/T-02] Kontrak mode sistem — fail-closed, persyaratan eksak:
+        if ($sistemAutoCancel) {
+            if ($user !== null) {
+                throw new \Exception('Mode sistem tidak menerima aktor user — aktor sistem direpresentasikan NULL untuk integritas audit trail');
+            }
+
+            if (blank($alasan)) {
+                throw new \Exception('Alasan wajib diisi untuk aksi otomatis sistem');
+            }
+
+            if ($statusBaru !== 'ditolak') {
+                throw new \Exception('Aksi otomatis sistem hanya boleh menargetkan status ditolak');
+            }
+        }
+
         // Validasi cepat (fail-early, tanpa transaksi) — pesan ramah untuk UI.
         if (! in_array($statusBaru, ServisStateMachine::allStatuses(), true)) {
             throw new \Exception('Status tidak valid');
         }
 
         $statusLama = $tiket->status;
+        $difasilitasiSistem = $sistemAutoCancel
+            && in_array($statusLama, ['dikerjakan', 'qc'], true)
+            && $statusBaru === 'ditolak';
+
         if (! ServisStateMachine::dapatTransisi($statusLama, $statusBaru)
+            && ! $difasilitasiSistem
             && (! $user || ! $user->can('servis.override-status'))) {
             throw new \Exception(
                 "Transisi dari '{$statusLama}' ke '{$statusBaru}' tidak valid. Hanya admin dengan override yang diizinkan."
@@ -280,16 +387,23 @@ class ServisService
 
         // [P1-1] `&$tiket` — objek hasil lock di dalam transaksi dipropagasikan
         // ke pemanggil supaya status yang terlihat pemanggil = status terkunci.
-        DB::transaction(function () use (&$tiket, $statusBaru, $user, $alasan) {
+        DB::transaction(function () use (&$tiket, $statusBaru, $user, $alasan, $sistemAutoCancel, $difasilitasiSistem) {
             $tiket = TiketServis::whereKey($tiket->id)->lockForUpdate()->firstOrFail();
 
             // Status otoritatif: yang tertulis di DB saat kunci dipegang.
             $statusLama = $tiket->status;
 
+            $difasilitasiSistem = $difasilitasiSistem
+                && $sistemAutoCancel
+                && in_array($statusLama, ['dikerjakan', 'qc'], true)
+                && $statusBaru === 'ditolak';
+
             // Validasi transisi diulang terhadap status TERKUNCI. Kalau request
             // paralel sudah mengubah status duluan, baris ini yang menolak —
             // bukan lolos diam-diam lalu menjalankan side effect dua kali.
-            if (ServisStateMachine::dapatTransisi($statusLama, $statusBaru)) {
+            if ($difasilitasiSistem) {
+                $aksi = 'auto_batal_sistem';
+            } elseif (ServisStateMachine::dapatTransisi($statusLama, $statusBaru)) {
                 $aksi = 'transisi';
             } elseif ($user && $user->can('servis.override-status')) {
                 $aksi = 'override';
@@ -1077,11 +1191,8 @@ class ServisService
 
             // [SUBLEDGER-SYNC] Lunaskan piutang servis bila ada di tabel piutang
             if ($tiket->pelanggan_id && Schema::hasTable('piutang')) {
-                $piutang = Piutang::where('keterangan', 'like', "%{$tiket->no_tiket}%")
-                    ->where('cabang_id', $tiket->cabang_id)
-                    ->where('status', 'belum_lunas')
-                    ->first();
-                if ($piutang) {
+                $piutang = $this->piutangServis($tiket);
+                if ($piutang && $piutang->status === 'belum_lunas') {
                     $piutang->update([
                         'jumlah_dibayar' => $piutang->jumlah,
                         'status' => 'lunas',
@@ -1112,6 +1223,30 @@ class ServisService
 
             return $tiket;
         }, 3);
+    }
+
+    /**
+     * [P1-3/T-03] Subledger AR one-row-per-invoice resolution.
+     *
+     * Urutan pencarian:
+     * 1. Referensi eksak `referensi_tipe + referensi_id` (sumber kebenaran;
+     *    dibuat oleh onSelesai sejak migrasi T-03).
+     * 2. Fallback `keterangan LIKE` HANYA untuk row legacy yang belum
+     *    ter-backfill oleh migrasi — scope cabang tetap dipertahankan.
+     */
+    private function piutangServis(TiketServis $tiket): ?Piutang
+    {
+        $exact = Piutang::where('referensi_tipe', TiketServis::class)
+            ->where('referensi_id', $tiket->id)
+            ->first();
+
+        if ($exact) {
+            return $exact;
+        }
+
+        return Piutang::where('keterangan', 'like', "%{$tiket->no_tiket}%")
+            ->where('cabang_id', $tiket->cabang_id)
+            ->first();
     }
 
     /**
@@ -1611,9 +1746,7 @@ class ServisService
 
                 // [SUBLEDGER-SYNC] Catat piutang servis ke subledger piutang agar selaras dengan akun 120-01
                 if ($tiket->pelanggan_id && Schema::hasTable('piutang')) {
-                    $existingPiutang = Piutang::where('keterangan', 'like', "%{$tiket->no_tiket}%")
-                        ->where('cabang_id', $tiket->cabang_id)
-                        ->first();
+                    $existingPiutang = $this->piutangServis($tiket);
                     if (! $existingPiutang) {
                         $countPiutang = Piutang::where('cabang_id', $tiket->cabang_id)
                             ->whereDate('created_at', now()->toDateString())
@@ -1628,6 +1761,10 @@ class ServisService
                             'jatuh_tempo' => now()->addDays(14)->toDateString(),
                             'status' => 'belum_lunas',
                             'keterangan' => "Piutang Servis {$tiket->no_tiket} ({$tiket->jenis_hp})",
+                            // [P1-3/T-03] Referensi eksplisit — matching pelunasan
+                            // tidak lagi bergantung pada keterangan LIKE.
+                            'referensi_tipe' => TiketServis::class,
+                            'referensi_id' => $tiket->id,
                         ]);
                     }
                 }
@@ -1698,6 +1835,16 @@ class ServisService
             app(AuditService::class)->catat(
                 'TiketServis', 'override', $tiket->id,
                 "Override status {$dari} → {$ke} pada {$tiket->no_tiket}: {$alasan}",
+                ['status' => $dari], ['status' => $ke]
+            );
+        }
+
+        // [P1-2/T-02] Aksi otomatis sistem selalu tercatat eksplisit sebagai
+        // aktor SISTEM (bukan dikunci ke user acak) — ISO 9001 §7.5.3.
+        if ($aksi === 'auto_batal_sistem') {
+            app(AuditService::class)->catat(
+                'TiketServis', 'auto_batal_sistem', $tiket->id,
+                "Sistem (scheduler SLA) membatalkan otomatis {$tiket->no_tiket}: {$alasan}",
                 ['status' => $dari], ['status' => $ke]
             );
         }

@@ -13,6 +13,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable([
     'no_piutang', 'pelanggan_id', 'transaksi_id', 'cabang_id', 'jumlah',
     'jumlah_dibayar', 'sisa', 'jatuh_tempo', 'status', 'keterangan',
+    'referensi_tipe', 'referensi_id',
 ])]
 class Piutang extends Model
 {

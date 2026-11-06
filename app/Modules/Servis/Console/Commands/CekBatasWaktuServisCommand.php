@@ -2,7 +2,6 @@
 
 namespace App\Modules\Servis\Console\Commands;
 
-use App\Models\User;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
@@ -66,9 +65,9 @@ class CekBatasWaktuServisCommand extends Command
                     try {
                         $alasanBatal = "Dibatalkan otomatis oleh sistem karena melewati batas waktu pengerjaan ({$tiket->batas_waktu_menit} menit) tanpa penyelesaian.";
 
-                        // Transisi ke status 'ditolak'
-                        $systemUser = User::role('super-admin')->first() ?? $tiket->teknisi ?? User::first();
-                        $servisService->updateStatus($tiket, 'ditolak', $systemUser, $alasanBatal);
+                        // [P1-2/T-02] Aktor SISTEM (user NULL) — integritas audit
+                        // trail; dulu bertopeng super-admin/teknisi/User::first().
+                        $servisService->updateStatus($tiket, 'ditolak', null, $alasanBatal, 'sistem');
 
                         $tiket->update(['status_sla_kpi' => 'cancelled_overdue']);
 
