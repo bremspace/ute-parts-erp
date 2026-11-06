@@ -3,6 +3,14 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-06 — Servis: Re-Audit P0–P3 & Perbaikan Celah (Fallback Estimasi Items, CLI Notification Context, Deteksi Duplicate Key, Validasi Cabang Online)
+
+- **[AUDIT-1] TiketServis::getRincianBiayaLengkap() residual overbill gap ditutup** — Cabang `elseif ($estimasiItems->where('tipe', 'jasa')->isNotEmpty())` dan `elseif ($estimasiItems->isNotEmpty())` sebelumnya menagihkan item estimasi jasa/part meskipun item pekerjaan teknisi terkait pernah dibuat lalu dibatalkan. Ditambahkan helper `punyaRiwayatPartEksplisit()` dan guard `! $this->punyaRiwayatJasaEksplisit()` / `! $this->punyaRiwayatPartEksplisit()` agar pembatalan pekerjaan tidak lagi memicu overbill dari estimasi.
+- **[AUDIT-2] Notification payload lengkap di CekBatasWaktuServisCommand** — Pemanggilan `$notifService->kirim()` di CLI command SLA sebelumnya tanpa `$payload` sehingga audience salah jatuh ke `'staf'` dan `pelanggan_id`/`cabang_id` hilang. Kini menyertakan payload lengkap (audience, pelanggan_id, cabang_id, tiket_id, user_id).
+- **[AUDIT-3] ServisService::adalahDuplicateKey() dipersempit** — Sebelumnya memeriksa SQLSTATE `23000` secara umum sehingga foreign key constraint failure (MySQL 1452) dan NOT NULL failure (MySQL 1048) disalahartikan sebagai duplicate key dan memicu retry 3x. Kini hanya menerima kode unik spesifik (MySQL 1062, SQLite 19/2067 constraint UNIQUE).
+- **[AUDIT-4] ServisService::bookingOnline() validasi cabang aktif** — Permintaan booking online dengan parameter `cabang_id` kini memvalidasi bahwa cabang bersangkutan berstatus `is_active = true`. Jika nonaktif atau tidak ditemukan, melempar exception (atau fallback ke cabang aktif default bila null).
+- **Testing**: `tests/Feature/ServisP2HardeningTest.php` diperluas menjadi 12/12 pass (40 assertions); seluruh suite servis utama 54/54 pass (209 assertions). Pint bersih.
+
 ## 2026-11-06 — Servis: Phase 3 — List View Papan Servis (Toggle Kanban ↔ List, Responsif)
 
 - **Toggle mode tampilan** — segmented control di toolbar (aria-selected, min-h 44px, ikon+label di sm+): Kanban ↔ List, persist `localStorage('servis-board-view-mode')` pola ADR 0008 (Alpine `x-init` → `$wire.viewMode`, ditulis ulang saat klik), normalisasi `updatedViewMode()` hanya menerima `kanban|list`.

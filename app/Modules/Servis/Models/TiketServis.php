@@ -110,6 +110,16 @@ class TiketServis extends Model
         return $this->items()->where('tipe', 'jasa')->exists();
     }
 
+    /**
+     * [P2-2/T-05-AUDIT] Apakah tiket pernah dibuatkan baris part eksplisit
+     * (pekerjaan teknisi atau legacy spareparts, termasuk yang dibatalkan)?
+     */
+    public function punyaRiwayatPartEksplisit(): bool
+    {
+        return $this->items()->where('tipe', 'part')->exists()
+            || $this->spareparts()->exists();
+    }
+
     public function estimasiItems(): HasMany
     {
         return $this->hasMany(TiketServisEstimasiItem::class);
@@ -228,7 +238,7 @@ class TiketServis extends Model
                         'subtotal' => $sub,
                     ];
                 }
-            } elseif ($estimasiItems->where('tipe', 'jasa')->isNotEmpty()) {
+            } elseif (! $this->punyaRiwayatJasaEksplisit() && $estimasiItems->where('tipe', 'jasa')->isNotEmpty()) {
                 foreach ($estimasiItems->where('tipe', 'jasa') as $ej) {
                     $sub = (float) ($ej->harga * $ej->qty);
                     $totalJasa += $sub;
@@ -289,8 +299,8 @@ class TiketServis extends Model
                 ];
             }
 
-            // Bila di pekerjaan tidak ada part tapi di estimasi ada part
-            if ($pekerjaanItems->where('tipe', 'part')->isEmpty() && $sparepartsLegacy->isEmpty() && $estimasiItems->where('tipe', 'part')->isNotEmpty()) {
+            // Bila di pekerjaan tidak ada part tapi di estimasi ada part (hanya jika tiket legacy tanpa riwayat part pekerjaan)
+            if (! $this->punyaRiwayatPartEksplisit() && $pekerjaanItems->where('tipe', 'part')->isEmpty() && $sparepartsLegacy->isEmpty() && $estimasiItems->where('tipe', 'part')->isNotEmpty()) {
                 foreach ($estimasiItems->where('tipe', 'part') as $ep) {
                     $sub = (float) ($ep->harga * $ep->qty);
                     $totalPart += $sub;
@@ -306,6 +316,15 @@ class TiketServis extends Model
             }
         } elseif ($estimasiItems->isNotEmpty()) {
             foreach ($estimasiItems as $ei) {
+                // [P2-2/T-05-AUDIT] Jika item jenis tsb pernah ada di pekerjaan lalu dibatalkan,
+                // jangan tagihkan fallback dari estimasi (overbill).
+                if ($ei->tipe === 'jasa' && $this->punyaRiwayatJasaEksplisit()) {
+                    continue;
+                }
+                if ($ei->tipe === 'part' && $this->punyaRiwayatPartEksplisit()) {
+                    continue;
+                }
+
                 $sub = (float) ($ei->harga * $ei->qty);
                 if ($ei->tipe === 'part') {
                     $totalPart += $sub;

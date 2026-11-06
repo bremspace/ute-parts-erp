@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Models\TiketServisEstimasiItem;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Services\ServisService;
 use Database\Seeders\AkunCoaSeeder;
@@ -159,7 +161,7 @@ class ServisP2HardeningTest extends TestCase
         session(['cabang_id' => $this->cabang->id]);
         $this->actingAs($kasir, 'web');
 
-        \Livewire\Livewire::test(\App\Modules\Pos\Livewire\PosKasir::class)
+        Livewire::test(PosKasir::class)
             ->call('prosesBayarServis')
             ->assertDispatched('alert', fn ($event, $params) => str_contains(
                 (string) ($params[0]['message'] ?? ''),
@@ -325,5 +327,71 @@ class ServisP2HardeningTest extends TestCase
 
         $this->assertSame($cabangSelatan->id, $tiket->cabang_id);
         $this->assertMatchesRegularExpression('/^SRV-C'.sprintf('%02d', $cabangSelatan->id).'-\d{8}-\d{4}$/', $tiket->no_tiket);
+    }
+
+    // --- RE-AUDIT FIXES (P0-P3 Gaps) ---
+
+    public function test_audit_rincian_biaya_tidak_ambil_estimasi_jasa_jika_pekerjaan_jasa_dibatalkan_walau_ada_part(): void
+    {
+        $tiket = $this->buatTiketSelesai(300000);
+
+        // Ada item estimasi jasa
+        TiketServisEstimasiItem::create([
+            'tiket_servis_id' => $tiket->id,
+            'tipe' => 'jasa',
+            'nama_item' => 'Estimasi Jasa Servis',
+            'qty' => 1,
+            'harga' => 300000,
+            'subtotal' => 300000,
+        ]);
+
+        // Teknisi pasang part AKTIF
+        TiketServisItem::create([
+            'tiket_servis_id' => $tiket->id,
+            'tipe' => 'part',
+            'nama_item' => 'LCD Original',
+            'qty' => 1,
+            'harga' => 500000,
+        ]);
+
+        // Teknisi pernah pasang jasa tapi DIBATALKAN (misal garansi/diskon toko)
+        TiketServisItem::create([
+            'tiket_servis_id' => $tiket->id,
+            'tipe' => 'jasa',
+            'nama_item' => 'Jasa Pemasangan',
+            'qty' => 1,
+            'harga' => 150000,
+        ])->forceFill(['dibatalkan_at' => now()])->save();
+
+        $this->assertTrue($tiket->punyaRiwayatJasaEksplisit());
+
+        $rincian = $tiket->getRincianBiayaLengkap();
+
+        // Jasa harus 0 (karena pekerjaan jasa dibatalkan), TIDAK boleh jatuh kembali ke estimasi 300k
+        $this->assertSame(0.0, (float) $rincian['total_jasa']);
+        $this->assertSame(500000.0, (float) $rincian['total_part']);
+        $this->assertSame(500000.0, (float) $rincian['total']);
+    }
+
+    public function test_audit_booking_online_cabang_nonaktif_ditolak(): void
+    {
+        $cabangNonaktif = Cabang::create([
+            'kode' => 'CBG-OFF',
+            'nama' => 'Cabang Tutup Permanen',
+            'alamat' => 'Jl. Tutup No. 99',
+            'telepon' => '021-999999',
+            'is_active' => false,
+        ]);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cabang yang dipilih tidak aktif atau tidak ditemukan');
+
+        app(ServisService::class)->bookingOnline([
+            'cabang_id' => $cabangNonaktif->id,
+            'nama' => 'Konsumen Online',
+            'telepon' => '08123456789',
+            'jenis_hp' => 'iPhone X',
+            'keluhan' => 'Baterai drop',
+        ]);
     }
 }

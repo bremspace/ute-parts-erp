@@ -91,18 +91,28 @@ class ServisService
     }
 
     /**
-     * [P1-1/T-01] Deteksi duplicate-key lintas driver (MySQL 1062 / SQLite
-     * SQLITE_CONSTRAINT) — hanya ini yang boleh me-trigger retry nomor tiket;
-     * exception lain harus di-throw ulang agar bug nyata tidak tersembunyi.
+     * [P1-1/T-01-AUDIT] Deteksi duplicate-key khusus untuk unique index `no_tiket`.
+     *
+     * HANYA mendeteksi kode duplicate key spesifik (MySQL 1062, SQLite 19/2067 dengan
+     * pelanggaran UNIQUE). SQLSTATE generic 23000 TIDAK dipakai langsung karena juga
+     * mencakup foreign key failure (1452) dan NOT NULL (1048) yang tidak boleh di-retry.
      */
     private function adalahDuplicateKey(QueryException $e): bool
     {
-        if (($e->errorInfo[0] ?? '') === '23000') {
+        $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+        // MySQL 1062 = ER_DUP_ENTRY
+        if ($driverCode === 1062) {
             return true;
         }
 
-        return str_contains($e->getMessage(), 'UNIQUE constraint failed')
-            || str_contains($e->getMessage(), 'Duplicate entry');
+        // SQLite error 19 (SQLITE_CONSTRAINT) atau 2067 (SQLITE_CONSTRAINT_UNIQUE)
+        if (in_array($driverCode, [19, 2067], true) && str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
+            return true;
+        }
+
+        return str_contains($e->getMessage(), 'Duplicate entry')
+            || str_contains($e->getMessage(), 'UNIQUE constraint failed');
     }
 
     /**
@@ -238,7 +248,19 @@ class ServisService
      */
     public function bookingOnline(array $data): TiketServis
     {
-        $cabangId = $data['cabang_id'] ?? Cabang::where('is_active', true)->first()?->id;
+        // [P2-4/AUDIT] Cabang penerima booking online WAJIB aktif
+        if (! empty($data['cabang_id'])) {
+            $cabang = Cabang::where('id', (int) $data['cabang_id'])->where('is_active', true)->first();
+            if (! $cabang) {
+                throw new \Exception('Cabang yang dipilih tidak aktif atau tidak ditemukan');
+            }
+            $cabangId = $cabang->id;
+        } else {
+            $cabangId = Cabang::where('is_active', true)->first()?->id;
+            if (! $cabangId) {
+                throw new \Exception('Belum ada cabang aktif yang dapat menerima booking servis');
+            }
+        }
 
         $pelanggan = ! empty($data['pelanggan_id']) ? Pelanggan::find($data['pelanggan_id']) : null;
         $namaPelanggan = $data['nama'] ?? ($data['nama_pelanggan'] ?? $pelanggan?->nama);
