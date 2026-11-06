@@ -26,7 +26,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath, zip, gd
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath, zip, gd, fileinfo
           coverage: none
 
       - name: Setup Node.js 20
@@ -51,7 +51,7 @@ jobs:
           npm ci --ignore-scripts
           npm run build
 
-      - name: Download Windows Runtimes (FrankPHP & MariaDB Portable)
+      - name: Download Windows Runtimes (FrankPHP, MariaDB Portable, WebView2)
         run: .\tools\windows\scripts\download-binaries.ps1
 
       - name: Compile Launcher Executable (Go)
