@@ -641,6 +641,7 @@
 
                 <!-- Shortcuts, Install Button & Status Indicator -->
                 <div class="flex items-center gap-1 sm:gap-2 lg:gap-3 flex-shrink-0">
+                    <x-prism.device-access-modal />
                     <x-prism.pwa-install-prompt variant="button" />
 
                     @if(request()->routeIs('pos*'))

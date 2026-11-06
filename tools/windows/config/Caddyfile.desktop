@@ -7,7 +7,7 @@
 }
 
 :{{APP_PORT}} {
-    bind 127.0.0.1
+    bind 0.0.0.0
     root * "{{APP_DIR}}/public"
     encode zstd gzip
 

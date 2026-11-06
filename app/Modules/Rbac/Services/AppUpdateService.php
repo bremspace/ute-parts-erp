@@ -699,8 +699,8 @@ class AppUpdateService
             $headers['Authorization'] = 'Bearer '.$token;
         }
 
-        $tempZip = storage_path('framework/update_' . uniqid() . '.zip');
-        $extractDir = storage_path('framework/update_extracted_' . uniqid());
+        $tempZip = storage_path('framework/update_'.uniqid().'.zip');
+        $extractDir = storage_path('framework/update_extracted_'.uniqid());
 
         try {
             $response = Http::withHeaders($headers)
@@ -710,15 +710,17 @@ class AppUpdateService
 
             if (! $response->successful() || ! File::exists($tempZip) || filesize($tempZip) === 0) {
                 @File::delete($tempZip);
+
                 return [
                     'success' => false,
-                    'message' => 'Gagal mengunduh berkas arsip rilis dari GitHub (Status: ' . $response->status() . ').',
+                    'message' => 'Gagal mengunduh berkas arsip rilis dari GitHub (Status: '.$response->status().').',
                 ];
             }
 
-            $zip = new \ZipArchive();
+            $zip = new \ZipArchive;
             if ($zip->open($tempZip) !== true) {
                 @File::delete($tempZip);
+
                 return [
                     'success' => false,
                     'message' => 'Berkas unduhan bukan arsip ZIP yang valid.',
@@ -759,7 +761,7 @@ class AppUpdateService
                     continue;
                 }
 
-                $targetPath = $basePath . DIRECTORY_SEPARATOR . $relativePath;
+                $targetPath = $basePath.DIRECTORY_SEPARATOR.$relativePath;
                 $targetDir = dirname($targetPath);
                 if (! File::isDirectory($targetDir)) {
                     File::makeDirectory($targetDir, 0755, true);
@@ -780,6 +782,7 @@ class AppUpdateService
             if (File::isDirectory($extractDir)) {
                 @File::deleteDirectory($extractDir);
             }
+
             return [
                 'success' => false,
                 'message' => $e->getMessage(),

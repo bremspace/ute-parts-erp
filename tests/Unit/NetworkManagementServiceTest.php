@@ -75,4 +75,26 @@ class NetworkManagementServiceTest extends TestCase
 
         $this->assertTrue($result['success']);
     }
+
+    public function test_get_device_access_urls_returns_valid_structure_and_qr(): void
+    {
+        $updateService = $this->createMock(AppUpdateService::class);
+        $service = new NetworkManagementService($updateService);
+
+        $urls = $service->getDeviceAccessUrls();
+
+        $this->assertIsArray($urls);
+        $this->assertArrayHasKey('lan_ip', $urls);
+        $this->assertArrayHasKey('port', $urls);
+        $this->assertArrayHasKey('lan_url', $urls);
+        $this->assertArrayHasKey('lan_qr_svg', $urls);
+        $this->assertArrayHasKey('is_online', $urls);
+        $this->assertArrayHasKey('recommended_url', $urls);
+        $this->assertArrayHasKey('recommended_qr_svg', $urls);
+
+        $this->assertStringStartsWith('http://', $urls['lan_url']);
+        $this->assertStringEndsWith('/app', $urls['lan_url']);
+        $this->assertStringContainsString('<svg', $urls['lan_qr_svg']);
+        $this->assertStringContainsString('</svg>', $urls['lan_qr_svg']);
+    }
 }

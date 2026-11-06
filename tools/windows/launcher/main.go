@@ -114,6 +114,13 @@ func main() {
 	cgiPort := findAvailablePort(DEFAULT_CGI_PORT, DEFAULT_CGI_PORT+50)
 
 	fmt.Printf("[Bremspace Launcher] DB Port: %d, App Port: %d, FastCGI Port: %d\n", dbPort, appPort, cgiPort)
+	lanIP := getLocalLANIP()
+	fmt.Printf("[Bremspace Launcher] Multi-Device LAN URL: http://%s:%d/app\n", lanIP, appPort)
+
+	// Register inbound firewall port allowance for multi-device LAN access
+	cmdFirewall := exec.Command("netsh", "advfirewall", "firewall", "add", "rule", "name=BremspaceERP", "dir=in", "action=allow", fmt.Sprintf("localport=%d", appPort), "protocol=TCP")
+	cmdFirewall.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	_ = cmdFirewall.Run()
 
 	// Prepare local config files
 	engineDir := filepath.Join(baseDir, "db_engine")
@@ -405,4 +412,17 @@ func prepareCaddyfile(templatePath, destPath string, appPort, cgiPort int, appDi
 	s = strings.ReplaceAll(s, "{{CGI_PORT}}", fmt.Sprintf("%d", cgiPort))
 	s = strings.ReplaceAll(s, "{{APP_DIR}}", filepath.ToSlash(appDir))
 	_ = os.WriteFile(destPath, []byte(s), 0644)
+}
+
+func getLocalLANIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return "127.0.0.1"
+	}
+	defer conn.Close()
+	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok || localAddr == nil {
+		return "127.0.0.1"
+	}
+	return localAddr.IP.String()
 }

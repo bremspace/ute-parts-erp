@@ -2,6 +2,7 @@
 
 namespace App\Modules\Rbac\Services;
 
+use App\Modules\Wms\Services\QrCodeService;
 use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Process\Process;
 use Throwable;
@@ -142,6 +143,53 @@ class NetworkManagementService
     }
 
     /**
+     * Dapatkan rincian URL & QR Code untuk akses multi-perangkat (HP/Tablet di LAN & Online).
+     *
+     * @return array{
+     *     lan_ip: string,
+     *     port: int,
+     *     lan_url: string,
+     *     lan_qr_svg: string,
+     *     is_online: bool,
+     *     online_url: ?string,
+     *     online_qr_svg: ?string,
+     *     recommended_url: string,
+     *     recommended_qr_svg: string
+     * }
+     */
+    public function getDeviceAccessUrls(): array
+    {
+        $status = $this->getStatus();
+        $lanIp = $status['lan_ip'] ?: '127.0.0.1';
+        $port = (int) ($status['server_port'] ?: 1741);
+        $isStandardPort = in_array($port, [80, 443], true);
+
+        $lanUrl = 'http://'.$lanIp.($isStandardPort ? '' : ':'.$port).'/app';
+        $onlineUrl = $status['is_online'] ? rtrim($status['app_url'], '/').'/app' : null;
+
+        $recommendedUrl = $status['is_online'] && $onlineUrl ? $onlineUrl : $lanUrl;
+
+        $qrService = (function_exists('app') && app()->bound(QrCodeService::class))
+            ? app(QrCodeService::class)
+            : new QrCodeService;
+        $lanQrSvg = $qrService->generateSvg($lanUrl, 160, 0);
+        $onlineQrSvg = $onlineUrl ? $qrService->generateSvg($onlineUrl, 160, 0) : null;
+        $recommendedQrSvg = $status['is_online'] && $onlineQrSvg ? $onlineQrSvg : $lanQrSvg;
+
+        return [
+            'lan_ip' => $lanIp,
+            'port' => $port,
+            'lan_url' => $lanUrl,
+            'lan_qr_svg' => $lanQrSvg,
+            'is_online' => $status['is_online'],
+            'online_url' => $onlineUrl,
+            'online_qr_svg' => $onlineQrSvg,
+            'recommended_url' => $recommendedUrl,
+            'recommended_qr_svg' => $recommendedQrSvg,
+        ];
+    }
+
+    /**
      * Deteksi IP jaringan lokal (LAN / Wi-Fi).
      */
     public function detectLanIp(): string
@@ -155,16 +203,35 @@ class NetworkManagementService
                 }
             } catch (Throwable) {
             }
+        } elseif (PHP_OS_FAMILY === 'Darwin') {
+            try {
+                $proc = Process::fromShellCommandline('ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null');
+                $proc->run();
+                $ip = trim($proc->getOutput());
+                if (! empty($ip) && filter_var($ip, FILTER_VALIDATE_IP)) {
+                    return $ip;
+                }
+            } catch (Throwable) {
+            }
         } else {
             try {
                 $proc = Process::fromShellCommandline("hostname -I 2>/dev/null | awk '{print $1}'");
                 $proc->run();
                 $ip = trim($proc->getOutput());
-                if (! empty($ip)) {
+                if (! empty($ip) && filter_var($ip, FILTER_VALIDATE_IP)) {
                     return $ip;
                 }
             } catch (Throwable) {
             }
+        }
+
+        // Fallback: cek hostname PHP atau server addr
+        try {
+            $hostIp = @gethostbyname(@gethostname());
+            if (! empty($hostIp) && $hostIp !== gethostname() && filter_var($hostIp, FILTER_VALIDATE_IP) && ! str_starts_with($hostIp, '127.')) {
+                return $hostIp;
+            }
+        } catch (Throwable) {
         }
 
         return (string) ($_SERVER['SERVER_ADDR'] ?? '127.0.0.1');
