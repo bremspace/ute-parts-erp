@@ -1001,11 +1001,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                     $gitSecret = trim($_POST['git_secret'] ?? bin2hex(random_bytes(16)));
 
                     $existingKey = '';
+                    $existingHostChallenge = '';
                     if (file_exists($baseDir.'/.env')) {
                         $currEnv = (string) @file_get_contents($baseDir.'/.env');
                         if (preg_match('/^APP_KEY=(.+)$/m', $currEnv, $km) && ! empty(trim($km[1]))) {
                             $existingKey = trim($km[1]);
                         }
+                        if (preg_match('/^BREMSPACE_HOST_CHALLENGE=(.+)$/m', $currEnv, $cm) && ! empty(trim($cm[1]))) {
+                            $existingHostChallenge = trim($cm[1], " \t\n\r\0\x0B\"'");
+                        }
+                    }
+                    if (empty($existingHostChallenge) && file_exists($baseDir.'/storage/license.key')) {
+                        $licJson = @json_decode((string) file_get_contents($baseDir.'/storage/license.key'), true);
+                        if (! empty($licJson['challenge'])) {
+                            $existingHostChallenge = trim((string) $licJson['challenge']);
+                        }
+                    }
+                    if (empty($existingHostChallenge) && ! empty(getenv('BREMSPACE_HOST_CHALLENGE'))) {
+                        $existingHostChallenge = trim((string) getenv('BREMSPACE_HOST_CHALLENGE'));
                     }
                     $appKey = ! empty($existingKey) ? $existingKey : 'base64:'.base64_encode(random_bytes(32));
 
@@ -1020,6 +1033,7 @@ APP_FALLBACK_LOCALE=en
 APP_ROLE={$appRole}
 NETWORK_MODE={$networkMode}
 CLOUDFLARE_TUNNEL_TOKEN={$tunnelToken}
+BREMSPACE_HOST_CHALLENGE={$existingHostChallenge}
 
 LOG_CHANNEL=stack
 LOG_STACK=single
@@ -1142,6 +1156,11 @@ EOF;
                             'message' => 'Mode Client: Data master menggunakan database Server Induk (seeding dilewati).',
                         ]);
                         break;
+                    }
+
+                    if (! file_exists($baseDir.'/database/seeders/DatabaseSeeder.php') && is_dir($baseDir.'/database_template')) {
+                        @mkdir($baseDir.'/database/seeders', 0775, true);
+                        @shell_exec("cp -rn {$baseDir}/database_template/* {$baseDir}/database/ 2>/dev/null");
                     }
 
                     $artisanPath = '"'.$baseDir.'/artisan"';

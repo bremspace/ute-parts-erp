@@ -37,14 +37,105 @@ final class HardwareIdentifier
     }
 
     /**
+     * Dapatkan Host Challenge yang diteruskan dari OS host ke dalam container/runtime
+     */
+    public static function getHostChallenge(): ?string
+    {
+        // 1. Cek environment variables (getenv, $_ENV, $_SERVER)
+        $envKeys = ['BREMSPACE_HOST_CHALLENGE'];
+        foreach ($envKeys as $key) {
+            $val = getenv($key);
+            if (! empty($val) && is_string($val)) {
+                return trim($val);
+            }
+            if (! empty($_ENV[$key]) && is_string($_ENV[$key])) {
+                return trim($_ENV[$key]);
+            }
+            if (! empty($_SERVER[$key]) && is_string($_SERVER[$key])) {
+                return trim($_SERVER[$key]);
+            }
+        }
+
+        // 2. Cek fungsi helper env() Laravel jika tersedia
+        if (function_exists('env')) {
+            $envVal = env('BREMSPACE_HOST_CHALLENGE');
+            if (! empty($envVal) && is_string($envVal)) {
+                return trim($envVal);
+            }
+        }
+
+        // 3. Cek langsung dari file .env di berbagai lokasi standar
+        $envCandidate = null;
+        try {
+            if (function_exists('base_path') && function_exists('app') && app()->has('path.base')) {
+                $envCandidate = base_path('.env');
+            }
+        } catch (\Throwable) {
+            $envCandidate = null;
+        }
+
+        $possibleEnvPaths = array_filter([
+            $envCandidate,
+            dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'.env',
+            '/var/www/html/.env',
+        ]);
+        foreach ($possibleEnvPaths as $envPath) {
+            if (file_exists($envPath)) {
+                $content = @file_get_contents($envPath);
+                if ($content && preg_match('/^BREMSPACE_HOST_CHALLENGE=(.+)$/m', $content, $matches)) {
+                    $val = trim($matches[1], " \t\n\r\0\x0B\"'");
+                    if (! empty($val)) {
+                        return $val;
+                    }
+                }
+            }
+        }
+
+        // 4. Fallback dalam container Docker: Cek storage/license.key jika sudah memiliki signature yang sah
+        $licenseCandidate = null;
+        try {
+            if (class_exists(LicenseVerifier::class)) {
+                $licenseCandidate = LicenseVerifier::getLicenseFilePath();
+            }
+        } catch (\Throwable) {
+            $licenseCandidate = null;
+        }
+
+        $possibleLicensePaths = array_filter([
+            $licenseCandidate,
+            dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'license.key',
+            '/var/www/html/storage/license.key',
+        ]);
+        foreach ($possibleLicensePaths as $licPath) {
+            if (file_exists($licPath)) {
+                $licContent = @file_get_contents($licPath);
+                if ($licContent) {
+                    $json = json_decode(trim($licContent), true);
+                    if (is_array($json) && ! empty($json['challenge']) && ! empty($json['key'])) {
+                        // Pastikan key valid secara kriptografis untuk challenge tersebut
+                        if (class_exists(LicenseVerifier::class) && LicenseVerifier::verifyKey((string) $json['challenge'], (string) $json['key'])) {
+                            return (string) $json['challenge'];
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Format Machine Challenge Code yang ramah pengguna untuk dikirim via WhatsApp
      * Format: BREM-XXXX-YYYY-ZZZZ (12 karakter alfanumerik)
      */
     public static function getChallengeCode(): string
     {
         // Jika berjalan di dalam kontainer Docker dan terdapat binding challenge host resmi
-        if (self::isDocker() && ! empty(getenv('BREMSPACE_HOST_CHALLENGE'))) {
-            return (string) getenv('BREMSPACE_HOST_CHALLENGE');
+        if (self::isDocker()) {
+            $hostChallenge = self::getHostChallenge();
+            if (! empty($hostChallenge)) {
+                return $hostChallenge;
+            }
         }
 
         $hash = strtoupper(self::getMachineHash());

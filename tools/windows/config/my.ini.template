@@ -1,0 +1,37 @@
+[mysqld]
+bind-address = 127.0.0.1
+port = {{DB_PORT}}
+socket = "mariadb_bremspace.sock"
+pid-file = "mariadb_bremspace.pid"
+basedir = "{{ENGINE_DIR}}"
+datadir = "{{DATA_DIR}}"
+tmpdir = "{{TMP_DIR}}"
+
+# Storage Engine & Reliability (Anti-Corruption on Windows sudden shutdown)
+default_storage_engine = InnoDB
+innodb_file_per_table = 1
+innodb_flush_log_at_trx_commit = 1
+sync_binlog = 1
+innodb_doublewrite = 1
+innodb_buffer_pool_size = 128M
+innodb_log_file_size = 32M
+
+# Resource Optimization for POS Desktop (RAM Conservation < 150MB)
+max_connections = 25
+key_buffer_size = 16M
+table_open_cache = 400
+performance_schema = OFF
+skip-character-set-client-handshake
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
+# Local execution security
+skip-name-resolve
+
+[client]
+port = {{DB_PORT}}
+default-character-set = utf8mb4
+
+[mysqladmin]
+port = {{DB_PORT}}
+user = root

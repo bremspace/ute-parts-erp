@@ -46,6 +46,9 @@ RUN composer install --no-dev --prefer-dist --optimize-autoloader --no-interacti
 # Backup public assets to template directory for volume sync
 RUN cp -r public /var/www/html/public_template
 
+# Backup database directory to template for volume fallback
+RUN cp -r database /var/www/html/database_template
+
 # Prepare storage directories, database & cache permissions
 RUN mkdir -p \
     storage/framework/cache/data \

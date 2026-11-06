@@ -27,7 +27,6 @@ services:
     volumes:
       - .:/var/www/html
       - ./storage:/var/www/html/storage
-      - ./database:/var/www/html/database
       - ./docker/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     networks:
       - bremspace-network
@@ -88,7 +87,6 @@ services:
     volumes:
       - .:/var/www/html
       - ./storage:/var/www/html/storage
-      - ./database:/var/www/html/database
       - ./docker/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     networks:
       - bremspace-network

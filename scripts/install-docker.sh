@@ -217,6 +217,13 @@ if [ ! -f ".env" ]; then
     fi
 fi
 export BREMSPACE_HOST_CHALLENGE="$CHALLENGE_CODE"
+if [ -f ".env" ]; then
+    if grep -q "^BREMSPACE_HOST_CHALLENGE=" .env; then
+        sed -i "s/^BREMSPACE_HOST_CHALLENGE=.*/BREMSPACE_HOST_CHALLENGE=$CHALLENGE_CODE/" .env
+    else
+        echo "BREMSPACE_HOST_CHALLENGE=$CHALLENGE_CODE" >> .env
+    fi
+fi
 
 # ------------------------------------------------------------------------------
 # 5b. Autentikasi GitHub Container Registry (GHCR) Otomatis
@@ -233,6 +240,11 @@ fi
 # 6. Jalankan Docker Compose Stack
 # ------------------------------------------------------------------------------
 echo "ℹ Memulai layanan kontainer Bremspace (Port 1741)..."
+
+# Pastikan volume database tidak menimpa seeder bawaan image
+if [ -f "compose.yaml" ]; then
+    sed -i '/\.\/database:\/var\/www\/html\/database/d' compose.yaml 2>/dev/null || true
+fi
 if grep -q "build:" compose.yaml 2>/dev/null && [ -f "Dockerfile" ]; then
     $DOCKER_COMPOSE_CMD up -d --build
 else

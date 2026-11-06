@@ -37,10 +37,25 @@ if grep -q "^APP_KEY=$" .env 2>/dev/null || ! grep -q "^APP_KEY=" .env 2>/dev/nu
     php artisan key:generate --force 2>/dev/null || true
 fi
 
+# Pastikan binding challenge host tersimpan di .env untuk middleware lisensi
+if [ -n "$BREMSPACE_HOST_CHALLENGE" ] && [ -f ".env" ]; then
+    if ! grep -q "^BREMSPACE_HOST_CHALLENGE=" .env; then
+        echo "BREMSPACE_HOST_CHALLENGE=$BREMSPACE_HOST_CHALLENGE" >> .env
+    fi
+fi
+
 # 2. Sinkronkan asset public terbaru dari public_template jika volume public dimount
 if [ -d "/var/www/html/public_template" ]; then
     mkdir -p public/build
     cp -ru /var/www/html/public_template/* public/ 2>/dev/null || true
+fi
+
+# 2b. Sinkronkan file database/seeders jika direktori database dimount dari host
+if [ -d "/var/www/html/database_template" ]; then
+    if [ ! -f "/var/www/html/database/seeders/DatabaseSeeder.php" ]; then
+        mkdir -p database/seeders database/migrations database/factories
+        cp -rn /var/www/html/database_template/* database/ 2>/dev/null || true
+    fi
 fi
 
 # 3. Pastikan struktur direktori storage & izin tulis siap

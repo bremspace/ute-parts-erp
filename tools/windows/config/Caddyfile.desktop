@@ -1,0 +1,21 @@
+{
+    admin off
+    auto_https off
+    log {
+        output discard
+    }
+}
+
+:{{APP_PORT}} {
+    bind 127.0.0.1
+    root * "{{APP_DIR}}/public"
+    encode zstd gzip
+
+    # Serve static assets directly
+    file_server
+
+    # FrankPHP native worker for Laravel
+    php_server {
+        resolve_root_symlink false
+    }
+}

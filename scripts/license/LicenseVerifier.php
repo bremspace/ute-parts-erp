@@ -26,6 +26,11 @@ final class LicenseVerifier
      */
     public static function getLicenseFilePath(): string
     {
+        $customPath = getenv('BREMSPACE_LICENSE_PATH');
+        if (! empty($customPath)) {
+            return (string) $customPath;
+        }
+
         $baseDir = dirname(__DIR__, 2);
 
         return $baseDir.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'license.key';

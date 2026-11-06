@@ -275,6 +275,17 @@ if (-not (Test-Path $envFile)) {
     }
 }
 $env:BREMSPACE_HOST_CHALLENGE = $challengeCode
+if (Test-Path $envFile) {
+    try {
+        $envTxt = Get-Content $envFile -Raw -ErrorAction SilentlyContinue
+        if ($envTxt -match '(?m)^BREMSPACE_HOST_CHALLENGE=') {
+            $envTxt = $envTxt -replace '(?m)^BREMSPACE_HOST_CHALLENGE=.*$', "BREMSPACE_HOST_CHALLENGE=$challengeCode"
+        } else {
+            $envTxt += "`r`nBREMSPACE_HOST_CHALLENGE=$challengeCode"
+        }
+        Set-Content -Path $envFile -Value $envTxt -Encoding UTF8
+    } catch {}
+}
 
 # Helper verifikasi koneksi port TCP
 function Test-PortListening([int]$p) {
@@ -296,6 +307,18 @@ function Test-PortListening([int]$p) {
 # 5. Jalankan Service Stack via Docker Compose
 # ------------------------------------------------------------------------------
 Write-Host "[4/5] Menyalakan kontainer Bremspace ERP dan POS (Port 1741)..." -ForegroundColor Cyan
+
+# Pastikan volume database tidak menimpa file seeder bawaan container
+$composeFile = Join-Path $projectRoot 'compose.yaml'
+if (Test-Path $composeFile) {
+    try {
+        $composeRaw = Get-Content $composeFile -Raw -ErrorAction SilentlyContinue
+        if ($composeRaw -match '-\s*\./database:/var/www/html/database') {
+            $composeClean = $composeRaw -replace '(?m)^\s*-\s*\./database:/var/www/html/database\r?\n?', ''
+            Set-Content -Path $composeFile -Value $composeClean -Encoding UTF8
+        }
+    } catch {}
+}
 
 $ghTokenObf = "dHZndWhvX2NuZ18xMU83VDdLVFYwRkg3WWtqS3VBNmJLX1V4dmN4UUl4czh0MUtGRVRXYmdoWGxZZnZrZ1RXOWlUaUdXc0NqSVZYdzgzUEJHRUVNNnhJN1ljYjRp"
 $ghPat = ""

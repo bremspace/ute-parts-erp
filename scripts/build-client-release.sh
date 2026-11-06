@@ -58,7 +58,7 @@ if [ -f ".env.example" ]; then
     cp .env.example "$TMP_DIR/.env.example"
 fi
 
-# 3. Siapkan struktur folder kosong
+# 3. Siapkan struktur folder penyimpanan lokal & database fallback
 mkdir -p "$TMP_DIR/storage/framework/cache/data"
 mkdir -p "$TMP_DIR/storage/framework/sessions"
 mkdir -p "$TMP_DIR/storage/framework/views"
@@ -66,6 +66,9 @@ mkdir -p "$TMP_DIR/storage/logs"
 mkdir -p "$TMP_DIR/storage/app/public"
 mkdir -p "$TMP_DIR/bootstrap/cache"
 mkdir -p "$TMP_DIR/database"
+cp -r database/seeders "$TMP_DIR/database/" 2>/dev/null || true
+cp -r database/migrations "$TMP_DIR/database/" 2>/dev/null || true
+cp -r database/factories "$TMP_DIR/database/" 2>/dev/null || true
 mkdir -p "$TMP_DIR/docker/data/mysql"
 
 # 4. Kompresi menjadi ZIP

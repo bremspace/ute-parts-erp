@@ -23,7 +23,6 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-bremspace_secret}
     volumes:
       - ./storage:/var/www/html/storage
-      - ./database:/var/www/html/database
       - ./.env:/var/www/html/.env
       - ./docker/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
       - bremspace-public:/var/www/html/public
@@ -81,7 +80,6 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-bremspace_secret}
     volumes:
       - ./storage:/var/www/html/storage
-      - ./database:/var/www/html/database
       - ./.env:/var/www/html/.env
       - ./docker/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     networks:

@@ -32,7 +32,8 @@ class EnsureLicenseValid
         }
 
         // Jalur berkas lisensi
-        $licenseFile = storage_path('license.key');
+        $customPath = getenv('BREMSPACE_LICENSE_PATH');
+        $licenseFile = ! empty($customPath) ? (string) $customPath : storage_path('license.key');
         if (! file_exists($licenseFile)) {
             // Jika belum berlisensi dan belum selesai setup wizard, izinkan setup
             if (! file_exists(storage_path('installed.lock'))) {
