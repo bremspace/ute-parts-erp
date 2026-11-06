@@ -97,4 +97,44 @@ class NetworkManagementServiceTest extends TestCase
         $this->assertStringContainsString('<svg', $urls['lan_qr_svg']);
         $this->assertStringContainsString('</svg>', $urls['lan_qr_svg']);
     }
+
+    public function test_normalize_domain_and_parse_parts(): void
+    {
+        $updateService = $this->createMock(AppUpdateService::class);
+        $service = new NetworkManagementService($updateService);
+
+        $this->assertEquals('pos.tokoberkah.com', $service->normalizeDomain('https://pos.tokoberkah.com:8443/shop'));
+        $this->assertEquals('tokosaya.id', $service->normalizeDomain('HTTP://TOKOSAYA.ID/'));
+
+        $partsSub = $service->parseDomainParts('pos.tokoberkah.com');
+        $this->assertEquals('pos', $partsSub['host']);
+        $this->assertEquals('tokoberkah.com', $partsSub['root_domain']);
+
+        $partsApex = $service->parseDomainParts('tokoberkah.com');
+        $this->assertEquals('@', $partsApex['host']);
+        $this->assertEquals('tokoberkah.com', $partsApex['root_domain']);
+    }
+
+    public function test_check_domain_dns_validates_and_formats_instructions(): void
+    {
+        $updateService = $this->createMock(AppUpdateService::class);
+        $service = new NetworkManagementService($updateService);
+
+        // Invalid domain
+        $invalid = $service->checkDomainDns('invalid_not_domain');
+        $this->assertFalse($invalid['is_pointed']);
+        $this->assertEquals('invalid_domain', $invalid['status']);
+
+        // Valid domain with Cloudflare tunnel token decode
+        $tokenPayload = base64_encode(json_encode(['a' => 'acc123', 't' => 'uuid-tunnel-xyz', 's' => 'sec456']));
+        $valid = $service->checkDomainDns('kasir.tokoberkah.com', $tokenPayload);
+
+        $this->assertEquals('kasir.tokoberkah.com', $valid['domain']);
+        $this->assertEquals('kasir', $valid['host']);
+        $this->assertEquals('tokoberkah.com', $valid['root_domain']);
+        $this->assertIsArray($valid['instructions']);
+        $this->assertEquals('CNAME', $valid['instructions']['type']);
+        $this->assertEquals('kasir', $valid['instructions']['name']);
+        $this->assertEquals('uuid-tunnel-xyz.cfargotunnel.com', $valid['instructions']['target']);
+    }
 }

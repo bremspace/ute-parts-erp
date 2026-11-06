@@ -143,6 +143,190 @@ class NetworkManagementService
     }
 
     /**
+     * Sanitasi dan normalisasi string domain.
+     */
+    public function normalizeDomain(string $domain): string
+    {
+        $clean = preg_replace('#^https?://#i', '', trim($domain));
+        $clean = explode('/', $clean)[0];
+        $clean = explode(':', $clean)[0];
+
+        return strtolower(trim($clean));
+    }
+
+    /**
+     * Parse host (subdomain) dan root domain untuk instruksi pointing DNS.
+     *
+     * @return array{host: string, root_domain: string}
+     */
+    public function parseDomainParts(string $domain): array
+    {
+        $clean = $this->normalizeDomain($domain);
+        $parts = explode('.', $clean);
+
+        if (count($parts) <= 2) {
+            return [
+                'host' => '@',
+                'root_domain' => $clean,
+            ];
+        }
+
+        $rootDomain = implode('.', array_slice($parts, -2));
+        $host = implode('.', array_slice($parts, 0, -2));
+
+        return [
+            'host' => $host,
+            'root_domain' => $rootDomain,
+        ];
+    }
+
+    /**
+     * Verifikasi konfigurasi DNS (CNAME / A record) untuk custom domain.
+     *
+     * @return array{
+     *     domain: string,
+     *     host: string,
+     *     root_domain: string,
+     *     is_pointed: bool,
+     *     status: 'tunnel_ready'|'pointed'|'not_pointed'|'invalid_domain',
+     *     status_badge: string,
+     *     cname_records: list<string>,
+     *     a_records: list<string>,
+     *     resolved_ip: ?string,
+     *     message: string,
+     *     instructions: array{
+     *         type: string,
+     *         name: string,
+     *         target: string,
+     *         ttl: string,
+     *         proxy_status: string
+     *     }
+     * }
+     */
+    public function checkDomainDns(string $domain, ?string $tunnelToken = null): array
+    {
+        $cleanDomain = $this->normalizeDomain($domain);
+
+        if (empty($cleanDomain) || ! preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/', $cleanDomain)) {
+            return [
+                'domain' => $cleanDomain ?: $domain,
+                'host' => '@',
+                'root_domain' => '',
+                'is_pointed' => false,
+                'status' => 'invalid_domain',
+                'status_badge' => 'Domain Tidak Valid',
+                'cname_records' => [],
+                'a_records' => [],
+                'resolved_ip' => null,
+                'message' => 'Format nama domain tidak valid. Contoh yang benar: kasir.tokosaya.com atau tokosaya.id',
+                'instructions' => [
+                    'type' => 'CNAME',
+                    'name' => '@',
+                    'target' => '<tunnel-id>.cfargotunnel.com',
+                    'ttl' => 'Auto',
+                    'proxy_status' => 'Proxied (Awan Oranye Cloudflare)',
+                ],
+            ];
+        }
+
+        $parts = $this->parseDomainParts($cleanDomain);
+        $host = $parts['host'];
+        $rootDomain = $parts['root_domain'];
+
+        $cnameList = [];
+        $aList = [];
+        $resolvedIp = null;
+
+        // Ambil record CNAME
+        $cnameRecords = @dns_get_record($cleanDomain, DNS_CNAME) ?: [];
+        foreach ($cnameRecords as $rec) {
+            if (! empty($rec['target'])) {
+                $cnameList[] = strtolower((string) $rec['target']);
+            }
+        }
+
+        // Ambil record A
+        $aRecords = @dns_get_record($cleanDomain, DNS_A) ?: [];
+        foreach ($aRecords as $rec) {
+            if (! empty($rec['ip'])) {
+                $aList[] = (string) $rec['ip'];
+            }
+        }
+
+        // Fallback IP resolution
+        try {
+            $ip = @gethostbyname($cleanDomain);
+            if ($ip && $ip !== $cleanDomain && filter_var($ip, FILTER_VALIDATE_IP)) {
+                $resolvedIp = $ip;
+                if (! in_array($ip, $aList, true)) {
+                    $aList[] = $ip;
+                }
+            }
+        } catch (Throwable) {
+        }
+
+        // Tentukan target instruksi CNAME
+        $targetInstruction = '<tunnel-id>.cfargotunnel.com';
+        if (! empty($tunnelToken)) {
+            $decoded = @json_decode(@base64_decode($tunnelToken), true);
+            if (is_array($decoded) && ! empty($decoded['t'])) {
+                $targetInstruction = $decoded['t'].'.cfargotunnel.com';
+            }
+        }
+
+        // Evaluasi status pointing
+        $isTunnel = false;
+        foreach ($cnameList as $cname) {
+            if (str_contains($cname, '.cfargotunnel.com') || str_contains($cname, 'cloudflare')) {
+                $isTunnel = true;
+                break;
+            }
+        }
+
+        if ($isTunnel) {
+            $status = 'tunnel_ready';
+            $statusBadge = 'Terhubung ke Cloudflare Tunnel';
+            $isPointed = true;
+            $message = "DNS domain {$cleanDomain} sudah terarah sempurna ke Cloudflare Tunnel!";
+        } elseif (! empty($cnameList)) {
+            $status = 'pointed';
+            $statusBadge = 'CNAME Terarah';
+            $isPointed = true;
+            $message = "DNS domain {$cleanDomain} mengarah ke CNAME: ".implode(', ', $cnameList);
+        } elseif (! empty($aList)) {
+            $status = 'pointed';
+            $statusBadge = 'A Record Terarah';
+            $isPointed = true;
+            $message = "DNS domain {$cleanDomain} mengarah ke IP: ".implode(', ', $aList);
+        } else {
+            $status = 'not_pointed';
+            $statusBadge = 'Belum Mengarah';
+            $isPointed = false;
+            $message = "DNS domain {$cleanDomain} belum terdeteksi. Silakan tambahkan DNS CNAME sesuai instruksi di bawah.";
+        }
+
+        return [
+            'domain' => $cleanDomain,
+            'host' => $host,
+            'root_domain' => $rootDomain,
+            'is_pointed' => $isPointed,
+            'status' => $status,
+            'status_badge' => $statusBadge,
+            'cname_records' => array_values(array_unique($cnameList)),
+            'a_records' => array_values(array_unique($aList)),
+            'resolved_ip' => $resolvedIp,
+            'message' => $message,
+            'instructions' => [
+                'type' => 'CNAME',
+                'name' => $host,
+                'target' => $targetInstruction,
+                'ttl' => 'Auto',
+                'proxy_status' => 'Proxied (Awan Oranye Cloudflare)',
+            ],
+        ];
+    }
+
+    /**
      * Dapatkan rincian URL & QR Code untuk akses multi-perangkat (HP/Tablet di LAN & Online).
      *
      * @return array{
@@ -254,22 +438,40 @@ class NetworkManagementService
             if ($proc->isSuccessful() && ! empty(trim($proc->getOutput()))) {
                 $path = trim(explode("\n", $proc->getOutput())[0]);
                 $installed = file_exists($path);
+            }
 
-                if ($installed) {
-                    $vProc = Process::fromShellCommandline("{$path} --version");
-                    $vProc->run();
-                    if ($vProc->isSuccessful()) {
-                        $version = trim($vProc->getOutput());
+            // Fallback lokasi instalasi desktop lokal Windows
+            if (! $installed && PHP_OS_FAMILY === 'Windows') {
+                $baseAppDir = function_exists('base_path') ? base_path() : getcwd();
+                $candidates = [
+                    $baseAppDir.DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'windows'.DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'cloudflared.exe',
+                    $baseAppDir.DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'cloudflared.exe',
+                    dirname($baseAppDir).DIRECTORY_SEPARATOR.'cloudflared'.DIRECTORY_SEPARATOR.'cloudflared.exe',
+                    'C:\\BremspaceERP\\tools\\cloudflared.exe',
+                ];
+                foreach ($candidates as $cand) {
+                    if (file_exists($cand)) {
+                        $path = $cand;
+                        $installed = true;
+                        break;
                     }
-
-                    // Cek apakah proses cloudflared sedang berjalan
-                    $pCmd = PHP_OS_FAMILY === 'Windows'
-                        ? 'tasklist | findstr /i cloudflared'
-                        : 'pgrep -x cloudflared || systemctl is-active cloudflared 2>/dev/null';
-                    $pProc = Process::fromShellCommandline($pCmd);
-                    $pProc->run();
-                    $running = $pProc->isSuccessful() && ! empty(trim($pProc->getOutput()));
                 }
+            }
+
+            if ($installed) {
+                $vProc = Process::fromShellCommandline("\"{$path}\" --version");
+                $vProc->run();
+                if ($vProc->isSuccessful()) {
+                    $version = trim($vProc->getOutput());
+                }
+
+                // Cek apakah proses cloudflared sedang berjalan
+                $pCmd = PHP_OS_FAMILY === 'Windows'
+                    ? 'tasklist | findstr /i cloudflared'
+                    : 'pgrep -x cloudflared || systemctl is-active cloudflared 2>/dev/null';
+                $pProc = Process::fromShellCommandline($pCmd);
+                $pProc->run();
+                $running = $pProc->isSuccessful() && ! empty(trim($pProc->getOutput()));
             }
         } catch (Throwable) {
         }
@@ -287,7 +489,19 @@ class NetworkManagementService
      */
     protected function applyCloudflaredService(string $token): string
     {
-        if (PHP_OS_FAMILY !== 'Windows') {
+        if (PHP_OS_FAMILY === 'Windows') {
+            try {
+                $cf = $this->checkCloudflared();
+                $bin = ! empty($cf['path']) ? "\"{$cf['path']}\"" : 'cloudflared';
+                $proc = Process::fromShellCommandline("{$bin} service install {$token}");
+                $proc->run();
+                $startProc = Process::fromShellCommandline('net start cloudflared');
+                $startProc->run();
+
+                return 'Service Cloudflare Tunnel Windows berhasil didaftarkan & dijalankan';
+            } catch (Throwable) {
+            }
+        } else {
             try {
                 // Jika memiliki hak sudo / root
                 $proc = Process::fromShellCommandline("sudo cloudflared service install {$token} 2>/dev/null || cloudflared service install {$token} 2>/dev/null");
@@ -310,7 +524,13 @@ class NetworkManagementService
      */
     protected function stopCloudflaredService(): void
     {
-        if (PHP_OS_FAMILY !== 'Windows') {
+        if (PHP_OS_FAMILY === 'Windows') {
+            try {
+                $proc = Process::fromShellCommandline('net stop cloudflared 2>nul || taskkill /F /IM cloudflared.exe 2>nul');
+                $proc->run();
+            } catch (Throwable) {
+            }
+        } else {
             try {
                 $proc = Process::fromShellCommandline('sudo systemctl stop cloudflared 2>/dev/null || systemctl stop cloudflared 2>/dev/null');
                 $proc->run();

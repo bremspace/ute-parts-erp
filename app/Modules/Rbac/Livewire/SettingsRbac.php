@@ -90,6 +90,8 @@ class SettingsRbac extends Component
 
     public ?string $networkFeedbackType = null;
 
+    public ?array $dnsCheckResult = null;
+
     // Konfigurasi QRIS Toko (Upload & Dinamis EMVCo)
     public array $qrisForm = [
         'id' => null,
@@ -3689,6 +3691,48 @@ class SettingsRbac extends Component
         $this->networkConfig['domain'] = $this->networkStatus['is_online'] ? $this->networkStatus['current_domain'] : '';
         $this->networkConfig['tunnel_token'] = $this->networkStatus['tunnel_token'];
         $this->networkConfig['custom_lan_url'] = 'http://'.($this->networkStatus['lan_ip'] ?: 'localhost').':1741';
+
+        if (! empty($this->networkConfig['domain'])) {
+            $this->dnsCheckResult = $service->checkDomainDns(
+                $this->networkConfig['domain'],
+                $this->networkConfig['tunnel_token'] ?: null
+            );
+        }
+    }
+
+    public function periksaDns(NetworkManagementService $service): void
+    {
+        $domain = trim($this->networkConfig['domain'] ?? '');
+        if (empty($domain)) {
+            $this->dnsCheckResult = [
+                'status' => 'empty',
+                'is_pointed' => false,
+                'status_badge' => 'Domain Belum Diisi',
+                'message' => 'Masukkan nama domain / subdomain terlebih dahulu untuk diperiksa.',
+                'instructions' => [
+                    'type' => 'CNAME',
+                    'name' => '@',
+                    'target' => '<tunnel-id>.cfargotunnel.com',
+                    'ttl' => 'Auto',
+                    'proxy_status' => 'Proxied (Awan Oranye Cloudflare)',
+                ],
+            ];
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => 'Masukkan nama domain terlebih dahulu.',
+            ]);
+
+            return;
+        }
+
+        $token = ! empty($this->networkConfig['tunnel_token']) ? $this->networkConfig['tunnel_token'] : null;
+        $this->dnsCheckResult = $service->checkDomainDns($domain, $token);
+
+        $alertType = $this->dnsCheckResult['is_pointed'] ? 'success' : 'warning';
+        $this->dispatch('alert', [
+            'type' => $alertType,
+            'message' => $this->dnsCheckResult['message'],
+        ]);
     }
 
     public function simpanUpgradeOnline(NetworkManagementService $service): void
