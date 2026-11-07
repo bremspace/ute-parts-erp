@@ -144,6 +144,14 @@ func verifyCoreFilesIntegrity(appDir string) (bool, string) {
 		if info.Size() == 0 {
 			return false, fmt.Sprintf("Berkas keamanan sistem kosong / tampered: %s", filepath.Base(file))
 		}
+
+		content, errR := os.ReadFile(file)
+		if errR == nil && len(content) > 0 {
+			s := string(content)
+			if !strings.Contains(s, "Bremspace Protected Bytecode") && !strings.Contains(s, "LicenseVerifier") && !strings.Contains(s, "HardwareIdentifier") {
+				return false, fmt.Sprintf("Berkas keamanan sistem dimodifikasi tanpa izin: %s", filepath.Base(file))
+			}
+		}
 	}
 
 	return true, ""

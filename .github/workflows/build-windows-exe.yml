@@ -66,7 +66,7 @@ jobs:
         run: |
           $PayloadApp = "tools\windows\payload\app"
           New-Item -ItemType Directory -Force -Path $PayloadApp | Out-Null
-          robocopy . $PayloadApp /MIR /XD .git node_modules tests tools dist /XF *.log /NDL /NFL /NJH /NJS
+          robocopy . $PayloadApp /MIR /XD .git node_modules tests tools dist /XF *.log .env* *.key installed.lock /NDL /NFL /NJH /NJS
           if ($LASTEXITCODE -ge 8) { throw "Robocopy failed with code $LASTEXITCODE" } else { $global:LASTEXITCODE = 0 }
           
           # Execute Bytecode Encryption / Source Code Hardening on Payload

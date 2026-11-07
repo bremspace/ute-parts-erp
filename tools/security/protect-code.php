@@ -24,7 +24,7 @@ echo "   Bremspace ERP — Bytecode Protection & Anti-Tamper Pipeline\n";
 echo "   Target: {$targetDir}\n";
 echo "======================================================================\n";
 
-$targetSubDirs = ['app', 'routes', 'scripts/license'];
+$targetSubDirs = ['app', 'routes', 'config', 'scripts/license'];
 $protectedCount = 0;
 $skippedCount = 0;
 $errorCount = 0;

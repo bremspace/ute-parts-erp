@@ -37,6 +37,9 @@ mkdir -p "${PAYLOAD_DIR}/app"
 rsync -a --exclude='.git' \
          --exclude='node_modules' \
          --exclude='tests' \
+         --exclude='.env*' \
+         --exclude='*.key' \
+         --exclude='installed.lock' \
          --exclude='storage/logs/*.log' \
          --exclude='storage/framework/cache/data/*' \
          --exclude='storage/framework/sessions/*' \

@@ -30,6 +30,13 @@ rsync -a --exclude='.git' \
          --exclude='tests' \
          --exclude='tools' \
          --exclude='dist' \
+         --exclude='.env*' \
+         --exclude='*.key' \
+         --exclude='installed.lock' \
+         --exclude='storage/logs/*.log' \
+         --exclude='storage/framework/cache/data/*' \
+         --exclude='storage/framework/sessions/*' \
+         --exclude='storage/framework/views/*' \
          --exclude='*.log' \
          "$PROJECT_ROOT/" "$APP_BUNDLE/Contents/Resources/app/"
 

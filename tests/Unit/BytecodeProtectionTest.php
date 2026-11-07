@@ -22,6 +22,7 @@ class BytecodeProtectionTest extends TestCase
         $this->tempDir = sys_get_temp_dir().DIRECTORY_SEPARATOR.'test_protection_'.uniqid();
         @mkdir($this->tempDir.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'Services', 0777, true);
         @mkdir($this->tempDir.DIRECTORY_SEPARATOR.'routes', 0777, true);
+        @mkdir($this->tempDir.DIRECTORY_SEPARATOR.'config', 0777, true);
         @mkdir($this->tempDir.DIRECTORY_SEPARATOR.'scripts'.DIRECTORY_SEPARATOR.'license', 0777, true);
     }
 
@@ -159,5 +160,35 @@ PHP;
 
         $this->assertTrue(LicenseVerifier::verifyKey($challenge, $signature));
         $this->assertFalse(LicenseVerifier::verifyKey($challenge, 'ACT-0000-0000-0000-0000'));
+    }
+
+    public function test_protect_code_script_encrypts_config_files(): void
+    {
+        $sampleConfig = <<<'PHP'
+<?php
+
+return [
+    'secret_app_key' => 'super-secret-config-12345',
+    'app_mode' => 'standalone',
+];
+PHP;
+
+        $targetConfigFile = $this->tempDir.DIRECTORY_SEPARATOR.'config'.DIRECTORY_SEPARATOR.'security_test.php';
+        file_put_contents($targetConfigFile, $sampleConfig);
+
+        $protectScript = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'tools'.DIRECTORY_SEPARATOR.'security'.DIRECTORY_SEPARATOR.'protect-code.php';
+        $cmd = escapeshellcmd("php {$protectScript} ").escapeshellarg($this->tempDir);
+        exec($cmd, $output, $returnCode);
+
+        $this->assertSame(0, $returnCode);
+
+        $protectedContent = (string) file_get_contents($targetConfigFile);
+        $this->assertStringContainsString('Bremspace Protected Bytecode', $protectedContent);
+        $this->assertStringNotContainsString('super-secret-config-12345', $protectedContent);
+
+        $configData = require $targetConfigFile;
+        $this->assertIsArray($configData);
+        $this->assertSame('super-secret-config-12345', $configData['secret_app_key']);
+        $this->assertSame('standalone', $configData['app_mode']);
     }
 }
