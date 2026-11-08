@@ -39,8 +39,24 @@ final class LicenseVerifier
     /**
      * Periksa apakah lisensi aktif dan sah di mesin ini
      */
-    public static function isLicensed(): bool
+    public static function isLicensed(bool $ignoreSwitch = false): bool
     {
+        // Proteksi hardware hanya aktif jika diset eksplisit BREMSPACE_LICENSE_ENABLED=true di .env / environment
+        // (Kecuali jika sedang diuji dengan custom BREMSPACE_LICENSE_PATH atau $ignoreSwitch)
+        if (! $ignoreSwitch && empty(getenv('BREMSPACE_LICENSE_PATH'))) {
+            $envEnabled = getenv('BREMSPACE_LICENSE_ENABLED');
+            if ($envEnabled === false && file_exists(dirname(__DIR__, 2).'/.env')) {
+                $envRaw = (string) @file_get_contents(dirname(__DIR__, 2).'/.env');
+                if (preg_match('/^BREMSPACE_LICENSE_ENABLED=(.+)$/m', $envRaw, $m)) {
+                    $envEnabled = trim($m[1], " \t\n\r\0\x0B\"'");
+                }
+            }
+            $isExplicitlyEnabled = in_array(strtolower((string) $envEnabled), ['true', '1', 'yes', 'on'], true);
+            if (! $isExplicitlyEnabled) {
+                return true;
+            }
+        }
+
         $file = self::getLicenseFilePath();
         if (! file_exists($file)) {
             return false;

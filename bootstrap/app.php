@@ -89,8 +89,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Set dynamic asset URL based on request host (IP vs domain)
         $middleware->web(prepend: [SetAssetUrl::class]);
 
-        // Enforcement Lisensi Hardware Mesin (Anti-Duplikasi Aplikasi)
-        $middleware->web(prepend: [EnsureLicenseValid::class]);
+        // Enforcement Lisensi Hardware Mesin (Anti-Duplikasi Aplikasi) - Hanya aktif jika BREMSPACE_LICENSE_ENABLED=true
+        if (filter_var(env('BREMSPACE_LICENSE_ENABLED', false), FILTER_VALIDATE_BOOLEAN)) {
+            $middleware->web(prepend: [EnsureLicenseValid::class]);
+        }
 
         // Apply security headers to all responses
         $middleware->web(append: [SecurityHeaders::class]);

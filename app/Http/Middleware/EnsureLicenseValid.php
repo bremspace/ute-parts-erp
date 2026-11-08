@@ -21,7 +21,7 @@ class EnsureLicenseValid
     public function handle(Request $request, Closure $next): Response
     {
         // Jalur bebas lisensi jika fitur proteksi lisensi dinonaktifkan (default: nonaktif untuk install langsung dari repo)
-        if (! config('app.license_enabled', (bool) env('BREMSPACE_LICENSE_ENABLED', false))) {
+        if (! filter_var(config('app.license_enabled', env('BREMSPACE_LICENSE_ENABLED', false)), FILTER_VALIDATE_BOOLEAN)) {
             return $next($request);
         }
 

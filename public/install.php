@@ -1027,6 +1027,7 @@ APP_NAME="{$appName}"
 APP_ENV=production
 APP_KEY={$appKey}
 APP_DEBUG=false
+BREMSPACE_LICENSE_ENABLED=false
 APP_URL={$appUrl}
 APP_LOCALE=id
 APP_FALLBACK_LOCALE=en
