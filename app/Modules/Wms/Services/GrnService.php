@@ -819,7 +819,7 @@ class GrnService
 
         // Ambil counter terbesar yang sudah terpakai di jurnal headers jika ada
         $terpakaiJurnal = [];
-        if (class_exists(JurnalHeader::class) && Schema::hasTable('jurnal_headers')) {
+        if (class_exists(JurnalHeader::class) && Schema::hasTable('jurnal_header')) {
             $terpakaiJurnal = JurnalHeader::where('cabang_key', $cabangId)
                 ->where('no_jurnal', 'like', $like)
                 ->pluck('no_jurnal')

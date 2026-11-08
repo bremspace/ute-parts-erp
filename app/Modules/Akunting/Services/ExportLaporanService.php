@@ -139,17 +139,40 @@ class ExportLaporanService
     {
         $j = $this->jurnals($dari, $sampai, $cabangId);
         $rows = [['LAPORAN LABA RUGI', $dari.' s.d. '.$sampai], []];
-        $rows[] = ['AKUN', 'JUMLAH (Rp)'];
+
+        $pendapatanRows = [];
+        $bebanRows = [];
+        $totalPendapatan = 0.0;
+        $totalBeban = 0.0;
 
         foreach ($this->groupAkun($j) as $g) {
-            $rows[] = [$g['nama'], $g['saldo']];
+            if ($g['tipe'] === 'pendapatan') {
+                $pendapatanRows[] = [$g['nama'], $g['saldo']];
+                $totalPendapatan += (float) $g['saldo'];
+            } elseif ($g['tipe'] === 'beban') {
+                $bebanRows[] = [$g['nama'], $g['saldo']];
+                $totalBeban += (float) $g['saldo'];
+            }
         }
+
+        $rows[] = ['=== PENDAPATAN ===', ''];
+        $rows[] = ['AKUN', 'JUMLAH (Rp)'];
+        foreach ($pendapatanRows as $r) {
+            $rows[] = $r;
+        }
+        $rows[] = ['TOTAL PENDAPATAN', round($totalPendapatan, 2)];
         $rows[] = [];
-        $debit = $j->sum('debit');
-        $kredit = $j->sum('kredit');
-        $rows[] = ['TOTAL DEBIT', $debit];
-        $rows[] = ['TOTAL KREDIT', $kredit];
-        $rows[] = ['LABA BERSIH (k- d)', round($kredit - $debit, 2)];
+
+        $rows[] = ['=== BEBAN OPERASIONAL ===', ''];
+        $rows[] = ['AKUN', 'JUMLAH (Rp)'];
+        foreach ($bebanRows as $r) {
+            $rows[] = $r;
+        }
+        $rows[] = ['TOTAL BEBAN', round($totalBeban, 2)];
+        $rows[] = [];
+
+        $labaBersih = round($totalPendapatan - $totalBeban, 2);
+        $rows[] = ['LABA BERSIH', $labaBersih];
 
         return $rows;
     }
@@ -298,7 +321,10 @@ class ExportLaporanService
         $rows[] = ['TANGGAL', 'MASUK (Rp)', 'KELUAR (Rp)', 'SELISIH (Rp)'];
 
         $perHari = $this->jurnals($dari, $sampai, $cabangId)
-            ->filter(fn ($j) => $j->akun && $j->akun->kode === '110-01' && $j->akun->tipe === 'aset')
+            ->filter(fn ($j) => $j->akun && $j->akun->tipe === 'aset' && (
+                in_array($j->akun->kelompok, ['kas', 'bank'], true)
+                || in_array($j->akun->kode, ['110-01', '110-02', '110-04'], true)
+            ))
             ->groupBy(fn ($j) => $j->tanggal->toDateString());
 
         $totalMasuk = 0.0;

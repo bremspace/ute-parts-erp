@@ -105,6 +105,8 @@ class StokDeductionService
         }
 
         // Jika ini penjualan POS kasir biasa (bukan pembayaran marketplace order), stok tidak boleh menabrak reservasi online aktif.
+        // [T-14] Kalkulasi reservasi dihitung terhadap total stok fisik cabang (seluruh gudang cabang),
+        // bukan dikurangkan secara mentah dan penuh pada stok tiap gudang individual secara terpisah.
         if (! $izinkanNegatif && ! $isMarketplacePayment && str_contains($jenis, 'penjualan')) {
             $gudang = Gudang::find($gudangId);
             if ($gudang) {
@@ -114,11 +116,32 @@ class StokDeductionService
                     $stok->sku_variant_id,
                     $excludeTransaksiId
                 );
-                $stokBebasReservasi = max(0, $stok->jumlah - $locked - $reserved);
-                if ($stokBebasReservasi < $qty) {
-                    throw new \Exception(
-                        "Stok tidak mencukupi karena {$reserved} unit sedang direservasi pesanan online (produk ID {$produkId}, tersedia bebas: {$stokBebasReservasi})"
-                    );
+
+                if ($reserved > 0) {
+                    $gudangIdsCabang = Gudang::where('cabang_id', $gudang->cabang_id)->pluck('id');
+                    $queryTotalCabang = StokItem::where('produk_id', $produkId)->whereIn('gudang_id', $gudangIdsCabang);
+                    if ($stok->sku_variant_id !== null) {
+                        $queryTotalCabang->where('sku_variant_id', $stok->sku_variant_id);
+                    }
+                    $totalStokCabang = (int) $queryTotalCabang->sum('jumlah');
+
+                    // Hitung total transfer locked di cabang
+                    $totalTransferLockedCabang = 0;
+                    foreach ($queryTotalCabang->get() as $itemCabang) {
+                        $totalTransferLockedCabang += StokTransfer::pendingLockedFor($itemCabang);
+                    }
+
+                    $sisaTersediaCabang = max(0, $totalStokCabang - $totalTransferLockedCabang - $reserved);
+
+                    // Stok di gudang ini yang dapat dipakai tidak boleh melebihi sisa tersedia di cabang
+                    // dan tidak boleh melebihi fisik gudang ini dikurangi transfer locked gudang ini
+                    $tersediaGudangIni = max(0, min($stok->jumlah - $locked, $sisaTersediaCabang));
+
+                    if ($tersediaGudangIni < $qty) {
+                        throw new \Exception(
+                            "Stok tidak mencukupi karena {$reserved} unit sedang direservasi pesanan online di cabang (tersedia bebas cabang: {$sisaTersediaCabang})"
+                        );
+                    }
                 }
             }
         }

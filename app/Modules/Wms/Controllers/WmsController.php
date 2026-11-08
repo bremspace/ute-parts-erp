@@ -29,6 +29,7 @@ use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\GrnService;
 use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\PurchaseOrderService;
+use App\Modules\Wms\Services\TransferStokJournalService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ApiResponse;
@@ -299,6 +300,9 @@ class WmsController extends Controller
                 'tanggal_terima' => now(),
                 'user_penerima_id' => auth()->id(),
             ]);
+
+            // [T-06] Jurnal akuntansi RAK (190-01) vs Persediaan (130-01) jika transfer antar cabang berbeda
+            app(TransferStokJournalService::class)->catatJurnalTerimaTransfer($transfer, auth()->id());
 
             return $this->success($transfer, 'Transfer stok berhasil diterima');
         });

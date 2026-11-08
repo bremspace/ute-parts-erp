@@ -160,6 +160,8 @@ class AkuntingDashboard extends Component
 
     public string $manualDeskripsi = '';
 
+    public bool $manualIsPenyesuaian = false;
+
     public array $manualLines = [];
 
     // Lampiran Bukti Transaksi Jurnal Manual (ISO / Audit)
@@ -1059,7 +1061,7 @@ class AkuntingDashboard extends Component
 
         $validator->after(function (LaravelValidator $validator) use ($serviceLines, $totalDebit, $totalKredit): void {
             // Sumber tunggal: ValidasiBarisJurnal (sama dgn API ACC-04 + JurnalService).
-            foreach (ValidasiBarisJurnal::cekBarisPerBaris($serviceLines) as $index => $perBaris) {
+            foreach (ValidasiBarisJurnal::cekBarisPerBaris($serviceLines, $this->manualIsPenyesuaian) as $index => $perBaris) {
                 foreach ($perBaris as $item) {
                     $validator->errors()->add("baris.{$index}.{$item['field']}", $item['pesan']);
                 }

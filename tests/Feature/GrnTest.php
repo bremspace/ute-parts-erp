@@ -981,12 +981,18 @@ class GrnTest extends TestCase
         $this->assertEquals(7, $stokAkhir);
 
         // Verifikasi Jurnal Retur: Debit Utang 210-01 (150.000), Kredit Persediaan 130-01 (150.000)
-        $debitUtangRetur = JurnalAkuntansi::where('no_jurnal', $retur->no_return)
+        $debitUtangRetur = JurnalAkuntansi::where(function ($q) use ($retur) {
+            $q->where('no_jurnal', $retur->no_return)
+                ->orWhere(fn ($sq) => $sq->where('referensi_tipe', ReturnPembelian::class)->where('referensi_id', $retur->id));
+        })
             ->whereHas('akun', fn ($q) => $q->where('kode', '210-01'))
             ->value('debit');
         $this->assertEquals(150000, (float) $debitUtangRetur);
 
-        $kreditPersediaanRetur = JurnalAkuntansi::where('no_jurnal', $retur->no_return)
+        $kreditPersediaanRetur = JurnalAkuntansi::where(function ($q) use ($retur) {
+            $q->where('no_jurnal', $retur->no_return)
+                ->orWhere(fn ($sq) => $sq->where('referensi_tipe', ReturnPembelian::class)->where('referensi_id', $retur->id));
+        })
             ->whereHas('akun', fn ($q) => $q->where('kode', '130-01'))
             ->value('kredit');
         $this->assertEquals(150000, (float) $kreditPersediaanRetur);

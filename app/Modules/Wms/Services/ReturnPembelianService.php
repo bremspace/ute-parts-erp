@@ -498,10 +498,11 @@ class ReturnPembelianService
                 // Barang discrap/dimusnahkan di vendor -> Jurnal kerugian persediaan
                 $nilaiBuku = round((float) $retur->jumlah, 2);
                 if ($nilaiBuku > 0) {
+                    $noJurnalTolak = $this->jurnalService->generateNoJurnal('retur', $cabangId);
                     $this->jurnalService->post(
-                        $retur->no_return,
+                        $noJurnalTolak,
                         now(),
-                        'manual',
+                        'retur',
                         [
                             ['akun_kode' => '520-08', 'debit' => $nilaiBuku, 'kredit' => 0],
                             ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $nilaiBuku],
@@ -677,10 +678,11 @@ class ReturnPembelianService
                 ];
             }
 
+            $noJurnalSelesai = $this->jurnalService->generateNoJurnal('retur', $cabangId);
             $this->jurnalService->post(
-                $retur->no_return,
+                $noJurnalSelesai,
                 now(),
-                'manual',
+                'retur',
                 $jurnalLines,
                 "Retur Pembelian {$retur->no_return}".($retur->purchaseOrder ? " (PO: {$retur->purchaseOrder->no_po})" : " (Supplier: {$retur->supplier?->nama})").($selisihKlaim != 0 ? ' [Selisih Klaim: Rp '.number_format($selisihKlaim, 0, ',', '.').']' : ''),
                 $cabangId,

@@ -13,6 +13,7 @@ use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\StokTransferItem;
 use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Wms\Services\StokDeductionService;
+use App\Modules\Wms\Services\TransferStokJournalService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -537,6 +538,9 @@ class TransferTab extends Component
 
                 // [F1-4] Catat log aktivitas transfer berbasis Transaction-Centric + Dual-Indexing di metadata
                 app(TransactionActivityLogService::class)->catatTransferStok($transfer, 'diterima');
+
+                // [T-06] Jurnal akuntansi RAK (190-01) vs Persediaan (130-01) jika transfer antar cabang berbeda
+                app(TransferStokJournalService::class)->catatJurnalTerimaTransfer($transfer, auth()->id());
             });
 
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Transfer berhasil diterima dan stok ditambahkan']);

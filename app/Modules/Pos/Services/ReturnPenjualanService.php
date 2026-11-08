@@ -613,10 +613,11 @@ class ReturnPenjualanService
                     $lines[] = ['akun_kode' => '510-02', 'debit' => 0, 'kredit' => $hppFinal];
                 }
 
+                $noJurnal = $this->jurnalService->generateNoJurnal('retur', $cabangId);
                 $this->jurnalService->post(
-                    $retur->no_return,
+                    $noJurnal,
                     now(),
-                    'manual',
+                    'retur',
                     $lines,
                     "Retur Penjualan {$retur->no_return} (Nota: {$retur->transaksi?->no_transaksi})",
                     $cabangId,
@@ -674,10 +675,11 @@ class ReturnPenjualanService
                     $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $hppPengganti];
                 }
 
+                $noJurnalTukar = $this->jurnalService->generateNoJurnal('retur', $cabangId);
                 $this->jurnalService->post(
-                    $retur->no_return,
+                    $noJurnalTukar,
                     now(),
-                    'manual',
+                    'retur',
                     $lines,
                     "Retur Tukar Produk {$retur->no_return} (Nota: {$retur->transaksi?->no_transaksi})",
                     $cabangId,

@@ -10,6 +10,7 @@ use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Pos\Services\TransaksiSequenceService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
@@ -44,11 +45,7 @@ class OrderService
         array $shippingData = []
     ): Transaksi {
         return DB::transaction(function () use ($pelanggan, $items, $cabangId, $metodeAmbil, $catatan, $shippingData) {
-            $today = now()->format('Ymd');
-            $count = Transaksi::whereDate('created_at', now()->toDateString())
-                ->where('sumber', 'marketplace')
-                ->count() + 1;
-            $noTransaksi = sprintf('MP-%s-%04d', $today, $count);
+            $noTransaksi = app(TransaksiSequenceService::class)->generateNoTransaksi($cabangId, 'MP');
 
             $subtotal = 0.0;
             $totalKomisiMitra = 0.0;
@@ -102,10 +99,12 @@ class OrderService
             $diskonPartai = (float) ($partaiInfo['diskon_nominal'] ?? 0.0);
 
             // [B-14] PPN per cabang — definisi identik POS: DPP = subtotal - diskon,
-            // PPN = DPP × persen, total_akhir = DPP + PPN.
+            // PPN = DPP × persen, total_akhir = DPP + PPN + ongkir.
             $diskon = 0.0;
             $diskonHeaderTotal = $diskon + $diskonPartai;
             $pajak = $this->pajakService->hitungPenjualan($cabangId, $subtotal, $diskonHeaderTotal);
+            $ongkir = ($metodeAmbil === 'pengiriman') ? (float) ($shippingData['ongkir'] ?? 0) : 0.0;
+            $totalAkhirDenganOngkir = round((float) $pajak['total_akhir'] + $ongkir, 2);
 
             $gudangId = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
                 ?? Gudang::where('cabang_id', $cabangId)->value('id')
@@ -127,7 +126,7 @@ class OrderService
                 'dpp' => $pajak['dpp'],
                 'pajak_nominal' => $pajak['ppn_nominal'],
                 'ppn_nominal' => $pajak['ppn_nominal'],
-                'total_akhir' => $pajak['total_akhir'],
+                'total_akhir' => $totalAkhirDenganOngkir,
                 'metode_bayar' => 'menunggu', // payment Duitku Hari 6
                 'jumlah_bayar' => 0,
                 'kembalian' => 0,

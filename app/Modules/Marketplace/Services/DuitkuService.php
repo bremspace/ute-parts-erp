@@ -71,6 +71,21 @@ class DuitkuService
         return $this->merchantCode !== '' && $this->apiKey !== '' && $this->merchantKey !== '';
     }
 
+    public function getMerchantCode(): string
+    {
+        return $this->merchantCode;
+    }
+
+    public function getApiKey(): string
+    {
+        return $this->apiKey;
+    }
+
+    public function getMerchantKey(): string
+    {
+        return $this->merchantKey;
+    }
+
     /**
      * Buat invoice Duitku via POST /v2/inquiry.
      *
@@ -446,10 +461,20 @@ class DuitkuService
             }
         }
 
-        // fallback MD5 (legacy) — hanya mode 'md5' atau 'dual'
-        $expectedMd5 = md5($this->merchantCode.$amount.$merchantOrderId.$this->apiKey);
+        // fallback MD5 (legacy) — verifikasi terhadap apiKey atau merchantKey
+        $expectedMd5Api = md5($this->merchantCode.$amount.$merchantOrderId.$this->apiKey);
+        if (hash_equals($expectedMd5Api, $signature)) {
+            return true;
+        }
 
-        return hash_equals($expectedMd5, $signature);
+        if ($this->merchantKey !== '') {
+            $expectedMd5Merchant = md5($this->merchantCode.$amount.$merchantOrderId.$this->merchantKey);
+            if (hash_equals($expectedMd5Merchant, $signature)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

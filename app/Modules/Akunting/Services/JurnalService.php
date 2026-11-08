@@ -30,7 +30,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class JurnalService
 {
-    public const SUMBER_VALID = ['pos', 'servis', 'servis-bayar', 'pembelian', 'beli', 'komisi', 'opname', 'manual', 'kas', 'channel', 'pembayaran', 'payroll', 'payroll-bayar', 'asset', 'depresiasi', 'disposal', 'import', 'grn', 'stok_awal', 'tutup_buku', 'reversal'];
+    public const SUMBER_VALID = ['pos', 'servis', 'servis-bayar', 'pembelian', 'beli', 'komisi', 'opname', 'manual', 'kas', 'channel', 'pembayaran', 'payroll', 'payroll-bayar', 'asset', 'depresiasi', 'disposal', 'import', 'grn', 'stok_awal', 'tutup_buku', 'reversal', 'retur', 'transfer'];
 
     /**
      * Cache status keberadaan tabel per request (server 1GB RAM: hindari

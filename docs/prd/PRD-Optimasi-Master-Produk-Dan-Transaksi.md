@@ -209,22 +209,22 @@ Dokumen ini menjadi cetak biru teknis komprehensif untuk memperbaiki semua celah
 Sesuai aturan kerja, setiap task wajib diverifikasi dengan pengujian unit/feature sebelum checkbox dicentang.
 
 ### Fase 1: Perbaikan Akuntansi, Jurnal & Laporan Keuangan
-- [ ] T-01 — Perbaiki agregasi Laba Rugi di `ExportLaporanService.php` agar hanya menghitung akun pendapatan & beban.
-- [ ] T-02 — Perbaiki agregasi Arus Kas di `ExportLaporanService.php` agar mencakup seluruh akun kas & bank (110-01, 110-02, 110-04).
-- [ ] T-03 — Perbaiki `ValidasiBarisJurnal.php` untuk mengizinkan mutasi normal debit/kredit pada jurnal penyesuaian manual.
-- [ ] T-04 — Standarisasi pemanggilan `generateNoJurnal` dengan `cabang_id` di Payroll, Return Penjualan, Return Pembelian, dan Import Produk.
-- [ ] T-05 — Perbaiki typo tabel `jurnal_headers` di `GrnService.php`.
-- [ ] T-06 — Implementasi jurnal akuntansi transfer persediaan antar-cabang di `TransferTab.php`.
-- [ ] T-07 — Perbaiki mapping akun utang komisi `210-03` di `PembayaranSubledgerService.php`.
-- [ ] T-08 — Tambahkan saving hook pada model `Utang` untuk kalkulasi otomatis kolom `sisa`.
+- [x] T-01 — Perbaiki agregasi Laba Rugi di `ExportLaporanService.php` agar hanya menghitung akun pendapatan & beban.
+- [x] T-02 — Perbaiki agregasi Arus Kas di `ExportLaporanService.php` agar mencakup seluruh akun kas & bank (110-01, 110-02, 110-04).
+- [x] T-03 — Perbaiki `ValidasiBarisJurnal.php` untuk mengizinkan mutasi normal debit/kredit pada jurnal penyesuaian manual.
+- [x] T-04 — Standarisasi pemanggilan `generateNoJurnal` dengan `cabang_id` di Payroll, Return Penjualan, Return Pembelian, dan Import Produk.
+- [x] T-05 — Perbaiki typo tabel `jurnal_headers` di `GrnService.php`.
+- [x] T-06 — Implementasi jurnal akuntansi transfer persediaan antar-cabang di `TransferTab.php`.
+- [x] T-07 — Perbaiki mapping akun utang komisi `210-03` di `PembayaranSubledgerService.php`.
+- [x] T-08 — Tambahkan saving hook pada model `Utang` untuk kalkulasi otomatis kolom `sisa`.
 
 ### Fase 2: Perbaikan Transaksi Online, Gateway & Kurir
-- [ ] T-09 — Pasang sequence generator pesimistik `lockForUpdate` untuk pembuatan `no_transaksi` di `OrderService.php`.
-- [ ] T-10 — Masukkan komponen ongkir ke dalam `transaksi.total_akhir` dan integrasikan ke jurnal Duitku di `OrderService` & `DuitkuPaymentProcessor`.
-- [ ] T-11 — Perbaiki verifikasi merchant code dan signature MD5 Duitku di `PaymentController` & `DuitkuService`.
-- [ ] T-12 — Pasang penanganan pembayaran order kadaluarsa (safety holding account) di `DuitkuPaymentProcessor`.
-- [ ] T-13 — Amankan endpoint `checkStatus` QRIS dengan otentikasi user & pengikatan invoice reference unik.
-- [ ] T-14 — Perbaiki kalkulasi reservasi multi-gudang pada `StokDeductionService.php`.
+- [x] T-09 — Pasang sequence generator pesimistik `lockForUpdate` untuk pembuatan `no_transaksi` di `OrderService.php`.
+- [x] T-10 — Masukkan komponen ongkir ke dalam `transaksi.total_akhir` dan integrasikan ke jurnal Duitku di `OrderService` & `DuitkuPaymentProcessor`.
+- [x] T-11 — Perbaiki verifikasi merchant code dan signature MD5 Duitku di `PaymentController` & `DuitkuService`.
+- [x] T-12 — Pasang penanganan pembayaran order kadaluarsa (safety holding account) di `DuitkuPaymentProcessor`.
+- [x] T-13 — Amankan endpoint `checkStatus` QRIS dengan otentikasi user & pengikatan invoice reference unik.
+- [x] T-14 — Perbaiki kalkulasi reservasi multi-gudang pada `StokDeductionService.php`.
 
 ### Fase 3: Optimasi Transaksi POS Kasir
 - [ ] T-15 — Hapus pemanggilan ganda audit log transaksi kasir di `PosKasir.php`.

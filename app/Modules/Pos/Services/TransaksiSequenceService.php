@@ -14,13 +14,13 @@ class TransaksiSequenceService
     /**
      * Generate sequential, collision-free transaction number per branch and date.
      * Uses pessimistic lock and existence verification to ensure atomic serializability.
-     * Format: TRX-C{cabang_id:02d}-{YYYYMMDD}-{seq:04d}
+     * Format: {prefix}-C{cabang_id:02d}-{YYYYMMDD}-{seq:04d}
      */
-    public function generateNoTransaksi(int $cabangId): string
+    public function generateNoTransaksi(int $cabangId, string $prefixTag = 'TRX'): string
     {
-        $generate = function () use ($cabangId) {
+        $generate = function () use ($cabangId, $prefixTag) {
             $today = now()->format('Ymd');
-            $prefix = sprintf('TRX-C%02d-%s', $cabangId, $today);
+            $prefix = sprintf('%s-C%02d-%s', strtoupper($prefixTag), $cabangId, $today);
             $like = $prefix.'-%';
 
             $maxSeq = Transaksi::where('cabang_id', $cabangId)

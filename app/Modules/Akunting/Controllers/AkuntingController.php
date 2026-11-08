@@ -212,7 +212,11 @@ class AkuntingController extends Controller
             ->values()
             ->all();
 
-        $galat = ValidasiBarisJurnal::cekBaris($lines);
+        $isPenyesuaian = $request->boolean('is_penyesuaian')
+            || in_array($request->input('sumber'), ['penyesuaian', 'ajustment', 'adjustment'], true)
+            || in_array($request->input('tipe'), ['penyesuaian', 'ajustment', 'adjustment'], true);
+
+        $galat = ValidasiBarisJurnal::cekBaris($lines, $isPenyesuaian);
         if ($galat !== []) {
             return $this->error(implode(' ', $galat), 422, ['errors' => $galat]);
         }

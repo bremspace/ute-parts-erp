@@ -50,11 +50,14 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '140-01', 'nama' => 'Perlengkapan Toko',            'tipe' => 'aset',      'kelompok' => 'perlengkapan', 'saldo_normal' => 'debit'],
             ['kode' => '150-01', 'nama' => 'Peralatan Servis',             'tipe' => 'aset',      'kelompok' => 'peralatan',   'saldo_normal' => 'debit'],
             ['kode' => '160-01', 'nama' => 'Aktiva Tetap',                 'tipe' => 'aset',      'kelompok' => 'aset_tetap',  'saldo_normal' => 'debit'],
+            ['kode' => '190-01', 'nama' => 'Rekening Antar Cabang (RAK)',  'tipe' => 'aset',      'kelompok' => 'rak',         'saldo_normal' => 'debit'],
 
             // KEWAJIBAN
             ['kode' => '210-01', 'nama' => 'Utang Usaha',                  'tipe' => 'kewajiban',  'kelompok' => 'utang_usaha', 'saldo_normal' => 'kredit'],
             ['kode' => '210-02', 'nama' => 'Utang Gaji',                   'tipe' => 'kewajiban',  'kelompok' => 'utang_gaji',  'saldo_normal' => 'kredit'],
             ['kode' => '210-03', 'nama' => 'Utang Komisi',                 'tipe' => 'kewajiban',  'kelompok' => 'utang_komisi', 'saldo_normal' => 'kredit'],
+            ['kode' => '210-04', 'nama' => 'Titipan Ongkir Pengiriman',    'tipe' => 'kewajiban',  'kelompok' => 'utang_lain',   'saldo_normal' => 'kredit'],
+            ['kode' => '210-05', 'nama' => 'Titipan Pembayaran Konsumen (Holding)', 'tipe' => 'kewajiban', 'kelompok' => 'utang_lain', 'saldo_normal' => 'kredit'],
             ['kode' => '220-01', 'nama' => 'PPN Keluaran',                 'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'], // [F1-2] kontrak AC: jurnal PPN keluaran
             ['kode' => '220-02', 'nama' => 'PPN Keluaran (Legacy 220-02)', 'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'],
 

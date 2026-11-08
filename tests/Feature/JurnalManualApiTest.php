@@ -225,4 +225,21 @@ class JurnalManualApiTest extends TestCase
             'kredit' => 100000,
         ]);
     }
+
+    public function test_api_menerima_jurnal_penyesuaian_dengan_mutasi_kontra_sisi(): void
+    {
+        // Jurnal penyesuaian: Debit Utang (normal kredit) dan Kredit Kas (normal debit)
+        $resp = $this->postJson('/api/akunting/jurnal-manual', [
+            'tanggal' => now()->toDateString(),
+            'deskripsi' => 'Penyesuaian pembayaran utang kasbon',
+            'is_penyesuaian' => true,
+            'lines' => [
+                ['akun_kode' => $this->utang->kode, 'debit' => 100000, 'kredit' => 0],
+                ['akun_kode' => $this->kas->kode, 'debit' => 0, 'kredit' => 100000],
+            ],
+        ])->assertStatus(201);
+
+        $this->assertNotEmpty((string) $resp->json('data.no_jurnal'));
+        $this->assertDatabaseCount('jurnal_akuntansi', 2);
+    }
 }

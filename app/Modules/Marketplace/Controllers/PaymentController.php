@@ -156,8 +156,9 @@ class PaymentController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid signature'], 400);
         }
 
-        // 2. Verify merchant code
-        if ($merchantCode !== config('duitku.merchant_code')) {
+        // 2. Verify merchant code (cocokkan ke instance konfigurasi Duitku aktif atau config fallback)
+        $expectedMerchantCode = $this->duitku->getMerchantCode() ?: (string) config('duitku.merchant_code');
+        if ($merchantCode !== $expectedMerchantCode) {
             return response()->json(['success' => false, 'message' => 'Invalid merchant'], 400);
         }
 
@@ -202,6 +203,18 @@ class PaymentController extends Controller
             ]);
 
             return response()->json(['success' => true, 'message' => 'Already processed']);
+        }
+
+        if ($hasil['kode'] === 'order_kadaluarsa_holding') {
+            Log::warning('[Duitku-webhook] Order kadaluarsa / batal menerima pembayaran — dialokasikan ke holding', [
+                'order' => $merchantOrderId,
+                'status' => $hasil['status'] ?? null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order kadaluarsa / batal — pembayaran dicatat ke holding titipan konsumen dan ditandai perlu tindakan manual',
+            ]);
         }
 
         if ($hasil['kode'] === 'nominal_tidak_cocok') {
@@ -343,9 +356,13 @@ class PaymentController extends Controller
 
         $expectedAmount = (int) round((float) $transaksi->total_akhir);
 
-        // 1. Cek notifikasi QRIS Toko di cache
-        $cachedQris = Cache::get("qris_payment_{$expectedAmount}");
+        // 1. Cek notifikasi QRIS Toko di cache:
+        // [T-13] Cek cache spesifik invoice ref terlebih dahulu ("qris_payment_{no_transaksi}"),
+        // baru fallback ke nominal ("qris_payment_{expectedAmount}") bila cocok.
+        $cachedQris = Cache::get("qris_payment_{$transaksi->no_transaksi}")
+            ?: Cache::get("qris_payment_{$expectedAmount}");
         if ($cachedQris) {
+            Cache::forget("qris_payment_{$transaksi->no_transaksi}");
             Cache::forget("qris_payment_{$expectedAmount}");
             $this->processor->prosesLunas($transaksi->no_transaksi, $expectedAmount, 'QRIS-TOKO', 'qris');
             $transaksi->refresh();

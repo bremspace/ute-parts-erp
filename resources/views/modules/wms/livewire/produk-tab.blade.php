@@ -116,14 +116,11 @@
                         @endif
 
                         @if(($visibleFilters['model_kompatibel'] ?? false) || ($visibleFilters['tipe_hp'] ?? false))
-                            @php
-                                $groupedMkWms = \App\Modules\Wms\Models\TipeHp::groupModelsByBrand($modelKompatibelList, $filterBrandKompatibel ?: null);
-                            @endphp
                             <div class="relative inline-flex items-center">
                                 <select wire:model.live="filterModelKompatibel" class="px-3 py-2 {{ $filterModelKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter berdasarkan Tipe/Model Smartphone Kompatibel">
                                     <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
-                                    @if(empty($filterBrandKompatibel) && count($groupedMkWms) > 1)
-                                        @foreach($groupedMkWms as $brandName => $models)
+                                    @if(empty($filterBrandKompatibel) && count($groupedMkWms ?? []) > 1)
+                                        @foreach(($groupedMkWms ?? []) as $brandName => $models)
                                             <optgroup label="{{ $brandName }}" class="bg-white dark:bg-ink-900 font-bold text-ink-900 dark:text-white">
                                                 @foreach($models as $mk)
                                                     <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 font-normal text-ink-700 dark:text-ink-300">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $brandName) }}</option>
@@ -802,8 +799,8 @@
                                                     <label class="block text-[10px] uppercase font-bold text-ink-700 dark:text-ink-400 mb-1">Tipe HP</label>
                                                     <select wire:model.live="filterModelKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
                                                         <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
-                                                        @if(empty($filterBrandKompatibel) && count($groupedMkWms) > 1)
-                                                            @foreach($groupedMkWms as $brandName => $models)
+                                                        @if(empty($filterBrandKompatibel) && count($groupedMkWms ?? []) > 1)
+                                                            @foreach(($groupedMkWms ?? []) as $brandName => $models)
                                                                 <optgroup label="{{ $brandName }}" class="bg-white dark:bg-ink-900 font-bold text-ink-900 dark:text-white">
                                                                     @foreach($models as $mk)
                                                                         <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 font-normal text-ink-700 dark:text-ink-300">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $brandName) }}</option>

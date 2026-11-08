@@ -2,6 +2,7 @@
 
 namespace App\Modules\Marketplace\Services;
 
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Services\PelangganService;
@@ -65,7 +66,7 @@ class DuitkuPaymentProcessor
                 // lockForUpdate() → baris order terkunci sampai commit; webhook
                 // paralel untuk order yang sama akan MENUNGGU di titik ini lalu
                 // membaca status 'lunas' (idempotent skip), bukan lolos guard.
-                $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership'])
+                $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'pengiriman'])
                     ->where('no_transaksi', $merchantOrderId)
                     ->lockForUpdate()
                     ->first();
@@ -76,6 +77,15 @@ class DuitkuPaymentProcessor
 
                 // ===== IDEMPOTENCY GUARD (dalam lock) =====
                 if (in_array($transaksi->status, self::STATUS_FINAL, true)) {
+                    // [T-12] Khusus kasus pembayaran masuk pada order yang telah dibatalkan / kadaluarsa:
+                    // Jangan langsung skip begitu saja tanpa jejak akuntansi; uang konsumen sudah terlanjur dipotong/diterima gateway.
+                    // Catat ke holding account (titipan konsumen) dan kirim notifikasi perhatian khusus ke backoffice.
+                    if (in_array($transaksi->status, ['kadaluarsa', 'dibatalkan', 'batal', 'gagal'], true)) {
+                        $this->tanganiPembayaranOrderKadaluarsa($transaksi, $amount, $reference, $metodeBayar);
+
+                        return ['kode' => 'order_kadaluarsa_holding', 'status' => $transaksi->status];
+                    }
+
                     return ['kode' => 'sudah_diproses', 'status' => $transaksi->status];
                 }
 
@@ -118,10 +128,13 @@ class DuitkuPaymentProcessor
                     );
                 }
 
-                // c. Jurnal otomatis: Kas masuk / Pendapatan / PPN / HPP / Persediaan turun
+                // c. Jurnal otomatis: Kas/Piutang masuk / Pendapatan / Titipan Ongkir / PPN / HPP / Persediaan turun
                 $totalHpp = (float) $transaksi->items->sum(fn ($i) => (float) $i->hpp * (int) $i->jumlah);
                 $totalAkhir = (float) $transaksi->total_akhir;
-                [$dpp, $ppnNominal] = $this->pisahDppPpn($transaksi, $totalAkhir);
+                $ongkir = (float) ($transaksi->pengiriman?->ongkir ?? 0);
+                $totalSebelumOngkir = max(0.0, round($totalAkhir - $ongkir, 2));
+
+                [$dpp, $ppnNominal] = $this->pisahDppPpn($transaksi, $totalSebelumOngkir);
                 $noJurnal = $this->jurnalService->generateNoJurnal('pos', $cabangId);
 
                 $debitAkun = ($channelBayar === 'qris') ? '110-02' : '120-02';
@@ -129,6 +142,12 @@ class DuitkuPaymentProcessor
                     ['akun_kode' => $debitAkun, 'debit' => $totalAkhir, 'kredit' => 0],
                     ['akun_kode' => '410-03', 'debit' => 0, 'kredit' => $dpp],
                 ];
+
+                // Titipan Ongkir Pengiriman (210-04)
+                if ($ongkir > 0) {
+                    $lines[] = ['akun_kode' => '210-04', 'debit' => 0, 'kredit' => $ongkir];
+                }
+
                 // PPN Keluaran → akun 220-01 (kontrak AC F1-2, baris dari PajakService)
                 foreach ($this->pajakService->jurnalLines($ppnNominal, $noJurnal, (int) $cabangId, 0) as $ppnLine) {
                     $lines[] = $ppnLine;
@@ -390,5 +409,67 @@ class DuitkuPaymentProcessor
         $dpp = $ppn > 0 ? round($total - $ppn, 2) : $total;
 
         return [$dpp, $ppn];
+    }
+
+    /**
+     * [T-12] Tangani pembayaran dana masuk pada order yang statusnya sudah kadaluarsa/batal.
+     * Uang masuk di gateway, namun stok pesanan sudah dilepas dari reservasi.
+     * Solusi safe holding: catat ke akun Titipan Pembayaran Konsumen (210-05) dan notifikasi admin.
+     */
+    protected function tanganiPembayaranOrderKadaluarsa(Transaksi $transaksi, int $amount, ?string $reference, ?string $metodeBayar): void
+    {
+        $cabangId = $transaksi->cabang_id ?: Cabang::firstOrFail()->id;
+        $channelBayar = $metodeBayar ?: 'duitku';
+        $debitAkun = ($channelBayar === 'qris') ? '110-02' : '120-02';
+
+        // Pastikan akun 210-05 ada
+        AkunCOA::firstOrCreate(
+            ['kode' => '210-05'],
+            [
+                'nama' => 'Titipan Pembayaran Konsumen (Holding)',
+                'tipe' => 'kewajiban',
+                'kelompok' => 'utang_lain',
+                'saldo_normal' => 'kredit',
+                'is_active' => true,
+            ]
+        );
+
+        // Update catatan transaksi
+        $transaksi->update([
+            'catatan' => trim($transaksi->catatan." [PERLU TINDAKAN MANUAL: Dana masuk Rp {$amount} pada order status {$transaksi->status} via {$channelBayar}]"),
+            'payment_reference' => $reference ?: $transaksi->payment_reference,
+        ]);
+
+        $noJurnal = $this->jurnalService->generateNoJurnal('pos', $cabangId);
+        $this->jurnalService->post(
+            $noJurnal,
+            now(),
+            'pos',
+            [
+                ['akun_kode' => $debitAkun, 'debit' => $amount, 'kredit' => 0],
+                ['akun_kode' => '210-05', 'debit' => 0, 'kredit' => $amount],
+            ],
+            "Titipan dana pembayaran order {$transaksi->status} {$transaksi->no_transaksi} ({$channelBayar})",
+            $cabangId,
+            null,
+            Transaksi::class,
+            $transaksi->id
+        );
+
+        $this->notifService->kirim(
+            'inapp',
+            null,
+            "PERHATIAN: Pembayaran Masuk pada Order {$transaksi->status} ({$transaksi->no_transaksi})",
+            'Dana sebesar Rp '.number_format($amount, 0, ',', '.')." masuk untuk order {$transaksi->no_transaksi} yang sudah berstatus {$transaksi->status}. Dana dialokasikan ke Titipan Konsumen (210-05). Hubungi pelanggan untuk pengiriman manual atau refund.",
+            [
+                'transaksi_id' => $transaksi->id,
+                'cabang_id' => $cabangId,
+                'target_role' => 'admin-toko',
+                'kategori' => 'transaksi',
+                'sumber' => 'marketplace',
+                'action_url' => '/app/pos/online-orders',
+                'audience' => 'staf',
+            ]
+        );
     }
 }

@@ -126,10 +126,10 @@ class ValidasiBarisJurnal
      * @param  array<int,array<string,mixed>>  $lines  [['akun_kode' => '110-01', 'debit' => 1000, 'kredit' => 0], ...]
      * @return array<int,string> daftar pesan galat (Indonesia), urut baris
      */
-    public static function cekBaris(array $lines): array
+    public static function cekBaris(array $lines, bool $isPenyesuaian = false): array
     {
         $galat = [];
-        foreach (static::cekBarisPerBaris($lines) as $perBaris) {
+        foreach (static::cekBarisPerBaris($lines, $isPenyesuaian) as $perBaris) {
             foreach ($perBaris as $item) {
                 $galat[] = $item['pesan'];
             }
@@ -146,10 +146,11 @@ class ValidasiBarisJurnal
      *
      * @param  array<int,mixed>  $lines  baris jurnal; tiap baris berisi array
      *                                   ['akun_kode' => '110-01', 'debit' => 1000, 'kredit' => 0]
+     * @param  bool  $isPenyesuaian  jika true, mutasi kontra-sisi diizinkan untuk jurnal penyesuaian
      * @return array<int,array<int,array{field: string, pesan: string}>>
      *                                                                   indeks baris => daftar {field: 'akun_kode'|'jumlah'|'sisi', pesan: string}
      */
-    public static function cekBarisPerBaris(array $lines): array
+    public static function cekBarisPerBaris(array $lines, bool $isPenyesuaian = false): array
     {
         $hasil = [];
 
@@ -197,7 +198,7 @@ class ValidasiBarisJurnal
             }
 
             $sisi = $debit > 0 ? 'debit' : 'kredit';
-            if ($akun->saldo_normal !== $sisi) {
+            if (! $isPenyesuaian && $akun->saldo_normal !== $sisi) {
                 $galat[] = ['field' => 'akun_kode', 'pesan' => static::pesanSisiTidakSesuai($akun, $sisi)];
             }
 

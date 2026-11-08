@@ -4407,6 +4407,8 @@ class ProdukTab extends Component
             return TipeHp::sortModelsByBrandAndAlphabet($rawModels, $selectedMerk);
         });
 
+        $groupedMkWms = TipeHp::groupModelsByBrand($modelKompatibelList, $this->filterBrandKompatibel ?: null);
+
         // 3. Filter data pendukung agar seluruh master data aktif terintegrasi penuh
         $allBrands = Brand::where('is_active', true)->orderBy('nama')->get();
         $brandsMaster = $allBrands;
@@ -4493,6 +4495,7 @@ class ProdukTab extends Component
             'allProdukOptions' => $allProdukOptions,
             'brandKompatibelList' => $brandKompatibelList,
             'modelKompatibelList' => $modelKompatibelList,
+            'groupedMkWms' => $groupedMkWms,
             'quickAddExistingModels' => $quickAddExistingModels,
             'marginGuardCreate' => $this->marginGuardCreate,
             'marginGuardEdit' => $this->marginGuardEdit,
