@@ -1,12 +1,11 @@
 # ==============================================================================
-# Bremspace ERP — Unas 1-Click Installer (Local Windows Edition)
-# Versi: 2.0 (Optimized & Hardened)
-# Otomatisasi: Pengecekan Sistem, Auto-Install Tools, Bypass Wizard/Lisensi,
-# Migrasi DB, Seeder, dan Peluncur Server Otomatis
+# Bremspace ERP — Unas 1-Click Interactive CLI Installer (Windows Edition)
+# Versi: 3.0 (Interactive Wizard CLI, Safe Defaults, Zero Manual .env)
 # ==============================================================================
 param(
     [switch]$ForceReinstallPhp,
-    [switch]$ForceRebuildAssets
+    [switch]$ForceRebuildAssets,
+    [switch]$NonInteractive
 )
 
 $ErrorActionPreference = 'Continue'
@@ -24,9 +23,54 @@ if (-not $scriptDir) {
 $projectRoot = Split-Path -Parent $scriptDir
 Set-Location -Path $projectRoot
 
+function Prompt-User([string]$message, [string]$defaultVal = "") {
+    if ($NonInteractive) { return $defaultVal }
+    if ($defaultVal -ne "") {
+        Write-Host "$message [$defaultVal]: " -NoNewline -ForegroundColor Yellow
+    } else {
+        Write-Host "$message: " -NoNewline -ForegroundColor Yellow
+    }
+    $inp = [Console]::ReadLine()
+    if ([string]::IsNullOrWhiteSpace($inp)) {
+        return $defaultVal
+    }
+    return $inp.Trim()
+}
+
+function Prompt-Password([string]$message, [string]$defaultVal = "") {
+    if ($NonInteractive) { return $defaultVal }
+    Write-Host "$message" -NoNewline -ForegroundColor Yellow
+    if ($defaultVal -ne "") {
+        Write-Host " (Kosongkan jika default/tanpa password): " -NoNewline -ForegroundColor DarkGray
+    } else {
+        Write-Host ": " -NoNewline -ForegroundColor Yellow
+    }
+    
+    $pwd = ""
+    while ($true) {
+        $key = [Console]::ReadKey($true)
+        if ($key.Key -eq [ConsoleKey]::Enter) {
+            Write-Host ""
+            break
+        } elseif ($key.Key -eq [ConsoleKey]::Backspace) {
+            if ($pwd.Length -gt 0) {
+                $pwd = $pwd.Substring(0, $pwd.Length - 1)
+                Write-Host "`b `b" -NoNewline
+            }
+        } elseif ($key.KeyChar -ge 32) {
+            $pwd += $key.KeyChar
+            Write-Host "*" -NoNewline
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($pwd)) {
+        return $defaultVal
+    }
+    return $pwd
+}
+
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "   Bremspace ERP - Unas 1-Click Installer (Windows Edition)" -ForegroundColor Cyan
-Write-Host "   Khusus Pemilik: Skip Wizard, Skip Lisensi & Auto-Config Penuh" -ForegroundColor Cyan
+Write-Host "   Bremspace ERP - Unas 1-Click Interactive CLI Installer" -ForegroundColor Cyan
+Write-Host "   Otomatisasi: Audit PC -> Konfigurasi .env Interaktif -> Setup -> Go-Live" -ForegroundColor Cyan
 Write-Host "   Direktori Project: $projectRoot" -ForegroundColor DarkGray
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
@@ -105,8 +149,7 @@ if ($gitCmd) {
         if ($gitCmd) { $hasGit = $true }
     }
     if (-not $hasGit) {
-        Write-Host " [INFO] Git CLI belum terdeteksi. Untuk fitur update repositori di masa depan:" -ForegroundColor DarkGray
-        Write-Host "        Unduh installer Git resmi: https://git-scm.com/download/win" -ForegroundColor DarkGray
+        Write-Host " [INFO] Git CLI belum terdeteksi. Disarankan jika ingin git pull otomatis." -ForegroundColor DarkGray
     }
 }
 
@@ -173,7 +216,6 @@ if (-not $ForceReinstallPhp) {
 
     $phpCandidates += (Join-Path $projectRoot 'tools\php\php.exe')
 
-    # Deteksi Laragon, XAMPP, dan direktori umum
     $commonDirs = @(
         'C:\laragon\bin\php\php-8.4*\php.exe',
         'C:\laragon\bin\php\php-8.5*\php.exe',
@@ -225,13 +267,10 @@ if (-not $detectedPhp) {
     Write-Host "======================================================================" -ForegroundColor Red
     Write-Host "Panduan Cepat Sesuai PC Anda:" -ForegroundColor Yellow
     if ($hasWinget) {
-        Write-Host "  1. Buka CMD / Terminal dan jalankan:" -ForegroundColor White
-        Write-Host "     winget install PHP.PHP.8.4" -ForegroundColor Cyan
+        Write-Host "  1. Buka CMD / Terminal dan jalankan: winget install PHP.PHP.8.4" -ForegroundColor Cyan
     }
-    Write-Host "  2. ATAU download PHP 8.4 VS17 x64 Thread Safe ZIP dari:" -ForegroundColor White
-    Write-Host "     https://windows.php.net/download/" -ForegroundColor Cyan
+    Write-Host "  2. ATAU download PHP 8.4 Thread Safe ZIP dari: https://windows.php.net/download/" -ForegroundColor Cyan
     Write-Host "     Ekstrak seluruh isinya ke folder: $projectRoot\tools\php\" -ForegroundColor Gray
-    Write-Host "  3. ATAU pasang Laragon (https://laragon.org) dengan paket PHP 8.4" -ForegroundColor White
     Write-Host "======================================================================" -ForegroundColor Red
     exit 1
 }
@@ -373,50 +412,162 @@ if ($nodeCmd -and $npmCmd) {
         Write-Host " [OK] Aset frontend pre-compiled tersedia di public\build\ (Aplikasi siap pakai langsung)." -ForegroundColor Green
     } else {
         Write-Host " [INFO] Node.js belum tersedia untuk compile asset baru." -ForegroundColor DarkGray
-        Write-Host "        Silakan unduh Node.js LTS resmi jika ingin modifikasi asset: https://nodejs.org/" -ForegroundColor DarkGray
     }
 }
 
 # ==============================================================================
-# 5. Deteksi Database Engine (MySQL / MariaDB vs SQLite Fallback)
+# 5. Panduan & Konfigurasi Interaktif .ENV (Sesuai Preferensi Unas)
 # ==============================================================================
-Write-Host "[5/7] Memeriksa database engine..." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "======================================================================" -ForegroundColor Magenta
+Write-Host "   KONFIGURASI SISTEM INTERAKTIF (PENGISIAN .ENV & PREFERENSI)" -ForegroundColor Magenta
+Write-Host "   (Tekan ENTER langsung untuk menggunakan nilai rekomendasi bawaan)" -ForegroundColor DarkGray
+Write-Host "======================================================================" -ForegroundColor Magenta
+Write-Host ""
 
 function Test-PortActive([int]$checkPort) {
     $tcp = Get-NetTCPConnection -LocalPort $checkPort -State Listen -ErrorAction SilentlyContinue
     return ($null -ne $tcp)
 }
 
-$useMysql = $false
-if (Test-PortActive 3306) {
-    # Uji coba koneksi nyata ke MySQL dengan user root tanpa password
-    $testMysqlOut = & $phpExe -r "try { `$c = @new mysqli('127.0.0.1', 'root', '', '', 3306); exit(`$c->connect_errno ? 1 : 0); } catch (Throwable `$e) { exit(1); }" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        $useMysql = $true
-    }
+# 5a. Pemilihan Database Engine
+$mysqlPortActive = Test-PortActive 3306
+if (-not $mysqlPortActive) {
+    try {
+        Start-Service MySQL -ErrorAction SilentlyContinue
+        Start-Service MySQL80 -ErrorAction SilentlyContinue
+        Start-Service MariaDB -ErrorAction SilentlyContinue
+        if (Test-PortActive 3306) { $mysqlPortActive = $true }
+    } catch {}
 }
 
-$envFile = Join-Path $projectRoot '.env'
-if (Test-Path $envFile) {
-    $envRaw = Get-Content -Path $envFile -Raw
-    if ($envRaw -match '(?m)^DB_CONNECTION=mysql') {
-        $useMysql = $true
-    }
-}
-
-if ($useMysql) {
-    Write-Host " [OK] Database Engine: MySQL / MariaDB (Port 3306 Aktif & Terkoneksi)." -ForegroundColor Green
-    $mysqlCli = Get-Command mysql.exe -ErrorAction SilentlyContinue
-    if ($mysqlCli) {
-        & mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS uteparts_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>$null | Out-Null
-    }
+Write-Host "Pilih Database Engine:" -ForegroundColor White
+Write-Host "  [1] SQLite (Rekomendasi Lokal / Standalone — Mandiri, Tanpa Setup Server DB)" -ForegroundColor Cyan
+if ($mysqlPortActive) {
+    Write-Host "  [2] MySQL / MariaDB (Port 3306 Terdeteksi Aktif di Komputer Ini)" -ForegroundColor Green
 } else {
-    Write-Host " [OK] Database Engine: SQLite (Mandiri, Zero-Setup, Tanpa Perlu Server MySQL)." -ForegroundColor Green
+    Write-Host "  [2] MySQL / MariaDB (Port 3306 Tidak Aktif / Belum Terpasang)" -ForegroundColor DarkGray
+}
+
+$dbChoice = Prompt-User "Pilihan Database (1 atau 2)" "1"
+$dbDriver = "sqlite"
+$dbHost = "127.0.0.1"
+$dbPort = "3306"
+$dbName = "uteparts_db"
+$dbUser = "root"
+$dbPass = ""
+
+if ($dbChoice -eq "2") {
+    $dbDriver = "mysql"
+    $dbHost = Prompt-User "MySQL Host" "127.0.0.1"
+    $dbPort = Prompt-User "MySQL Port" "3306"
+    $dbName = Prompt-User "Nama Database MySQL" "uteparts_db"
+    $dbUser = Prompt-User "Username MySQL" "root"
+    $dbPass = Prompt-Password "Password MySQL" ""
+
+    # Uji coba koneksi MySQL interaktif
+    Write-Host " Menguji koneksi ke database MySQL..." -ForegroundColor Gray
+    $testScript = "try { `$c = @new mysqli('$dbHost', '$dbUser', '$dbPass', '', (int)'$dbPort'); if (`$c->connect_errno) { exit(1); } else { exit(0); } } catch (Throwable `$e) { exit(1); }"
+    & $phpExe -r "$testScript" 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host " [OK] Koneksi MySQL terverifikasi berhasil!" -ForegroundColor Green
+        # Coba auto-create database jika belum ada
+        $createDbScript = "try { `$c = new mysqli('$dbHost', '$dbUser', '$dbPass', '', (int)'$dbPort'); `$c->query('CREATE DATABASE IF NOT EXISTS \`$dbName\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch (Throwable `$e) {}"
+        & $phpExe -r "$createDbScript" 2>$null | Out-Null
+    } else {
+        Write-Host " [PERINGATAN] Koneksi MySQL gagal. Mengalihkan otomatis ke SQLite agar instalasi tetap sukses." -ForegroundColor Yellow
+        $dbDriver = "sqlite"
+    }
+}
+
+# 5b. Konfigurasi Port Aplikasi
+Write-Host ""
+$appPort = Prompt-User "Port Web Server ERP" "1741"
+$appName = Prompt-User "Nama Brand / Aplikasi" "Bremspace"
+
+# 5c. Konfigurasi Integrasi Eksternal (Opsional)
+Write-Host ""
+Write-Host "Apakah Anda ingin memasukkan key integrasi bisnis sekarang?" -ForegroundColor White
+Write-Host "(Duitku, Biteship, WhatsApp Gateway — Dapat diisi sekarang atau nanti via web)" -ForegroundColor DarkGray
+$inputIntegrasi = Prompt-User "Konfigurasi integrasi sekarang? (y/n)" "n"
+
+$duitkuMerchantCode = ""
+$duitkuApiKey = ""
+$biteshipApiKey = ""
+$waGatewayUrl = ""
+$waGatewayToken = ""
+
+if ($inputIntegrasi.ToLower() -eq "y") {
+    Write-Host ""
+    Write-Host "--- Integrasi Pembayaran (Duitku) ---" -ForegroundColor Cyan
+    $duitkuMerchantCode = Prompt-User "Duitku Merchant Code" ""
+    $duitkuApiKey = Prompt-User "Duitku API Key" ""
+
+    Write-Host "--- Integrasi Pengiriman (Biteship) ---" -ForegroundColor Cyan
+    $biteshipApiKey = Prompt-User "Biteship API Key" ""
+
+    Write-Host "--- WhatsApp Gateway (Fonnte/Wablas/Custom) ---" -ForegroundColor Cyan
+    $waGatewayUrl = Prompt-User "WA Gateway Endpoint URL" ""
+    $waGatewayToken = Prompt-User "WA Gateway Auth Token" ""
+}
+
+# 5d. Konfigurasi File .env
+$envFile = Join-Path $projectRoot '.env'
+$envExample = Join-Path $projectRoot '.env.example'
+if (-not (Test-Path $envFile) -and (Test-Path $envExample)) {
+    Copy-Item -Path $envExample -Destination $envFile -Force
+}
+
+if (Test-Path $envFile) {
+    $envContent = Get-Content -Path $envFile -Raw
+    
+    # Update Parameter Inti
+    $envContent = $envContent -replace '(?m)^APP_NAME=.*', "APP_NAME=`"$appName`""
+    $envContent = $envContent -replace '(?m)^APP_URL=.*', "APP_URL=http://localhost:$appPort"
+
+    if ($dbDriver -eq "mysql") {
+        $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=mysql'
+        if ($envContent -notmatch '(?m)^DB_HOST=') {
+            $envContent += "`r`nDB_HOST=$dbHost`r`nDB_PORT=$dbPort`r`nDB_DATABASE=$dbName`r`nDB_USERNAME=$dbUser`r`nDB_PASSWORD=$dbPass"
+        } else {
+            $envContent = $envContent -replace '(?m)^DB_HOST=.*', "DB_HOST=$dbHost"
+            $envContent = $envContent -replace '(?m)^DB_PORT=.*', "DB_PORT=$dbPort"
+            $envContent = $envContent -replace '(?m)^DB_DATABASE=.*', "DB_DATABASE=$dbName"
+            $envContent = $envContent -replace '(?m)^DB_USERNAME=.*', "DB_USERNAME=$dbUser"
+            $envContent = $envContent -replace '(?m)^DB_PASSWORD=.*', "DB_PASSWORD=$dbPass"
+        }
+    } else {
+        $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=sqlite'
+        $sqliteDb = Join-Path $projectRoot 'database\database.sqlite'
+        if (-not (Test-Path $sqliteDb)) {
+            New-Item -ItemType File -Path $sqliteDb -Force | Out-Null
+        }
+    }
+
+    if ($duitkuMerchantCode -ne "") {
+        $envContent = $envContent -replace '(?m)^DUITKU_MERCHANT_CODE=.*', "DUITKU_MERCHANT_CODE=$duitkuMerchantCode"
+    }
+    if ($duitkuApiKey -ne "") {
+        $envContent = $envContent -replace '(?m)^DUITKU_API_KEY=.*', "DUITKU_API_KEY=$duitkuApiKey"
+    }
+    if ($biteshipApiKey -ne "") {
+        $envContent = $envContent -replace '(?m)^BITESHIP_API_KEY=.*', "BITESHIP_API_KEY=$biteshipApiKey"
+    }
+    if ($waGatewayUrl -ne "") {
+        $envContent = $envContent -replace '(?m)^#?\s*WA_GATEWAY_URL=.*', "WA_GATEWAY_URL=$waGatewayUrl"
+    }
+    if ($waGatewayToken -ne "") {
+        $envContent = $envContent -replace '(?m)^#?\s*WA_GATEWAY_TOKEN=.*', "WA_GATEWAY_TOKEN=$waGatewayToken"
+    }
+
+    Set-Content -Path $envFile -Value $envContent -Encoding ASCII
+    Write-Host " [OK] Konfigurasi berkas .env berhasil disesuaikan." -ForegroundColor Green
 }
 
 # ==============================================================================
 # 6. Eksekusi Instalasi & Otomasi Setup (Urutan Tepat & Anti-Gagal)
 # ==============================================================================
+Write-Host ""
 Write-Host "[6/7] Menjalankan instalasi aplikasi, migrasi & aktivasi akun..." -ForegroundColor Cyan
 
 # 6a. Siapkan Folder Framework
@@ -435,39 +586,7 @@ foreach ($f in $folders) {
     if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
 }
 
-# 6b. Siapkan File .env
-$envExample = Join-Path $projectRoot '.env.example'
-if (-not (Test-Path $envFile) -and (Test-Path $envExample)) {
-    Copy-Item -Path $envExample -Destination $envFile -Force
-}
-
-if (Test-Path $envFile) {
-    $envContent = Get-Content -Path $envFile -Raw
-    
-    if ($envContent -match '(?m)^APP_URL=') {
-        $envContent = $envContent -replace '(?m)^APP_URL=.*', 'APP_URL=http://localhost:1741'
-    } else {
-        $envContent += "`r`nAPP_URL=http://localhost:1741"
-    }
-
-    if ($useMysql) {
-        $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=mysql'
-        if ($envContent -notmatch '(?m)^DB_DATABASE=') {
-            $envContent += "`r`nDB_HOST=127.0.0.1`r`nDB_PORT=3306`r`nDB_DATABASE=uteparts_db`r`nDB_USERNAME=root`r`nDB_PASSWORD="
-        } else {
-            $envContent = $envContent -replace '(?m)^DB_DATABASE=.*', 'DB_DATABASE=uteparts_db'
-        }
-    } else {
-        $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=sqlite'
-        $sqliteDb = Join-Path $projectRoot 'database\database.sqlite'
-        if (-not (Test-Path $sqliteDb)) {
-            New-Item -ItemType File -Path $sqliteDb -Force | Out-Null
-        }
-    }
-    Set-Content -Path $envFile -Value $envContent -Encoding ASCII
-}
-
-# 6c. Pasang Dependensi Composer (Vendor) TERLEBIH DAHULU sebelum artisan
+# 6b. Pasang Dependensi Composer (Vendor) TERLEBIH DAHULU sebelum artisan
 $vendorAutoload = Join-Path $projectRoot 'vendor\autoload.php'
 if (-not (Test-Path $vendorAutoload)) {
     Write-Host " Menjalankan composer install untuk memasang modul backend..." -ForegroundColor Yellow
@@ -485,7 +604,7 @@ if (-not (Test-Path $vendorAutoload)) {
 }
 Write-Host " [OK] Modul composer vendor terverifikasi." -ForegroundColor Green
 
-# 6d. Generate APP_KEY
+# 6c. Generate APP_KEY
 $artisan = Join-Path $projectRoot 'artisan'
 $envCheck = Get-Content -Path $envFile -Raw
 if ($envCheck -notmatch '(?m)^APP_KEY=.+') {
@@ -493,7 +612,7 @@ if ($envCheck -notmatch '(?m)^APP_KEY=.+') {
     Write-Host " [OK] Application Encryption Key berhasil di-generate." -ForegroundColor Green
 }
 
-# 6e. SKIP & OTOMATIS AKTIVASI LISENSI MESIN (Offline Self-Activation Unas)
+# 6d. SKIP & OTOMATIS AKTIVASI LISENSI MESIN (Offline Self-Activation Unas)
 Write-Host " Mengaktifkan lisensi mesin mandiri untuk PC Unas..." -ForegroundColor Gray
 & $phpExe -r "
 require 'scripts/license/LicenseVerifier.php';
@@ -506,26 +625,26 @@ if (Test-Path (Join-Path $projectRoot 'storage\license.key')) {
     Write-Host " [OK] Lisensi PC aktif secara offline (storage/license.key terverifikasi)." -ForegroundColor Green
 }
 
-# 6f. SKIP INSTALL WIZARD (Buat storage/installed.lock)
+# 6e. SKIP INSTALL WIZARD (Buat storage/installed.lock)
 $installedLock = Join-Path $projectRoot 'storage\installed.lock'
 Set-Content -Path $installedLock -Value (Get-Date).ToString("yyyy-MM-dd HH:mm:ss") -Encoding ASCII
 Write-Host " [OK] Setup Wizard Web dilewati (storage/installed.lock siap)." -ForegroundColor Green
 
-# 6g. Pastikan File SQLite Siap jika menggunakan SQLite
-if (-not $useMysql) {
+# 6f. Pastikan File SQLite Siap jika menggunakan SQLite
+if ($dbDriver -eq "sqlite") {
     $sqliteDb = Join-Path $projectRoot 'database\database.sqlite'
     if (-not (Test-Path $sqliteDb)) {
         New-Item -ItemType File -Path $sqliteDb -Force | Out-Null
     }
 }
 
-# 6h. Jalankan Migrasi Database & Seeder
+# 6g. Jalankan Migrasi Database & Seeder
 Write-Host " Menjalankan migrasi database skema & data bawaan..." -ForegroundColor Gray
 & $phpExe $artisan migrate --force 2>$null | Out-Null
 & $phpExe $artisan db:seed --force --no-interaction 2>$null | Out-Null
 Write-Host " [OK] Skema tabel & data seeder awal (RBAC, Akun Admin, COA) berhasil dimuat." -ForegroundColor Green
 
-# 6i. SKIP SETUP WIZARD TOKO (Bypass /app/setup-wizard)
+# 6h. SKIP SETUP WIZARD TOKO (Bypass /app/setup-wizard)
 & $phpExe -r "
 require 'vendor/autoload.php';
 `$app = require_once 'bootstrap/app.php';
@@ -534,14 +653,14 @@ app(App\Modules\Crm\Services\KonfigurasiService::class)->set('app_setup_complete
 " 2>$null | Out-Null
 Write-Host " [OK] Setup wizard operasional toko di-bypass (Langsung siap pakai)." -ForegroundColor Green
 
-# 6j. Symlink Storage Publik
+# 6i. Symlink Storage Publik
 $pubStorage = Join-Path $projectRoot 'public\storage'
 if (-not (Test-Path $pubStorage)) {
     & $phpExe $artisan storage:link 2>$null | Out-Null
     Write-Host " [OK] Symlink berkas publik storage:link berhasil dibuat." -ForegroundColor Green
 }
 
-# 6k. Build Asset Frontend (Jika Node & npm tersedia)
+# 6j. Build Asset Frontend (Jika Node & npm tersedia)
 if ($hasNode -and ($ForceRebuildAssets -or -not (Test-Path (Join-Path $projectRoot 'public\build\manifest.json')))) {
     Write-Host " Mengompilasi asset antarmuka Vite frontend..." -ForegroundColor Gray
     & npm install --ignore-scripts 2>$null | Out-Null
@@ -549,15 +668,16 @@ if ($hasNode -and ($ForceRebuildAssets -or -not (Test-Path (Join-Path $projectRo
     Write-Host " [OK] Asset frontend berhasil dikompilasi." -ForegroundColor Green
 }
 
-# 6l. Bersihkan Cache Optimal
+# 6k. Bersihkan Cache Optimal
 & $phpExe $artisan optimize:clear 2>$null | Out-Null
 
 # ==============================================================================
 # 7. Menyalakan Web Server & Membuka Antarmuka Aplikasi
 # ==============================================================================
+Write-Host ""
 Write-Host "[7/7] Menyiapkan port jaringan dan menyalakan server..." -ForegroundColor Cyan
 
-$port = 1741
+$port = [int]$appPort
 if (Test-PortActive $port) {
     $tcps = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     foreach ($conn in $tcps) {
@@ -570,7 +690,7 @@ if (Test-PortActive $port) {
     }
     Start-Sleep -Seconds 1
     if (Test-PortActive $port) {
-        for ($p = 1742; $p -le 1760; $p++) {
+        for ($p = ($port + 1); $p -le ($port + 20); $p++) {
             if (-not (Test-PortActive $p)) {
                 $port = $p
                 break
