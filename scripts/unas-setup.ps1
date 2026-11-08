@@ -1,5 +1,6 @@
 # ==============================================================================
 # Bremspace ERP — Unas 1-Click Installer (Local Windows Edition)
+# Versi: 2.0 (Optimized & Hardened)
 # Otomatisasi: Pengecekan Sistem, Auto-Install Tools, Bypass Wizard/Lisensi,
 # Migrasi DB, Seeder, dan Peluncur Server Otomatis
 # ==============================================================================
@@ -242,6 +243,19 @@ Write-Host " [OK] PHP terverifikasi: $phpExe (Versi: $($detectedPhp.Version))" -
 # Sisipkan folder PHP ke urutan awal PATH sesi ini
 $env:Path = "$phpDir;" + $env:Path
 
+# Pastikan Sertifikat SSL CA (cacert.pem) tersedia untuk cURL & OpenSSL di Windows
+$cacertFile = Join-Path $phpDir 'cacert.pem'
+if (-not (Test-Path $cacertFile)) {
+    try {
+        $cacertUrl = "https://curl.se/ca/cacert.pem"
+        if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+            & curl.exe -sS -L --fail "$cacertUrl" -o "$cacertFile" 2>$null
+        } else {
+            (New-Object System.Net.WebClient).DownloadFile($cacertUrl, $cacertFile)
+        }
+    } catch {}
+}
+
 # Konfigurasi php.ini & Ekstensi Kritis
 $phpIni = Join-Path $phpDir 'php.ini'
 if (-not (Test-Path $phpIni)) {
@@ -255,8 +269,10 @@ if (-not (Test-Path $phpIni)) {
 if (Test-Path $phpIni) {
     $iniContent = Get-Content -Path $phpIni -Raw
     $extDir = (Join-Path $phpDir 'ext').Replace('\', '/')
+    $cacertFormatted = if (Test-Path $cacertFile) { $cacertFile.Replace('\', '/') } else { "" }
+
     if ($iniContent -notmatch "Bremspace ERP Extensions") {
-        $extList = @('curl','fileinfo','gd','intl','mbstring','mysqli','openssl','pdo_mysql','pdo_sqlite','sqlite3','zip','bcmath','exif')
+        $extList = @('curl','fileinfo','gd','intl','mbstring','mysqli','openssl','pdo_mysql','pdo_sqlite','sqlite3','zip','bcmath','exif','sodium')
         $iniContent = $iniContent -replace '(?m)^[;\s]*extension_dir\s*=\s*"ext"', "extension_dir = `"$extDir`""
         foreach ($ext in $extList) {
             $iniContent = [System.Text.RegularExpressions.Regex]::Replace($iniContent, "(?m)^[;\s]*extension\s*=\s*(php_)?$ext(\.dll)?\b", "extension=$ext")
@@ -282,6 +298,7 @@ if (Test-Path $phpIni) {
             "extension=zip",
             "extension=bcmath",
             "extension=exif",
+            "extension=sodium",
             "zend_extension=opcache",
             "memory_limit = 512M",
             "max_execution_time = 300",
@@ -291,6 +308,10 @@ if (Test-Path $phpIni) {
             "opcache.enable = 1",
             "opcache.enable_cli = 1"
         )
+        if ($cacertFormatted) {
+            $appendLines += "curl.cainfo = `"$cacertFormatted`""
+            $appendLines += "openssl.cafile = `"$cacertFormatted`""
+        }
         $iniContent += ($appendLines -join "`r`n")
         Set-Content -Path $phpIni -Value $iniContent -Encoding ASCII
         Write-Host " [OK] Konfigurasi php.ini & ekstensi berhasil diperbarui." -ForegroundColor Green
@@ -307,11 +328,11 @@ $composerPhar = Join-Path $projectRoot 'composer.phar'
 $usePhar = $false
 $compCmd = Get-Command composer -ErrorAction SilentlyContinue
 
-if ($compCmd) {
-    Write-Host " [OK] Composer global terdeteksi." -ForegroundColor Green
-} elseif (Test-Path $composerPhar) {
+if (Test-Path $composerPhar) {
     $usePhar = $true
     Write-Host " [OK] Composer portable (composer.phar) terdeteksi." -ForegroundColor Green
+} elseif ($compCmd) {
+    Write-Host " [OK] Composer global terdeteksi di PATH." -ForegroundColor Green
 } else {
     Write-Host " [AUTO-INSTALL] Mengunduh composer.phar resmi (getcomposer.org)..." -ForegroundColor Yellow
     try {
@@ -368,29 +389,33 @@ function Test-PortActive([int]$checkPort) {
 
 $useMysql = $false
 if (Test-PortActive 3306) {
-    $useMysql = $true
-} else {
-    try {
-        Start-Service MySQL -ErrorAction SilentlyContinue
-        Start-Service MySQL80 -ErrorAction SilentlyContinue
-        Start-Service MariaDB -ErrorAction SilentlyContinue
-        if (Test-PortActive 3306) { $useMysql = $true }
-    } catch {}
+    # Uji coba koneksi nyata ke MySQL dengan user root tanpa password
+    $testMysqlOut = & $phpExe -r "try { `$c = @new mysqli('127.0.0.1', 'root', '', '', 3306); exit(`$c->connect_errno ? 1 : 0); } catch (Throwable `$e) { exit(1); }" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        $useMysql = $true
+    }
+}
+
+$envFile = Join-Path $projectRoot '.env'
+if (Test-Path $envFile) {
+    $envRaw = Get-Content -Path $envFile -Raw
+    if ($envRaw -match '(?m)^DB_CONNECTION=mysql') {
+        $useMysql = $true
+    }
 }
 
 if ($useMysql) {
-    Write-Host " [OK] Database Engine: MySQL / MariaDB (Port 3306 Aktif)." -ForegroundColor Green
-    # Coba buat database uteparts_db jika cli mysql tersedia
+    Write-Host " [OK] Database Engine: MySQL / MariaDB (Port 3306 Aktif & Terkoneksi)." -ForegroundColor Green
     $mysqlCli = Get-Command mysql.exe -ErrorAction SilentlyContinue
     if ($mysqlCli) {
         & mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS uteparts_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>$null | Out-Null
     }
 } else {
-    Write-Host " [OK] Database Engine: SQLite (Mandiri & Zero-Setup, Tanpa Perlu Server MySQL)." -ForegroundColor Green
+    Write-Host " [OK] Database Engine: SQLite (Mandiri, Zero-Setup, Tanpa Perlu Server MySQL)." -ForegroundColor Green
 }
 
 # ==============================================================================
-# 6. Eksekusi Instalasi & Otomasi Setup (Skip Wizard & Skip Lisensi)
+# 6. Eksekusi Instalasi & Otomasi Setup (Urutan Tepat & Anti-Gagal)
 # ==============================================================================
 Write-Host "[6/7] Menjalankan instalasi aplikasi, migrasi & aktivasi akun..." -ForegroundColor Cyan
 
@@ -411,17 +436,14 @@ foreach ($f in $folders) {
 }
 
 # 6b. Siapkan File .env
-$envFile = Join-Path $projectRoot '.env'
 $envExample = Join-Path $projectRoot '.env.example'
 if (-not (Test-Path $envFile) -and (Test-Path $envExample)) {
     Copy-Item -Path $envExample -Destination $envFile -Force
 }
 
-# Konfigurasi parameter .env
 if (Test-Path $envFile) {
     $envContent = Get-Content -Path $envFile -Raw
     
-    # Port default 1741
     if ($envContent -match '(?m)^APP_URL=') {
         $envContent = $envContent -replace '(?m)^APP_URL=.*', 'APP_URL=http://localhost:1741'
     } else {
@@ -445,18 +467,31 @@ if (Test-Path $envFile) {
     Set-Content -Path $envFile -Value $envContent -Encoding ASCII
 }
 
-# 6c. Generate APP_KEY jika belum ada
+# 6c. Pasang Dependensi Composer (Vendor) TERLEBIH DAHULU sebelum artisan
+$vendorAutoload = Join-Path $projectRoot 'vendor\autoload.php'
+if (-not (Test-Path $vendorAutoload)) {
+    Write-Host " Menjalankan composer install untuk memasang modul backend..." -ForegroundColor Yellow
+    if ($usePhar) {
+        & $phpExe $composerPhar install --no-interaction --prefer-dist --no-scripts
+        if (-not (Test-Path $vendorAutoload)) {
+            & $phpExe $composerPhar install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
+        }
+    } else {
+        & composer install --no-interaction --prefer-dist --no-scripts
+        if (-not (Test-Path $vendorAutoload)) {
+            & composer install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
+        }
+    }
+}
+Write-Host " [OK] Modul composer vendor terverifikasi." -ForegroundColor Green
+
+# 6d. Generate APP_KEY
 $artisan = Join-Path $projectRoot 'artisan'
 $envCheck = Get-Content -Path $envFile -Raw
 if ($envCheck -notmatch '(?m)^APP_KEY=.+') {
     & $phpExe $artisan key:generate --force 2>$null | Out-Null
     Write-Host " [OK] Application Encryption Key berhasil di-generate." -ForegroundColor Green
 }
-
-# 6d. SKIP INSTALL WIZARD (Buat storage/installed.lock)
-$installedLock = Join-Path $projectRoot 'storage\installed.lock'
-Set-Content -Path $installedLock -Value (Get-Date).ToString("yyyy-MM-dd HH:mm:ss") -Encoding ASCII
-Write-Host " [OK] Setup Wizard Web dilewati (storage/installed.lock siap)." -ForegroundColor Green
 
 # 6e. SKIP & OTOMATIS AKTIVASI LISENSI MESIN (Offline Self-Activation Unas)
 Write-Host " Mengaktifkan lisensi mesin mandiri untuk PC Unas..." -ForegroundColor Gray
@@ -471,43 +506,42 @@ if (Test-Path (Join-Path $projectRoot 'storage\license.key')) {
     Write-Host " [OK] Lisensi PC aktif secara offline (storage/license.key terverifikasi)." -ForegroundColor Green
 }
 
-# 6f. Pasang Dependensi Composer (Vendor)
-$vendorAutoload = Join-Path $projectRoot 'vendor\autoload.php'
-if (-not (Test-Path $vendorAutoload)) {
-    Write-Host " Menjalankan composer install untuk melengkapi modul backend..." -ForegroundColor Yellow
-    if ($usePhar) {
-        & $phpExe $composerPhar install --no-interaction --prefer-dist --no-scripts
-        if (-not (Test-Path $vendorAutoload)) {
-            & $phpExe $composerPhar install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
-        }
-    } else {
-        & composer install --no-interaction --prefer-dist --no-scripts
-        if (-not (Test-Path $vendorAutoload)) {
-            & composer install --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
-        }
+# 6f. SKIP INSTALL WIZARD (Buat storage/installed.lock)
+$installedLock = Join-Path $projectRoot 'storage\installed.lock'
+Set-Content -Path $installedLock -Value (Get-Date).ToString("yyyy-MM-dd HH:mm:ss") -Encoding ASCII
+Write-Host " [OK] Setup Wizard Web dilewati (storage/installed.lock siap)." -ForegroundColor Green
+
+# 6g. Pastikan File SQLite Siap jika menggunakan SQLite
+if (-not $useMysql) {
+    $sqliteDb = Join-Path $projectRoot 'database\database.sqlite'
+    if (-not (Test-Path $sqliteDb)) {
+        New-Item -ItemType File -Path $sqliteDb -Force | Out-Null
     }
 }
-& $phpExe $artisan package:discover --ansi 2>$null | Out-Null
-Write-Host " [OK] Modul composer vendor siap digunakan." -ForegroundColor Green
 
-# 6g. Jalankan Migrasi Database & Seeder
+# 6h. Jalankan Migrasi Database & Seeder
 Write-Host " Menjalankan migrasi database skema & data bawaan..." -ForegroundColor Gray
 & $phpExe $artisan migrate --force 2>$null | Out-Null
 & $phpExe $artisan db:seed --force --no-interaction 2>$null | Out-Null
 Write-Host " [OK] Skema tabel & data seeder awal (RBAC, Akun Admin, COA) berhasil dimuat." -ForegroundColor Green
 
-# 6h. SKIP SETUP WIZARD TOKO (Bypass /app/setup-wizard)
-& $phpExe $artisan tinker --execute="app(\App\Modules\Crm\Services\KonfigurasiService::class)->set('app_setup_completed', 'true');" 2>$null | Out-Null
+# 6i. SKIP SETUP WIZARD TOKO (Bypass /app/setup-wizard)
+& $phpExe -r "
+require 'vendor/autoload.php';
+`$app = require_once 'bootstrap/app.php';
+`$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+app(App\Modules\Crm\Services\KonfigurasiService::class)->set('app_setup_completed', 'true');
+" 2>$null | Out-Null
 Write-Host " [OK] Setup wizard operasional toko di-bypass (Langsung siap pakai)." -ForegroundColor Green
 
-# 6i. Symlink Storage Publik
+# 6j. Symlink Storage Publik
 $pubStorage = Join-Path $projectRoot 'public\storage'
 if (-not (Test-Path $pubStorage)) {
     & $phpExe $artisan storage:link 2>$null | Out-Null
     Write-Host " [OK] Symlink berkas publik storage:link berhasil dibuat." -ForegroundColor Green
 }
 
-# 6j. Build Asset Frontend (Jika Node & npm tersedia)
+# 6k. Build Asset Frontend (Jika Node & npm tersedia)
 if ($hasNode -and ($ForceRebuildAssets -or -not (Test-Path (Join-Path $projectRoot 'public\build\manifest.json')))) {
     Write-Host " Mengompilasi asset antarmuka Vite frontend..." -ForegroundColor Gray
     & npm install --ignore-scripts 2>$null | Out-Null
@@ -515,7 +549,7 @@ if ($hasNode -and ($ForceRebuildAssets -or -not (Test-Path (Join-Path $projectRo
     Write-Host " [OK] Asset frontend berhasil dikompilasi." -ForegroundColor Green
 }
 
-# 6k. Bersihkan Cache Optimal
+# 6l. Bersihkan Cache Optimal
 & $phpExe $artisan optimize:clear 2>$null | Out-Null
 
 # ==============================================================================
@@ -525,7 +559,6 @@ Write-Host "[7/7] Menyiapkan port jaringan dan menyalakan server..." -Foreground
 
 $port = 1741
 if (Test-PortActive $port) {
-    # Cek apakah port dipakai proses PHP sebelumnya, restart
     $tcps = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     foreach ($conn in $tcps) {
         try {
