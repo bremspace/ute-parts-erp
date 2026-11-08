@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'license_enabled' => (bool) env('BREMSPACE_LICENSE_ENABLED', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
