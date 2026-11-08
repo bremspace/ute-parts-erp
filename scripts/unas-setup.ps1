@@ -1,6 +1,6 @@
 # ==============================================================================
 # Bremspace ERP - Unas 1-Click Interactive CLI Installer (Windows Edition)
-# Versi: 3.2 (Pure ASCII, Rock-Solid PowerShell 5.1/7+ Engine)
+# Versi: 3.3 (Clean PHP Output, Non-Destructive php.ini, Smart XAMPP Recovery)
 # ==============================================================================
 param(
     [switch]$ForceReinstallPhp,
@@ -196,7 +196,7 @@ function Test-PhpBinary([string]$binPath) {
     if (-not $binPath) { return $null }
     try {
         if (-not (Test-Path $binPath)) { return $null }
-        $out = & $binPath -r "echo PHP_VERSION;" 2>$null
+        $out = & $binPath -n -r "echo PHP_VERSION;" 2>$null
         if ($out -and ($out -match '^(\d+)\.(\d+)')) {
             $maj = [int]$matches[1]
             $min = [int]$matches[2]
@@ -296,65 +296,71 @@ if (-not (Test-Path $cacertFile)) {
 }
 
 # Konfigurasi php.ini & Ekstensi Kritis
+$isIsolatedPhp = ($phpExe -like "*tools\php\*")
 $phpIni = Join-Path $phpDir 'php.ini'
-if (-not (Test-Path $phpIni)) {
-    $iniDev = Join-Path $phpDir 'php.ini-development'
-    $iniProd = Join-Path $phpDir 'php.ini-production'
-    if (Test-Path $iniDev) { Copy-Item -Path $iniDev -Destination $phpIni -Force }
-    elseif (Test-Path $iniProd) { Copy-Item -Path $iniProd -Destination $phpIni -Force }
-    else { Set-Content -Path $phpIni -Value "[PHP]`r`n" -Encoding ASCII }
-}
 
-if (Test-Path $phpIni) {
-    $iniContent = Get-Content -Path $phpIni -Raw
-    $extDir = (Join-Path $phpDir 'ext').Replace('\', '/')
-    $cacertFormatted = if (Test-Path $cacertFile) { $cacertFile.Replace('\', '/') } else { "" }
-
-    if ($iniContent -notmatch "Bremspace ERP Extensions") {
-        $extList = @('curl','fileinfo','gd','intl','mbstring','mysqli','openssl','pdo_mysql','pdo_sqlite','sqlite3','zip','bcmath','exif','sodium')
-        $iniContent = $iniContent -replace '(?m)^[;\s]*extension_dir\s*=\s*"ext"', "extension_dir = `"$extDir`""
-        foreach ($ext in $extList) {
-            $iniContent = [System.Text.RegularExpressions.Regex]::Replace($iniContent, "(?m)^[;\s]*extension\s*=\s*(php_)?$ext(\.dll)?\b", "extension=$ext")
-        }
-        $iniContent = [System.Text.RegularExpressions.Regex]::Replace($iniContent, '(?m)^[;\s]*zend_extension\s*=\s*(php_)?opcache(\.dll)?\b', 'zend_extension=opcache')
-
-        $appendLines = @(
-            "",
-            ";; ==============================================================================",
-            ";; Bremspace ERP Extensions and Overrides",
-            ";; ==============================================================================",
-            "extension_dir = `"$extDir`"",
-            "extension=curl",
-            "extension=fileinfo",
-            "extension=gd",
-            "extension=intl",
-            "extension=mbstring",
-            "extension=mysqli",
-            "extension=openssl",
-            "extension=pdo_mysql",
-            "extension=pdo_sqlite",
-            "extension=sqlite3",
-            "extension=zip",
-            "extension=bcmath",
-            "extension=exif",
-            "extension=sodium",
-            "zend_extension=opcache",
-            "memory_limit = 512M",
-            "max_execution_time = 300",
-            "post_max_size = 64M",
-            "upload_max_filesize = 64M",
-            "date.timezone = Asia/Jakarta",
-            "opcache.enable = 1",
-            "opcache.enable_cli = 1"
-        )
-        if ($cacertFormatted) {
-            $appendLines += "curl.cainfo = `"$cacertFormatted`""
-            $appendLines += "openssl.cafile = `"$cacertFormatted`""
-        }
-        $iniContent += ($appendLines -join "`r`n")
-        Set-Content -Path $phpIni -Value $iniContent -Encoding ASCII
-        Write-Host " [OK] Konfigurasi php.ini & ekstensi berhasil diperbarui." -ForegroundColor Green
+if ($isIsolatedPhp) {
+    if (-not (Test-Path $phpIni)) {
+        $iniDev = Join-Path $phpDir 'php.ini-development'
+        $iniProd = Join-Path $phpDir 'php.ini-production'
+        if (Test-Path $iniDev) { Copy-Item -Path $iniDev -Destination $phpIni -Force }
+        elseif (Test-Path $iniProd) { Copy-Item -Path $iniProd -Destination $phpIni -Force }
+        else { Set-Content -Path $phpIni -Value "[PHP]`r`n" -Encoding ASCII }
     }
+
+    if (Test-Path $phpIni) {
+        $iniContent = Get-Content -Path $phpIni -Raw
+        $extDir = (Join-Path $phpDir 'ext').Replace('\', '/')
+        $cacertFormatted = if (Test-Path $cacertFile) { $cacertFile.Replace('\', '/') } else { "" }
+
+        if ($iniContent -notmatch "Bremspace ERP Extensions") {
+            $extList = @('curl','fileinfo','gd','intl','mbstring','mysqli','openssl','pdo_mysql','pdo_sqlite','sqlite3','zip','bcmath','exif','sodium')
+            $iniContent = $iniContent -replace '(?m)^[;\s]*extension_dir\s*=\s*"ext"', "extension_dir = `"$extDir`""
+            foreach ($ext in $extList) {
+                $iniContent = [System.Text.RegularExpressions.Regex]::Replace($iniContent, "(?m)^[;\s]*extension\s*=\s*(php_)?$ext(\.dll)?\b", "extension=$ext")
+            }
+            $iniContent = [System.Text.RegularExpressions.Regex]::Replace($iniContent, '(?m)^[;\s]*zend_extension\s*=\s*(php_)?opcache(\.dll)?\b', 'zend_extension=opcache')
+
+            $appendLines = @(
+                "",
+                ";; ==============================================================================",
+                ";; Bremspace ERP Extensions and Overrides",
+                ";; ==============================================================================",
+                "extension_dir = `"$extDir`"",
+                "extension=curl",
+                "extension=fileinfo",
+                "extension=gd",
+                "extension=intl",
+                "extension=mbstring",
+                "extension=mysqli",
+                "extension=openssl",
+                "extension=pdo_mysql",
+                "extension=pdo_sqlite",
+                "extension=sqlite3",
+                "extension=zip",
+                "extension=bcmath",
+                "extension=exif",
+                "extension=sodium",
+                "zend_extension=opcache",
+                "memory_limit = 512M",
+                "max_execution_time = 300",
+                "post_max_size = 64M",
+                "upload_max_filesize = 64M",
+                "date.timezone = Asia/Jakarta",
+                "opcache.enable = 1",
+                "opcache.enable_cli = 1"
+            )
+            if ($cacertFormatted) {
+                $appendLines += "curl.cainfo = `"$cacertFormatted`""
+                $appendLines += "openssl.cafile = `"$cacertFormatted`""
+            }
+            $iniContent += ($appendLines -join "`r`n")
+            Set-Content -Path $phpIni -Value $iniContent -Encoding ASCII
+            Write-Host " [OK] Konfigurasi php.ini & ekstensi tools\php berhasil diperbarui." -ForegroundColor Green
+        }
+    }
+} else {
+    Write-Host " [OK] Menggunakan runtime PHP sistem ($phpDir)." -ForegroundColor Green
 }
 
 # ==============================================================================
@@ -480,7 +486,8 @@ if ($dbChoice -eq "2") {
         [int]::TryParse($dbPort, [ref]$portNum) | Out-Null
 
         $diagPhp = "try { `$c = @new mysqli('$escapedHost', '$escapedUser', '$escapedPass', '', $portNum); if (`$c->connect_errno) { echo 'ERR:' . `$c->connect_errno . ':' . `$c->connect_error; exit(1); } else { exit(0); } } catch (Throwable `$e) { echo 'ERR:EXCEPTION:' . `$e->getMessage(); exit(1); }"
-        $connTestOut = & $phpExe -r $diagPhp 2>$null
+        $rawOut = & $phpExe -d display_errors=0 -d display_startup_errors=0 -r $diagPhp 2>&1
+        $errLine = ($rawOut | Where-Object { $_ -match "^ERR:" } | Select-Object -First 1)
 
         if ($LASTEXITCODE -eq 0) {
             $dbConnected = $true
@@ -488,25 +495,30 @@ if ($dbChoice -eq "2") {
             # Auto-create database jika belum ada
             $escapedDbName = $dbName.Replace("`"", "")
             $createDbScript = "try { `$c = new mysqli('$escapedHost', '$escapedUser', '$escapedPass', '', $portNum); `$c->query('CREATE DATABASE IF NOT EXISTS \`$escapedDbName\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch (Throwable `$e) {}"
-            & $phpExe -r $createDbScript 2>$null | Out-Null
+            & $phpExe -d display_errors=0 -d display_startup_errors=0 -r $createDbScript 2>$null | Out-Null
         } else {
             Write-Host ""
             Write-Host "======================================================================" -ForegroundColor Red
             Write-Host " [KONEKSI GAGAL] Tidak dapat terhubung ke MySQL." -ForegroundColor Red
-            if ($connTestOut -and $connTestOut.StartsWith("ERR:")) {
-                Write-Host " Detail Error: $connTestOut" -ForegroundColor Yellow
+            if ($errLine) {
+                Write-Host " Pesan Error MySQL: $errLine" -ForegroundColor Yellow
             }
             Write-Host "======================================================================" -ForegroundColor Red
-            Write-Host "Analisis & Solusi Masalah:" -ForegroundColor Yellow
-            Write-Host "  1. Access denied (User/Password salah):" -ForegroundColor White
-            Write-Host "     - Pastikan username/password MySQL Anda sudah sesuai." -ForegroundColor Gray
-            Write-Host "     - Jika pakai Laragon/XAMPP default, biasanya user 'root' tanpa password (cukup tekan ENTER)." -ForegroundColor Gray
-            Write-Host "  2. Connection refused / Port salah:" -ForegroundColor White
-            Write-Host "     - Pastikan service MySQL/MariaDB sudah running (di Laragon, XAMPP, atau Windows Services)." -ForegroundColor Gray
-            Write-Host "     - Periksa apakah port MySQL Anda 3306 atau port lain (misal 3307)." -ForegroundColor Gray
+            
+            # Deteksi spesifik Access denied
+            if ($errLine -and $errLine -match "Access denied") {
+                Write-Host "Penyebab Terdeteksi: Password/Username salah!" -ForegroundColor Yellow
+                Write-Host "  - Di XAMPP default, user 'root' TIDAK MEMILIKI PASSWORD." -ForegroundColor Cyan
+                Write-Host "  - Jika tadi Anda mengetik password, coba kosongkan (cukup tekan ENTER saat ditanya password)." -ForegroundColor Cyan
+            } else {
+                Write-Host "Penyebab Terdeteksi: Port atau Service MySQL belum siap." -ForegroundColor Yellow
+                Write-Host "  - Pastikan modul MySQL di XAMPP Control Panel sudah berwarna HIJAU (Running)." -ForegroundColor Cyan
+                Write-Host "  - Pastikan port MySQL sesuai (default: 3306)." -ForegroundColor Cyan
+            }
+            
             Write-Host ""
             Write-Host "Pilihan Tindakan Anda:" -ForegroundColor White
-            Write-Host "  (1) Coba Lagi (Koreksi Host, Port, User, atau Password)" -ForegroundColor Cyan
+            Write-Host "  (1) Coba Lagi (Koreksi Host, Port, User, atau Kosongkan Password)" -ForegroundColor Cyan
             Write-Host "  (2) Beralih ke SQLite (Zero-Setup, Mandiri & Langsung Berjalan)" -ForegroundColor Green
             Write-Host "  (3) Tetap Gunakan Pengaturan MySQL Ini (Saya akan perbaiki MySQL sendiri nanti)" -ForegroundColor Yellow
 
