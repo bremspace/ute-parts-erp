@@ -271,8 +271,32 @@
                 @endif
             </div>
 
+            <!-- Opsi Cetak Langsung Struk Kasir (Pesanan Online) -->
+            <div
+                class="px-3.5 py-2 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex items-center justify-between mt-3"
+                x-data="{
+                    autoDirect: localStorage.getItem('ute_auto_direct_print') === '1',
+                    printerName: localStorage.getItem('ute_ble_printer_name') || null,
+                    toggleDirect() {
+                        this.autoDirect = !this.autoDirect;
+                        localStorage.setItem('ute_auto_direct_print', this.autoDirect ? '1' : '0');
+                    }
+                }"
+            >
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-ink-900 dark:text-white">Cetak Langsung Struk</span>
+                    <template x-if="printerName">
+                        <span class="px-1.5 py-0.5 rounded bg-up-mint/15 text-[10px] text-up-mint font-semibold truncate max-w-[120px]" x-text="printerName"></span>
+                    </template>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" :checked="autoDirect" @change="toggleDirect()" class="sr-only peer">
+                    <div class="w-9 h-5 bg-ink-300 dark:bg-ink-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-up-mint"></div>
+                </label>
+            </div>
+
             <!-- Footer Aksi -->
-            <div class="flex gap-2.5 pt-3.5 border-t border-ink-200/70 dark:border-white/10 mt-4">
+            <div class="flex gap-2.5 pt-3.5 border-t border-ink-200/70 dark:border-white/10 mt-3">
                 <button
                     type="button"
                     wire:click="tutupPesananOnlineModal"

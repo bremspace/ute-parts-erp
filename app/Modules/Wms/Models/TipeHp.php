@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -164,6 +165,40 @@ class TipeHp extends Model
         }
 
         return $base;
+    }
+
+    public static function resolveModelBySlug(string $slug): string
+    {
+        $clean = trim(urldecode($slug));
+        if ($clean === '') {
+            return '';
+        }
+
+        $directCandidate = str_replace('-', ' ', $clean);
+
+        return Cache::remember('tipe_hp_model_by_slug_'.md5(strtolower($clean)), 300, function () use ($clean, $directCandidate) {
+            $matched = static::where('is_active', true)
+                ->where(function ($q) use ($clean, $directCandidate) {
+                    $q->where('model', $clean)
+                        ->orWhere('model', $directCandidate);
+                })
+                ->value('model');
+
+            if ($matched) {
+                return $matched;
+            }
+
+            // Fallback: cari model yang cocok dengan Str::slug
+            $allModels = static::where('is_active', true)->pluck('model')->unique();
+            $targetSlug = Str::slug($clean);
+            foreach ($allModels as $m) {
+                if (Str::slug($m) === $targetSlug) {
+                    return $m;
+                }
+            }
+
+            return $directCandidate;
+        });
     }
 
     /**

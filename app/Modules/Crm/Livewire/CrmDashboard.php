@@ -215,7 +215,7 @@ class CrmDashboard extends Component
 
     public array $editPelangganForm = [
         'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
-        'tanggal_lahir' => '', 'tier_membership_id' => null, 'is_reseller' => false,
+        'tanggal_lahir' => '', 'tier_membership_id' => null, 'status' => 'aktif', 'is_reseller' => false,
         'tipe_konsumen' => 'retail', 'kode_agen' => '', 'referral_kode' => '',
     ];
 
@@ -281,6 +281,7 @@ class CrmDashboard extends Component
             'alamat' => $p->alamat ?? '',
             'tanggal_lahir' => $p->tanggal_lahir?->format('Y-m-d') ?? '',
             'tier_membership_id' => $p->tier_membership_id,
+            'status' => $p->status ?? 'aktif',
             'is_reseller' => (bool) $p->is_reseller,
             'tipe_konsumen' => $p->tipe_konsumen ?? ($p->is_reseller ? 'reseller' : 'retail'),
             'kode_agen' => $p->kode_agen ?? '',
@@ -331,21 +332,35 @@ class CrmDashboard extends Component
         if (empty($this->editPelangganForm['alamat'])) {
             $this->editPelangganForm['alamat'] = null;
         }
+        if (empty($this->editPelangganForm['tier_membership_id'])) {
+            $this->editPelangganForm['tier_membership_id'] = null;
+        }
+        if (empty($this->editPelangganForm['status'])) {
+            $this->editPelangganForm['status'] = 'aktif';
+        }
 
         $this->validate([
             'editPelangganForm.nama' => 'required|string|max:255',
             'editPelangganForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon,'.$this->editPelangganId,
             'editPelangganForm.email' => 'nullable|email|unique:pelanggan,email,'.$this->editPelangganId,
+            'editPelangganForm.tier_membership_id' => 'nullable|exists:tier_memberships,id',
+            'editPelangganForm.status' => 'required|in:aktif,pending,nonaktif,ditolak',
             'editPelangganForm.kode_agen' => 'nullable|string|max:40|unique:pelanggan,kode_agen,'.$this->editPelangganId,
             'editPelangganForm.referral_kode' => 'nullable|string|max:40',
         ]);
 
-        $pelanggan = Pelanggan::findOrFail($this->editPelangganId);
-        app(PelangganService::class)->update($pelanggan, $this->editPelangganForm);
+        try {
+            $pelanggan = Pelanggan::findOrFail($this->editPelangganId);
+            app(PelangganService::class)->update($pelanggan, $this->editPelangganForm);
 
-        $this->showEditPelangganModal = false;
-        $this->editPelangganId = null;
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Data pelanggan berhasil diperbarui']);
+            $this->showEditPelangganModal = false;
+            $this->editPelangganId = null;
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Data pelanggan berhasil diperbarui']);
+        } catch (ValidationException $e) {
+            $this->setErrorBag($e->validator->getMessageBag());
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memperbarui pelanggan: '.$e->getMessage()]);
+        }
     }
 
     public function hapusPelanggan(int $id): void
@@ -510,6 +525,7 @@ class CrmDashboard extends Component
             ->latest()->take(8)->get();
 
         $servis = TiketServis::with('garansi')
+            ->select(['id', 'no_tiket', 'cabang_id', 'pelanggan_id', 'jenis_hp', 'seri_hp', 'status', 'created_at'])
             ->where('pelanggan_id', $pelanggan->id)
             ->latest()->take(8)->get();
 

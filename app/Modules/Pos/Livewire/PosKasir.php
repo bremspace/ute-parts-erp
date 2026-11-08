@@ -1920,6 +1920,7 @@ class PosKasir extends Component
         $this->pelangganSearch = '';
         $this->poinDitukar = 0;
         $this->diskonPoin = 0.0;
+        $this->resetComputedTotals();
 
         $customer = $this->customer;
         if ($customer) {
@@ -2035,21 +2036,37 @@ class PosKasir extends Component
 
     public function updatedSplitTunai($value): void
     {
+        $total = (float) $this->totalAkhir;
         $tunai = (float) $this->parseNominal($value);
         if ($tunai < 0) {
-            $tunai = 0;
-            $this->splitTunai = '0';
+            $tunai = 0.0;
+        } elseif ($tunai > $total) {
+            $tunai = $total;
         }
+        $nonTunai = max(0.0, $total - $tunai);
+
+        $this->splitTunai = number_format($tunai, 0, ',', '.');
+        $this->splitNonTunai = number_format($nonTunai, 0, ',', '.');
         unset($this->kembalian);
+
+        if ($this->splitMetodeNonTunai === 'qris') {
+            $this->refreshQrisKasir($nonTunai);
+        }
     }
 
     public function updatedSplitNonTunai($value): void
     {
+        $total = (float) $this->totalAkhir;
         $nonTunai = (float) $this->parseNominal($value);
         if ($nonTunai < 0) {
-            $nonTunai = 0;
-            $this->splitNonTunai = '0';
+            $nonTunai = 0.0;
+        } elseif ($nonTunai > $total) {
+            $nonTunai = $total;
         }
+        $tunai = max(0.0, $total - $nonTunai);
+
+        $this->splitNonTunai = number_format($nonTunai, 0, ',', '.');
+        $this->splitTunai = number_format($tunai, 0, ',', '.');
         unset($this->kembalian);
 
         if ($this->splitMetodeNonTunai === 'qris') {
@@ -2483,8 +2500,8 @@ class PosKasir extends Component
             return;
         }
 
-        if ($this->metodeBayar === 'split' && ($splitTunaiVal + $splitNonTunaiVal) < $totalAkhir) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Total pembayaran split kurang']);
+        if ($this->metodeBayar === 'split' && abs(($splitTunaiVal + $splitNonTunaiVal) - $totalAkhir) > 0.01) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Total nominal split harus tepat sesuai nilai faktur (Rp '.number_format($totalAkhir, 0, ',', '.').')']);
 
             return;
         }
@@ -3140,10 +3157,12 @@ class PosKasir extends Component
             $total = (float) $this->selectedServisDetail['total'];
             $tunai = (float) $this->parseNominal($this->servisSplitTunai);
             if ($tunai < 0) {
-                $tunai = 0;
-                $this->servisSplitTunai = '0';
+                $tunai = 0.0;
+            } elseif ($tunai > $total) {
+                $tunai = $total;
             }
-            $sisaNonTunai = max(0, $total - $tunai);
+            $sisaNonTunai = max(0.0, $total - $tunai);
+            $this->servisSplitTunai = number_format($tunai, 0, ',', '.');
             $this->servisSplitNonTunai = number_format($sisaNonTunai, 0, ',', '.');
         }
         $this->hitungKembalianServis();
@@ -3155,10 +3174,12 @@ class PosKasir extends Component
             $total = (float) $this->selectedServisDetail['total'];
             $nonTunai = (float) $this->parseNominal($this->servisSplitNonTunai);
             if ($nonTunai < 0) {
-                $nonTunai = 0;
-                $this->servisSplitNonTunai = '0';
+                $nonTunai = 0.0;
+            } elseif ($nonTunai > $total) {
+                $nonTunai = $total;
             }
-            $sisaTunai = max(0, $total - $nonTunai);
+            $sisaTunai = max(0.0, $total - $nonTunai);
+            $this->servisSplitNonTunai = number_format($nonTunai, 0, ',', '.');
             $this->servisSplitTunai = number_format($sisaTunai, 0, ',', '.');
         }
         $this->hitungKembalianServis();
@@ -3203,8 +3224,8 @@ class PosKasir extends Component
             return;
         }
 
-        if ($this->servisMetodeBayar === 'split' && ($splitTunai + $splitNonTunai) < $total) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Total pembayaran split kurang dari total tagihan servis']);
+        if ($this->servisMetodeBayar === 'split' && abs(($splitTunai + $splitNonTunai) - $total) > 0.01) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Total pembayaran split servis harus tepat sesuai faktur (Rp '.number_format($total, 0, ',', '.').')']);
 
             return;
         }
@@ -3261,6 +3282,13 @@ class PosKasir extends Component
                         auth()->user(),
                         "Unit diserahkan kepada pelanggan saat pelunasan di kasir POS ({$noTransaksi})"
                     );
+                }
+
+                // Catat audit trail pelunasan servis (termasuk split pembayaran jika ada)
+                try {
+                    app(TransactionActivityLogService::class)->catatPenjualan($transaksi);
+                } catch (\Throwable $e) {
+                    Log::warning('Gagal mencatat audit log pelunasan servis kasir: '.$e->getMessage());
                 }
 
                 // Data struk thermal POS

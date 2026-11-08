@@ -560,9 +560,42 @@ async function connectBlePrinter(forceNewPairing = false) {
                 return { device: cachedBleDevice, char, reused: true };
             }
         } catch (err) {
-            console.warn('[BLE] Reconnect failed, requesting device pairing:', err);
+            console.warn('[BLE] Reconnect failed, checking permitted devices:', err);
             cachedBleDevice = null;
             cachedCharacteristic = null;
+        }
+    }
+
+    // Auto-reconnect Chromium getDevices() jika sudah pernah dipairing sebelumnya tanpa popup
+    if (!forceNewPairing && 'getDevices' in navigator.bluetooth) {
+        try {
+            const devices = await navigator.bluetooth.getDevices();
+            const savedName = localStorage.getItem('ute_ble_printer_name');
+            let matchedDevice = null;
+
+            if (savedName && devices.length > 0) {
+                matchedDevice = devices.find(d => d.name === savedName) || devices[0];
+            } else if (devices.length > 0) {
+                matchedDevice = devices[0];
+            }
+
+            if (matchedDevice) {
+                notify(`Menyambungkan otomatis ke ${matchedDevice.name || 'Printer Bluetooth'}...`, 'info');
+                matchedDevice.addEventListener('gattserverdisconnected', () => {
+                    console.log('[BLE] Printer disconnected:', matchedDevice.name);
+                    cachedCharacteristic = null;
+                });
+                const server = await matchedDevice.gatt.connect();
+                const char = await findWriteCharacteristic(server);
+                if (char) {
+                    cachedBleDevice = matchedDevice;
+                    cachedCharacteristic = char;
+                    localStorage.setItem('ute_ble_printer_name', matchedDevice.name || 'Printer BLE');
+                    return { device: matchedDevice, char, reused: true };
+                }
+            }
+        } catch (err) {
+            console.warn('[BLE] getDevices auto-connect failed:', err);
         }
     }
 
@@ -691,10 +724,49 @@ function thermalPrinter(receiptData) {
         data: receiptData || null,
         isPrinting: false,
         pairedPrinterName: localStorage.getItem('ute_ble_printer_name') || null,
+        autoDirectPrint: localStorage.getItem('ute_auto_direct_print') === '1',
 
         init() {
             if (!this.data) {
                 this.data = resolveReceiptData();
+            }
+            this.syncPrinterName();
+        },
+
+        syncPrinterName() {
+            this.pairedPrinterName = localStorage.getItem('ute_ble_printer_name') || null;
+            return this.pairedPrinterName;
+        },
+
+        toggleAutoDirectPrint() {
+            this.autoDirectPrint = !this.autoDirectPrint;
+            localStorage.setItem('ute_auto_direct_print', this.autoDirectPrint ? '1' : '0');
+        },
+
+        async directPrint(preferredSize = null) {
+            if (this.isPrinting) return;
+            const size = preferredSize || (this.paperSize || localStorage.getItem('ute_pos_paper_size') || '58');
+            this.syncPrinterName();
+
+            // Jika ada printer Bluetooth tersimpan atau browser support Bluetooth
+            if (this.pairedPrinterName || ('bluetooth' in navigator)) {
+                try {
+                    if (size === '80') {
+                        await this.printFaktur80(false);
+                    } else {
+                        await this.printStruk58(false);
+                    }
+                    return;
+                } catch (e) {
+                    console.warn('[DirectPrint] BLE error, fallback web print:', e);
+                }
+            }
+
+            // Fallback web print native dialog
+            if (size === '80') {
+                this.webPrint80();
+            } else {
+                this.webPrint58();
             }
         },
 

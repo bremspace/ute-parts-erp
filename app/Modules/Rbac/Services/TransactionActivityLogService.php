@@ -31,12 +31,20 @@ use Illuminate\Support\Facades\Log;
 class TransactionActivityLogService
 {
     /**
-     * Catat Transaksi Penjualan Kasir (POS).
+     * Catat Transaksi Penjualan (POS, Pelunasan Servis Kasir, dan Order Online Marketplace).
      */
     public function catatPenjualan(Transaksi $transaksi): ?AktivitasLog
     {
         try {
-            $transaksi->loadMissing(['items.produk', 'kasir', 'pelanggan', 'cabang']);
+            $existing = AktivitasLog::where('subject_type', $transaksi->getMorphClass())
+                ->where('subject_id', $transaksi->id)
+                ->where('event', 'penjualan')
+                ->first();
+            if ($existing) {
+                return $existing;
+            }
+
+            $transaksi->loadMissing(['items.produk', 'kasir', 'pelanggan', 'cabang', 'tiketServis']);
 
             $items = [];
             $produkIds = [];
@@ -67,21 +75,59 @@ class TransactionActivityLogService
             $totalNominal = (float) $transaksi->total_akhir;
             $pelangganNama = $transaksi->pelanggan?->nama ?? 'Pelanggan Umum';
             $kasirNama = $transaksi->kasir?->name ?? 'Kasir';
-            $metodeBayar = strtoupper(str_replace('_', ' ', (string) $transaksi->metode_bayar));
             $totalQty = array_sum(array_column($items, 'qty'));
 
-            $ringkasan = sprintf(
-                'Penjualan kasir oleh %s kepada %s: %d barang (%s) senilai Rp %s dibayar secara %s.',
-                $kasirNama,
-                $pelangganNama,
-                $totalQty,
-                implode(', ', $itemSummaries),
-                number_format($totalNominal, 0, ',', '.'),
-                $metodeBayar
-            );
+            $splitDetail = is_string($transaksi->split_detail) ? json_decode($transaksi->split_detail, true) : (array) $transaksi->split_detail;
+            $isSplit = $transaksi->metode_bayar === 'split' || (! empty($splitDetail) && (($splitDetail['tunai'] ?? 0) > 0 || ($splitDetail['non_tunai'] ?? 0) > 0));
+
+            if ($isSplit && ! empty($splitDetail)) {
+                $tunai = (float) ($splitDetail['tunai'] ?? 0);
+                $nonTunai = (float) ($splitDetail['non_tunai'] ?? 0);
+                $metodeNon = strtoupper(str_replace('_', ' ', (string) ($splitDetail['metode_non_tunai'] ?? 'Non-Tunai')));
+                $metodeTeks = sprintf('Split (Tunai Rp %s + %s Rp %s)', number_format($tunai, 0, ',', '.'), $metodeNon, number_format($nonTunai, 0, ',', '.'));
+            } else {
+                $metodeTeks = strtoupper(str_replace('_', ' ', (string) $transaksi->metode_bayar));
+            }
+
+            // Narasi kontekstual berdasarkan sumber transaksi (POS / Servis / Marketplace Online)
+            if ($transaksi->sumber === 'servis' || $transaksi->tiket_servis_id) {
+                $tiketNo = $transaksi->tiketServis?->no_tiket ?? ('Tiket #'.($transaksi->tiket_servis_id ?? ''));
+                $ringkasan = sprintf(
+                    'Pelunasan servis %s oleh %s untuk %s senilai Rp %s dibayar secara %s.',
+                    $tiketNo,
+                    $kasirNama,
+                    $pelangganNama,
+                    number_format($totalNominal, 0, ',', '.'),
+                    $metodeTeks
+                );
+                $deskripsi = "Pelunasan Servis {$transaksi->no_transaksi} ({$tiketNo}) - Rp ".number_format($totalNominal, 0, ',', '.');
+            } elseif ($transaksi->sumber === 'marketplace' || str_starts_with((string) $transaksi->sumber, 'channel:')) {
+                $ringkasan = sprintf(
+                    'Pesanan online %s oleh %s: %d barang (%s) senilai Rp %s dibayar via %s.',
+                    $transaksi->no_transaksi,
+                    $pelangganNama,
+                    $totalQty,
+                    ! empty($itemSummaries) ? implode(', ', $itemSummaries) : 'Produk',
+                    number_format($totalNominal, 0, ',', '.'),
+                    $metodeTeks
+                );
+                $deskripsi = "Pesanan Online {$transaksi->no_transaksi} ({$pelangganNama}) - Rp ".number_format($totalNominal, 0, ',', '.');
+            } else {
+                $ringkasan = sprintf(
+                    'Penjualan kasir oleh %s kepada %s: %d barang (%s) senilai Rp %s dibayar secara %s.',
+                    $kasirNama,
+                    $pelangganNama,
+                    $totalQty,
+                    ! empty($itemSummaries) ? implode(', ', $itemSummaries) : 'Produk',
+                    number_format($totalNominal, 0, ',', '.'),
+                    $metodeTeks
+                );
+                $deskripsi = "Penjualan Kasir {$transaksi->no_transaksi} ({$pelangganNama}) - Rp ".number_format($totalNominal, 0, ',', '.');
+            }
 
             $properties = [
                 'tipe_transaksi' => 'penjualan',
+                'sumber' => $transaksi->sumber ?: 'pos',
                 'no_referensi' => $transaksi->no_transaksi,
                 'cabang_id' => $transaksi->cabang_id,
                 'produk_ids' => $produkIds,
@@ -89,6 +135,8 @@ class TransactionActivityLogService
                 'items' => $items,
                 'total_akhir' => $totalNominal,
                 'metode_bayar' => $transaksi->metode_bayar,
+                'split_detail' => ! empty($splitDetail) ? $splitDetail : null,
+                'pembayaran_detail' => $metodeTeks,
                 'pelanggan' => $pelangganNama,
                 'kasir' => $kasirNama,
             ];
@@ -96,7 +144,7 @@ class TransactionActivityLogService
             return $this->tulisLog(
                 subject: $transaksi,
                 event: 'penjualan',
-                description: "Penjualan Kasir {$transaksi->no_transaksi} ({$pelangganNama}) - Rp ".number_format($totalNominal, 0, ',', '.'),
+                description: $deskripsi,
                 properties: $properties,
                 causer: $transaksi->kasir ?: auth()->user(),
                 cabangId: $transaksi->cabang_id
@@ -283,6 +331,7 @@ class TransactionActivityLogService
                 'ringkasan' => $ringkasan,
                 'tipe_penyelesaian' => $retur->tipe_penyelesaian,
                 'metode_pengembalian' => $retur->metode_pengembalian,
+                'metode_bayar_selisih' => $retur->metode_bayar_selisih,
                 'nominal_retur' => $nominalRetur,
                 'selisih_nominal' => $selisih,
                 'items_retur' => $itemsRetur,

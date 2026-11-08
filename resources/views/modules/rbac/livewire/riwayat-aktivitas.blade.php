@@ -259,9 +259,24 @@
                                             </p>
                                             {{-- Metadata Pelengkap Transaksi / Aksi --}}
                                             <div class="flex flex-wrap gap-1.5 mt-2">
-                                                @if(!empty($props['metode_bayar']))
+                                                @if(!empty($props['metode_bayar']) && $props['metode_bayar'] === 'split' && !empty($props['split_detail']))
+                                                    @php
+                                                        $split = is_array($props['split_detail']) ? $props['split_detail'] : (json_decode($props['split_detail'], true) ?: []);
+                                                        $tunaiNom = (float)($split['tunai'] ?? 0);
+                                                        $nonTunaiNom = (float)($split['non_tunai'] ?? 0);
+                                                        $metodeNonText = strtoupper(str_replace('_', ' ', (string)($split['metode_non_tunai'] ?? 'NON-TUNAI')));
+                                                    @endphp
+                                                    <span class="px-2 py-0.5 rounded-md bg-up-primary/15 border border-up-primary/30 text-[10px] text-up-primary font-medium">
+                                                        Split: <strong class="text-white">Tunai Rp {{ number_format($tunaiNom, 0, ',', '.') }}</strong> + <strong class="text-white">{{ $metodeNonText }} Rp {{ number_format($nonTunaiNom, 0, ',', '.') }}</strong>
+                                                    </span>
+                                                @elseif(!empty($props['metode_bayar']))
                                                     <span class="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] text-ink-300">
                                                         Metode: <strong class="text-white">{{ strtoupper(str_replace('_', ' ', (string) $props['metode_bayar'])) }}</strong>
+                                                    </span>
+                                                @endif
+                                                @if(!empty($props['metode_bayar_selisih']))
+                                                    <span class="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] text-ink-300">
+                                                        Metode Selisih: <strong class="text-white">{{ strtoupper(str_replace('_', ' ', (string) $props['metode_bayar_selisih'])) }}</strong>
                                                     </span>
                                                 @endif
                                                 @if(!empty($props['tipe_penyelesaian']))

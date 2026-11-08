@@ -9,9 +9,11 @@ use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\SmartSearchService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -67,6 +69,7 @@ class ShopPage extends Component
     // Detail: pilihan varian & qty
     public ?int $selectedVariantId = null;
 
+    #[Url(as: 'tipe', except: '')]
     public ?string $selectedGadgetModel = null;
 
     public int $qty = 1;
@@ -105,7 +108,7 @@ class ShopPage extends Component
             $this->filterKategori = $this->resolveKategoriParam($kategori);
         }
         if ($hpModel) {
-            $this->filterHpModel = str_replace('-', ' ', urldecode($hpModel));
+            $this->filterHpModel = TipeHp::resolveModelBySlug($hpModel);
         }
 
         // Support query parameters on direct landing
@@ -135,6 +138,12 @@ class ShopPage extends Component
         }
         if (request()->has('sort') && empty($this->sort)) {
             $this->sort = (string) request()->query('sort');
+        }
+        if (request()->has('tipe') && empty($this->selectedGadgetModel)) {
+            $this->selectedGadgetModel = (string) request()->query('tipe');
+        }
+        if (! empty($this->selectedGadgetModel) && $this->slug) {
+            $this->resolveAndMatchSelectedGadget($this->selectedGadgetModel);
         }
     }
 
@@ -480,13 +489,42 @@ class ShopPage extends Component
             return;
         }
 
-        $this->selectedGadgetModel = $gadgetModel;
+        $this->resolveAndMatchSelectedGadget($gadgetModel);
+    }
+
+    public function resolveAndMatchSelectedGadget(string $gadgetModel): void
+    {
+        $target = trim($gadgetModel);
+        if ($target === '') {
+            $this->selectedGadgetModel = null;
+
+            return;
+        }
+
+        $p = $this->productDetail;
+        $canonical = $target;
+
+        if ($p && $p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
+            $targetSlug = Str::slug($target);
+            foreach ($p->tipeHps as $thp) {
+                $thpNama = trim("{$thp->merk} {$thp->model}");
+                if (Str::slug($thpNama) === $targetSlug ||
+                    Str::slug($thp->model) === $targetSlug ||
+                    strcasecmp($thpNama, $target) === 0 ||
+                    strcasecmp($thp->model, $target) === 0) {
+                    $canonical = $thpNama;
+                    break;
+                }
+            }
+        }
+
+        $this->selectedGadgetModel = $canonical;
 
         // Auto-match SKU Variant jika ada varian yang namanya relevan dengan model gadget
-        if ($this->productDetail && $this->productDetail->skuVariants->isNotEmpty()) {
-            $matchedVariant = $this->productDetail->skuVariants->first(function ($v) use ($gadgetModel) {
+        if ($p && $p->skuVariants->isNotEmpty()) {
+            $gNama = strtolower($canonical);
+            $matchedVariant = $p->skuVariants->first(function ($v) use ($gNama) {
                 $vNama = strtolower($v->nama_varian);
-                $gNama = strtolower($gadgetModel);
 
                 return str_contains($vNama, $gNama) || str_contains($gNama, $vNama);
             });
@@ -637,6 +675,17 @@ class ShopPage extends Component
         $webService = app(WebKonsumenService::class);
         $webConfig = $webService->getAll();
 
+        $metaTitle = 'Katalog Sparepart — '.($webConfig['store_name'] ?? 'Bremspace');
+        if ($this->activeCategoryName && $this->filterHpModel) {
+            $modelLabel = TipeHp::resolveLabelForModel($this->filterHpModel, $this->filterHpMerk ?: null);
+            $metaTitle = "Sparepart {$this->activeCategoryName} {$modelLabel} — ".($webConfig['store_name'] ?? 'Bremspace');
+        } elseif ($this->filterHpModel) {
+            $modelLabel = TipeHp::resolveLabelForModel($this->filterHpModel, $this->filterHpMerk ?: null);
+            $metaTitle = "Katalog Suku Cadang {$modelLabel} — ".($webConfig['store_name'] ?? 'Bremspace');
+        } elseif ($this->activeCategoryName) {
+            $metaTitle = "Katalog {$this->activeCategoryName} — ".($webConfig['store_name'] ?? 'Bremspace');
+        }
+
         return view('modules.marketplace.livewire.shop-catalog', [
             'categories' => $this->categories,
             'brands' => $this->brands,
@@ -654,7 +703,7 @@ class ShopPage extends Component
             'filterKondisi' => $this->filterKondisi,
             'search' => $this->search,
         ])->layout('layouts.marketplace', [
-            'title' => $this->activeCategoryName ? "Katalog {$this->activeCategoryName} — ".($webConfig['store_name'] ?? 'Bremspace') : 'Katalog Sparepart — '.($webConfig['store_name'] ?? 'Bremspace'),
+            'title' => $metaTitle,
         ]);
     }
 }

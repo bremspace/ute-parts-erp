@@ -1,13 +1,38 @@
 @push('seo')
-    <link rel="canonical" href="{{ route('shop') }}" />
-    <meta name="description" content="Katalog suku cadang dan sparepart handphone terlengkap: LCD Touchscreen, Baterai, Flexible Board, IC Chipset kualitas OEM & Original bergaransi resmi.">
-    <meta name="keywords" content="katalog sparepart hp, lcd touchscreen, baterai handphone, flexible hp, ic power, alat servis hp">
+    @php
+        $modelSlug = !empty($filterHpModel) ? \Illuminate\Support\Str::slug($filterHpModel) : null;
+        $canonicalUrl = route('shop');
+        if (!empty($filterKategori) && !empty($modelSlug)) {
+            $canonicalUrl = route('shop.kategori.model', ['kategori' => $filterKategori, 'hpModel' => $modelSlug]);
+        } elseif (!empty($modelSlug)) {
+            $canonicalUrl = route('shop.tipe', ['hpModel' => $modelSlug]);
+        } elseif (!empty($filterKategori)) {
+            $canonicalUrl = route('shop.kategori', ['kategori' => $filterKategori]);
+        }
+
+        $formattedModelLabel = !empty($filterHpModel) ? \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($filterHpModel, $filterHpMerk ?: null) : null;
+        $seoTitle = 'Katalog Sparepart & Suku Cadang HP — ' . config('app.name', 'Bremspace');
+        $seoDesc = 'Katalog suku cadang dan sparepart handphone terlengkap: LCD Touchscreen, Baterai, Flexible Board, IC Chipset kualitas OEM & Original bergaransi resmi.';
+        if (!empty($activeCategoryName) && !empty($formattedModelLabel)) {
+            $seoTitle = "Sparepart {$activeCategoryName} {$formattedModelLabel} — " . config('app.name', 'Bremspace');
+            $seoDesc = "Jual suku cadang & {$activeCategoryName} untuk {$formattedModelLabel} terlengkap, kualitas teruji dan bergaransi resmi toko.";
+        } elseif (!empty($formattedModelLabel)) {
+            $seoTitle = "Katalog Suku Cadang & Sparepart {$formattedModelLabel} — " . config('app.name', 'Bremspace');
+            $seoDesc = "Koleksi lengkap sparepart HP {$formattedModelLabel}: LCD, baterai, casing, flexibel board bergaransi untuk teknisi dan konsumen.";
+        } elseif (!empty($activeCategoryName)) {
+            $seoTitle = "Katalog {$activeCategoryName} HP — " . config('app.name', 'Bremspace');
+            $seoDesc = "Daftar lengkap {$activeCategoryName} handphone original & OEM bergaransi siap kirim ke seluruh Indonesia.";
+        }
+    @endphp
+    <link rel="canonical" href="{{ $canonicalUrl }}" />
+    <meta name="description" content="{{ $seoDesc }}">
+    <meta name="keywords" content="{{ $formattedModelLabel ? "{$formattedModelLabel}, sparepart {$formattedModelLabel}, " : '' }}{{ $activeCategoryName ? "{$activeCategoryName}, " : '' }}katalog sparepart hp, lcd touchscreen, baterai handphone, flexible hp, ic power, alat servis hp">
 
     <!-- OpenGraph -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="{{ !empty($activeCategoryName) ? "Katalog {$activeCategoryName} — " : '' }}Katalog Sparepart & Suku Cadang HP — {{ config('app.name', 'Bremspace') }}">
-    <meta property="og:description" content="Temukan ribuan suku cadang HP siap kirim dengan jaminan garansi toko dan harga grosir untuk teknisi & mitra.">
-    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:title" content="{{ $seoTitle }}">
+    <meta property="og:description" content="{{ $seoDesc }}">
+    <meta property="og:url" content="{{ $canonicalUrl }}">
     <meta property="og:image" content="{{ asset('icons/icon-512x512.png') }}">
 
     @php
@@ -50,16 +75,17 @@
                 '@type' => 'ListItem',
                 'position' => $pos++,
                 'name' => $activeCategoryName,
-                'item' => route('shop', ['kategori' => $filterKategori]),
+                'item' => route('shop.kategori', ['kategori' => $filterKategori]),
             ];
         }
         if (!empty($filterHpModel)) {
-            $formattedModelLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($filterHpModel, $filterHpMerk ?: null);
             $catalogBreadcrumbs['itemListElement'][] = [
                 '@type' => 'ListItem',
                 'position' => $pos++,
                 'name' => $formattedModelLabel,
-                'item' => route('shop', ['kategori' => $filterKategori, 'hpModel' => $filterHpModel]),
+                'item' => !empty($filterKategori)
+                    ? route('shop.kategori.model', ['kategori' => $filterKategori, 'hpModel' => $modelSlug])
+                    : route('shop.tipe', ['hpModel' => $modelSlug]),
             ];
         }
     @endphp

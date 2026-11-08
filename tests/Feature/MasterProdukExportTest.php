@@ -218,4 +218,29 @@ class MasterProdukExportTest extends TestCase
         // Produk nonaktif kategori NULL dikeluarkan karena filter kategori aktif
         $this->assertStringNotContainsString('Produk Nonaktif Master', $content);
     }
+
+    public function test_export_master_dengan_produk_memiliki_galeri_foto_array(): void
+    {
+        Produk::create([
+            'nama' => 'Produk Dengan Foto Array',
+            'harga_beli' => 50000,
+            'harga_jual_retail' => 75000,
+            'foto' => [
+                [
+                    'url' => '/storage/produk/2026/11/sample-foto.webp',
+                    'thumb' => '/storage/produk/2026/11/sample-foto_thumb.webp',
+                    'is_primary' => true,
+                ],
+            ],
+            'is_active' => true,
+        ]);
+
+        $test = Livewire::test(ProdukTab::class)
+            ->call('exportMaster', 'xlsx');
+
+        $test->assertFileDownloaded();
+
+        $relativePath = $this->fileExportMasterTerbaru();
+        Storage::disk('local')->assertExists($relativePath);
+    }
 }

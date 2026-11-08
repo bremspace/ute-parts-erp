@@ -104,15 +104,18 @@
                         '@type' => 'ListItem',
                         'position' => $bPos++,
                         'name' => $catNama,
-                        'item' => route('shop', ['kategori' => $catParam]),
+                        'item' => route('shop.kategori', ['kategori' => $catParam]),
                     ];
                 }
                 if ($compatModel && $compatLabel) {
+                    $cSlug = \Illuminate\Support\Str::slug($compatModel);
                     $productBreadcrumbs['itemListElement'][] = [
                         '@type' => 'ListItem',
                         'position' => $bPos++,
                         'name' => $compatLabel,
-                        'item' => route('shop', ['kategori' => $catParam, 'hpModel' => $compatModel]),
+                        'item' => $catParam
+                            ? route('shop.kategori.model', ['kategori' => $catParam, 'hpModel' => $cSlug])
+                            : route('shop.tipe', ['hpModel' => $cSlug]),
                     ];
                 }
                 $productBreadcrumbs['itemListElement'][] = [
@@ -142,13 +145,19 @@
             </a>
             <span class="text-ink-300 dark:text-ink-700">/</span>
             @if($catNama)
-                <a href="{{ route('shop', ['kategori' => $catParam]) }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-medium">
+                <a href="{{ route('shop.kategori', ['kategori' => $catParam]) }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-medium">
                     {{ $catNama }}
                 </a>
                 <span class="text-ink-300 dark:text-ink-700">/</span>
             @endif
             @if($compatModel && $compatLabel)
-                <a href="{{ route('shop', ['kategori' => $catParam, 'hpModel' => $compatModel]) }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-medium">
+                @php
+                    $cSlug = \Illuminate\Support\Str::slug($compatModel);
+                    $compatBreadcrumbUrl = $catParam
+                        ? route('shop.kategori.model', ['kategori' => $catParam, 'hpModel' => $cSlug])
+                        : route('shop.tipe', ['hpModel' => $cSlug]);
+                @endphp
+                <a href="{{ $compatBreadcrumbUrl }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-medium">
                     {{ $compatLabel }}
                 </a>
                 <span class="text-ink-300 dark:text-ink-700">/</span>
@@ -244,10 +253,161 @@
                         {{ $produk->nama }}
                     </h1>
 
-                    @if($produk->brand_kompatibel)
-                        <p class="text-xs sm:text-sm text-ink-500 dark:text-ink-400 break-words">
-                            Kompatibilitas Pabrikan: <strong class="text-ink-800 dark:text-ink-200">{{ is_array($produk->brand_kompatibel) ? implode(' ', $produk->brand_kompatibel) : (string) $produk->brand_kompatibel }} {{ is_array($produk->model_kompatibel) ? implode(' ', $produk->model_kompatibel) : (string) $produk->model_kompatibel }}</strong>
-                        </p>
+                    @php
+                        $compatList = collect();
+                        if ($produk->relationLoaded('tipeHps') && $produk->tipeHps->isNotEmpty()) {
+                            $compatList = $produk->tipeHps->map(fn($t) => (object) [
+                                'id' => $t->id,
+                                'merk' => $t->merk,
+                                'model' => $t->model,
+                                'nama_tampilan' => $t->nama_tampilan ?: trim("{$t->merk} {$t->model}"),
+                            ]);
+                        } elseif (!empty($produk->model_kompatibel)) {
+                            $bMerk = is_array($produk->brand_kompatibel) ? implode(' ', $produk->brand_kompatibel) : trim((string) ($produk->brand_kompatibel ?? ''));
+                            $rawModels = is_array($produk->model_kompatibel) ? $produk->model_kompatibel : array_filter(array_map('trim', explode(',', (string) $produk->model_kompatibel)));
+                            $compatList = collect($rawModels)->map(fn($mod) => (object) [
+                                'id' => null,
+                                'merk' => $bMerk ?: 'Universal',
+                                'model' => $mod,
+                                'nama_tampilan' => trim(($bMerk ? $bMerk.' ' : '').$mod),
+                            ]);
+                        }
+                    @endphp
+
+                    @if($compatList->isNotEmpty())
+                        @php
+                            $totalCompat = $compatList->count();
+                            $catSlugOrId = $catRel ? ($catRel->slug ?: $catRel->id) : (is_array($produk->kategori) ? \Illuminate\Support\Str::slug($produk->kategori[0] ?? '') : \Illuminate\Support\Str::slug((string) $produk->kategori));
+                        @endphp
+                        <!-- Kompatibilitas Tipe HP Terverifikasi (Top Section - Interactive, Expandable, Searchable & Deep-Linkable) -->
+                        <div class="pt-2.5 pb-1 space-y-2"
+                             x-data="{
+                                expanded: false,
+                                searchModel: '',
+                                filterMatches(name, model) {
+                                    if (!this.searchModel.trim()) return true;
+                                    const q = this.searchModel.toLowerCase().trim();
+                                    return name.toLowerCase().includes(q) || model.toLowerCase().includes(q);
+                                }
+                             }">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-[11px] font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Model Kompatibel</span>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold text-up-mint bg-up-mint/10 dark:bg-up-mint/20 tabular-nums">{{ $totalCompat }} Tipe Cocok</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    @if($totalCompat > 8)
+                                        <button
+                                            type="button"
+                                            @click="expanded = !expanded"
+                                            class="text-[11px] font-bold text-up-primary hover:underline flex items-center gap-1 cursor-pointer transition py-0.5"
+                                        >
+                                            <span x-text="expanded ? 'Tampilkan Lebih Sedikit' : 'Lihat Semua ({{ $totalCompat }})'"></span>
+                                            <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @if($totalCompat > 12)
+                                <!-- Quick filter pencarian jika model sangat banyak (>12) -->
+                                <div x-show="expanded" x-collapse class="relative max-w-xs">
+                                    <input
+                                        type="text"
+                                        x-model="searchModel"
+                                        placeholder="Cari tipe/seri HP..."
+                                        class="w-full text-xs pl-7 pr-3 py-1.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 text-ink-900 dark:text-white placeholder:text-ink-400 focus:outline-none focus:border-up-primary"
+                                    />
+                                    <svg class="w-3.5 h-3.5 text-ink-400 absolute left-2 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    <button
+                                        type="button"
+                                        x-show="searchModel"
+                                        @click="searchModel = ''"
+                                        class="absolute right-2 top-1.5 text-ink-400 hover:text-ink-700 text-xs"
+                                    >✕</button>
+                                </div>
+                            @endif
+
+                            <div class="flex flex-wrap gap-1.5 sm:gap-2 transition-all duration-300 {{ $totalCompat > 8 ? 'overflow-y-auto max-h-[360px] pr-1' : '' }}">
+                                @foreach($compatList as $idx => $thp)
+                                    @php
+                                        $thpNama = $thp->nama_tampilan;
+                                        $thpSlug = \Illuminate\Support\Str::slug($thp->model);
+                                        $isSelected = ($selectedGadgetModel === $thpNama || $selectedGadgetModel === $thp->model);
+                                        // SEO Permalink: prioritas kategori+tipe atau tipe langsung
+                                        $seoUrl = $catSlugOrId
+                                            ? route('shop.kategori.model', ['kategori' => $catSlugOrId, 'hpModel' => $thpSlug])
+                                            : route('shop.tipe', ['hpModel' => $thpSlug]);
+                                    @endphp
+                                    <div
+                                        x-show="expanded || {{ $idx }} < 8 || searchModel.length > 0"
+                                        x-cloak
+                                        x-transition:enter="transition ease-out duration-150"
+                                        x-transition:enter-start="opacity-0 scale-95"
+                                        x-transition:enter-end="opacity-100 scale-100"
+                                        class="inline-flex items-stretch rounded-xl border transition duration-150 shadow-sm overflow-hidden text-xs {{ $isSelected ? 'border-up-primary bg-up-primary text-white ring-2 ring-up-primary/25' : 'bg-white dark:bg-white/5 border-ink-200/80 dark:border-white/10 text-ink-800 dark:text-ink-200 hover:border-up-primary/50' }}"
+                                        x-bind:class="{ 'hidden': !filterMatches('{{ addslashes($thpNama) }}', '{{ addslashes($thp->model) }}') }"
+                                    >
+                                        <button
+                                            type="button"
+                                            wire:click="selectGadgetModel('{{ addslashes($thpNama) }}')"
+                                            class="px-2.5 py-1 text-xs font-semibold cursor-pointer active:scale-95 flex items-center gap-1.5 transition text-left"
+                                            title="Pilih {{ $thpNama }} untuk pesanan ini"
+                                        >
+                                            @if($isSelected)
+                                                <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                            @else
+                                                <span class="w-1.5 h-1.5 rounded-full bg-up-mint flex-shrink-0"></span>
+                                            @endif
+                                            <span class="truncate max-w-[200px] sm:max-w-none">{{ $thpNama }}</span>
+                                        </button>
+                                        <a
+                                            href="{{ $seoUrl }}"
+                                            wire:navigate
+                                            class="px-1.5 flex items-center justify-center border-l transition cursor-pointer {{ $isSelected ? 'border-white/20 hover:bg-white/20 text-white' : 'border-ink-200/60 dark:border-white/10 text-ink-400 hover:text-up-primary hover:bg-black/5 dark:hover:bg-white/10' }}"
+                                            title="Buka katalog khusus {{ $catNama ?: 'suku cadang' }} {{ $thpNama }}"
+                                            aria-label="Katalog SEO {{ $thpNama }}"
+                                        >
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                        </a>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            @if($totalCompat > 8)
+                                <div class="pt-0.5">
+                                    <button
+                                        type="button"
+                                        @click="expanded = !expanded"
+                                        class="text-xs font-bold text-up-primary hover:text-up-primary/80 inline-flex items-center gap-1 cursor-pointer py-1"
+                                    >
+                                        <span x-text="expanded ? '▲ Tutup pilihan tipe' : '▼ Tampilkan +{{ $totalCompat - 8 }} tipe lainnya'"></span>
+                                    </button>
+                                </div>
+                            @endif
+
+                            @if($selectedGadgetModel)
+                                @php
+                                    $selectedSlug = \Illuminate\Support\Str::slug($selectedGadgetModel);
+                                    $selectedUrl = $catSlugOrId
+                                        ? route('shop.kategori.model', ['kategori' => $catSlugOrId, 'hpModel' => $selectedSlug])
+                                        : route('shop.tipe', ['hpModel' => $selectedSlug]);
+                                @endphp
+                                <div class="p-2.5 rounded-2xl bg-up-primary/10 border border-up-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs animate-in fade-in duration-150">
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-up-primary text-white text-[11px] font-bold">✓</span>
+                                        <div>
+                                            <span class="font-bold text-ink-900 dark:text-white">Model Terpilih: {{ $selectedGadgetModel }}</span>
+                                            <span class="text-ink-500 dark:text-ink-400 block text-[11px]">Varian produk &amp; catatan belanja otomatis disesuaikan.</span>
+                                        </div>
+                                    </div>
+                                    <a href="{{ $selectedUrl }}" wire:navigate class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary/90 transition shadow-sm self-start sm:self-auto cursor-pointer">
+                                        <span>Lihat Semua {{ $catNama ?: 'Sparepart' }} {{ $selectedGadgetModel }}</span>
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                                    </a>
+                                </div>
+                            @endif
+                        </div>
                     @endif
                 </div>
 
@@ -408,37 +568,6 @@
                         <h3 class="text-xs font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Spesifikasi & Keterangan</h3>
                         <div class="text-xs sm:text-sm text-ink-600 dark:text-ink-400 leading-relaxed whitespace-pre-line">
                             {{ $produk->deskripsi }}
-                        </div>
-                    </div>
-                @endif
-
-                <!-- Device Compatibility List (Interactive & Auto-Select) -->
-                @if($produk->tipeHps && $produk->tipeHps->count() > 0)
-                    <div class="pt-6 border-t border-ink-100/80 dark:border-white/10 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xs font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Model Gadget Terverifikasi</h3>
-                                <p class="text-[11px] text-ink-400 mt-0.5">Klik model gadget Anda untuk otomatis terpilih ke varian / catatan belanja:</p>
-                            </div>
-                            <span class="text-[11px] font-semibold text-up-mint flex-shrink-0">{{ $produk->tipeHps->count() }} Cocok</span>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            @foreach($produk->tipeHps as $thp)
-                                @php
-                                    $thpNama = trim("{$thp->merk} {$thp->model}");
-                                    $isSelected = ($selectedGadgetModel === $thpNama);
-                                @endphp
-                                <button
-                                    type="button"
-                                    wire:click="selectGadgetModel('{{ addslashes($thpNama) }}')"
-                                    class="px-3.5 py-2 rounded-2xl text-xs font-semibold border transition-[background-color,border-color,color,transform] duration-140 cursor-pointer active:scale-95 flex items-center gap-1.5 {{ $isSelected ? 'border-up-primary bg-up-primary text-white shadow-sm shadow-up-primary/30 ring-2 ring-up-primary/20' : 'bg-ink-50 dark:bg-white/5 border-ink-200/70 dark:border-white/10 text-ink-800 dark:text-ink-200 hover:border-up-primary/60 hover:bg-up-primary/5' }}"
-                                >
-                                    @if($isSelected)
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                    @endif
-                                    <span>{{ $thpNama }}</span>
-                                </button>
-                            @endforeach
                         </div>
                     </div>
                 @endif

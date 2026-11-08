@@ -9,12 +9,14 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\StokDeductionService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * [Phase 2 / T-05] Unified POS Checkout Domain Service.
@@ -292,6 +294,12 @@ class PosCheckoutService
                         'keterangan' => 'Komisi akumulasi mitra transaksi '.$transaksi->no_transaksi,
                     ]);
                 }
+            }
+
+            try {
+                app(TransactionActivityLogService::class)->catatPenjualan($transaksi);
+            } catch (\Throwable $e) {
+                Log::warning('Gagal mencatat audit log checkout: '.$e->getMessage());
             }
 
             return $transaksi;

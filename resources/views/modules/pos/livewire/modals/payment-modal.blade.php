@@ -309,7 +309,7 @@
                     <!-- Summary & Kembalian Split -->
                     <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-200/80 dark:border-white/10 space-y-1.5 text-xs">
                         <div class="flex justify-between items-center text-ink-500 dark:text-ink-400">
-                            <span>Total Diterima (Tunai + Non-Tunai)</span>
+                            <span>Total Split (Tunai + Non-Tunai)</span>
                             <span class="font-bold tabular-nums text-ink-800 dark:text-ink-200">Rp {{ number_format($totalBayarSplit, 0, ',', '.') }}</span>
                         </div>
                         @if($sisaTagihanSplit > 0)
@@ -317,11 +317,16 @@
                                 <span>Kurang Bayar</span>
                                 <span class="tabular-nums">-Rp {{ number_format($sisaTagihanSplit, 0, ',', '.') }}</span>
                             </div>
+                        @elseif(abs($totalBayarSplit - (float) $totalAkhir) < 0.01)
+                            <div class="flex justify-between items-center pt-1 border-t border-ink-200/50 dark:border-white/5 text-up-mint font-bold">
+                                <span>Status Split</span>
+                                <span>✓ Tepat Sesuai Faktur</span>
+                            </div>
                         @else
                             <div class="flex justify-between items-center pt-1 border-t border-ink-200/50 dark:border-white/5">
-                                <span class="text-ink-600 dark:text-ink-400 font-bold uppercase tracking-wider">Kembalian Tunai</span>
-                                <span class="font-black text-lg tabular-nums {{ $kembalian > 0 ? 'text-up-mint' : 'text-ink-900 dark:text-white' }}">
-                                    Rp {{ number_format($kembalian, 0, ',', '.') }}
+                                <span class="text-ink-600 dark:text-ink-400 font-bold uppercase tracking-wider">Selisih Lebih</span>
+                                <span class="font-black text-sm tabular-nums text-up-amber">
+                                    +Rp {{ number_format($totalBayarSplit - (float) $totalAkhir, 0, ',', '.') }}
                                 </span>
                             </div>
                         @endif
@@ -668,6 +673,38 @@
                     </svg>
                     <span>T&C: Segel utuh, tidak ada cacat fisik/bekas lem, wajib membawa struk ber-QR saat klaim.</span>
                 </div>
+            </div>
+
+            <!-- Opsi Cetak Langsung Struk Kasir -->
+            <div
+                class="px-3.5 py-2.5 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex items-center justify-between"
+                x-data="{
+                    autoDirect: localStorage.getItem('ute_auto_direct_print') === '1',
+                    printerName: localStorage.getItem('ute_ble_printer_name') || null,
+                    toggleDirect() {
+                        this.autoDirect = !this.autoDirect;
+                        localStorage.setItem('ute_auto_direct_print', this.autoDirect ? '1' : '0');
+                    }
+                }"
+            >
+                <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-lg bg-up-mint/15 border border-up-mint/30 flex items-center justify-center text-up-mint shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs font-bold text-ink-900 dark:text-white">Cetak Langsung Struk</span>
+                            <template x-if="printerName">
+                                <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-[10px] text-up-mint font-semibold truncate max-w-[140px]" x-text="printerName"></span>
+                            </template>
+                        </div>
+                        <p class="text-[10px] text-ink-400">Otomatis kirim ke printer tersambung tanpa pilih printer lagi</p>
+                    </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" :checked="autoDirect" @change="toggleDirect()" class="sr-only peer">
+                    <div class="w-9 h-5 bg-ink-300 dark:bg-ink-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-up-mint"></div>
+                </label>
             </div>
 
             <!-- Submit Button Grid -->

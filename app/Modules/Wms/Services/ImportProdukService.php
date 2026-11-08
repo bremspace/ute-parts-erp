@@ -1629,9 +1629,11 @@ class ImportProdukService
      */
     public function parseRows(string $filePath, array $columnMapping = []): array
     {
-        // Enforce lightweight streaming memory limit (bounded to 64MB)
-        @ini_set('memory_limit', '64M');
-        @set_time_limit(120);
+        // Pastikan alokasi memory cukup untuk file master besar (minimal 512M)
+        if ((int) ini_get('memory_limit') < 512 && ini_get('memory_limit') !== '-1') {
+            @ini_set('memory_limit', '512M');
+        }
+        @set_time_limit(300);
 
         $filePath = $this->resolveFilePath($filePath);
 
@@ -1962,9 +1964,10 @@ class ImportProdukService
      */
     protected function parseRowsCsv(string $filePath, array $columnMapping = []): array
     {
-        // Bounded to 64MB streaming limit
-        @ini_set('memory_limit', '64M');
-        @set_time_limit(120);
+        if ((int) ini_get('memory_limit') < 512 && ini_get('memory_limit') !== '-1') {
+            @ini_set('memory_limit', '512M');
+        }
+        @set_time_limit(300);
 
         $handle = fopen($filePath, 'r');
         if ($handle === false) {
@@ -2368,14 +2371,16 @@ class ImportProdukService
         $existingSkuDb = [];
         if (! empty($fileSkus)) {
             foreach (array_chunk(array_values($fileSkus), 1000) as $skuChunk) {
-                $variants = SkuVariant::with('produk:id,nama')
-                    ->whereIn('sku', $skuChunk)
-                    ->get(['id', 'produk_id', 'sku', 'barcode']);
+                $variants = DB::table('sku_variants')
+                    ->leftJoin('produk', 'produk.id', '=', 'sku_variants.produk_id')
+                    ->whereIn('sku_variants.sku', $skuChunk)
+                    ->select(['sku_variants.id', 'sku_variants.produk_id', 'sku_variants.sku', 'sku_variants.barcode', 'produk.nama as produk_nama'])
+                    ->get();
                 foreach ($variants as $v) {
                     $existingSkuDb[strtolower($v->sku)] = [
                         'sku' => $v->sku,
                         'produk_id' => $v->produk_id,
-                        'produk_nama' => $v->produk?->nama ?? '',
+                        'produk_nama' => $v->produk_nama ?? '',
                         'barcode' => $v->barcode,
                     ];
                 }
@@ -2385,17 +2390,19 @@ class ImportProdukService
         $existingBarcodeDb = [];
         if (! empty($fileBarcodes)) {
             foreach (array_chunk(array_values($fileBarcodes), 1000) as $barcodeChunk) {
-                $variants = SkuVariant::with('produk:id,nama')
-                    ->whereIn('barcode', $barcodeChunk)
-                    ->get(['id', 'produk_id', 'sku', 'barcode']);
+                $variants = DB::table('sku_variants')
+                    ->leftJoin('produk', 'produk.id', '=', 'sku_variants.produk_id')
+                    ->whereIn('sku_variants.barcode', $barcodeChunk)
+                    ->select(['sku_variants.id', 'sku_variants.produk_id', 'sku_variants.sku', 'sku_variants.barcode', 'produk.nama as produk_nama'])
+                    ->get();
                 foreach ($variants as $v) {
                     $existingBarcodeDb[$v->barcode] = [
                         'sku' => $v->sku,
                         'produk_id' => $v->produk_id,
-                        'produk_nama' => $v->produk?->nama ?? '',
+                        'produk_nama' => $v->produk_nama ?? '',
                     ];
                 }
-                $produks = Produk::whereIn('barcode', $barcodeChunk)->get(['id', 'nama', 'barcode']);
+                $produks = DB::table('produk')->whereIn('barcode', $barcodeChunk)->select(['id', 'nama', 'barcode'])->get();
                 foreach ($produks as $p) {
                     if (! isset($existingBarcodeDb[$p->barcode])) {
                         $existingBarcodeDb[$p->barcode] = [
@@ -2461,14 +2468,14 @@ class ImportProdukService
             $skuRaw = trim((string) ($row['sku'] ?? ''));
             $barcodeRaw = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
 
-            $resErr = $resolusiErrorBaris[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiErrorBaris[$skuRaw] ?? null) : null);
+            $resErr = $resolusiErrorBaris[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiErrorBaris[$skuRaw] ?? null) : null) ?? ($resolusiErrorBaris['*'] ?? null) ?? ($resolusiErrorBaris['default'] ?? null);
             $isErrorSkipped = $resErr === 'skip';
 
-            $resBc = $resolusiBarcode[$nomorBaris] ?? ($barcodeRaw !== '' ? ($resolusiBarcode[$barcodeRaw] ?? null) : null);
+            $resBc = $resolusiBarcode[$nomorBaris] ?? ($barcodeRaw !== '' ? ($resolusiBarcode[$barcodeRaw] ?? null) : null) ?? ($resolusiBarcode['*'] ?? null) ?? ($resolusiBarcode['default'] ?? null);
             $aksiBc = is_array($resBc) ? ($resBc['aksi'] ?? null) : $resBc;
             $barcodeBaru = is_array($resBc) ? trim((string) ($resBc['barcode_baru'] ?? '')) : '';
 
-            $resDup = $resolusiDuplikat[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiDuplikat[$skuRaw] ?? null) : null);
+            $resDup = $resolusiDuplikat[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiDuplikat[$skuRaw] ?? null) : null) ?? ($resolusiDuplikat['*'] ?? null) ?? ($resolusiDuplikat['default'] ?? null);
             $aksiDup = is_array($resDup) ? ($resDup['aksi'] ?? null) : $resDup;
             $skuBaru = is_array($resDup) ? trim((string) ($resDup['sku_baru'] ?? '')) : '';
 
@@ -2489,14 +2496,14 @@ class ImportProdukService
 
             $errors = $this->validateRow($rowValidasi, $konteks);
             if ($aksiDup === 'timpa_update') {
-                $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat')));
+                $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat') && ! str_contains($err, 'potensi rugi langsung')));
             } elseif (in_array($aksiDup, ['ganti_sku', 'skip'], true)) {
                 $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat') || ! str_contains($err, 'SKU')));
             }
-            if ($aksiBc === 'kosongkan_barcode' || $aksiDup === 'kosongkan_barcode') {
+            if ($aksiBc === 'kosongkan_barcode' || $aksiDup === 'kosongkan_barcode' || $aksiDup === 'timpa_update') {
                 $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'Barcode')));
             }
-            if ($isErrorSkipped) {
+            if ($isErrorSkipped || $resErr === 'tetap_impor') {
                 $errors = [];
             }
 
@@ -2842,8 +2849,8 @@ class ImportProdukService
                         'baris' => $nomorBaris,
                     ];
 
-                    // Resolusi Error Baris (Abaikan / Skip)
-                    $resErr = $resolusiErrorBaris[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiErrorBaris[$skuRaw] ?? null) : null);
+                    // Resolusi Error Baris (Abaikan / Skip / Tetap Impor)
+                    $resErr = $resolusiErrorBaris[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiErrorBaris[$skuRaw] ?? null) : null) ?? ($resolusiErrorBaris['*'] ?? null) ?? ($resolusiErrorBaris['default'] ?? null);
                     if ($resErr === 'skip') {
                         $detail[] = [
                             'baris' => $nomorBaris,
@@ -2857,7 +2864,7 @@ class ImportProdukService
                     }
 
                     // Resolusi Barcode Duplikat
-                    $resBc = $resolusiBarcode[$nomorBaris] ?? ($barcodeRaw !== '' ? ($resolusiBarcode[$barcodeRaw] ?? null) : null);
+                    $resBc = $resolusiBarcode[$nomorBaris] ?? ($barcodeRaw !== '' ? ($resolusiBarcode[$barcodeRaw] ?? null) : null) ?? ($resolusiBarcode['*'] ?? null) ?? ($resolusiBarcode['default'] ?? null);
                     $aksiBc = is_array($resBc) ? ($resBc['aksi'] ?? null) : $resBc;
                     $barcodeBaru = is_array($resBc) ? trim((string) ($resBc['barcode_baru'] ?? '')) : '';
 
@@ -2880,7 +2887,7 @@ class ImportProdukService
                     }
 
                     // Resolusi Duplikat SKU / Barcode dari input pengguna
-                    $resDup = $resolusiDuplikat[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiDuplikat[$skuRaw] ?? null) : null);
+                    $resDup = $resolusiDuplikat[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiDuplikat[$skuRaw] ?? null) : null) ?? ($resolusiDuplikat['*'] ?? null) ?? ($resolusiDuplikat['default'] ?? null);
                     $aksiDup = is_array($resDup) ? ($resDup['aksi'] ?? null) : $resDup;
                     $skuBaru = is_array($resDup) ? trim((string) ($resDup['sku_baru'] ?? '')) : '';
 
@@ -2906,7 +2913,7 @@ class ImportProdukService
                     }
 
                     // Aksi Kemiripan Produk
-                    $aksi = $aksiKemiripan[$nomorBaris] ?? ($skuRaw !== '' ? ($aksiKemiripan[$skuRaw] ?? null) : null) ?? 'terpisah';
+                    $aksi = $aksiKemiripan[$nomorBaris] ?? ($skuRaw !== '' ? ($aksiKemiripan[$skuRaw] ?? null) : null) ?? ($aksiKemiripan['*'] ?? null) ?? 'terpisah';
 
                     if ($aksi === 'skip') {
                         $detail[] = [
@@ -2922,12 +2929,15 @@ class ImportProdukService
 
                     $errors = $this->validateRow($row, $konteks);
                     if ($aksi === 'gabung' || $aksiDup === 'timpa_update') {
-                        $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat')));
+                        $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat') && ! str_contains($err, 'potensi rugi langsung')));
                     } elseif (in_array($aksiDup, ['ganti_sku', 'skip'], true)) {
                         $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat') || ! str_contains($err, 'SKU')));
                     }
-                    if ($aksiBc === 'kosongkan_barcode' || $aksiDup === 'kosongkan_barcode') {
+                    if ($aksiBc === 'kosongkan_barcode' || $aksiDup === 'kosongkan_barcode' || $aksiDup === 'timpa_update') {
                         $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'Barcode')));
+                    }
+                    if ($resErr === 'tetap_impor') {
+                        $errors = [];
                     }
                     $warnings = $this->checkRowWarnings($row, $nomorBaris, $konteks, $threshold);
                     $this->catatKonteks($row, $nomorBaris, $konteks);
@@ -3247,9 +3257,10 @@ class ImportProdukService
         if ($daftarTipe) {
             $ids = [];
             foreach ($daftarTipe as $t) {
-                $cacheKey = $t['merk'].'|'.$t['model'];
+                $kodeProduk = $t['kode_produk'] ?? null;
+                $cacheKey = $t['merk'].'|'.$t['model'].(! empty($kodeProduk) ? '|'.$kodeProduk : '');
                 if (! isset($this->tipeHpCache[$cacheKey])) {
-                    $this->tipeHpCache[$cacheKey] = $this->resolveOrCreateTipeHpId($t['merk'], $t['model']);
+                    $this->tipeHpCache[$cacheKey] = $this->resolveOrCreateTipeHpId($t['merk'], $t['model'], $kodeProduk);
                 }
                 $ids[] = $this->tipeHpCache[$cacheKey];
             }
@@ -3449,8 +3460,12 @@ class ImportProdukService
             $barcodeList = array_values($extractedBarcodes);
             $barcode = $barcodeList[0];
             $barcodeAltMap = array_slice($extractedBarcodes, 1);
-            $produkUpdate['barcode'] = $barcode;
-            $produkUpdate['barcode_alt'] = ! empty($barcodeAltMap) ? $barcodeAltMap : null;
+            $barcodeConflict = Produk::where('barcode', $barcode)->where('id', '!=', $produk->id)->exists()
+                || SkuVariant::where('barcode', $barcode)->where('produk_id', '!=', $produk->id)->exists();
+            if (! $barcodeConflict) {
+                $produkUpdate['barcode'] = $barcode;
+                $produkUpdate['barcode_alt'] = ! empty($barcodeAltMap) ? $barcodeAltMap : null;
+            }
         }
 
         if (isset($row['deskripsi']) && trim((string) $row['deskripsi']) !== '') {
@@ -3483,9 +3498,10 @@ class ImportProdukService
         if ($daftarTipe) {
             $ids = [];
             foreach ($daftarTipe as $t) {
-                $cacheKey = $t['merk'].'|'.$t['model'];
+                $kodeProduk = $t['kode_produk'] ?? null;
+                $cacheKey = $t['merk'].'|'.$t['model'].(! empty($kodeProduk) ? '|'.$kodeProduk : '');
                 if (! isset($this->tipeHpCache[$cacheKey])) {
-                    $this->tipeHpCache[$cacheKey] = $this->resolveOrCreateTipeHpId($t['merk'], $t['model']);
+                    $this->tipeHpCache[$cacheKey] = $this->resolveOrCreateTipeHpId($t['merk'], $t['model'], $kodeProduk);
                 }
                 $ids[] = $this->tipeHpCache[$cacheKey];
             }
@@ -3708,6 +3724,10 @@ class ImportProdukService
             ? round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2)
             : null;
 
+        if ($barcode && (Produk::where('barcode', $barcode)->exists() || SkuVariant::where('barcode', $barcode)->exists())) {
+            $barcode = null;
+        }
+
         $produk = Produk::create([
             'nama' => $nama,
             'slug' => (Str::limit(Str::slug($nama), 180, '') ?: 'produk').'-'.Str::lower(Str::random(4)),
@@ -3752,9 +3772,10 @@ class ImportProdukService
         if ($daftarTipe) {
             $ids = [];
             foreach ($daftarTipe as $t) {
-                $cacheKey = $t['merk'].'|'.$t['model'];
+                $kodeProduk = $t['kode_produk'] ?? null;
+                $cacheKey = $t['merk'].'|'.$t['model'].(! empty($kodeProduk) ? '|'.$kodeProduk : '');
                 if (! isset($this->tipeHpCache[$cacheKey])) {
-                    $this->tipeHpCache[$cacheKey] = $this->resolveOrCreateTipeHpId($t['merk'], $t['model']);
+                    $this->tipeHpCache[$cacheKey] = $this->resolveOrCreateTipeHpId($t['merk'], $t['model'], $kodeProduk);
                 }
                 $ids[] = $this->tipeHpCache[$cacheKey];
             }
@@ -4020,6 +4041,54 @@ class ImportProdukService
     }
 
     /**
+     * Ekstrak nama model dan kode produk (jika ada dalam kurung atau dipisah tanda kurung).
+     * Contoh: "iPhone 16 (A3287)" -> ['merk' => 'Apple', 'model' => 'iPhone 16', 'kode_produk' => 'A3287']
+     *         "Galaxy A54"        -> ['merk' => 'Samsung', 'model' => 'Galaxy A54']
+     *
+     * @return array{merk: string, model: string, kode_produk?: string}
+     */
+    public function extractModelDanKodeProduk(?string $rawModel, string $merk): array
+    {
+        $raw = trim((string) ($rawModel ?? ''));
+        $normMerk = $this->normalizeMerkHp($merk) ?: 'Universal';
+
+        if ($raw === '') {
+            return [
+                'merk' => $normMerk,
+                'model' => 'Universal',
+            ];
+        }
+
+        $kodeProduk = null;
+        $baseModel = $raw;
+
+        if (preg_match('/^(.*?)\s*[\(\[]([^\)\]]+)[\)\]]$/', $raw, $matches)) {
+            $candidateModel = trim($matches[1]);
+            $candidateKode = trim($matches[2]);
+            if ($candidateModel !== '') {
+                $baseModel = $candidateModel;
+                $kodeProduk = $candidateKode;
+            }
+        }
+
+        $cleanModel = $this->normalizeModelHp($baseModel);
+        if ($cleanModel === '') {
+            $cleanModel = $raw;
+        }
+
+        $result = [
+            'merk' => $normMerk,
+            'model' => $cleanModel,
+        ];
+
+        if ($kodeProduk !== null && $kodeProduk !== '') {
+            $result['kode_produk'] = $kodeProduk;
+        }
+
+        return $result;
+    }
+
+    /**
      * Parse kolom tipe_hp yang mendukung format:
      * - Model saja dipisah koma (jika $defaultMerk tersedia, cth: "A11, A15, A12" atau "iPhone 13 Pro Max")
      * - Format lengkap "Merk Model" dipisah ';' atau ',' (cth: "Samsung Galaxy A11; Xiaomi Redmi 9" atau "Apple iPhone 13")
@@ -4268,24 +4337,20 @@ class ImportProdukService
         }
     }
 
-    protected function resolveOrCreateTipeHpId(string $merk, string $model): int
+    protected function resolveOrCreateTipeHpId(string $merk, string $model, ?string $kodeProduk = null): int
     {
         $merk = trim($merk);
         $model = trim($model);
 
-        // 1. Cek exact match merk + model
-        $th = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ?', [strtolower($merk), strtolower($model)])->first();
-        if ($th) {
-            return $th->id;
-        }
-
-        // 2. Cek apakah ada kode produk dalam tanda kurung, misal: "iPhone 16 (A3287)"
-        $extractedKode = null;
+        // 1. Cek apakah ada kode produk dalam parameter atau dalam tanda kurung, misal: "iPhone 16 (A3287)"
+        $extractedKode = $kodeProduk !== null && trim($kodeProduk) !== '' ? trim($kodeProduk) : null;
         $baseModel = $model;
-        if (preg_match('/^(.*?)\s*\(([^)]+)\)$/', $model, $matches)) {
+        if (! $extractedKode && preg_match('/^(.*?)\s*[\(\[]([^\)\]]+)[\)\]]$/', $model, $matches)) {
             $baseModel = trim($matches[1]);
             $extractedKode = trim($matches[2]);
+        }
 
+        if ($extractedKode !== null && $extractedKode !== '') {
             $thKode = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ? AND LOWER(TRIM(kode_produk)) = ?', [
                 strtolower($merk),
                 strtolower($baseModel),
@@ -4295,6 +4360,12 @@ class ImportProdukService
             if ($thKode) {
                 return $thKode->id;
             }
+        }
+
+        // 2. Cek exact match merk + model
+        $th = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ?', [strtolower($merk), strtolower($baseModel)])->first();
+        if ($th) {
+            return $th->id;
         }
 
         // 3. Cek by nama tampilan lengkap

@@ -53,6 +53,10 @@ class ReportBuilder extends Component
      */
     public bool $shared = true;
 
+    public array $aggregates = [];
+
+    public array $isoMetadata = [];
+
     protected $listeners = ['refreshResults', 'exportReport'];
 
     public function mount(): void
@@ -159,7 +163,37 @@ class ReportBuilder extends Component
             ? array_keys($this->queryResults[0])
             : $this->selectedColumns;
 
+        // [ISO 9001 / ISO/IEC 25010] Rekonsiliasi agregat numerik baris & ISO Metadata
+        $this->calculateAggregates($this->queryResults);
+        $this->isoMetadata = $service->getReportMetadata($this->sourceModel, $this->reportName);
+
         $this->showResults = true;
+    }
+
+    private function calculateAggregates(array $rows): void
+    {
+        $sums = [];
+        $numericCols = [
+            'total_akhir', 'total_kotor', 'total_diskon', 'total_pajak', 'subtotal',
+            'harga_satuan', 'hpp', 'debit', 'kredit', 'jumlah', 'jumlah_dibayar',
+            'sisa', 'total', 'total_dibayar', 'estimasi_biaya', 'biaya_akhir',
+            'jumlah_bayar', 'kembalian', 'stok', 'qty', 'qty_dipesan', 'qty_diterima',
+            'selisih', 'jumlah_masuk', 'jumlah_keluar',
+        ];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            foreach ($row as $k => $v) {
+                if (in_array((string) $k, $numericCols, true)) {
+                    $cleaned = is_numeric($v) ? (float) $v : (float) str_replace(['.', ','], ['', '.'], (string) $v);
+                    $sums[$k] = ($sums[$k] ?? 0.0) + $cleaned;
+                }
+            }
+        }
+
+        $this->aggregates = $sums;
     }
 
     public function export()
@@ -351,6 +385,8 @@ class ReportBuilder extends Component
             'savedReports' => $savedReports,
             'whitelist' => $this->whitelist,
             'resultColumns' => $this->resultColumns,
+            'aggregates' => $this->aggregates,
+            'isoMetadata' => $this->isoMetadata,
         ])->layout('layouts.backoffice', ['header' => 'Laporan Kustom']);
     }
 }

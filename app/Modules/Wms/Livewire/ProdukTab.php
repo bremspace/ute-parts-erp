@@ -25,6 +25,7 @@ use App\Modules\Wms\Services\MarginGuardService;
 use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\ProductImageService;
 use App\Modules\Wms\Services\ProdukService;
+use App\Modules\Wms\Services\ScanResolverService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -247,6 +248,11 @@ class ProdukTab extends Component
     public bool $showEditProdukModal = false;
 
     public ?int $editProdukId = null;
+
+    // Quick-Scan Barcode Inputs (Mesin Scanner Gun & Kamera)
+    public string $scanBarcodeAltInput = '';
+
+    public string $scanBarcodeAltEdit = '';
 
     public array $editProdukForm = [];
 
@@ -1008,6 +1014,69 @@ class ProdukTab extends Component
         }
     }
 
+    public function tambahBarcodeAltDariScan(string $formType = 'edit', ?string $code = null): void
+    {
+        $raw = $code !== null
+            ? $code
+            : ($formType === 'tambah' ? $this->scanBarcodeAltInput : $this->scanBarcodeAltEdit);
+
+        $clean = app(ScanResolverService::class)->bersihkanBarcode((string) $raw);
+        if (empty($clean)) {
+            return;
+        }
+
+        $formKey = $formType === 'tambah' ? 'produkForm' : 'editProdukForm';
+        if (! isset($this->{$formKey}['barcode_alt_list']) || ! is_array($this->{$formKey}['barcode_alt_list'])) {
+            $this->{$formKey}['barcode_alt_list'] = [];
+        }
+
+        $currentList = (array) $this->{$formKey}['barcode_alt_list'];
+
+        // Cek 1: Apakah sama dengan barcode utama produk
+        $mainBarcode = trim((string) ($this->{$formKey}['barcode'] ?? ''));
+        if (! empty($mainBarcode) && strcasecmp($mainBarcode, $clean) === 0) {
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Kode '{$clean}' sudah menjadi Barcode Utama produk ini.",
+            ]);
+            $this->resetScanBarcodeAltInput($formType);
+
+            return;
+        }
+
+        // Cek 2: Apakah sudah ada di list barcode_alt
+        foreach ($currentList as $existing) {
+            if (strcasecmp(trim((string) $existing), $clean) === 0) {
+                $this->dispatch('alert', [
+                    'type' => 'info',
+                    'message' => "Barcode '{$clean}' sudah terdaftar dalam daftar barcode tambahan produk ini.",
+                ]);
+                $this->resetScanBarcodeAltInput($formType);
+
+                return;
+            }
+        }
+
+        $currentList[] = $clean;
+        $this->{$formKey}['barcode_alt_list'] = array_values($currentList);
+
+        $this->resetScanBarcodeAltInput($formType);
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Barcode '{$clean}' berhasil ditambahkan ke multi-barcode.",
+        ]);
+        $this->dispatch('barcode-alt-added', ['barcode' => $clean, 'formType' => $formType]);
+    }
+
+    protected function resetScanBarcodeAltInput(string $formType): void
+    {
+        if ($formType === 'tambah') {
+            $this->scanBarcodeAltInput = '';
+        } else {
+            $this->scanBarcodeAltEdit = '';
+        }
+    }
+
     public function terapkanRekomendasiMargin(string $mode = 'create'): void
     {
         if (! isSuperAdminOrOwner() && ! $this->boleh('wms.create', 'Anda tidak memiliki izin mengubah harga produk.')) {
@@ -1145,6 +1214,18 @@ class ProdukTab extends Component
             $this->produkForm['model_kompatibel'] = null;
         }
 
+        $scanResolver = app(ScanResolverService::class);
+
+        $barcodeToCheck = ! empty($this->produkForm['barcode']) ? $scanResolver->bersihkanBarcode((string) $this->produkForm['barcode']) : '';
+        if (! empty($barcodeToCheck)) {
+            $variantConflict = SkuVariant::where('barcode', $barcodeToCheck)->exists();
+            if ($variantConflict) {
+                $this->addError('produkForm.barcode', 'Barcode ini sudah digunakan oleh varian produk lain.');
+
+                return;
+            }
+        }
+
         $minStokVal = ! empty($this->produkForm['min_stock']) ? (int) $this->produkForm['min_stock'] : (int) $this->produkForm['stok_minimum'];
 
         if (! empty($this->produkForm['multi_satuan'])) {
@@ -1160,9 +1241,10 @@ class ProdukTab extends Component
 
         $altList = [];
         if (! empty($this->produkForm['barcode_alt_list']) && is_array($this->produkForm['barcode_alt_list'])) {
-            $altList = array_values(array_filter(array_map('trim', $this->produkForm['barcode_alt_list'])));
+            $altList = array_values(array_unique(array_filter(array_map(fn ($b) => $scanResolver->bersihkanBarcode((string) $b), $this->produkForm['barcode_alt_list']))));
         } elseif (! empty($this->produkForm['barcode_alt_input'])) {
-            $altList = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', (string) $this->produkForm['barcode_alt_input']))));
+            $raws = preg_split('/[,;\n]+/', (string) $this->produkForm['barcode_alt_input']);
+            $altList = array_values(array_unique(array_filter(array_map(fn ($b) => $scanResolver->bersihkanBarcode((string) $b), $raws))));
         }
 
         try {
@@ -1195,7 +1277,7 @@ class ProdukTab extends Component
                 minStock: ! empty($this->produkForm['min_stock']) ? (int) $this->produkForm['min_stock'] : null,
                 maxStock: ! empty($this->produkForm['max_stock']) ? (int) $this->produkForm['max_stock'] : null,
                 isOndemand: (bool) ($this->produkForm['is_ondemand'] ?? false),
-                barcode: ! empty($this->produkForm['barcode']) ? trim($this->produkForm['barcode']) : null,
+                barcode: ! empty($this->produkForm['barcode']) ? $scanResolver->bersihkanBarcode((string) $this->produkForm['barcode']) : null,
                 metodeHargaBeli: $this->produkForm['metode_harga_beli'] ?? 'average',
                 marginPersen: ! empty($this->produkForm['margin_persen']) ? (float) $this->produkForm['margin_persen'] : null,
                 rakId: ! empty($this->produkForm['rak_id']) ? (int) $this->produkForm['rak_id'] : null,
@@ -1212,7 +1294,7 @@ class ProdukTab extends Component
                 'type' => 'success',
                 'message' => 'Produk tersimpan'.((int) $this->produkForm['stok_awal'] > 0 ? ' + jurnal pembelian dibuat' : ''),
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
     }
@@ -1673,11 +1755,26 @@ class ProdukTab extends Component
             }
         }
 
+        $scanResolver = app(ScanResolverService::class);
+
+        $barcodeToCheck = isset($this->editProdukForm['barcode']) ? $scanResolver->bersihkanBarcode((string) $this->editProdukForm['barcode']) : '';
+        if (! empty($barcodeToCheck)) {
+            $variantConflict = SkuVariant::where('barcode', $barcodeToCheck)
+                ->where('produk_id', '!=', $this->editProdukId)
+                ->exists();
+            if ($variantConflict) {
+                $this->addError('editProdukForm.barcode', 'Barcode ini sudah digunakan oleh varian produk lain.');
+
+                return;
+            }
+        }
+
         $altList = [];
         if (isset($this->editProdukForm['barcode_alt_list']) && is_array($this->editProdukForm['barcode_alt_list'])) {
-            $altList = array_values(array_filter(array_map('trim', $this->editProdukForm['barcode_alt_list'])));
+            $altList = array_values(array_unique(array_filter(array_map(fn ($b) => $scanResolver->bersihkanBarcode((string) $b), $this->editProdukForm['barcode_alt_list']))));
         } elseif (isset($this->editProdukForm['barcode_alt_input'])) {
-            $altList = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', (string) $this->editProdukForm['barcode_alt_input']))));
+            $raws = preg_split('/[,;\n]+/', (string) $this->editProdukForm['barcode_alt_input']);
+            $altList = array_values(array_unique(array_filter(array_map(fn ($b) => $scanResolver->bersihkanBarcode((string) $b), $raws))));
         }
 
         try {
@@ -1706,7 +1803,7 @@ class ProdukTab extends Component
                 minStock: ! empty($this->editProdukForm['min_stock']) ? (int) $this->editProdukForm['min_stock'] : null,
                 maxStock: ! empty($this->editProdukForm['max_stock']) ? (int) $this->editProdukForm['max_stock'] : null,
                 isOndemand: (bool) ($this->editProdukForm['is_ondemand'] ?? false),
-                barcode: isset($this->editProdukForm['barcode']) ? trim((string) $this->editProdukForm['barcode']) : null,
+                barcode: isset($this->editProdukForm['barcode']) ? ($scanResolver->bersihkanBarcode((string) $this->editProdukForm['barcode']) ?: null) : null,
                 metodeHargaBeli: $this->editProdukForm['metode_harga_beli'] ?? 'manual',
                 marginPersen: ! empty($this->editProdukForm['margin_persen']) ? (float) $this->editProdukForm['margin_persen'] : null,
                 multiSatuan: $this->editProdukForm['multi_satuan'] ?? [],
@@ -1728,7 +1825,7 @@ class ProdukTab extends Component
             $this->editFotoUploads = [];
             $this->editFotoKameraUpload = null;
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Master produk berhasil diperbarui']);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
     }

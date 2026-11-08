@@ -8,10 +8,12 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Services\StokDeductionService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Pembayaran pesanan online "bayar di toko" (pickup) — kontrak API BEKU.
@@ -246,6 +248,12 @@ class PembayaranPesananOnlineService
             }
 
             $notif->sinkronkanStatusTransaksi($transaksi, 'lunas');
+
+            try {
+                app(TransactionActivityLogService::class)->catatPenjualan($transaksi);
+            } catch (\Throwable $e) {
+                Log::warning('Gagal mencatat audit log pickup kasir: '.$e->getMessage());
+            }
 
             return ['transaksi' => $transaksi, 'kembalian' => $kembalian];
         });

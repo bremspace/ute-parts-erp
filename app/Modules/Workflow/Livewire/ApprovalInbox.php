@@ -211,6 +211,10 @@ class ApprovalInbox extends Component
 
     public function confirmApproveMember()
     {
+        if (isset($this->memberApprovalForm['tier_membership_id']) && $this->memberApprovalForm['tier_membership_id'] === '') {
+            $this->memberApprovalForm['tier_membership_id'] = null;
+        }
+
         $this->validate([
             'memberApprovalForm.tipe_konsumen' => 'required|in:retail,reseller,agen',
             'memberApprovalForm.tier_membership_id' => 'nullable|exists:tier_memberships,id',

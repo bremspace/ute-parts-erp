@@ -5,6 +5,7 @@ namespace App\Modules\Rbac\Livewire;
 use App\Models\User;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Marketplace\Models\WebKonsumenSetting;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Models\QrisCabang;
@@ -13,6 +14,7 @@ use App\Modules\Wms\Exports\ImportProdukTemplateExport;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Services\ImportProdukService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -432,23 +434,42 @@ class SetupWizard extends Component
         } elseif ($this->currentStep === 3) {
             $rules = [
                 'superAdminNama' => 'required|string|max:100',
+                'superAdminEmail' => 'required|email|max:100',
             ];
             if (! empty($this->superAdminPassword)) {
                 $rules['superAdminPassword'] = 'min:8|same:superAdminPasswordConfirmation';
             }
             if ($this->aturKasir) {
                 $rules['kasirNama'] = 'required|string|max:100';
+                $rules['kasirEmail'] = 'required|email|max:100';
                 if (! empty($this->kasirPassword)) {
                     $rules['kasirPassword'] = 'min:8';
                 }
             }
             if ($this->aturTeknisi) {
                 $rules['teknisiNama'] = 'required|string|max:100';
+                $rules['teknisiEmail'] = 'required|email|max:100';
                 if (! empty($this->teknisiPassword)) {
                     $rules['teknisiPassword'] = 'min:8';
                 }
             }
             $this->validate($rules);
+
+            if ($this->aturKasir && strtolower(trim($this->kasirEmail)) === strtolower(trim($this->superAdminEmail))) {
+                $this->addError('kasirEmail', 'Email kasir tidak boleh sama dengan email Super Admin.');
+
+                return;
+            }
+            if ($this->aturTeknisi && strtolower(trim($this->teknisiEmail)) === strtolower(trim($this->superAdminEmail))) {
+                $this->addError('teknisiEmail', 'Email teknisi tidak boleh sama dengan email Super Admin.');
+
+                return;
+            }
+            if ($this->aturKasir && $this->aturTeknisi && strtolower(trim($this->teknisiEmail)) === strtolower(trim($this->kasirEmail))) {
+                $this->addError('teknisiEmail', 'Email teknisi tidak boleh sama dengan email kasir.');
+
+                return;
+            }
         } elseif ($this->currentStep === 4) {
             // Migrasi bersifat opsional
             // Lanjut ke step 5
@@ -514,7 +535,13 @@ class SetupWizard extends Component
 
             if ($this->formatMigrasi === 'sid_retail') {
                 $this->isCustomMapping = false;
-                $preview = $service->preview($fullPath, 99, [], [], [], $cabangId);
+                $preview = $service->preview(
+                    filePath: $fullPath,
+                    threshold: 99,
+                    resolusiDuplikat: ['*' => 'timpa_update'],
+                    resolusiBarcode: ['*' => 'kosongkan_barcode'],
+                    cabangId: $cabangId
+                );
             } else {
                 $inspect = $service->inspectFile($fullPath);
                 $this->customColumns = $inspect['headings'] ?? [];
@@ -532,7 +559,13 @@ class SetupWizard extends Component
                 }
 
                 $this->isCustomMapping = false;
-                $preview = $service->preview($fullPath, 99, [], [], [], $cabangId);
+                $preview = $service->preview(
+                    filePath: $fullPath,
+                    threshold: 99,
+                    resolusiDuplikat: ['*' => 'timpa_update'],
+                    resolusiBarcode: ['*' => 'kosongkan_barcode'],
+                    cabangId: $cabangId
+                );
             }
 
             $this->previewSummary = [
@@ -576,8 +609,8 @@ class SetupWizard extends Component
             $preview = $service->preview(
                 filePath: $fullPath,
                 threshold: 99,
-                resolusiDuplikat: [],
-                resolusiBarcode: [],
+                resolusiDuplikat: ['*' => 'timpa_update'],
+                resolusiBarcode: ['*' => 'kosongkan_barcode'],
                 resolusiErrorBaris: [],
                 cabangId: $cabangId,
                 columnMapping: $this->columnMapping,
@@ -727,9 +760,11 @@ class SetupWizard extends Component
                     $logoUrl = Storage::url($stored);
                     $config->set('app_logo', $logoUrl, 'Logo Resmi Toko / Brand');
                     $this->existingLogoUrl = $logoUrl;
+                }
 
-                    if (class_exists(WebKonsumenSetting::class)) {
-                        try {
+                if (class_exists(WebKonsumenSetting::class)) {
+                    try {
+                        if ($logoUrl) {
                             WebKonsumenSetting::updateOrCreate(
                                 ['setting_key' => 'store_logo_url'],
                                 [
@@ -739,9 +774,29 @@ class SetupWizard extends Component
                                     'deskripsi' => 'URL logo toko resmi',
                                 ]
                             );
-                            Cache::forget(WebKonsumenService::CACHE_KEY);
-                        } catch (Throwable) {
                         }
+                        WebKonsumenSetting::updateOrCreate(
+                            ['setting_key' => 'store_name'],
+                            [
+                                'group_key' => 'branding',
+                                'setting_value' => $this->namaToko,
+                                'value_type' => 'string',
+                                'deskripsi' => 'Nama resmi brand toko',
+                            ]
+                        );
+                        if (! empty($this->teleponToko)) {
+                            WebKonsumenSetting::updateOrCreate(
+                                ['setting_key' => 'wa_number'],
+                                [
+                                    'group_key' => 'kontak',
+                                    'setting_value' => $this->teleponToko,
+                                    'value_type' => 'string',
+                                    'deskripsi' => 'Nomor WhatsApp resmi toko',
+                                ]
+                            );
+                        }
+                        Cache::forget(WebKonsumenService::CACHE_KEY);
+                    } catch (Throwable) {
                     }
                 }
 
@@ -754,6 +809,33 @@ class SetupWizard extends Component
                     $this->updateEnvKey('APP_URL', "https://{$cleanDomain}");
                     $this->updateEnvKey('MAIL_FROM_ADDRESS', "hello@{$cleanDomain}");
                     config(['app.url' => "https://{$cleanDomain}"]);
+                }
+
+                // Pastikan Cabang memiliki Gudang & Rak default untuk operasional WMS
+                if (class_exists(Gudang::class)) {
+                    $gudang = Gudang::firstOrCreate(
+                        ['cabang_id' => $cabang->id, 'is_active' => true],
+                        [
+                            'kode' => 'GD-'.($cabang->kode ?: '01'),
+                            'nama' => 'Gudang Utama '.$cabang->nama,
+                            'is_active' => true,
+                        ]
+                    );
+                    if (! $this->defaultGudangId) {
+                        $this->defaultGudangId = $gudang->id;
+                    }
+
+                    if (class_exists(Rak::class)) {
+                        Rak::firstOrCreate(
+                            ['gudang_id' => $gudang->id],
+                            [
+                                'kode' => 'RAK-01',
+                                'nama' => 'Rak Display',
+                                'zona' => 'A',
+                                'is_active' => true,
+                            ]
+                        );
+                    }
                 }
 
                 // 2. Simpan konfigurasi struk
@@ -769,25 +851,44 @@ class SetupWizard extends Component
                     'logo_url' => $logoUrl,
                     'auto_print' => false,
                 ];
-                $config->set('struk_config', $strukData, 'Pengaturan default struk transaksi kasir');
+                $config->set('struk_config', array_merge($config->getStrukConfig(), $strukData), 'Pengaturan default struk transaksi kasir');
 
-                // 3. Update Akun Super Admin
+                // 3. Update atau Buat Akun Super Admin
                 $admin = ($this->superAdminId ? User::find($this->superAdminId) : null)
                     ?? auth()->user()
                     ?? (method_exists(User::class, 'role') ? User::role('super-admin')->first() : null)
+                    ?? User::where('email', $this->superAdminEmail)->first()
                     ?? User::first();
                 if ($admin) {
                     $adminUpdate = [
                         'name' => $this->superAdminNama,
                         'email' => $this->superAdminEmail,
+                        'is_active' => true,
                     ];
                     if (! empty($this->superAdminPassword)) {
                         $adminUpdate['password'] = Hash::make($this->superAdminPassword);
                     }
                     $admin->update($adminUpdate);
+                } else {
+                    $admin = User::create([
+                        'name' => $this->superAdminNama,
+                        'email' => $this->superAdminEmail,
+                        'password' => Hash::make($this->superAdminPassword ?: 'Password123!'),
+                        'email_verified_at' => now(),
+                        'is_active' => true,
+                    ]);
+                }
+                if (method_exists($admin, 'syncRoles')) {
+                    $admin->syncRoles(['super-admin']);
+                }
+                if (! $admin->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+                    $admin->cabangs()->attach($cabang->id, ['is_default' => true]);
+                }
+                if (auth()->check() && auth()->id() === $admin->id) {
+                    auth()->setUser($admin);
                 }
 
-                // 4. Update Akun Kasir
+                // 4. Update atau Buat Akun Kasir
                 if ($this->aturKasir) {
                     $kasir = ($this->kasirId ? User::find($this->kasirId) : null)
                         ?? User::where('email', $this->kasirEmail)->first()
@@ -796,18 +897,47 @@ class SetupWizard extends Component
                         $kasirUpdate = [
                             'name' => $this->kasirNama,
                             'email' => $this->kasirEmail,
+                            'is_active' => true,
                         ];
                         if (! empty($this->kasirPassword)) {
                             $kasirUpdate['password'] = Hash::make($this->kasirPassword);
                         }
                         $kasir->update($kasirUpdate);
-                        if (! $kasir->cabangs()->where('cabang_id', $cabang->id)->exists()) {
-                            $kasir->cabangs()->attach($cabang->id, ['is_default' => true]);
+                    } else {
+                        $kasir = User::create([
+                            'name' => $this->kasirNama,
+                            'email' => $this->kasirEmail,
+                            'password' => Hash::make($this->kasirPassword ?: 'Password123!'),
+                            'email_verified_at' => now(),
+                            'is_active' => true,
+                        ]);
+                    }
+                    if (method_exists($kasir, 'syncRoles')) {
+                        $kasir->syncRoles(['kasir']);
+                    }
+                    if (! $kasir->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+                        $kasir->cabangs()->attach($cabang->id, ['is_default' => true]);
+                    }
+
+                    if (class_exists(Karyawan::class)) {
+                        try {
+                            Karyawan::updateOrCreate(
+                                ['user_id' => $kasir->id],
+                                [
+                                    'nama' => $kasir->name,
+                                    'email' => $kasir->email,
+                                    'cabang_id' => $cabang->id,
+                                    'jabatan' => 'kasir',
+                                    'status_aktif' => true,
+                                    'tgl_masuk' => now()->format('Y-m-d'),
+                                ]
+                            );
+                        } catch (Throwable) {
                         }
                     }
                 }
 
-                // 5. Update Akun Teknisi
+                // 5. Update atau Buat Akun Teknisi
                 if ($this->aturTeknisi) {
                     $teknisi = ($this->teknisiId ? User::find($this->teknisiId) : null)
                         ?? User::where('email', $this->teknisiEmail)->first()
@@ -816,28 +946,63 @@ class SetupWizard extends Component
                         $teknisiUpdate = [
                             'name' => $this->teknisiNama,
                             'email' => $this->teknisiEmail,
+                            'is_active' => true,
                         ];
                         if (! empty($this->teknisiPassword)) {
                             $teknisiUpdate['password'] = Hash::make($this->teknisiPassword);
                         }
                         $teknisi->update($teknisiUpdate);
-                        if (! $teknisi->cabangs()->where('cabang_id', $cabang->id)->exists()) {
-                            $teknisi->cabangs()->attach($cabang->id, ['is_default' => true]);
+                    } else {
+                        $teknisi = User::create([
+                            'name' => $this->teknisiNama,
+                            'email' => $this->teknisiEmail,
+                            'password' => Hash::make($this->teknisiPassword ?: 'Password123!'),
+                            'email_verified_at' => now(),
+                            'is_active' => true,
+                        ]);
+                    }
+                    if (method_exists($teknisi, 'syncRoles')) {
+                        $teknisi->syncRoles(['teknisi']);
+                    }
+                    if (! $teknisi->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+                        $teknisi->cabangs()->attach($cabang->id, ['is_default' => true]);
+                    }
+
+                    if (class_exists(Karyawan::class)) {
+                        try {
+                            Karyawan::updateOrCreate(
+                                ['user_id' => $teknisi->id],
+                                [
+                                    'nama' => $teknisi->name,
+                                    'email' => $teknisi->email,
+                                    'cabang_id' => $cabang->id,
+                                    'jabatan' => 'teknisi',
+                                    'status_aktif' => true,
+                                    'tgl_masuk' => now()->format('Y-m-d'),
+                                ]
+                            );
+                        } catch (Throwable) {
                         }
                     }
                 }
 
-                // 6. Seragamkan akun staf bawaan lainnya ke domain baru (idempotent)
+                // 6. Seragamkan akun staf bawaan lainnya ke domain baru & hubungkan ke cabang
                 if (! empty($cleanDomain)) {
-                    $otherRoles = ['owner', 'admin-toko', 'staff-gudang', 'finance', 'marketing', 'hr'];
+                    $otherRoles = ['owner', 'admin-toko', 'staff-gudang', 'finance', 'marketing', 'kelola-hr', 'karyawan'];
                     foreach ($otherRoles as $roleName) {
                         if (method_exists(User::class, 'role')) {
-                            $roleUsers = User::role($roleName)->get();
-                            foreach ($roleUsers as $u) {
-                                if ($u->id !== ($admin?->id ?? 0) && $u->id !== ($kasir?->id ?? 0) && $u->id !== ($teknisi?->id ?? 0)) {
-                                    $prefix = explode('@', $u->email)[0] ?: $roleName;
-                                    $u->update(['email' => "{$prefix}@{$cleanDomain}"]);
+                            try {
+                                $roleUsers = User::role($roleName)->get();
+                                foreach ($roleUsers as $u) {
+                                    if ($u->id !== ($admin?->id ?? 0) && $u->id !== ($kasir?->id ?? 0) && $u->id !== ($teknisi?->id ?? 0)) {
+                                        $prefix = explode('@', $u->email)[0] ?: $roleName;
+                                        $u->update(['email' => "{$prefix}@{$cleanDomain}"]);
+                                        if (! $u->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+                                            $u->cabangs()->attach($cabang->id, ['is_default' => false]);
+                                        }
+                                    }
                                 }
+                            } catch (Throwable) {
                             }
                         }
                     }
@@ -899,23 +1064,27 @@ class SetupWizard extends Component
 
                     if ($totalBaris <= 100) {
                         ImportProdukExcelJob::dispatchSync(
-                            $log->id,
-                            $this->storedFilePath,
-                            auth()->id(),
-                            $this->formatMigrasi === 'sid_retail' ? 'sid_retail' : 'standar',
-                            $cabang->id,
-                            $this->columnMapping,
-                            $this->defaultGudangId
+                            importLogId: $log->id,
+                            filePath: $this->storedFilePath,
+                            userId: auth()->id(),
+                            format: $this->formatMigrasi === 'sid_retail' ? 'sid_retail' : 'standar',
+                            cabangId: $cabang->id,
+                            resolusiDuplikat: ['*' => 'timpa_update'],
+                            resolusiBarcode: ['*' => 'kosongkan_barcode'],
+                            columnMapping: $this->columnMapping,
+                            defaultGudangId: $this->defaultGudangId
                         );
                     } else {
                         ImportProdukExcelJob::dispatch(
-                            $log->id,
-                            $this->storedFilePath,
-                            auth()->id(),
-                            $this->formatMigrasi === 'sid_retail' ? 'sid_retail' : 'standar',
-                            $cabang->id,
-                            $this->columnMapping,
-                            $this->defaultGudangId
+                            importLogId: $log->id,
+                            filePath: $this->storedFilePath,
+                            userId: auth()->id(),
+                            format: $this->formatMigrasi === 'sid_retail' ? 'sid_retail' : 'standar',
+                            cabangId: $cabang->id,
+                            resolusiDuplikat: ['*' => 'timpa_update'],
+                            resolusiBarcode: ['*' => 'kosongkan_barcode'],
+                            columnMapping: $this->columnMapping,
+                            defaultGudangId: $this->defaultGudangId
                         );
                     }
                 }
@@ -950,6 +1119,8 @@ class SetupWizard extends Component
             $this->isSaving = false;
             $this->errorMessage = 'Gagal menyimpan konfigurasi setup awal: '.$e->getMessage();
             Log::error('Wizard finish error: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
+            return null;
         }
     }
 

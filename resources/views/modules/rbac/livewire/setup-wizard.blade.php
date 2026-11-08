@@ -339,11 +339,16 @@
                     <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white">Super Administrator / Owner</h3>
                     <span class="text-[10px] sm:text-[11px] text-ink-500 font-mono break-all">({{ $superAdminEmail }})</span>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
                     <div>
                         <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Nama Pemilik / Admin</label>
                         <input type="text" wire:model="superAdminNama" class="w-full px-3 py-2 rounded-lg border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm text-ink-900 dark:text-white">
                         @error('superAdminNama') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Email Login Admin</label>
+                        <input type="email" wire:model="superAdminEmail" class="w-full px-3 py-2 rounded-lg border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm text-ink-900 dark:text-white">
+                        @error('superAdminEmail') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Sandi Baru (Kosongkan jika tetap)</label>
@@ -364,11 +369,16 @@
                     <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white">Akun Kasir Utama</h3>
                     <span class="text-[10px] sm:text-[11px] text-ink-500 font-mono break-all">({{ $kasirEmail }})</span>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3">
                     <div>
                         <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Nama Staf Kasir</label>
                         <input type="text" wire:model="kasirNama" class="w-full px-3 py-2 rounded-lg border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm text-ink-900 dark:text-white">
                         @error('kasirNama') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Email Login Kasir</label>
+                        <input type="email" wire:model="kasirEmail" class="w-full px-3 py-2 rounded-lg border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm text-ink-900 dark:text-white">
+                        @error('kasirEmail') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Sandi Kasir (Kosongkan jika tetap)</label>
@@ -385,11 +395,16 @@
                     <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white">Akun Teknisi Servis</h3>
                     <span class="text-[10px] sm:text-[11px] text-ink-500 font-mono break-all">({{ $teknisiEmail }})</span>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3">
                     <div>
                         <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Nama Teknisi</label>
                         <input type="text" wire:model="teknisiNama" class="w-full px-3 py-2 rounded-lg border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm text-ink-900 dark:text-white">
                         @error('teknisiNama') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Email Login Teknisi</label>
+                        <input type="email" wire:model="teknisiEmail" class="w-full px-3 py-2 rounded-lg border border-ink-300 dark:border-white/10 bg-white dark:bg-[#0B1120] text-xs sm:text-sm text-ink-900 dark:text-white">
+                        @error('teknisiEmail') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-ink-700 dark:text-ink-300 mb-1">Sandi Teknisi (Kosongkan jika tetap)</label>

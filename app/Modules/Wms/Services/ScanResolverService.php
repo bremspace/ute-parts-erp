@@ -83,6 +83,14 @@ class ScanResolverService
     }
 
     /**
+     * Alias bersihkanBarcode untuk membersihkan input scanner gun / kamera.
+     */
+    public function bersihkanBarcode(string $raw): string
+    {
+        return $this->cleanCode($raw);
+    }
+
+    /**
      * Resolusi produk dari hasil pemindaian Barcode / QR Code.
      *
      * @return array{

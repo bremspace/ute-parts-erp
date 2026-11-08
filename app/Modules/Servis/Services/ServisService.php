@@ -1244,7 +1244,20 @@ class ServisService
                 'transaksi_id' => $transaksiId ?? $tiket->transaksi_id,
             ]);
 
-            $pesanLog = "Pelunasan servis ({$metodePembayaran}): Rp {$totalTagihan}";
+            if ($metodePembayaran === 'split' && $splitDetail) {
+                $tunaiNominal = (float) ($splitDetail['tunai'] ?? 0);
+                $nonTunaiNominal = (float) ($splitDetail['non_tunai'] ?? 0);
+                $metodeNon = strtoupper(str_replace('_', ' ', (string) ($splitDetail['metode_non_tunai'] ?? 'Non-Tunai')));
+                $pesanLog = sprintf(
+                    'Pelunasan servis (Split - Tunai: Rp %s, %s: Rp %s): Rp %s',
+                    number_format($tunaiNominal, 0, ',', '.'),
+                    $metodeNon,
+                    number_format($nonTunaiNominal, 0, ',', '.'),
+                    number_format($totalTagihan, 0, ',', '.')
+                );
+            } else {
+                $pesanLog = 'Pelunasan servis ('.strtoupper($metodePembayaran).'): Rp '.number_format($totalTagihan, 0, ',', '.');
+            }
             if ($catatan) {
                 $pesanLog .= " - {$catatan}";
             }

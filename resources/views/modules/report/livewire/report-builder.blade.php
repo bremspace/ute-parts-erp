@@ -111,6 +111,50 @@
 
         <!-- Results -->
         @if($showResults && count($queryResults) > 0)
+            <!-- [ISO 9001 Clause 7.5 / ISO 27001] ISO Controlled Document Header & Letterhead -->
+            @if(!empty($isoMetadata))
+                <div class="mt-4 p-4 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-md shadow-sm">
+                    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-3 border-b border-white/10">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-up-primary/20 border border-up-primary/40 flex items-center justify-center text-up-primary font-black text-sm">
+                                ISO
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-black tracking-widest uppercase text-up-primary font-mono">{{ $isoMetadata['doc_code'] }}</span>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-up-mint/10 text-up-mint border border-up-mint/30 font-bold uppercase tracking-wider">{{ $isoMetadata['status'] }}</span>
+                                </div>
+                                <h2 class="text-base font-black text-white tracking-tight mt-0.5">{{ $isoMetadata['doc_name'] }}</h2>
+                            </div>
+                        </div>
+                        <div class="text-right text-[11px] text-ink-400 self-end md:self-auto space-y-0.5">
+                            <div>Standar: <span class="font-semibold text-ink-200">{{ $isoMetadata['iso_std'] }}</span></div>
+                            <div>Klasifikasi: <span class="font-semibold text-up-amber">{{ $isoMetadata['classification'] }}</span></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-xs">
+                        <div>
+                            <span class="block text-[10px] uppercase font-bold text-ink-500">Cabang / Unit Kerja</span>
+                            <span class="font-semibold text-white">{{ $isoMetadata['cabang_nama'] }} ({{ $isoMetadata['cabang_kode'] }})</span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] uppercase font-bold text-ink-500">Operator Pelapor</span>
+                            <span class="font-semibold text-white">{{ $isoMetadata['operator'] }} <span class="text-ink-400 font-normal">({{ $isoMetadata['operator_role'] }})</span></span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] uppercase font-bold text-ink-500">Waktu Penarikan Data</span>
+                            <span class="font-semibold text-white tabular-nums">{{ $isoMetadata['generated_at'] }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] uppercase font-bold text-ink-500">Integritas Data</span>
+                            <span class="font-semibold text-up-mint flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <span>Verified Cabang-Scoped</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            @endif
             @php
                 $fmtCell = function ($v, $key) {
                     if (is_bool($v)) {
@@ -175,9 +219,18 @@
                     <x-prism.dual-scroll>
                         <table class="w-full text-xs text-left border-collapse">
                             <thead>
-                                <tr class="bg-white/5">
+                                <tr class="bg-white/5 border-b border-white/10">
                                     @foreach($resultColumns as $col)
-                                        <th class="py-2.5 px-3 font-semibold text-ink-400 uppercase text-[10px] whitespace-nowrap">{{ $availableColumns[$col] ?? \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$col] ?? str_replace('_', ' ', $col) }}</th>
+                                        @php
+                                            $isNumCol = in_array((string) $col, [
+                                                'total_akhir', 'total_kotor', 'total_diskon', 'total_pajak', 'subtotal',
+                                                'harga_satuan', 'hpp', 'debit', 'kredit', 'jumlah', 'jumlah_dibayar',
+                                                'sisa', 'total', 'total_dibayar', 'estimasi_biaya', 'biaya_akhir',
+                                                'jumlah_bayar', 'kembalian', 'stok', 'qty', 'qty_dipesan', 'qty_diterima',
+                                                'selisih', 'jumlah_masuk', 'jumlah_keluar'
+                                            ], true);
+                                        @endphp
+                                        <th class="py-2.5 px-3 font-semibold text-ink-400 uppercase text-[10px] whitespace-nowrap {{ $isNumCol ? 'text-right' : 'text-left' }}">{{ $availableColumns[$col] ?? \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$col] ?? str_replace('_', ' ', $col) }}</th>
                                     @endforeach
                                 </tr>
                             </thead>
@@ -185,11 +238,43 @@
                                 @foreach($queryResults as $row)
                                     <tr class="hover:bg-white/5 transition">
                                         @foreach($resultColumns as $col)
-                                            <td class="py-2 px-3 tabular-nums whitespace-nowrap">{{ $fmtCell($row[$col] ?? null, $col) }}</td>
+                                            @php
+                                                $isNumCol = in_array((string) $col, [
+                                                    'total_akhir', 'total_kotor', 'total_diskon', 'total_pajak', 'subtotal',
+                                                    'harga_satuan', 'hpp', 'debit', 'kredit', 'jumlah', 'jumlah_dibayar',
+                                                    'sisa', 'total', 'total_dibayar', 'estimasi_biaya', 'biaya_akhir',
+                                                    'jumlah_bayar', 'kembalian', 'stok', 'qty', 'qty_dipesan', 'qty_diterima',
+                                                    'selisih', 'jumlah_masuk', 'jumlah_keluar'
+                                                ], true);
+                                            @endphp
+                                            <td class="py-2 px-3 tabular-nums whitespace-nowrap {{ $isNumCol ? 'text-right' : 'text-left' }}">{{ $fmtCell($row[$col] ?? null, $col) }}</td>
                                         @endforeach
                                     </tr>
                                 @endforeach
                             </tbody>
+                            {{-- [ISO 9001 / ISO/IEC 25010] Table Footer Rekonsiliasi & Total Agregat --}}
+                            @if(!empty($aggregates))
+                                <tfoot>
+                                    <tr class="bg-white/[0.06] border-t-2 border-white/20 font-bold text-ink-200">
+                                        @php $isFirst = true; @endphp
+                                        @foreach($resultColumns as $col)
+                                            @php
+                                                $isNumCol = array_key_exists((string) $col, $aggregates);
+                                            @endphp
+                                            <td class="py-2.5 px-3 tabular-nums whitespace-nowrap {{ $isNumCol ? 'text-right text-up-mint font-black' : 'text-left' }}">
+                                                @if($isNumCol)
+                                                    Rp {{ number_format($aggregates[$col], 0, ',', '.') }}
+                                                @elseif($isFirst)
+                                                    <span class="text-[10px] uppercase tracking-wider text-ink-400">TOTAL HALAMAN:</span>
+                                                    @php $isFirst = false; @endphp
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
+                                        @endforeach
+                                    </tr>
+                                </tfoot>
+                            @endif
                         </table>
                     </x-prism.dual-scroll>
                 </div>

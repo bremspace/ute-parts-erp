@@ -15,6 +15,7 @@ use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
+use App\Modules\Wms\Services\ExportMasterProdukService;
 use App\Modules\Wms\Services\ImportProdukService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -286,5 +287,65 @@ class ExportImportUnifiedTest extends TestCase
 
         $this->assertSame(1, $commitResult['sukses'], 'Commit timpa_update harus berhasil 100% memperbarui data');
         $this->assertSame(0, $commitResult['gagal']);
+    }
+
+    public function test_reimport_with_wildcard_timpa_update_and_low_margin_products(): void
+    {
+        // 1. Setup produk dengan harga jual di bawah modal (cuci gudang / clearance)
+        $p = Produk::create([
+            'nama' => 'LCD Cuci Gudang',
+            'slug' => 'lcd-cuci-gudang-test',
+            'satuan' => 'pcs',
+            'harga_beli' => 120000,
+            'harga_jual_retail' => 110000,
+            'is_active' => true,
+        ]);
+        SkuVariant::create([
+            'produk_id' => $p->id,
+            'sku' => 'LCD-CG-01',
+            'barcode' => 'BC-CG-01',
+            'nama_varian' => 'Standar',
+            'satuan_kode' => 'pcs',
+            'harga_beli' => 120000,
+            'harga_jual_retail' => 110000,
+            'is_active' => true,
+        ]);
+
+        $exportService = app(ExportMasterProdukService::class);
+        $exportResponse = $exportService->export('xlsx', $this->cabang->id);
+        $fullPath = $exportResponse->getFile()->getPathname();
+
+        $importService = app(ImportProdukService::class);
+
+        // Preview dengan wildcard timpa_update harus valid 100%
+        $preview = $importService->preview(
+            filePath: $fullPath,
+            threshold: 99,
+            resolusiDuplikat: ['*' => 'timpa_update'],
+            resolusiBarcode: ['*' => 'kosongkan_barcode']
+        );
+
+        $this->assertGreaterThan(0, $preview['total_baris']);
+        $this->assertSame(0, $preview['invalid'], 'Seluruh baris harus valid jika wildcard timpa_update aktif');
+
+        // Commit dengan wildcard timpa_update harus sukses 100%
+        $log = ImportLog::create([
+            'tipe' => 'produk_excel',
+            'nama_file' => 'test_wildcard.xlsx',
+            'status' => 'proses',
+            'user_id' => $this->user->id,
+        ]);
+
+        $commitResult = $importService->commit(
+            filePath: $fullPath,
+            importLogId: $log->id,
+            userId: $this->user->id,
+            aksiKemiripan: [],
+            resolusiDuplikat: ['*' => 'timpa_update'],
+            resolusiBarcode: ['*' => 'kosongkan_barcode']
+        );
+
+        $this->assertGreaterThan(0, $commitResult['sukses']);
+        $this->assertSame(0, $commitResult['gagal'], 'Tidak boleh ada produk gagal saat re-impor katalog eksisting dengan timpa_update');
     }
 }

@@ -95,4 +95,28 @@ class CrmTabDanWorkflowTest extends TestCase
             ->assertSee('Pelanggan')
             ->assertSee('Tier Loyalty');
     }
+
+    public function test_crm_dashboard_edit_pelanggan_sanitizes_empty_tier_and_updates_status(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'cabang_id' => $this->cabang->id,
+            'nama' => 'Joko Test',
+            'telepon' => '081234567890',
+            'tipe_konsumen' => 'retail',
+            'status' => 'aktif',
+        ]);
+
+        Livewire::test(CrmDashboard::class)
+            ->call('openEditPelangganModal', $pelanggan->id)
+            ->assertSet('editPelangganId', $pelanggan->id)
+            ->set('editPelangganForm.tier_membership_id', '')
+            ->set('editPelangganForm.status', 'nonaktif')
+            ->call('simpanEditPelanggan')
+            ->assertHasNoErrors()
+            ->assertSet('showEditPelangganModal', false);
+
+        $pelanggan->refresh();
+        $this->assertNull($pelanggan->tier_membership_id);
+        $this->assertSame('nonaktif', $pelanggan->status);
+    }
 }

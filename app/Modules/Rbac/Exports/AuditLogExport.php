@@ -112,7 +112,15 @@ class AuditLogExport implements FromCollection, ShouldAutoSize, WithHeadings, Wi
             $metadataText[] = "• Target: {$props['target_kredensial']}";
         }
         if (! empty($props['metode_bayar'])) {
-            $metadataText[] = '• Metode Bayar: '.strtoupper(str_replace('_', ' ', (string) $props['metode_bayar']));
+            if ($props['metode_bayar'] === 'split' && ! empty($props['split_detail'])) {
+                $detail = is_array($props['split_detail']) ? $props['split_detail'] : (json_decode($props['split_detail'], true) ?: []);
+                $tunai = (float) ($detail['tunai'] ?? 0);
+                $nonTunai = (float) ($detail['non_tunai'] ?? 0);
+                $metodeNon = strtoupper(str_replace('_', ' ', (string) ($detail['metode_non_tunai'] ?? 'Non-Tunai')));
+                $metadataText[] = sprintf('• Metode Bayar: SPLIT (Tunai: Rp %s | %s: Rp %s)', number_format($tunai, 0, ',', '.'), $metodeNon, number_format($nonTunai, 0, ',', '.'));
+            } else {
+                $metadataText[] = '• Metode Bayar: '.strtoupper(str_replace('_', ' ', (string) $props['metode_bayar']));
+            }
         }
         if (! empty($props['tipe_penyelesaian'])) {
             $metadataText[] = '• Penyelesaian: '.($props['tipe_penyelesaian'] === 'tukar_produk' ? 'Tukar Produk' : 'Refund Dana');

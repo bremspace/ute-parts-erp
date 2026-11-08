@@ -147,10 +147,10 @@ class PosSplitBillKasbonKadaluarsaTest extends TestCase
             ->call('openPaymentModal')
             ->set('metodeBayar', 'split')
             ->set('splitMetodeNonTunai', 'qris')
-            ->set('splitNonTunai', '50.000')
-            ->set('splitTunai', '120.000'); // total bayar = 170.000, belanja = 150.000 → kembalian 20.000
+            ->set('splitNonTunai', '50.000'); // Otomatis menghitung tunai = 100.000 (total faktur = 150.000)
 
-        $this->assertEquals(20000, $comp->get('kembalian'));
+        $this->assertEquals('100.000', $comp->get('splitTunai'));
+        $this->assertEquals(0, $comp->get('kembalian'));
 
         $comp->call('processTransaction');
 
@@ -158,8 +158,8 @@ class PosSplitBillKasbonKadaluarsaTest extends TestCase
         $this->assertNotNull($transaksi);
         $this->assertEquals('split', $transaksi->metode_bayar);
         $this->assertEquals(150000, (float) $transaksi->total_akhir);
-        $this->assertEquals(170000, (float) $transaksi->jumlah_bayar);
-        $this->assertEquals(20000, (float) $transaksi->kembalian);
+        $this->assertEquals(150000, (float) $transaksi->jumlah_bayar);
+        $this->assertEquals(0, (float) $transaksi->kembalian);
 
         // Periksa jurnal akuntansi: total debit harus sama persis dengan total kredit
         $jurnal = JurnalHeader::where('referensi_tipe', Transaksi::class)
@@ -178,9 +178,38 @@ class PosSplitBillKasbonKadaluarsaTest extends TestCase
         $debitBank = (float) $jurnal->lines->filter(fn ($l) => $l->akun?->kode === '110-02')->sum('debit');
         $this->assertEquals(50000, $debitBank);
 
-        // Porsi kas laci (110-04): 150.000 - 50.000 = 100.000 (bersih setelah potong kembalian 20.000)
+        // Porsi kas laci (110-04): 100.000
         $debitKas = (float) $jurnal->lines->filter(fn ($l) => $l->akun?->kode === '110-04')->sum('debit');
         $this->assertEquals(100000, $debitKas);
+    }
+
+    public function test_split_bill_otomatis_hitung_dua_arah_sesuai_faktur(): void
+    {
+        $this->actingAs($this->kasir);
+        $this->bukaSesiKas();
+
+        $comp = Livewire::test(PosKasir::class)
+            ->call('addToCart', $this->produk->id)
+            ->call('openPaymentModal')
+            ->set('metodeBayar', 'split');
+
+        // Total akhir = 150.000
+        $this->assertEquals(150000, $comp->get('totalAkhir'));
+
+        // 1. Isi Tunai 60.000 -> Non-Tunai otomatis 90.000
+        $comp->set('splitTunai', '60.000');
+        $this->assertEquals('90.000', $comp->get('splitNonTunai'));
+        $this->assertEquals('60.000', $comp->get('splitTunai'));
+
+        // 2. Isi Non-Tunai 110.000 -> Tunai otomatis 40.000
+        $comp->set('splitNonTunai', '110.000');
+        $this->assertEquals('40.000', $comp->get('splitTunai'));
+        $this->assertEquals('110.000', $comp->get('splitNonTunai'));
+
+        // 3. Input melebihi total faktur (misal 200.000) -> dipatok pas sesuai faktur
+        $comp->set('splitTunai', '200.000');
+        $this->assertEquals('150.000', $comp->get('splitTunai'));
+        $this->assertEquals('0', $comp->get('splitNonTunai'));
     }
 
     public function test_transaksi_kasbon_piutang_dan_saldo_piutang_pelanggan(): void

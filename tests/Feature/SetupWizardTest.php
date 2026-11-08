@@ -5,9 +5,13 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Hr\Models\Karyawan;
+use App\Modules\Marketplace\Models\WebKonsumenSetting;
 use App\Modules\Rbac\Livewire\SetupWizard;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\DatabaseManagementService;
+use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\Rak;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -352,5 +356,118 @@ class SetupWizardTest extends TestCase
             ->assertSet('isCustomMapping', false)
             ->assertSet('sudahPreview', false)
             ->assertSet('customColumns', []);
+    }
+
+    public function test_setup_wizard_validates_staff_emails_uniqueness_in_step_3(): void
+    {
+        $cabang = Cabang::create([
+            'kode' => 'CBG-01',
+            'nama' => 'Cabang Pusat',
+            'is_active' => true,
+        ]);
+
+        $admin = User::create([
+            'name' => 'Super Admin',
+            'email' => 'admin@bremspace.id',
+            'password' => Hash::make('password'),
+        ]);
+        $admin->assignRole('super-admin');
+
+        session(['cabang_id' => $cabang->id, 'cabang_nama' => $cabang->nama]);
+
+        Livewire::actingAs($admin)
+            ->test(SetupWizard::class)
+            ->set('currentStep', 3)
+            ->set('superAdminEmail', 'admin@bremspace.id')
+            ->set('kasirEmail', 'admin@bremspace.id') // duplicate with admin
+            ->call('nextStep')
+            ->assertHasErrors(['kasirEmail']);
+    }
+
+    public function test_setup_wizard_creates_missing_users_and_assigns_roles_branches_and_karyawan(): void
+    {
+        $cabang = Cabang::create([
+            'kode' => 'CBG-01',
+            'nama' => 'Cabang Pusat',
+            'is_active' => true,
+        ]);
+
+        $admin = User::create([
+            'name' => 'Owner Toko',
+            'email' => 'owner@tokobaru.com',
+            'password' => Hash::make('Password123!'),
+        ]);
+        $admin->assignRole('super-admin');
+
+        // Pastikan tidak ada akun kasir atau teknisi sebelumnya di DB
+        $this->assertEquals(0, User::where('email', 'kasir@tokobaru.com')->count());
+        $this->assertEquals(0, User::where('email', 'teknisi@tokobaru.com')->count());
+
+        session(['cabang_id' => $cabang->id, 'cabang_nama' => $cabang->nama]);
+
+        Livewire::actingAs($admin)
+            ->test(SetupWizard::class)
+            ->set('namaToko', 'Toko Baru Maju')
+            ->set('domainToko', 'tokobaru.com')
+            ->set('teleponToko', '081299998888')
+            ->set('superAdminNama', 'Owner Baru')
+            ->set('superAdminEmail', 'owner@tokobaru.com')
+            ->set('aturKasir', true)
+            ->set('kasirNama', 'Kasir Pertama')
+            ->set('kasirEmail', 'kasir@tokobaru.com')
+            ->set('kasirPassword', 'KasirPass123!')
+            ->set('aturTeknisi', true)
+            ->set('teknisiNama', 'Teknisi Handal')
+            ->set('teknisiEmail', 'teknisi@tokobaru.com')
+            ->set('teknisiPassword', 'TeknisiPass123!')
+            ->set('saldoKas', 1000000)
+            ->set('saldoBank', 5000000)
+            ->set('skipMigrasi', true)
+            ->call('selesaikanSetup')
+            ->assertRedirect(route('pos'));
+
+        // 1. Verifikasi User Kasir dibuat di DB dan memiliki role & cabang
+        $kasir = User::where('email', 'kasir@tokobaru.com')->first();
+        $this->assertNotNull($kasir);
+        $this->assertEquals('Kasir Pertama', $kasir->name);
+        $this->assertTrue(Hash::check('KasirPass123!', $kasir->password));
+        $this->assertTrue($kasir->hasRole('kasir'));
+        $this->assertTrue($kasir->cabangs()->where('cabang_id', $cabang->id)->exists());
+
+        // 2. Verifikasi User Teknisi dibuat di DB dan memiliki role & cabang
+        $teknisi = User::where('email', 'teknisi@tokobaru.com')->first();
+        $this->assertNotNull($teknisi);
+        $this->assertEquals('Teknisi Handal', $teknisi->name);
+        $this->assertTrue(Hash::check('TeknisiPass123!', $teknisi->password));
+        $this->assertTrue($teknisi->hasRole('teknisi'));
+        $this->assertTrue($teknisi->cabangs()->where('cabang_id', $cabang->id)->exists());
+
+        // 3. Verifikasi Data HR Karyawan tersinkronisasi
+        $karyawanKasir = Karyawan::where('user_id', $kasir->id)->first();
+        $this->assertNotNull($karyawanKasir);
+        $this->assertEquals('kasir', $karyawanKasir->jabatan);
+        $this->assertEquals($cabang->id, $karyawanKasir->cabang_id);
+
+        $karyawanTeknisi = Karyawan::where('user_id', $teknisi->id)->first();
+        $this->assertNotNull($karyawanTeknisi);
+        $this->assertEquals('teknisi', $karyawanTeknisi->jabatan);
+        $this->assertEquals($cabang->id, $karyawanTeknisi->cabang_id);
+
+        // 4. Verifikasi Gudang dan Rak default terbuat untuk cabang
+        $gudang = Gudang::where('cabang_id', $cabang->id)->first();
+        $this->assertNotNull($gudang);
+        $this->assertTrue((bool) $gudang->is_active);
+
+        $rak = Rak::where('gudang_id', $gudang->id)->first();
+        $this->assertNotNull($rak);
+
+        // 5. Verifikasi WebKonsumenSetting tersimpan
+        $storeNameSetting = WebKonsumenSetting::where('setting_key', 'store_name')->first();
+        $this->assertNotNull($storeNameSetting);
+        $this->assertEquals('Toko Baru Maju', $storeNameSetting->setting_value);
+
+        $waSetting = WebKonsumenSetting::where('setting_key', 'wa_number')->first();
+        $this->assertNotNull($waSetting);
+        $this->assertEquals('081299998888', $waSetting->setting_value);
     }
 }

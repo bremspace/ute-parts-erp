@@ -1118,7 +1118,10 @@
                             if (in_array($aksi, ['ganti_sku', 'timpa_update', 'skip'], true) && str_contains($e, 'SKU') && str_contains($e, 'duplikat')) {
                                 return false;
                             }
-                            if (($aksiBc === 'kosongkan_barcode' || $aksi === 'kosongkan_barcode') && str_contains($e, 'Barcode') && str_contains($e, 'duplikat')) {
+                            if (($aksiBc === 'kosongkan_barcode' || $aksi === 'kosongkan_barcode' || $aksi === 'timpa_update') && str_contains($e, 'Barcode') && str_contains($e, 'duplikat')) {
+                                return false;
+                            }
+                            if ($aksi === 'timpa_update' && str_contains($e, 'potensi rugi langsung')) {
                                 return false;
                             }
                             return true;

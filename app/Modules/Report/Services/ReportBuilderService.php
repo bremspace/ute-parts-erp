@@ -189,6 +189,60 @@ class ReportBuilderService
     ];
 
     /**
+     * [ISO 9001 Clause 7.5 / ISO 27001] Kode Kontrol Dokumen ISO untuk Setiap Laporan Resmi.
+     */
+    public const ISO_DOC_CODES = [
+        'Transaksi' => 'DOC-REP-TRX-01',
+        'TransaksiItem' => 'DOC-REP-TRXI-01',
+        'JurnalAkuntansi' => 'DOC-REP-JRN-01',
+        'StokItem' => 'DOC-REP-STK-01',
+        'StokLog' => 'DOC-REP-STKL-01',
+        'PurchaseOrder' => 'DOC-REP-PO-01',
+        'PurchaseOrderItem' => 'DOC-REP-POI-01',
+        'Piutang' => 'DOC-REP-PIU-01',
+        'Utang' => 'DOC-REP-UTG-01',
+        'TiketServis' => 'DOC-REP-SRV-01',
+        'TiketServisItem' => 'DOC-REP-SRVI-01',
+        'Pelanggan' => 'DOC-REP-CRM-01',
+        'Produk' => 'DOC-REP-PRD-01',
+        'StokOpname' => 'DOC-REP-OPN-01',
+        'StokTransfer' => 'DOC-REP-TRF-01',
+        'ReturnPembelian' => 'DOC-REP-RTN-01',
+    ];
+
+    /**
+     * Dapatkan kode dokumen ISO untuk model laporan.
+     */
+    public function getIsoDocCode(?string $modelShortName): string
+    {
+        return self::ISO_DOC_CODES[$modelShortName ?? ''] ?? 'DOC-REP-GEN-01';
+    }
+
+    /**
+     * Dapatkan metadata kontrol dokumen ISO lengkap.
+     */
+    public function getReportMetadata(?string $modelShortName, ?string $reportName = null, ?int $cabangId = null): array
+    {
+        $cabangId = $cabangId ?: session('cabang_id');
+        $cabang = $cabangId ? Cabang::find($cabangId) : null;
+        $user = auth()->user();
+
+        return [
+            'doc_code' => $this->getIsoDocCode($modelShortName),
+            'doc_name' => $reportName ?: ($this->getModelLabel($modelShortName ?? '') ?: 'Laporan Operasional'),
+            'iso_std' => 'ISO 9001:2015 Clause 7.5 / ISO 27001 / ISO/IEC 25010',
+            'classification' => 'Internal Controlled Document',
+            'cabang_nama' => $cabang?->nama ?? 'Semua Cabang / Terpusat',
+            'cabang_kode' => $cabang?->kode ?? 'HQ',
+            'generated_at' => now()->translatedFormat('d F Y H:i:s'),
+            'operator' => $user?->name ?? 'System',
+            'operator_role' => $user?->roles?->pluck('name')->first() ?? 'Staff',
+            'revision' => '1.0',
+            'status' => 'APPROVED / RESMI',
+        ];
+    }
+
+    /**
      * Label ramah pengguna untuk kolom-kolom database umum.
      */
     public const COLUMN_LABELS = [
@@ -426,6 +480,19 @@ class ReportBuilderService
 
         foreach ($groupByFields as $field) {
             $query->groupBy($field);
+        }
+
+        // [ISO 9001 / ISO/IEC 25010] Deterministic sorting untuk integritas audit data
+        if ($groupByFields === []) {
+            $dateCol = $this->getDateColumnForModel($modelShortName);
+            $modelObj = new $modelClass;
+            $primaryKey = $modelObj->getKeyName() ?: 'id';
+
+            if ($dateCol && in_array($dateCol, $allowedColumns, true)) {
+                $query->orderByDesc($dateCol)->orderByDesc($primaryKey);
+            } else {
+                $query->orderByDesc($primaryKey);
+            }
         }
 
         return $query;

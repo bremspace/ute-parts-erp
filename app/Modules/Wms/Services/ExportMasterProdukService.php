@@ -116,6 +116,12 @@ class ExportMasterProdukService
 
                             public function bindValue(Cell $cell, mixed $value): bool
                             {
+                                if (is_array($value) || is_object($value)) {
+                                    $cell->setValueExplicit(json_encode($value, JSON_UNESCAPED_UNICODE), DataType::TYPE_STRING);
+
+                                    return true;
+                                }
+
                                 $col = $cell->getColumn();
                                 if (in_array($col, ['A', 'C', 'D', 'E', 'F'], true) && $value !== null) {
                                     $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
@@ -381,7 +387,23 @@ class ExportMasterProdukService
             }
 
             $produkKompatibelSku = $p->produkKompatibel->pluck('kode')->filter()->implode(',');
-            $fotoUrl = $p->foto ?? $p->gambar ?? '';
+            $fotoUrl = '';
+            if (is_array($p->foto) && ! empty($p->foto)) {
+                $urls = [];
+                foreach ($p->foto as $f) {
+                    if (is_array($f) && ! empty($f['url'])) {
+                        $urls[] = trim((string) $f['url']);
+                    } elseif (is_string($f) && trim($f) !== '') {
+                        $urls[] = trim($f);
+                    }
+                }
+                $fotoUrl = implode(', ', $urls);
+            } elseif (is_string($p->foto) && trim($p->foto) !== '') {
+                $fotoUrl = trim($p->foto);
+            }
+            if ($fotoUrl === '' && ! empty($p->gambar) && is_string($p->gambar)) {
+                $fotoUrl = trim($p->gambar);
+            }
 
             $kategoriImport = '';
             $subKategoriImport = '';

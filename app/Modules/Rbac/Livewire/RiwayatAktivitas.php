@@ -665,6 +665,9 @@ class RiwayatAktivitas extends Component
             'jumlah_bayar' => 'Jumlah Bayar',
             'kembalian' => 'Kembalian',
             'metode_bayar' => 'Metode Bayar',
+            'split_detail' => 'Rincian Pembayaran Split',
+            'metode_bayar_selisih' => 'Metode Bayar Selisih',
+            'pembayaran_detail' => 'Detail Pembayaran',
             'metode_pengembalian' => 'Metode Pengembalian Dana',
             'tipe_penyelesaian' => 'Bentuk Penyelesaian Retur',
             'status' => 'Status',
@@ -847,6 +850,18 @@ class RiwayatAktivitas extends Component
         }
         if (is_bool($value)) {
             return $value ? 'Ya / Aktif' : 'Tidak / Nonaktif';
+        }
+
+        if ($key === 'split_detail') {
+            $arr = is_string($value) ? json_decode($value, true) : (array) $value;
+            if (empty($arr)) {
+                return '—';
+            }
+            $tunai = (float) ($arr['tunai'] ?? 0);
+            $nonTunai = (float) ($arr['non_tunai'] ?? 0);
+            $metodeNon = strtoupper(str_replace('_', ' ', (string) ($arr['metode_non_tunai'] ?? 'Non-Tunai')));
+
+            return sprintf('Tunai: Rp %s | %s: Rp %s', number_format($tunai, 0, ',', '.'), $metodeNon, number_format($nonTunai, 0, ',', '.'));
         }
 
         if (is_numeric($value) && (str_ends_with($key, '_id') || in_array($key, ['void_by', 'kasir_id', 'teknisi_id', 'causer_id'], true))) {

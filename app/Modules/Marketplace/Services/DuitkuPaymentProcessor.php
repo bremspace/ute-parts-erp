@@ -8,6 +8,7 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Services\StokDeductionService;
@@ -226,6 +227,13 @@ class DuitkuPaymentProcessor
 
                 // g. Otomatis sinkronkan status notifikasi sebelumnya (selesaikan notif "menunggu bayar")
                 $this->notifService->sinkronkanStatusTransaksi($transaksi, 'lunas');
+
+                // h. Catat transaksi penjualan ke audit log (TransactionActivityLogService)
+                try {
+                    app(TransactionActivityLogService::class)->catatPenjualan($transaksi);
+                } catch (\Throwable $e) {
+                    Log::warning('Gagal mencatat audit log pembayaran Duitku: '.$e->getMessage());
+                }
 
                 return ['kode' => 'sukses'];
             });

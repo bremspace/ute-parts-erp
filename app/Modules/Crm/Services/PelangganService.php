@@ -92,6 +92,7 @@ class PelangganService
             'is_reseller' => 'sometimes|boolean',
             'tipe_konsumen' => 'sometimes|nullable|in:retail,reseller,agen',
             'tier_membership_id' => 'sometimes|nullable|exists:tier_memberships,id',
+            'status' => 'sometimes|nullable|in:aktif,pending,nonaktif,ditolak',
             'kode_agen' => $kodeAgenRule,
             'referral_kode' => 'sometimes|nullable|string|max:40',
         ];
@@ -110,6 +111,10 @@ class PelangganService
     {
         if (isset($data['telepon'])) {
             $data['telepon'] = $this->normalizePhone($data['telepon']);
+        }
+
+        if (array_key_exists('tier_membership_id', $data) && ($data['tier_membership_id'] === '' || $data['tier_membership_id'] === null)) {
+            $data['tier_membership_id'] = null;
         }
 
         $validated = Validator::make($data, $this->rules(), $this->messages())->validate();
@@ -193,6 +198,10 @@ class PelangganService
             $data['telepon'] = $this->normalizePhone($data['telepon']);
         }
 
+        if (array_key_exists('tier_membership_id', $data) && ($data['tier_membership_id'] === '' || $data['tier_membership_id'] === null)) {
+            $data['tier_membership_id'] = null;
+        }
+
         $validated = Validator::make($data, $this->rules(true, $pelanggan->id), $this->messages())->validate();
 
         $updateData = [];
@@ -213,6 +222,9 @@ class PelangganService
         }
         if (array_key_exists('tier_membership_id', $validated)) {
             $updateData['tier_membership_id'] = $validated['tier_membership_id'] ?: null;
+        }
+        if (array_key_exists('status', $validated) && $validated['status']) {
+            $updateData['status'] = $validated['status'];
         }
         if (array_key_exists('kode_agen', $validated)) {
             $updateData['kode_agen'] = $validated['kode_agen'] ? strtoupper(trim($validated['kode_agen'])) : null;

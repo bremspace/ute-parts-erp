@@ -13,8 +13,20 @@
     </script>
     <div
         class="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
-        x-data="{ ...thermalPrinter({{ \Illuminate\Support\Js::from(array_merge($strukConfig, $receiptData)) }}), paperSize: '{{ $defaultPaperSize }}', autoPrint: {{ $autoPrint ? 'true' : 'false' }} }"
-        x-init="if (autoPrint) { setTimeout(() => { paperSize === '58' ? webPrint58() : webPrint80(); }, 400); }"
+        x-data="{
+            ...thermalPrinter({{ \Illuminate\Support\Js::from(array_merge($strukConfig, $receiptData)) }}),
+            paperSize: localStorage.getItem('ute_pos_paper_size') || '{{ $defaultPaperSize }}',
+            autoPrint: {{ $autoPrint ? 'true' : 'false' }},
+            setPaperSize(size) {
+                this.paperSize = size;
+                localStorage.setItem('ute_pos_paper_size', size);
+            }
+        }"
+        x-init="
+            if (autoDirectPrint || autoPrint) {
+                setTimeout(() => { directPrint(paperSize); }, 350);
+            }
+        "
     >
         <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-white/10 shadow-2xl relative my-auto max-h-[95vh] flex flex-col"> 
             <!-- Header Modal -->
@@ -407,7 +419,7 @@
                     <div class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-up-mint/10 border border-up-mint/20 text-[11px] text-up-mint">
                         <span class="flex items-center gap-1.5 truncate">
                             <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
-                            <span class="truncate">BLE Terhubung: <strong x-text="pairedPrinterName"></strong></span>
+                            <span class="truncate">Printer Aktif: <strong x-text="pairedPrinterName"></strong></span>
                         </span>
                         <button
                             type="button"
@@ -419,13 +431,28 @@
                     </div>
                 </template>
 
+                <!-- Toggle Opsi Cetak Langsung (Direct Print) -->
+                <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs">
+                    <div class="flex flex-col">
+                        <span class="text-white font-medium text-[11px] flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-up-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Cetak Langsung Struk
+                        </span>
+                        <span class="text-[10px] text-ink-400">Otomatis kirim ke printer tersambung</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" :checked="autoDirectPrint" @change="toggleAutoDirectPrint()" class="sr-only peer">
+                        <div class="w-9 h-5 bg-ink-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-up-mint"></div>
+                    </label>
+                </div>
+
                 <!-- Pilihan Ukuran Struk (Segmented Control Ringkas) -->
                 <div class="flex items-center justify-between p-1 bg-white/5 rounded-xl border border-white/10 text-xs">
                     <span class="text-ink-400 text-[11px] font-semibold pl-2">Format Kertas:</span>
                     <div class="flex items-center gap-1">
                         <button
                             type="button"
-                            @click="paperSize = '58'"
+                            @click="setPaperSize('58')"
                             :class="paperSize === '58' ? 'bg-up-mint text-ink-950 font-bold shadow-sm' : 'text-ink-300 hover:text-white'"
                             class="px-3 py-1 rounded-lg text-xs transition cursor-pointer"
                         >
@@ -433,7 +460,7 @@
                         </button>
                         <button
                             type="button"
-                            @click="paperSize = '80'"
+                            @click="setPaperSize('80')"
                             :class="paperSize === '80' ? 'bg-up-mint text-ink-950 font-bold shadow-sm' : 'text-ink-300 hover:text-white'"
                             class="px-3 py-1 rounded-lg text-xs transition cursor-pointer"
                         >
@@ -446,23 +473,24 @@
                 <div class="flex gap-2">
                     <button
                         type="button"
-                        @click="paperSize === '58' ? webPrint58() : webPrint80()"
-                        class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs shadow-md shadow-up-mint/20 cursor-pointer min-h-[42px] flex items-center justify-center gap-2 transition active:scale-[0.98]"
-                        :title="'Cetak struk ' + paperSize + 'mm via USB / Print Dialog Browser'"
+                        @click="directPrint(paperSize)"
+                        :disabled="isPrinting"
+                        class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs shadow-md shadow-up-mint/20 cursor-pointer min-h-[42px] flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-50"
+                        :title="'Cetak struk langsung ke printer aktif'"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                        <span x-text="'Cetak Struk (' + paperSize + 'mm)'"></span>
+                        <span x-text="isPrinting ? 'Mencetak...' : 'Cetak Struk (' + paperSize + 'mm)'"></span>
                     </button>
 
                     <button
                         type="button"
-                        @click="paperSize === '58' ? printStruk58() : printFaktur80()"
+                        @click="paperSize === '58' ? printStruk58(true) : printFaktur80(true)"
                         :disabled="isPrinting"
                         class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-xs border border-up-mint/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
-                        :title="'Cetak nirkabel via Bluetooth Thermal BLE (' + paperSize + 'mm)'"
+                        :title="'Pilih / pasangkan printer Bluetooth baru (' + paperSize + 'mm)'"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        <span x-text="isPrinting ? 'Menghubungkan...' : 'BLE'"></span>
+                        <span x-text="isPrinting ? '...' : (pairedPrinterName ? 'Pair Baru' : 'Pilih BLE')"></span>
                     </button>
                 </div>
 

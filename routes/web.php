@@ -72,6 +72,7 @@ use Illuminate\Validation\ValidationException;
 Route::get('/', fn () => redirect('/shop'));
 Route::get('/dashboard', fn () => redirect('/app/dashboard'));
 Route::get('/shop', ShopPage::class)->name('shop');
+Route::get('/shop/tipe/{hpModel}', ShopPage::class)->name('shop.tipe');
 Route::get('/shop/kategori/{kategori}', ShopPage::class)->name('shop.kategori');
 Route::get('/shop/kategori/{kategori}/{hpModel}', ShopPage::class)->name('shop.kategori.model');
 Route::get('/shop/{slug}', ShopPage::class)->name('shop.detail');

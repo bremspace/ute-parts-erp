@@ -43,6 +43,14 @@ class DrillDownViewer extends Component
 
     public ?string $childModel = null;
 
+    public int $totalRecords = 0;
+
+    public int $totalPages = 1;
+
+    public array $aggregates = [];
+
+    public array $isoMetadata = [];
+
     protected $listeners = ['drillDown', 'refreshDrillDown', 'backFromDetail'];
 
     public function mount(?string $model = null, ?int $id = null): void
@@ -133,16 +141,75 @@ class DrillDownViewer extends Component
             }
         }
 
-        $rawItems = collect($query->paginate($this->perPage, ['*'], 'page', $this->currentPage)->items())
+        $paginator = $query->paginate($this->perPage, ['*'], 'page', $this->currentPage);
+        $this->totalRecords = $paginator->total();
+        $this->totalPages = max(1, $paginator->lastPage());
+        $this->currentPage = min($this->currentPage, $this->totalPages);
+
+        $rawItems = collect($paginator->items())
             ->map(fn ($item) => $item instanceof Model ? $item->toArray() : (array) $item)
             ->all();
 
         $this->items = $service->formatRowsForDisplay($rawItems, $this->currentModel);
 
+        // [ISO 9001 / ISO/IEC 25010] Rekonsiliasi agregat numerik baris aktif
+        $this->calculateAggregates($this->items);
+
+        // ISO Document Metadata
+        $this->isoMetadata = $service->getReportMetadata($this->currentModel);
+
         // Build breadcrumbs
         $this->breadcrumbs = array_map(function ($m) {
             return ['label' => app(ReportBuilderService::class)->getModelLabel($m), 'model' => $m];
         }, $service->getDrillChain($this->currentModel));
+    }
+
+    public function gotoPage(int $page): void
+    {
+        $this->currentPage = max(1, min($page, $this->totalPages));
+        $this->loadRecords();
+    }
+
+    public function nextPage(): void
+    {
+        if ($this->currentPage < $this->totalPages) {
+            $this->currentPage++;
+            $this->loadRecords();
+        }
+    }
+
+    public function previousPage(): void
+    {
+        if ($this->currentPage > 1) {
+            $this->currentPage--;
+            $this->loadRecords();
+        }
+    }
+
+    private function calculateAggregates(array $rows): void
+    {
+        $sums = [];
+        $numericCols = [
+            'total_akhir', 'total_kotor', 'total_diskon', 'total_pajak', 'subtotal',
+            'harga_satuan', 'hpp', 'debit', 'kredit', 'jumlah', 'jumlah_dibayar',
+            'sisa', 'total', 'total_dibayar', 'estimasi_biaya', 'biaya_akhir',
+            'jumlah_bayar', 'kembalian', 'stok', 'qty', 'qty_dipesan', 'qty_diterima',
+            'selisih', 'jumlah_masuk', 'jumlah_keluar',
+        ];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            foreach ($row as $k => $v) {
+                if (in_array((string) $k, $numericCols, true)) {
+                    $cleaned = is_numeric($v) ? (float) $v : (float) str_replace(['.', ','], ['', '.'], (string) $v);
+                    $sums[$k] = ($sums[$k] ?? 0.0) + $cleaned;
+                }
+            }
+        }
+
+        $this->aggregates = $sums;
     }
 
     public function loadDetail(string $model, int $itemId): void
@@ -365,6 +432,11 @@ class DrillDownViewer extends Component
             'childModel' => $this->childModel,
             'hasCabang' => $hasCabang,
             'cabangId' => session('cabang_id'),
+            'totalRecords' => $this->totalRecords,
+            'totalPages' => $this->totalPages,
+            'currentPage' => $this->currentPage,
+            'aggregates' => $this->aggregates,
+            'isoMetadata' => $this->isoMetadata,
         ])->layout('layouts.backoffice', ['header' => 'Drill-Down Laporan']);
     }
 }

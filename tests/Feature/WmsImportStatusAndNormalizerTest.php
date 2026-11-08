@@ -225,4 +225,34 @@ class WmsImportStatusAndNormalizerTest extends TestCase
         );
         $this->assertCount(2, $gabung);
     }
+
+    public function test_extract_model_dan_kode_produk_serta_format_multi_varian(): void
+    {
+        // 1. Uji langsung method extractModelDanKodeProduk
+        $parsed1 = $this->service->extractModelDanKodeProduk('iPhone 16 (A3287)', 'Apple');
+        $this->assertSame('Apple', $parsed1['merk']);
+        $this->assertSame('iPhone 16', $parsed1['model']);
+        $this->assertSame('A3287', $parsed1['kode_produk']);
+
+        $parsed2 = $this->service->extractModelDanKodeProduk('Galaxy A54 (SM-A546B)', 'Samsung');
+        $this->assertSame('Samsung', $parsed2['merk']);
+        $this->assertSame('Galaxy A54', $parsed2['model']);
+        $this->assertSame('SM-A546B', $parsed2['kode_produk']);
+
+        $parsed3 = $this->service->extractModelDanKodeProduk('iPhone 13', 'Apple');
+        $this->assertSame('Apple', $parsed3['merk']);
+        $this->assertSame('iPhone 13', $parsed3['model']);
+        $this->assertArrayNotHasKey('kode_produk', $parsed3);
+
+        // 2. Uji parsing multi-tipe dengan kode produk via parseKompatibilitas
+        $hasil = $this->service->parseKompatibilitas('Apple:iPhone 16 (A3287); Samsung:Galaxy A54 (SM-A546B)');
+        $this->assertCount(2, $hasil);
+        $this->assertSame('Apple', $hasil[0]['merk']);
+        $this->assertSame('iPhone 16', $hasil[0]['model']);
+        $this->assertSame('A3287', $hasil[0]['kode_produk']);
+
+        $this->assertSame('Samsung', $hasil[1]['merk']);
+        $this->assertSame('Galaxy A54', $hasil[1]['model']);
+        $this->assertSame('SM-A546B', $hasil[1]['kode_produk']);
+    }
 }
