@@ -1,6 +1,6 @@
 # ==============================================================================
 # Bremspace ERP — Unas 1-Click Interactive CLI Installer (Windows Edition)
-# Versi: 3.0 (Interactive Wizard CLI, Safe Defaults, Zero Manual .env)
+# Versi: 3.1 (Interactive Wizard CLI, Smart DB Diagnostics & Robust Mitigation)
 # ==============================================================================
 param(
     [switch]$ForceReinstallPhp,
@@ -430,7 +430,7 @@ function Test-PortActive([int]$checkPort) {
     return ($null -ne $tcp)
 }
 
-# 5a. Pemilihan Database Engine
+# 5a. Pemilihan Database Engine & Siklus Mitigasi
 $mysqlPortActive = Test-PortActive 3306
 if (-not $mysqlPortActive) {
     try {
@@ -459,24 +459,63 @@ $dbPass = ""
 
 if ($dbChoice -eq "2") {
     $dbDriver = "mysql"
-    $dbHost = Prompt-User "MySQL Host" "127.0.0.1"
-    $dbPort = Prompt-User "MySQL Port" "3306"
-    $dbName = Prompt-User "Nama Database MySQL" "uteparts_db"
-    $dbUser = Prompt-User "Username MySQL" "root"
-    $dbPass = Prompt-Password "Password MySQL" ""
+    $dbConnected = $false
 
-    # Uji coba koneksi MySQL interaktif
-    Write-Host " Menguji koneksi ke database MySQL..." -ForegroundColor Gray
-    $testScript = "try { `$c = @new mysqli('$dbHost', '$dbUser', '$dbPass', '', (int)'$dbPort'); if (`$c->connect_errno) { exit(1); } else { exit(0); } } catch (Throwable `$e) { exit(1); }"
-    & $phpExe -r "$testScript" 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host " [OK] Koneksi MySQL terverifikasi berhasil!" -ForegroundColor Green
-        # Coba auto-create database jika belum ada
-        $createDbScript = "try { `$c = new mysqli('$dbHost', '$dbUser', '$dbPass', '', (int)'$dbPort'); `$c->query('CREATE DATABASE IF NOT EXISTS \`$dbName\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch (Throwable `$e) {}"
-        & $phpExe -r "$createDbScript" 2>$null | Out-Null
-    } else {
-        Write-Host " [PERINGATAN] Koneksi MySQL gagal. Mengalihkan otomatis ke SQLite agar instalasi tetap sukses." -ForegroundColor Yellow
-        $dbDriver = "sqlite"
+    while (-not $dbConnected) {
+        Write-Host ""
+        Write-Host "--- Pengaturan Koneksi MySQL ---" -ForegroundColor Cyan
+        $dbHost = Prompt-User "MySQL Host" $dbHost
+        $dbPort = Prompt-User "MySQL Port" $dbPort
+        $dbName = Prompt-User "Nama Database MySQL" $dbName
+        $dbUser = Prompt-User "Username MySQL" $dbUser
+        $dbPass = Prompt-Password "Password MySQL ($dbUser)" $dbPass
+
+        # Uji coba koneksi MySQL dan tangkap error detail
+        Write-Host " Menguji koneksi ke database MySQL..." -ForegroundColor Gray
+        $diagPhp = "try { `$c = @new mysqli('$dbHost', '$dbUser', '$dbPass', '', (int)'$dbPort'); if (`$c->connect_errno) { echo 'ERR:' . `$c->connect_errno . ':' . `$c->connect_error; exit(1); } else { exit(0); } } catch (Throwable `$e) { echo 'ERR:EXCEPTION:' . `$e->getMessage(); exit(1); }"
+        $connTestOut = & $phpExe -r "$diagPhp" 2>$null
+
+        if ($LASTEXITCODE -eq 0) {
+            $dbConnected = $true
+            Write-Host " [OK] Koneksi MySQL terverifikasi berhasil!" -ForegroundColor Green
+            # Auto-create database jika belum ada
+            $createDbScript = "try { `$c = new mysqli('$dbHost', '$dbUser', '$dbPass', '', (int)'$dbPort'); `$c->query('CREATE DATABASE IF NOT EXISTS \`$dbName\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch (Throwable `$e) {}"
+            & $phpExe -r "$createDbScript" 2>$null | Out-Null
+        } else {
+            Write-Host ""
+            Write-Host "======================================================================" -ForegroundColor Red
+            Write-Host " [KONEKSI GAGAL] Tidak dapat terhubung ke MySQL." -ForegroundColor Red
+            if ($connTestOut -and $connTestOut.StartsWith("ERR:")) {
+                Write-Host " Detail Error: $connTestOut" -ForegroundColor Yellow
+            }
+            Write-Host "======================================================================" -ForegroundColor Red
+            Write-Host "Analisis & Solusi Masalah:" -ForegroundColor Yellow
+            Write-Host "  1. Access denied (User/Password salah):" -ForegroundColor White
+            Write-Host "     - Pastikan username/password MySQL Anda sudah sesuai." -ForegroundColor Gray
+            Write-Host "     - Jika pakai Laragon/XAMPP default, biasanya user 'root' tanpa password (cukup tekan ENTER)." -ForegroundColor Gray
+            Write-Host "  2. Connection refused / Port salah:" -ForegroundColor White
+            Write-Host "     - Pastikan service MySQL/MariaDB sudah running (di Laragon, XAMPP, atau Windows Services)." -ForegroundColor Gray
+            Write-Host "     - Periksa apakah port MySQL Anda 3306 atau port lain (misal 3307)." -ForegroundColor Gray
+            Write-Host ""
+            Write-Host "Pilihan Tindakan Anda:" -ForegroundColor White
+            Write-Host "  [1] Coba Lagi (Koreksi Host, Port, User, atau Password)" -ForegroundColor Cyan
+            Write-Host "  [2] Beralih ke SQLite (Zero-Setup, Mandiri & Langsung Berjalan)" -ForegroundColor Green
+            Write-Host "  [3] Tetap Gunakan Pengaturan MySQL Ini (Saya akan perbaiki MySQL sendiri nanti)" -ForegroundColor Yellow
+
+            $mitigasiChoice = Prompt-User "Pilih tindakan (1, 2, atau 3)" "1"
+
+            if ($mitigasiChoice -eq "2") {
+                $dbDriver = "sqlite"
+                $dbConnected = $true
+                Write-Host " [OK] Beralih ke SQLite. Database lokal disiapkan mandiri." -ForegroundColor Green
+            } elseif ($mitigasiChoice -eq "3") {
+                $dbDriver = "mysql"
+                $dbConnected = $true
+                Write-Host " [INFO] Tetap menggunakan konfigurasi MySQL. Pastikan service MySQL siap sebelum menjalankan migrasi." -ForegroundColor Yellow
+            } else {
+                Write-Host " Silakan masukkan kembali kredensial MySQL yang benar..." -ForegroundColor Cyan
+            }
+        }
     }
 }
 
