@@ -1,6 +1,6 @@
 # ==============================================================================
 # Bremspace ERP - Unas 1-Click Interactive CLI Installer (Windows Edition)
-# Versi: 3.3 (Clean PHP Output, Non-Destructive php.ini, Smart XAMPP Recovery)
+# Versi: 3.4 (Zero-Bug Password Handling, Multi-Candidate MySQL Connect)
 # ==============================================================================
 param(
     [switch]$ForceReinstallPhp,
@@ -37,33 +37,30 @@ function Prompt-User([string]$message, [string]$defaultVal = "") {
     return $inp.Trim()
 }
 
-function Prompt-Password([string]$message, [string]$defaultVal = "") {
-    if ($NonInteractive) { return $defaultVal }
-    Write-Host $message -NoNewline -ForegroundColor Yellow
-    if ($defaultVal -ne "") {
-        Write-Host " (Kosongkan jika default/tanpa password): " -NoNewline -ForegroundColor DarkGray
-    } else {
-        Write-Host ": " -NoNewline -ForegroundColor Yellow
-    }
+function Prompt-Password([string]$message) {
+    if ($NonInteractive) { return "" }
+    Write-Host ($message + " (ENTER jika tanpa password): ") -NoNewline -ForegroundColor Yellow
     
     $pwd = ""
-    while ($true) {
-        $key = [Console]::ReadKey($true)
-        if ($key.Key -eq [ConsoleKey]::Enter) {
-            Write-Host ""
-            break
-        } elseif ($key.Key -eq [ConsoleKey]::Backspace) {
-            if ($pwd.Length -gt 0) {
-                $pwd = $pwd.Substring(0, $pwd.Length - 1)
-                Write-Host "`b `b" -NoNewline
+    try {
+        while ($true) {
+            $key = [Console]::ReadKey($true)
+            if ($key.Key -eq [ConsoleKey]::Enter) {
+                Write-Host ""
+                break
+            } elseif ($key.Key -eq [ConsoleKey]::Backspace) {
+                if ($pwd.Length -gt 0) {
+                    $pwd = $pwd.Substring(0, $pwd.Length - 1)
+                    Write-Host "`b `b" -NoNewline
+                }
+            } elseif ($key.KeyChar -ge 32) {
+                $pwd += $key.KeyChar
+                Write-Host "*" -NoNewline
             }
-        } elseif ($key.KeyChar -ge 32) {
-            $pwd += $key.KeyChar
-            Write-Host "*" -NoNewline
         }
-    }
-    if ([string]::IsNullOrWhiteSpace($pwd)) {
-        return $defaultVal
+    } catch {
+        $inp = [Console]::ReadLine()
+        if ($inp) { $pwd = $inp.Trim() } else { $pwd = "" }
     }
     return $pwd
 }
@@ -474,42 +471,52 @@ if ($dbChoice -eq "2") {
         $dbPort = Prompt-User "MySQL Port" $dbPort
         $dbName = Prompt-User "Nama Database MySQL" $dbName
         $dbUser = Prompt-User "Username MySQL" $dbUser
-        $dbPass = Prompt-Password ("Password MySQL (" + $dbUser + ")") $dbPass
+        $dbPass = Prompt-Password ("Password MySQL (" + $dbUser + ")")
 
-        # Uji coba koneksi MySQL dan tangkap error detail
         Write-Host " Menguji koneksi ke database MySQL..." -ForegroundColor Gray
         
-        $escapedHost = $dbHost.Replace("'", "\'")
-        $escapedUser = $dbUser.Replace("'", "\'")
-        $escapedPass = $dbPass.Replace("'", "\'")
-        $portNum = 3306
-        [int]::TryParse($dbPort, [ref]$portNum) | Out-Null
+        $testDbScript = Join-Path $scriptDir 'test-db-connection.php'
+        $rawOut = & $phpExe $testDbScript "$dbHost" "$dbPort" "$dbUser" "$dbPass" "$dbName" 2>&1
+        $resLine = ($rawOut | Where-Object { $_ -match "^(SUCCESS|ERROR)\|" } | Select-Object -First 1)
 
-        $diagPhp = "try { `$c = @new mysqli('$escapedHost', '$escapedUser', '$escapedPass', '', $portNum); if (`$c->connect_errno) { echo 'ERR:' . `$c->connect_errno . ':' . `$c->connect_error; exit(1); } else { exit(0); } } catch (Throwable `$e) { echo 'ERR:EXCEPTION:' . `$e->getMessage(); exit(1); }"
-        $rawOut = & $phpExe -d display_errors=0 -d display_startup_errors=0 -r $diagPhp 2>&1
-        $errLine = ($rawOut | Where-Object { $_ -match "^ERR:" } | Select-Object -First 1)
-
-        if ($LASTEXITCODE -eq 0) {
+        if ($resLine -and $resLine -like "SUCCESS*") {
             $dbConnected = $true
-            Write-Host " [OK] Koneksi MySQL terverifikasi berhasil!" -ForegroundColor Green
-            # Auto-create database jika belum ada
-            $escapedDbName = $dbName.Replace("`"", "")
-            $createDbScript = "try { `$c = new mysqli('$escapedHost', '$escapedUser', '$escapedPass', '', $portNum); `$c->query('CREATE DATABASE IF NOT EXISTS \`$escapedDbName\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch (Throwable `$e) {}"
-            & $phpExe -d display_errors=0 -d display_startup_errors=0 -r $createDbScript 2>$null | Out-Null
+            if ($resLine -like "SUCCESS_EMPTY_PASS*") {
+                $dbPass = ""
+                Write-Host " [INFO] Terhubung ke MySQL menggunakan user '$dbUser' tanpa password (XAMPP Default)!" -ForegroundColor Green
+            } else {
+                Write-Host " [OK] Koneksi MySQL terverifikasi berhasil!" -ForegroundColor Green
+            }
+            Write-Host " [OK] Database '$dbName' siap digunakan." -ForegroundColor Green
         } else {
+            $errMsg = ""
+            if ($resLine) {
+                $parts = $resLine.Split('|')
+                if ($parts.Length -ge 3) {
+                    $errMsg = $parts[2]
+                }
+            }
+            if (-not $errMsg) {
+                $errMsg = ($rawOut -join " ")
+            }
+
             Write-Host ""
             Write-Host "======================================================================" -ForegroundColor Red
             Write-Host " [KONEKSI GAGAL] Tidak dapat terhubung ke MySQL." -ForegroundColor Red
-            if ($errLine) {
-                Write-Host " Pesan Error MySQL: $errLine" -ForegroundColor Yellow
+            if ($errMsg) {
+                Write-Host " Pesan Error: $errMsg" -ForegroundColor Yellow
             }
             Write-Host "======================================================================" -ForegroundColor Red
             
-            # Deteksi spesifik Access denied
-            if ($errLine -and $errLine -match "Access denied") {
-                Write-Host "Penyebab Terdeteksi: Password/Username salah!" -ForegroundColor Yellow
-                Write-Host "  - Di XAMPP default, user 'root' TIDAK MEMILIKI PASSWORD." -ForegroundColor Cyan
-                Write-Host "  - Jika tadi Anda mengetik password, coba kosongkan (cukup tekan ENTER saat ditanya password)." -ForegroundColor Cyan
+            if ($errMsg -match "Access denied") {
+                Write-Host "Penyebab Terdeteksi: Akses ditolak oleh server MySQL!" -ForegroundColor Yellow
+                if ($errMsg -match "using password: YES") {
+                    Write-Host "  - Server menolak password yang Anda masukkan." -ForegroundColor Cyan
+                    Write-Host "  - Di XAMPP default, user 'root' TIDAK MEMILIKI PASSWORD (cukup tekan ENTER saat ditanya password)." -ForegroundColor Cyan
+                } else {
+                    Write-Host "  - Server MySQL Anda membutuhkan password khusus untuk user '$dbUser'." -ForegroundColor Cyan
+                    Write-Host "  - Silakan masukkan password yang tepat untuk user '$dbUser'." -ForegroundColor Cyan
+                }
             } else {
                 Write-Host "Penyebab Terdeteksi: Port atau Service MySQL belum siap." -ForegroundColor Yellow
                 Write-Host "  - Pastikan modul MySQL di XAMPP Control Panel sudah berwarna HIJAU (Running)." -ForegroundColor Cyan
@@ -518,7 +525,7 @@ if ($dbChoice -eq "2") {
             
             Write-Host ""
             Write-Host "Pilihan Tindakan Anda:" -ForegroundColor White
-            Write-Host "  (1) Coba Lagi (Koreksi Host, Port, User, atau Kosongkan Password)" -ForegroundColor Cyan
+            Write-Host "  (1) Coba Lagi (Koreksi Host, Port, User, atau Password)" -ForegroundColor Cyan
             Write-Host "  (2) Beralih ke SQLite (Zero-Setup, Mandiri & Langsung Berjalan)" -ForegroundColor Green
             Write-Host "  (3) Tetap Gunakan Pengaturan MySQL Ini (Saya akan perbaiki MySQL sendiri nanti)" -ForegroundColor Yellow
 
