@@ -127,7 +127,7 @@ Route::middleware(['throttle:60,1'])->group(function () {
 
             // [T-15] WMS-14: generate barcode
             Route::post('/produk/{id}/generate-barcode', [WmsController::class, 'generateBarcode'])->middleware('permission:wms.create');
-            Route::delete('/produk/{id}', [WmsController::class, 'destroyProduk'])->name('wms.produk.destroy');
+            Route::delete('/produk/{id}', [WmsController::class, 'destroyProduk'])->name('wms.produk.destroy')->middleware('permission:wms.delete');
 
             // [T-44] Master data pendukung produk
             Route::get('/brand', [WmsController::class, 'indexBrand'])->middleware('permission:wms.view');

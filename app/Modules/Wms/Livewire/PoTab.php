@@ -712,6 +712,12 @@ class PoTab extends Component
             return;
         }
 
+        if ($po->status === 'ditolak') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => "PO {$po->no_po} berstatus ditolak dan tidak dapat dikirim ke supplier"]);
+
+            return;
+        }
+
         $po->update(['status' => 'dikirim']);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'PO dikirim ke supplier']);
     }

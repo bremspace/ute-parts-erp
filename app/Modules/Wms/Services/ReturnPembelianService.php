@@ -482,14 +482,21 @@ class ReturnPembelianService
             if ($opsiBarang === 'kembali_ke_toko') {
                 // Barang kembali ke toko
                 if ($retur->purchase_order_id && $retur->status === 'dikirim') {
-                    // Kembalikan ke stok gudang
+                    // Kembalikan ke stok gudang via mutasi terdata
+                    $deductionService = app(StokDeductionService::class);
                     foreach ($retur->items as $item) {
-                        $stokItem = StokItem::firstOrCreate([
-                            'gudang_id' => $gudangId,
-                            'produk_id' => $item->produk_id,
-                            'sku_variant_id' => $item->sku_variant_id,
-                        ], ['jumlah' => 0]);
-                        $stokItem->increment('jumlah', (int) $item->jumlah);
+                        $deductionService->mutasi(
+                            (int) $item->produk_id,
+                            $item->sku_variant_id,
+                            $gudangId,
+                            (int) $item->jumlah,
+                            'penyesuaian',
+                            'retur_pembelian_ditolak',
+                            ReturnPembelian::class,
+                            $retur->id,
+                            $userId,
+                            "Penolakan retur supplier {$retur->no_return} (opsi: kembali ke toko — {$alasanTolak})"
+                        );
                     }
                 }
                 ReturnPenjualanItem::where('return_pembelian_id', $retur->id)

@@ -3,6 +3,7 @@
 namespace App\Modules\Pos\Livewire\Concerns;
 
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Produk;
 use Illuminate\Support\Facades\DB;
 
@@ -76,10 +77,10 @@ trait ManagesHoldTransactions
     /** Daftar transaksi ditahan (scope cabang aktif — POS-05). */
     public function getDitahanListProperty()
     {
-        $cabangId = currentCabangId();
+        $cabangId = (int) (currentCabangId() ?: auth()->user()?->cabangs()->first()?->id ?: Cabang::value('id'));
 
         return Transaksi::with('kasir')
-            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('cabang_id', $cabangId)
             ->where('status', 'ditahan')
             ->latest()
             ->get();
@@ -88,9 +89,9 @@ trait ManagesHoldTransactions
     /** Lanjutkan transaksi yang ditahan → isi ulang keranjang, status duplikat jadi draft biasa. */
     public function resumeDitahan(int $id)
     {
-        $cabangId = currentCabangId();
+        $cabangId = (int) (currentCabangId() ?: auth()->user()?->cabangs()->first()?->id ?: Cabang::value('id'));
         $transaksi = Transaksi::where('id', $id)
-            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('cabang_id', $cabangId)
             ->where('status', 'ditahan')
             ->firstOrFail();
 
@@ -155,9 +156,9 @@ trait ManagesHoldTransactions
     /** Hapus / batalkan transaksi yang ditahan. */
     public function hapusDitahan(int $id): void
     {
-        $cabangId = currentCabangId();
+        $cabangId = (int) (currentCabangId() ?: auth()->user()?->cabangs()->first()?->id ?: Cabang::value('id'));
         $transaksi = Transaksi::where('id', $id)
-            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('cabang_id', $cabangId)
             ->where('status', 'ditahan')
             ->first();
 

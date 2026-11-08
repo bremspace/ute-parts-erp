@@ -22,7 +22,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // POS
             'pos.create', 'pos.view', 'pos.view-own', 'pos.void',
             // WMS
-            'wms.view', 'wms.create', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'wms.receive-po',
+            'wms.view', 'wms.create', 'wms.delete', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'wms.receive-po',
             // SERVIS
             // SERVIS — `servis.manage` = permission resmi master jenis servis
             // (pengganti ekuivalen sementara `servis.update-status`).

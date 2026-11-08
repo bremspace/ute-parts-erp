@@ -85,6 +85,13 @@ class PosCheckoutService
     {
         $execute = function () use ($data, $items) {
             $cabangId = (int) $data['cabang_id'];
+
+            // [T-18] Transaksi piutang / kasbon wajib memilih data pelanggan
+            $isPiutang = in_array(strtolower((string) ($data['metode_bayar'] ?? '')), ['piutang', 'kasbon'], true);
+            if ($isPiutang && empty($data['pelanggan_id'])) {
+                throw new \InvalidArgumentException('Transaksi kasbon/piutang wajib memilih data pelanggan.');
+            }
+
             $noTransaksi = $this->sequenceService->generateNoTransaksi($cabangId);
 
             $transaksi = Transaksi::create([

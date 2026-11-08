@@ -36,6 +36,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -705,7 +706,7 @@ class WmsController extends Controller
     public function destroyProduk(Request $request, $id)
     {
         $user = $request->user();
-        if (! isSuperAdminOrOwner($user)) {
+        if (! isSuperAdminOrOwner($user) && ! ($user && $user->can('wms.delete'))) {
             return $this->error('Hanya Super Admin / Owner yang berhak menghapus produk.', 403);
         }
 
@@ -716,9 +717,9 @@ class WmsController extends Controller
             return $this->error("Tidak dapat menghapus produk '{$produk->nama}'. Masih ada stok fisik sebanyak {$stokFisik} unit.", 422);
         }
 
-        $hasTransaksi = DB::table('transaksi_items')->where('produk_id', $id)->exists();
-        $hasPo = DB::table('po_items')->where('produk_id', $id)->exists();
-        $hasServis = DB::table('servis_item')->where('produk_id', $id)->exists();
+        $hasTransaksi = DB::table('transaksi_item')->where('produk_id', $id)->exists();
+        $hasPo = DB::table('purchase_order_item')->where('produk_id', $id)->exists();
+        $hasServis = DB::table('tiket_servis_item')->where('produk_id', $id)->exists();
         $hasTransfer = DB::table('stok_transfer_item')->where('produk_id', $id)->exists();
         $hasOpname = DB::table('stok_opname_item')->where('produk_id', $id)->exists();
 
@@ -736,7 +737,9 @@ class WmsController extends Controller
             HargaTier::where('produk_id', $id)->delete();
             StokItem::where('produk_id', $id)->delete();
             SkuVariant::where('produk_id', $id)->delete();
-            DB::table('sid_import_maps')->where('entity_type', 'produk')->where('entity_id', $id)->delete();
+            if (Schema::hasTable('sid_import_maps')) {
+                DB::table('sid_import_maps')->where('entity_type', 'produk')->where('entity_id', $id)->delete();
+            }
             $produk->delete();
         });
 

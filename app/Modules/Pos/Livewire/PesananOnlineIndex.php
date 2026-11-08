@@ -13,7 +13,6 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\StokItem;
-use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\DB;
@@ -560,29 +559,35 @@ class PesananOnlineIndex extends Component
         DB::transaction(function () use ($transaksi) {
             $wasPaidOrPacked = in_array($transaksi->status, ['lunas', 'diproses', 'dikirim']);
 
-            // Jika stok sudah terpotong, kembalikan stok ke gudang
+            // Jika stok sudah terpotong, kembalikan stok ke gudang via StokDeductionService
             if ($wasPaidOrPacked) {
-                $gudang = Gudang::where('cabang_id', $transaksi->cabang_id)->first();
-                if ($gudang) {
+                $deductionService = app(StokDeductionService::class);
+                $targetGudangId = $transaksi->gudang_id
+                    ?? Gudang::where('cabang_id', $transaksi->cabang_id)->where('is_active', true)->value('id')
+                    ?? Gudang::where('cabang_id', $transaksi->cabang_id)->value('id');
+
+                if ($targetGudangId) {
                     foreach ($transaksi->items as $it) {
-                        $stokItem = StokItem::firstOrCreate([
-                            'gudang_id' => $gudang->id,
-                            'produk_id' => $it->produk_id,
-                            'sku_variant_id' => $it->sku_variant_id,
-                        ], ['jumlah' => 0]);
+                        $qtyDasar = (int) round((float) $it->jumlah * (float) ($it->konversi ?? 1));
+                        if ($qtyDasar > 0) {
+                            StokItem::firstOrCreate([
+                                'gudang_id' => $targetGudangId,
+                                'produk_id' => $it->produk_id,
+                                'sku_variant_id' => $it->sku_variant_id,
+                            ], ['jumlah' => 0]);
 
-                        $saldoAwal = (int) $stokItem->jumlah;
-                        $stokItem->increment('jumlah', (int) $it->jumlah);
-
-                        StokLog::create([
-                            'stok_item_id' => $stokItem->id,
-                            'jenis' => 'masuk',
-                            'jumlah' => (int) $it->jumlah,
-                            'saldo_awal' => $saldoAwal,
-                            'saldo_akhir' => $saldoAwal + (int) $it->jumlah,
-                            'keterangan' => "Pengembalian stok pembatalan order {$transaksi->no_transaksi}",
-                            'user_id' => auth()->id(),
-                        ]);
+                            $deductionService->kembalikan(
+                                (int) $it->produk_id,
+                                $it->sku_variant_id,
+                                (int) $targetGudangId,
+                                $qtyDasar,
+                                'masuk',
+                                Transaksi::class,
+                                $transaksi->id,
+                                auth()->id(),
+                                "Pengembalian stok pembatalan order {$transaksi->no_transaksi}"
+                            );
+                        }
                     }
                 }
             }

@@ -78,7 +78,8 @@ class TransaksiVoidService
             }
 
             // 2. Reversal Jurnal Akuntansi (Double-Entry Reversal)
-            $jurnalLama = JurnalAkuntansi::where('referensi_tipe', Transaksi::class)
+            $jurnalLama = JurnalAkuntansi::with('akun')
+                ->where('referensi_tipe', Transaksi::class)
                 ->where('referensi_id', $transaksi->id)
                 ->get();
 

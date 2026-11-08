@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 #[Fillable([
     'produk_id', 'sku_variant_id', 'gudang_id', 'user_id', 'delta', 'sumber',
@@ -29,6 +30,11 @@ class StockMutationLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function referensi(): MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'referensi_tipe', 'referensi_id');
     }
 
     /**

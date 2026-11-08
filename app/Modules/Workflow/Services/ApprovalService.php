@@ -11,6 +11,7 @@ use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Wms\Models\Grn;
+use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\ReturnPembelian;
 use App\Modules\Wms\Services\CycleCountService;
 use App\Modules\Wms\Services\GrnService;
@@ -112,7 +113,7 @@ class ApprovalService
         // 3. ATAU role super-admin / owner (bisa approve semua request)
         // 4. ATAU bila entity_type == 'selisih_kas' dan rule mengizinkan admin-toko
         $user = User::find($actionedBy);
-        $hasRole = $user && $user->hasRole($request->approver_role);
+        $hasRole = $user && ! empty($request->approver_role) && $user->hasRole($request->approver_role);
         $hasPermission = $user && $user->hasPermissionTo('approve-workflow');
         $isSuperOrOwner = $user && ($user->hasRole('super-admin') || $user->hasRole('owner'));
         $isKasApprover = $user && $request->entity_type === 'selisih_kas' && (
@@ -346,6 +347,28 @@ class ApprovalService
                         'approved_by_user_id' => $actionedBy,
                         'approved_at' => now(),
                         'catatan_approval' => $catatan,
+                    ]);
+                }
+            }
+
+            return;
+        }
+
+        // [T-23] Eksekusi Approval Purchase Order di Workflow
+        if ($request->entity_type === 'po') {
+            $po = PurchaseOrder::find($request->entity_id);
+            if ($po) {
+                $userName = User::find($actionedBy)?->name ?? "User #{$actionedBy}";
+                $catatanLama = $po->catatan ? $po->catatan.' | ' : '';
+                if ($status === 'disetujui') {
+                    $po->update([
+                        'status' => 'disetujui',
+                        'catatan' => $catatanLama."[Disetujui oleh {$userName}".($catatan ? ': '.$catatan : '').']',
+                    ]);
+                } else {
+                    $po->update([
+                        'status' => 'ditolak',
+                        'catatan' => $catatanLama."[Ditolak oleh {$userName}".($catatan ? ': '.$catatan : '').']',
                     ]);
                 }
             }

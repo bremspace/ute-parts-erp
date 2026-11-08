@@ -227,23 +227,23 @@ Sesuai aturan kerja, setiap task wajib diverifikasi dengan pengujian unit/featur
 - [x] T-14 — Perbaiki kalkulasi reservasi multi-gudang pada `StokDeductionService.php`.
 
 ### Fase 3: Optimasi Transaksi POS Kasir
-- [ ] T-15 — Hapus pemanggilan ganda audit log transaksi kasir di `PosKasir.php`.
-- [ ] T-16 — Hapus data `harga_beli` dari array `$cart` public Livewire `PosKasir.php`.
-- [ ] T-17 — Terapkan filter `where('cabang_id', ...)` ketat pada `lihatDetailTransaksi` dan `ManagesHoldTransactions`.
-- [ ] T-18 — Tambahkan validasi wajib pilih pelanggan pada transaksi kasbon/piutang di kasir.
+- [x] T-15 — Hapus pemanggilan ganda audit log transaksi kasir di `PosKasir.php`.
+- [x] T-16 — Hapus data `harga_beli` dari array `$cart` public Livewire `PosKasir.php`.
+- [x] T-17 — Terapkan filter `where('cabang_id', ...)` ketat pada `lihatDetailTransaksi` dan `ManagesHoldTransactions`.
+- [x] T-18 — Tambahkan validasi wajib pilih pelanggan pada transaksi kasbon/piutang di kasir.
 
 ### Fase 4: Integritas Master Data Produk & SOT Stok WMS
-- [ ] T-19 — Tambahkan `SoftDeletes` pada model `Produk` dan migrasi tabel produk.
-- [ ] T-20 — Perbaiki pemulihan stok saat pembatalan order online di `PesananOnlineIndex.php` via `StokDeductionService::kembalikan()`.
-- [ ] T-21 — Pasang `StokDeductionService::mutasi()` pada alur penolakan retur vendor di `ReturnPembelianService.php`.
-- [ ] T-22 — Tambahkan relasi `referensi(): MorphTo` pada `StokLog` dan `StockMutationLog` beserta indeks migrasi `(referensi_tipe, referensi_id)`.
+- [x] T-19 — Tambahkan `SoftDeletes` pada model `Produk` dan migrasi tabel produk.
+- [x] T-20 — Perbaiki pemulihan stok saat pembatalan order online di `PesananOnlineIndex.php` via `StokDeductionService::kembalikan()`.
+- [x] T-21 — Pasang `StokDeductionService::mutasi()` pada alur penolakan retur vendor di `ReturnPembelianService.php`.
+- [x] T-22 — Tambahkan relasi `referensi(): MorphTo` pada `StokLog` dan `StockMutationLog` beserta indeks migrasi `(referensi_tipe, referensi_id)`.
 
 ### Fase 5: Servis, Omnichannel, Workflow & RBAC Security
-- [ ] T-23 — Tambahkan handler eksekusi permohonan `entity_type === 'po'` di `ApprovalService::selesaikanEntity()`.
-- [ ] T-24 — Jadikan pemotongan stok omnichannel fail-closed (cegah transaksi `selesai` jika stok kurang) di `ChannelSyncService.php`.
-- [ ] T-25 — Pasang `lockForUpdate` pada ingestion order channel di `ChannelSyncService.php`.
-- [ ] T-26 — Kunci verifikasi signature webhook Shopee (wajib tolak jika key kosong) di `OmnichannelController.php`.
-- [ ] T-27 — Pasang middleware permission `wms.delete` pada route `DELETE /api/wms/produk/{id}` dan guard permission pada route Workflow.
+- [x] T-23 — Tambahkan handler eksekusi permohonan `entity_type === 'po'` di `ApprovalService::selesaikanEntity()`.
+- [x] T-24 — Jadikan pemotongan stok omnichannel fail-closed (cegah transaksi `selesai` jika stok kurang) di `ChannelSyncService.php`.
+- [x] T-25 — Pasang `lockForUpdate` pada ingestion order channel di `ChannelSyncService.php`.
+- [x] T-26 — Kunci verifikasi signature webhook Shopee (wajib tolak jika key kosong) di `OmnichannelController.php`.
+- [x] T-27 — Pasang middleware permission `wms.delete` pada route `DELETE /api/wms/produk/{id}` dan guard permission pada route Workflow.
 
 ---
 

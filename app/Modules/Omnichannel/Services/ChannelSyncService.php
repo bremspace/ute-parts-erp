@@ -13,7 +13,6 @@ use App\Modules\Omnichannel\Models\Channel;
 use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\StokDeductionService;
@@ -249,7 +248,7 @@ class ChannelSyncService
             $this->potongStokDanBuatTransaksi($channel, $channelOrder);
         }
 
-        if ($jenisStatus === 'selesai') {
+        if ($channelOrder->status === 'selesai') {
             $this->prosesBiayaAdmin($channelOrder);
         }
 
@@ -269,6 +268,7 @@ class ChannelSyncService
         return DB::transaction(function () use ($channel, $orderId, $orderPayload) {
             $existing = ChannelOrder::where('channel_id', $channel->id)
                 ->where('channel_order_id', $orderId)
+                ->lockForUpdate()
                 ->first();
 
             if (! $existing) {
@@ -299,7 +299,7 @@ class ChannelSyncService
                 $this->potongStokDanBuatTransaksi($channel, $existing);
             }
 
-            if ($jenisStatus === 'selesai') {
+            if ($existing->status === 'selesai') {
                 $this->prosesBiayaAdmin($existing);
             }
 
@@ -309,76 +309,52 @@ class ChannelSyncService
 
     /**
      * Buat Transaksi lokal dan potong stok gudang untuk order channel.
+     * Fail-closed: jika pemotongan stok gagal / stok fisik tidak mencukupi,
+     * status ChannelOrder dialihkan ke 'stok_kurang' dan transaksi/jurnal dibatalkan.
      */
     protected function potongStokDanBuatTransaksi(Channel $channel, ChannelOrder $channelOrder): void
     {
         $payload = $channelOrder->payload ?? [];
         $items = $payload['item_list'] ?? [];
         $totalAmount = (float) ($payload['total_amount'] ?? 0);
-
         $cabangId = $channel->kredensial['cabang_id'] ?? currentCabangId() ?? Cabang::value('id');
-        $noTransaksi = 'TRX-CH-'.$channel->id.'-'.$channelOrder->channel_order_id;
 
-        $transaksi = Transaksi::firstOrCreate(
-            ['no_transaksi' => $noTransaksi],
-            [
-                'cabang_id' => $cabangId,
-                'sumber' => 'channel:'.$channel->platform,
-                'subtotal' => $totalAmount,
-                'total_akhir' => $totalAmount,
-                'metode_bayar' => $channel->platform ?: 'marketplace',
-                'status' => 'selesai',
-                'catatan' => "Order {$channel->nama} #{$channelOrder->channel_order_id}",
-            ]
-        );
+        try {
+            DB::transaction(function () use ($channel, $channelOrder, $items, $totalAmount, $cabangId, $payload) {
+                $itemsDipotong = [];
+                $totalHpp = 0.0;
 
-        $totalHpp = 0.0;
+                foreach ($items as $item) {
+                    $itemId = $item['item_id'] ?? null;
+                    $modelId = $item['model_id'] ?? null;
+                    $itemSku = $item['item_sku'] ?? $item['model_sku'] ?? null;
+                    $qty = (int) ($item['model_quantity_purchased'] ?? $item['quantity_purchased'] ?? 1);
+                    $itemPrice = (float) ($item['model_discounted_price'] ?? $item['item_price'] ?? 0);
 
-        foreach ($items as $item) {
-            $itemId = $item['item_id'] ?? null;
-            $modelId = $item['model_id'] ?? null;
-            $itemSku = $item['item_sku'] ?? $item['model_sku'] ?? null;
-            $qty = (int) ($item['model_quantity_purchased'] ?? $item['quantity_purchased'] ?? 1);
-            $itemPrice = (float) ($item['model_discounted_price'] ?? $item['item_price'] ?? 0);
+                    if ($qty <= 0) {
+                        continue;
+                    }
 
-            if ($qty <= 0) {
-                continue;
-            }
+                    // Cari mapping produk berdasarkan model_id atau item_id atau SKU
+                    $mappingQuery = ChannelProductMapping::where('channel_id', $channel->id);
+                    if ($modelId && $modelId !== 0 && $modelId !== '0') {
+                        $mappingQuery->where(function ($q) use ($modelId, $itemId) {
+                            $q->where('channel_model_id', (string) $modelId)
+                                ->orWhere('channel_item_id', (string) $itemId);
+                        });
+                    } elseif ($itemId) {
+                        $mappingQuery->where('channel_item_id', (string) $itemId);
+                    } elseif ($itemSku) {
+                        $mappingQuery->where('channel_sku', (string) $itemSku);
+                    }
 
-            // Cari mapping produk berdasarkan model_id atau item_id atau SKU
-            $mappingQuery = ChannelProductMapping::where('channel_id', $channel->id);
-            if ($modelId && $modelId !== 0 && $modelId !== '0') {
-                $mappingQuery->where(function ($q) use ($modelId, $itemId) {
-                    $q->where('channel_model_id', (string) $modelId)
-                        ->orWhere('channel_item_id', (string) $itemId);
-                });
-            } elseif ($itemId) {
-                $mappingQuery->where('channel_item_id', (string) $itemId);
-            } elseif ($itemSku) {
-                $mappingQuery->where('channel_sku', (string) $itemSku);
-            }
+                    $mapping = $mappingQuery->first();
 
-            $mapping = $mappingQuery->first();
-            $hpp = 0.0;
+                    if (! $mapping || ! $mapping->gudang_id || ! $mapping->produk_id) {
+                        throw new \Exception("Mapping produk atau gudang tidak ditemukan untuk item #{$itemId}/{$itemSku}");
+                    }
 
-            if ($mapping && $mapping->produk) {
-                $hpp = (float) $mapping->produk->harga_beli;
-                $totalHpp += ($hpp * $qty);
-
-                TransaksiItem::create([
-                    'transaksi_id' => $transaksi->id,
-                    'produk_id' => $mapping->produk_id,
-                    'sku_variant_id' => $mapping->sku_variant_id,
-                    'jumlah' => $qty,
-                    'harga_satuan' => $itemPrice > 0 ? $itemPrice : (float) $mapping->produk->harga_jual,
-                    'diskon_nominal' => 0,
-                    'subtotal' => round(($itemPrice > 0 ? $itemPrice : (float) $mapping->produk->harga_jual) * $qty, 2),
-                    'hpp' => $hpp,
-                ]);
-            }
-
-            if ($mapping && $mapping->gudang_id) {
-                try {
+                    // Fail-closed: potong stok wajib berhasil (izinkanNegatif: false)
                     app(StokDeductionService::class)->kurangi(
                         produkId: $mapping->produk_id,
                         skuVariantId: $mapping->sku_variant_id,
@@ -391,64 +367,100 @@ class ChannelSyncService
                         catatan: "Order {$channel->nama} #{$channelOrder->channel_order_id}",
                         izinkanNegatif: false
                     );
-                } catch (\Throwable $e) {
-                    Log::warning("Gagal potong stok order channel #{$channelOrder->channel_order_id}: {$e->getMessage()}");
+
+                    $hpp = (float) ($mapping->produk?->harga_beli ?? 0);
+                    $totalHpp += ($hpp * $qty);
+
+                    $itemsDipotong[] = [
+                        'produk_id' => $mapping->produk_id,
+                        'sku_variant_id' => $mapping->sku_variant_id,
+                        'jumlah' => $qty,
+                        'harga_satuan' => $itemPrice > 0 ? $itemPrice : (float) ($mapping->produk->harga_jual ?? 0),
+                        'diskon_nominal' => 0,
+                        'subtotal' => round(($itemPrice > 0 ? $itemPrice : (float) ($mapping->produk->harga_jual ?? 0)) * $qty, 2),
+                        'hpp' => $hpp,
+                    ];
                 }
-            }
-        }
 
-        // Buat record pengiriman jika ada tracking/kurir
-        $trackingNo = $payload['tracking_number'] ?? $payload['shipping_carrier_number'] ?? null;
-        $carrier = $payload['shipping_carrier'] ?? $channel->nama;
-        if ($trackingNo || $carrier) {
-            Pengiriman::firstOrCreate(
-                ['transaksi_id' => $transaksi->id],
-                [
-                    'kurir' => $carrier,
-                    'layanan' => 'Reguler',
-                    'ongkir' => (float) ($payload['actual_shipping_fee'] ?? 0),
-                    'asal_cabang' => $transaksi->cabang?->nama ?? 'Cabang',
-                    'nama_penerima' => $payload['recipient_address']['name'] ?? $payload['buyer_username'] ?? 'Konsumen Channel',
-                    'alamat_tujuan' => $payload['recipient_address']['full_address'] ?? '-',
-                    'telepon_tujuan' => $payload['recipient_address']['phone'] ?? '-',
-                    'tracking_id' => $trackingNo,
-                    'status' => 'dikirim',
-                ]
-            );
-        }
+                // Buat record Transaksi lokal setelah semua baris stok berhasil dipotong
+                $noTransaksi = 'TRX-CH-'.$channel->id.'-'.$channelOrder->channel_order_id;
+                $transaksi = Transaksi::firstOrCreate(
+                    ['no_transaksi' => $noTransaksi],
+                    [
+                        'cabang_id' => $cabangId,
+                        'sumber' => 'channel:'.$channel->platform,
+                        'subtotal' => $totalAmount,
+                        'total_akhir' => $totalAmount,
+                        'metode_bayar' => $channel->platform ?: 'marketplace',
+                        'status' => 'selesai',
+                        'catatan' => "Order {$channel->nama} #{$channelOrder->channel_order_id}",
+                    ]
+                );
 
-        // Catat Jurnal Penjualan Omnichannel Terintegrasi
-        try {
-            $akunPiutangChannel = str_contains($channel->platform, 'shopee') ? '120-03' : '120-04';
-            $jurnalService = app(JurnalService::class);
-            $noJurnal = $jurnalService->generateNoJurnal('channel', $cabangId);
+                foreach ($itemsDipotong as $it) {
+                    $transaksi->items()->create($it);
+                }
 
-            $lines = [
-                ['akun_kode' => $akunPiutangChannel, 'debit' => $totalAmount, 'kredit' => 0],
-                ['akun_kode' => '410-04', 'debit' => 0, 'kredit' => $totalAmount],
-            ];
+                // Buat record pengiriman jika ada tracking/kurir
+                $trackingNo = $payload['tracking_number'] ?? $payload['shipping_carrier_number'] ?? null;
+                $carrier = $payload['shipping_carrier'] ?? $channel->nama;
+                if ($trackingNo || $carrier) {
+                    Pengiriman::firstOrCreate(
+                        ['transaksi_id' => $transaksi->id],
+                        [
+                            'kurir' => $carrier,
+                            'layanan' => 'Reguler',
+                            'ongkir' => (float) ($payload['actual_shipping_fee'] ?? 0),
+                            'asal_cabang' => $transaksi->cabang?->nama ?? 'Cabang',
+                            'nama_penerima' => $payload['recipient_address']['name'] ?? $payload['buyer_username'] ?? 'Konsumen Channel',
+                            'alamat_tujuan' => $payload['recipient_address']['full_address'] ?? '-',
+                            'telepon_tujuan' => $payload['recipient_address']['phone'] ?? '-',
+                            'tracking_id' => $trackingNo,
+                            'status' => 'dikirim',
+                        ]
+                    );
+                }
 
-            if ($totalHpp > 0) {
-                $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
-                $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
-            }
+                // Catat Jurnal Penjualan Omnichannel Terintegrasi
+                try {
+                    $akunPiutangChannel = str_contains($channel->platform, 'shopee') ? '120-03' : '120-04';
+                    $jurnalService = app(JurnalService::class);
+                    $noJurnal = $jurnalService->generateNoJurnal('channel', $cabangId);
 
-            $jurnalService->post(
-                $noJurnal,
-                now(),
-                'channel',
-                $lines,
-                "Jurnal penjualan {$channel->nama} #{$channelOrder->channel_order_id}",
-                $cabangId,
-                null,
-                Transaksi::class,
-                $transaksi->id
-            );
+                    $lines = [
+                        ['akun_kode' => $akunPiutangChannel, 'debit' => $totalAmount, 'kredit' => 0],
+                        ['akun_kode' => '410-04', 'debit' => 0, 'kredit' => $totalAmount],
+                    ];
+
+                    if ($totalHpp > 0) {
+                        $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
+                        $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
+                    }
+
+                    $jurnalService->post(
+                        $noJurnal,
+                        now(),
+                        'channel',
+                        $lines,
+                        "Jurnal penjualan {$channel->nama} #{$channelOrder->channel_order_id}",
+                        $cabangId,
+                        null,
+                        Transaksi::class,
+                        $transaksi->id
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning("Jurnal penjualan channel gagal (order #{$channelOrder->id}): {$e->getMessage()}");
+                }
+
+                $channelOrder->update(['transaksi_id' => $transaksi->id]);
+            });
         } catch (\Throwable $e) {
-            Log::warning("Jurnal penjualan channel gagal (order #{$channelOrder->id}): {$e->getMessage()}");
+            Log::error("Fail-closed: Pemotongan stok order channel #{$channelOrder->channel_order_id} gagal — {$e->getMessage()}");
+            $channelOrder->update([
+                'status' => 'stok_kurang',
+                'catatan' => 'Insiden stok: '.$e->getMessage(),
+            ]);
         }
-
-        $channelOrder->update(['transaksi_id' => $transaksi->id]);
     }
 
     /**

@@ -260,18 +260,26 @@ class OmnichannelController extends Controller
         }
         RateLimiter::hit($rateKey, 60);
 
-        // Verifikasi signature webhook bila ada kredensial partner_key
-        $partnerKey = $channel->kredensial['partner_key'] ?? env('SHOPEE_PARTNER_KEY', '');
+        // [T-26] Verifikasi signature webhook channel (fail-closed: wajib tolak jika key belum dikonfigurasi)
+        $partnerKey = trim((string) ($channel->kredensial['partner_key'] ?? env('SHOPEE_PARTNER_KEY', '')));
+        if (empty($partnerKey)) {
+            Log::warning("Webhook channel #{$channel->id} ({$channel->platform}) ditolak: partner_key belum dikonfigurasi");
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Partner key belum dikonfigurasi pada channel.',
+            ], 401);
+        }
+
         $signature = $request->header('Authorization') ?? $request->header('X-Shopee-Signature') ?? '';
+        if (empty($signature)) {
+            Log::warning("Signature webhook {$channel->platform} tidak disertakan untuk channel #{$channel->id}");
+
+            return response()->json(['success' => false, 'message' => 'Signature wajib disertakan'], 401);
+        }
+
         $adapter = $this->syncService->adapterFor($channel->platform);
-
-        if ($adapter && ! empty($partnerKey)) {
-            if (empty($signature)) {
-                Log::warning("Signature webhook {$channel->platform} tidak disertakan untuk channel #{$channel->id}");
-
-                return response()->json(['success' => false, 'message' => 'Signature wajib disertakan'], 401);
-            }
-
+        if ($adapter) {
             $valid = $adapter->verifyWebhookSignature($request->fullUrl(), $request->getContent(), $signature, $partnerKey);
             if (! $valid) {
                 Log::warning("Signature webhook {$channel->platform} tidak valid untuk channel #{$channel->id}");

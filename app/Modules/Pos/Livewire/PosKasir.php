@@ -1470,7 +1470,6 @@ class PosKasir extends Component
                 'daftar_satuan' => $daftarSatuan,
                 'harga' => $harga,
                 'harga_dasar' => (float) ($pricing['harga_dasar'] * $faktorKonversi),
-                'harga_beli' => (float) ($produk->harga_beli * $faktorKonversi),
                 'qty' => 1,
                 'diskon' => (float) ($pricing['diskon_nominal'] ?? 0.0) * $faktorKonversi,
                 'potensi_komisi' => (float) ($pricing['potensi_komisi'] ?? 0.0) * $faktorKonversi,
@@ -1557,7 +1556,6 @@ class PosKasir extends Component
         $item['konversi'] = $faktorKonversi;
         $item['harga'] = $harga;
         $item['harga_dasar'] = (float) ($pricing['harga_dasar'] * $faktorKonversi);
-        $item['harga_beli'] = (float) ($produk->harga_beli * $faktorKonversi);
         $item['diskon'] = (float) ($pricing['diskon_nominal'] ?? 0.0) * $faktorKonversi;
         $item['potensi_komisi'] = (float) ($pricing['potensi_komisi'] ?? 0.0) * $faktorKonversi;
         $item['qty'] = $newQty;
@@ -2665,8 +2663,6 @@ class PosKasir extends Component
                 ];
 
                 $this->completedTransactionId = $transaksi->id;
-                // [F1-4] Catat log aktivitas transaksi berbasis Transaction-Centric + Dual-Indexing di metadata
-                app(TransactionActivityLogService::class)->catatPenjualan($transaksi);
             });
 
             $this->showPaymentModal = false;
@@ -2691,9 +2687,9 @@ class PosKasir extends Component
 
     public function lihatDetailTransaksi(int $id): void
     {
-        $cabangId = session('cabang_id');
+        $cabangId = (int) (session('cabang_id') ?: auth()->user()?->cabang_id ?: Cabang::value('id'));
         $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang', 'pengiriman', 'piutang'])
-            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('cabang_id', $cabangId)
             ->findOrFail($id);
 
         $pelanggan = $transaksi->pelanggan;

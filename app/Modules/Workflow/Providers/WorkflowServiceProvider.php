@@ -21,6 +21,9 @@ class WorkflowServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Load Workflow API routes
+        $this->loadRoutesFrom(__DIR__.'/../routes.php');
+
         // Auto-fire approval observers
         PurchaseOrder::observe(PurchaseOrderObserver::class);
         ReturnPenjualan::observe(ReturnPenjualanObserver::class);

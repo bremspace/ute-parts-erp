@@ -407,9 +407,9 @@ class RiwayatTransaksiIndex extends Component
 
     public function lihatDetailTransaksi(int $id): void
     {
-        $cabangId = $this->getActiveCabangId();
+        $cabangId = (int) ($this->getActiveCabangId() ?: Cabang::value('id'));
         $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'voidBy', 'tiketServis', 'pengiriman', 'channelOrder.channel', 'returnPenjualan.items.produk', 'piutang'])
-            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('cabang_id', $cabangId)
             ->findOrFail($id);
 
         $isOnline = in_array($trx->sumber, ['marketplace']) || str_starts_with((string) $trx->sumber, 'channel:');
