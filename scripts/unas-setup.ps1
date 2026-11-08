@@ -1,6 +1,6 @@
 # ==============================================================================
-# Bremspace ERP — Unas 1-Click Interactive CLI Installer (Windows Edition)
-# Versi: 3.1 (Interactive Wizard CLI, Smart DB Diagnostics & Robust Mitigation)
+# Bremspace ERP - Unas 1-Click Interactive CLI Installer (Windows Edition)
+# Versi: 3.2 (Pure ASCII, Rock-Solid PowerShell 5.1/7+ Engine)
 # ==============================================================================
 param(
     [switch]$ForceReinstallPhp,
@@ -26,9 +26,9 @@ Set-Location -Path $projectRoot
 function Prompt-User([string]$message, [string]$defaultVal = "") {
     if ($NonInteractive) { return $defaultVal }
     if ($defaultVal -ne "") {
-        Write-Host "$message [$defaultVal]: " -NoNewline -ForegroundColor Yellow
+        Write-Host ($message + " [" + $defaultVal + "]: ") -NoNewline -ForegroundColor Yellow
     } else {
-        Write-Host "$message: " -NoNewline -ForegroundColor Yellow
+        Write-Host ($message + ": ") -NoNewline -ForegroundColor Yellow
     }
     $inp = [Console]::ReadLine()
     if ([string]::IsNullOrWhiteSpace($inp)) {
@@ -39,7 +39,7 @@ function Prompt-User([string]$message, [string]$defaultVal = "") {
 
 function Prompt-Password([string]$message, [string]$defaultVal = "") {
     if ($NonInteractive) { return $defaultVal }
-    Write-Host "$message" -NoNewline -ForegroundColor Yellow
+    Write-Host $message -NoNewline -ForegroundColor Yellow
     if ($defaultVal -ne "") {
         Write-Host " (Kosongkan jika default/tanpa password): " -NoNewline -ForegroundColor DarkGray
     } else {
@@ -442,11 +442,11 @@ if (-not $mysqlPortActive) {
 }
 
 Write-Host "Pilih Database Engine:" -ForegroundColor White
-Write-Host "  [1] SQLite (Rekomendasi Lokal / Standalone — Mandiri, Tanpa Setup Server DB)" -ForegroundColor Cyan
+Write-Host "  (1) SQLite (Rekomendasi Lokal - Mandiri, Tanpa Setup Server DB)" -ForegroundColor Cyan
 if ($mysqlPortActive) {
-    Write-Host "  [2] MySQL / MariaDB (Port 3306 Terdeteksi Aktif di Komputer Ini)" -ForegroundColor Green
+    Write-Host "  (2) MySQL / MariaDB (Port 3306 Terdeteksi Aktif di Komputer Ini)" -ForegroundColor Green
 } else {
-    Write-Host "  [2] MySQL / MariaDB (Port 3306 Tidak Aktif / Belum Terpasang)" -ForegroundColor DarkGray
+    Write-Host "  (2) MySQL / MariaDB (Port 3306 Tidak Aktif / Belum Terpasang)" -ForegroundColor DarkGray
 }
 
 $dbChoice = Prompt-User "Pilihan Database (1 atau 2)" "1"
@@ -468,19 +468,27 @@ if ($dbChoice -eq "2") {
         $dbPort = Prompt-User "MySQL Port" $dbPort
         $dbName = Prompt-User "Nama Database MySQL" $dbName
         $dbUser = Prompt-User "Username MySQL" $dbUser
-        $dbPass = Prompt-Password "Password MySQL ($dbUser)" $dbPass
+        $dbPass = Prompt-Password ("Password MySQL (" + $dbUser + ")") $dbPass
 
         # Uji coba koneksi MySQL dan tangkap error detail
         Write-Host " Menguji koneksi ke database MySQL..." -ForegroundColor Gray
-        $diagPhp = "try { `$c = @new mysqli('$dbHost', '$dbUser', '$dbPass', '', (int)'$dbPort'); if (`$c->connect_errno) { echo 'ERR:' . `$c->connect_errno . ':' . `$c->connect_error; exit(1); } else { exit(0); } } catch (Throwable `$e) { echo 'ERR:EXCEPTION:' . `$e->getMessage(); exit(1); }"
-        $connTestOut = & $phpExe -r "$diagPhp" 2>$null
+        
+        $escapedHost = $dbHost.Replace("'", "\'")
+        $escapedUser = $dbUser.Replace("'", "\'")
+        $escapedPass = $dbPass.Replace("'", "\'")
+        $portNum = 3306
+        [int]::TryParse($dbPort, [ref]$portNum) | Out-Null
+
+        $diagPhp = "try { `$c = @new mysqli('$escapedHost', '$escapedUser', '$escapedPass', '', $portNum); if (`$c->connect_errno) { echo 'ERR:' . `$c->connect_errno . ':' . `$c->connect_error; exit(1); } else { exit(0); } } catch (Throwable `$e) { echo 'ERR:EXCEPTION:' . `$e->getMessage(); exit(1); }"
+        $connTestOut = & $phpExe -r $diagPhp 2>$null
 
         if ($LASTEXITCODE -eq 0) {
             $dbConnected = $true
             Write-Host " [OK] Koneksi MySQL terverifikasi berhasil!" -ForegroundColor Green
             # Auto-create database jika belum ada
-            $createDbScript = "try { `$c = new mysqli('$dbHost', '$dbUser', '$dbPass', '', (int)'$dbPort'); `$c->query('CREATE DATABASE IF NOT EXISTS \`$dbName\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch (Throwable `$e) {}"
-            & $phpExe -r "$createDbScript" 2>$null | Out-Null
+            $escapedDbName = $dbName.Replace("`"", "")
+            $createDbScript = "try { `$c = new mysqli('$escapedHost', '$escapedUser', '$escapedPass', '', $portNum); `$c->query('CREATE DATABASE IF NOT EXISTS \`$escapedDbName\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch (Throwable `$e) {}"
+            & $phpExe -r $createDbScript 2>$null | Out-Null
         } else {
             Write-Host ""
             Write-Host "======================================================================" -ForegroundColor Red
@@ -498,9 +506,9 @@ if ($dbChoice -eq "2") {
             Write-Host "     - Periksa apakah port MySQL Anda 3306 atau port lain (misal 3307)." -ForegroundColor Gray
             Write-Host ""
             Write-Host "Pilihan Tindakan Anda:" -ForegroundColor White
-            Write-Host "  [1] Coba Lagi (Koreksi Host, Port, User, atau Password)" -ForegroundColor Cyan
-            Write-Host "  [2] Beralih ke SQLite (Zero-Setup, Mandiri & Langsung Berjalan)" -ForegroundColor Green
-            Write-Host "  [3] Tetap Gunakan Pengaturan MySQL Ini (Saya akan perbaiki MySQL sendiri nanti)" -ForegroundColor Yellow
+            Write-Host "  (1) Coba Lagi (Koreksi Host, Port, User, atau Password)" -ForegroundColor Cyan
+            Write-Host "  (2) Beralih ke SQLite (Zero-Setup, Mandiri & Langsung Berjalan)" -ForegroundColor Green
+            Write-Host "  (3) Tetap Gunakan Pengaturan MySQL Ini (Saya akan perbaiki MySQL sendiri nanti)" -ForegroundColor Yellow
 
             $mitigasiChoice = Prompt-User "Pilih tindakan (1, 2, atau 3)" "1"
 
@@ -527,7 +535,7 @@ $appName = Prompt-User "Nama Brand / Aplikasi" "Bremspace"
 # 5c. Konfigurasi Integrasi Eksternal (Opsional)
 Write-Host ""
 Write-Host "Apakah Anda ingin memasukkan key integrasi bisnis sekarang?" -ForegroundColor White
-Write-Host "(Duitku, Biteship, WhatsApp Gateway — Dapat diisi sekarang atau nanti via web)" -ForegroundColor DarkGray
+Write-Host "(Duitku, Biteship, WhatsApp Gateway - Dapat diisi sekarang atau nanti via web)" -ForegroundColor DarkGray
 $inputIntegrasi = Prompt-User "Konfigurasi integrasi sekarang? (y/n)" "n"
 
 $duitkuMerchantCode = ""
@@ -716,7 +724,10 @@ if ($hasNode -and ($ForceRebuildAssets -or -not (Test-Path (Join-Path $projectRo
 Write-Host ""
 Write-Host "[7/7] Menyiapkan port jaringan dan menyalakan server..." -ForegroundColor Cyan
 
-$port = [int]$appPort
+$portNumFinal = 1741
+[int]::TryParse($appPort, [ref]$portNumFinal) | Out-Null
+$port = $portNumFinal
+
 if (Test-PortActive $port) {
     $tcps = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     foreach ($conn in $tcps) {
