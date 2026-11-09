@@ -17,6 +17,7 @@
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
+/public/install.php
 /storage/*.key
 /storage/installed.lock
 /storage/pail
