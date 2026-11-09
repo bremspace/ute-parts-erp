@@ -21,6 +21,7 @@ use App\Modules\Pos\Services\PembayaranPesananOnlineService;
 use App\Modules\Pos\Services\PosCheckoutService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Pos\Services\QrisService;
+use App\Modules\Pos\Services\TransaksiSequenceService;
 use App\Modules\Pos\Services\TransaksiVoidService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
@@ -3292,6 +3293,7 @@ class PosKasir extends Component
                     'no_transaksi' => $transaksi->no_transaksi,
                     'no_tiket' => $tiket->no_tiket,
                     'jenis_hp' => $tiket->jenis_hp,
+                    'seri_hp' => $tiket->seri_hp ?? '',
                     'waktu' => now()->format('d/m/Y H:i'),
                     'kasir' => auth()->user()?->name ?? 'Kasir',
                     'pelanggan' => $this->selectedServisDetail['pelanggan_nama'],
@@ -3308,7 +3310,15 @@ class PosKasir extends Component
                     'total' => $total,
                     'bayar' => $transaksi->jumlah_bayar,
                     'kembali' => $this->servisKembalian,
+                    'sisa_tagihan' => 0,
                     'metode' => strtoupper($this->servisMetodeBayar),
+                    'status_pembayaran' => 'lunas',
+                    'is_lunas' => true,
+                    'is_spk' => false,
+                    'tipe_struk' => 'kwitansi',
+                    'label_struk' => 'KWITANSI PELUNASAN SERVIS',
+                    'garansi' => $tiket->garansi?->durasi_hari ? $tiket->garansi->durasi_hari.' Hari' : null,
+                    'cabang' => $transaksi->cabang?->nama ?? 'Bremspace',
                 ];
 
                 $this->completedTransactionId = $transaksi->id;

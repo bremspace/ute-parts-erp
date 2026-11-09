@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'tiket_servis_id', 'tipe', 'produk_id', 'sku_variant_id',
-    'nama_item', 'qty', 'harga', 'hpp',
+    'nama_item', 'qty', 'harga', 'hpp', 'dibatalkan_at', 'alasan_batal', 'dibatalkan_by',
 ])]
 class TiketServisItem extends Model
 {
@@ -20,6 +20,7 @@ class TiketServisItem extends Model
         'qty' => 'integer',
         'harga' => 'decimal:2',
         'hpp' => 'decimal:2',
+        'dibatalkan_at' => 'datetime',
     ];
 
     public function tiketServis(): BelongsTo

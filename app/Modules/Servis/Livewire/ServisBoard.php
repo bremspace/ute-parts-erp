@@ -252,6 +252,12 @@ class ServisBoard extends Component
 
     public ?int $pekerjaanGudangId = null;
 
+    // Modal Konfirmasi Pembatalan Item Pekerjaan
+    public bool $showBatalItemModal = false;
+    public ?int $batalItemId = null;
+    public string $batalItemNama = '';
+    public string $batalItemAlasan = '';
+
     public function mount()
     {
         $this->photoInputs = [null, null, null]; // max 3 foto
@@ -612,6 +618,13 @@ class ServisBoard extends Component
         }
 
         return $grouped;
+    }
+
+    public function setViewMode(string $mode): void
+    {
+        if (in_array($mode, ['kanban', 'list'], true)) {
+            $this->viewMode = $mode;
+        }
     }
 
     /**
@@ -1735,8 +1748,8 @@ class ServisBoard extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => count($rows).' item estimasi dimuat ke form']);
     }
 
-    /** [Batalkan Item Pekerjaan] Batalkan part/jasa & kembalikan stok part ke gudang */
-    public function batalkanItem(int $itemId): void
+    /** [Batalkan Item Pekerjaan] Buka modal konfirmasi dengan alasan */
+    public function bukaModalBatalItem(int $itemId): void
     {
         $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
         if (! $tiket) {
@@ -1754,9 +1767,39 @@ class ServisBoard extends Component
             return;
         }
 
+        $this->batalItemId = $item->id;
+        $this->batalItemNama = $item->nama_item;
+        $this->batalItemAlasan = '';
+        $this->showBatalItemModal = true;
+    }
+
+    /** [Batalkan Item Pekerjaan] Eksekusi pembatalan part/jasa & kembalikan stok part ke gudang */
+    public function batalkanItem(?int $itemId = null): void
+    {
+        $id = $itemId ?? $this->batalItemId;
+        $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
+        if (! $tiket || ! $id) {
+            return;
+        }
+
+        if (! $this->boleh('servis.input-sparepart', 'Anda tidak punya izin membatalkan item pekerjaan')) {
+            return;
+        }
+
+        $item = TiketServisItem::where('tiket_servis_id', $tiket->id)->find($id);
+        if (! $item) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Item pekerjaan tidak ditemukan']);
+
+            return;
+        }
+
         try {
-            app(ServisService::class)->batalkanItemPekerjaan($tiket, $item, auth()->user());
-            $this->dispatch('alert', ['type' => 'success', 'message' => "Item '{$item->nama_item}' dibatalkan (stok dikembalikan jika part)"]);
+            app(ServisService::class)->batalkanItemPekerjaan($tiket, $item, auth()->user(), $this->batalItemAlasan);
+            $this->showBatalItemModal = false;
+            $this->batalItemId = null;
+            $this->batalItemNama = '';
+            $this->batalItemAlasan = '';
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Item '{$item->nama_item}' berhasil dibatalkan (stok dipulihkan jika part)."]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
@@ -1951,10 +1994,10 @@ class ServisBoard extends Component
         $cabangId = session('cabang_id');
 
         return view('modules.servis.livewire.servis-board', [
-            'jenisServisList' => JenisServis::where('is_active', true)->get(),
-            'pelangganList' => Pelanggan::with('tierMembership')->limit(10)->get(),
-            'teknisiList' => User::role(['teknisi', 'admin-toko', 'super-admin'])->get(),
-            'gudangList' => Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))->where('is_active', true)->get(),
+            'jenisServisList' => JenisServis::where('is_active', true)->get(['id', 'nama', 'batas_waktu_menit', 'auto_cancel_jika_overdue']),
+            'pelangganList' => collect(),
+            'teknisiList' => User::role(['teknisi', 'admin-toko', 'super-admin'])->get(['id', 'name']),
+            'gudangList' => Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))->where('is_active', true)->get(['id', 'nama', 'kode']),
             'produkList' => $this->produkEstimasiList,
             'produkEstimasiList' => $this->produkEstimasiList,
             'stateMachineColumns' => $this->stateMachineColumns,

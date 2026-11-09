@@ -764,7 +764,10 @@ class ImportSidRetailService
         $targetGudangRak = $gudangTokoId ?? $gudangPusatId;
         if ($lokasiNama !== '') {
             if (! $targetGudangRak) {
-                $gudangDef = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first();
+                $gudangDef = Gudang::where('cabang_id', $cabangId)->where('is_active', true)
+                    ->where(fn ($q) => $q->where('nama', 'like', '%Utama%')->orWhere('nama', 'like', '%Pusat%')->orWhere('kode', 'like', '%UTAMA%'))
+                    ->first()
+                    ?? Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first();
                 if (! $gudangDef) {
                     $baseKode = $cabangId > 1 ? "GDG-CBG{$cabangId}-UTAMA" : 'GDG-UTAMA';
                     $kodeUnik = $baseKode;

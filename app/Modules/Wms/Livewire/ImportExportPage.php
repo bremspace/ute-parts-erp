@@ -257,7 +257,7 @@ class ImportExportPage extends Component
 
                 $this->isCustomMapping = false;
                 $this->customColumns = $inspect['headings'];
-                $hasil = $service->preview($realPath, (int) $this->thresholdKemiripan, [], [], [], $cabangId);
+                $hasil = $service->preview($realPath, (int) $this->thresholdKemiripan, [], [], [], $cabangId, [], $this->defaultGudangId);
             }
 
             $this->importFilePath = $path;
@@ -466,6 +466,29 @@ class ImportExportPage extends Component
                         'type' => 'info',
                         'message' => "Threshold diperbarui menjadi {$this->thresholdKemiripan}%. Terdeteksi {$hasil['total_kemiripan_rows']} produk mirip.",
                     ]);
+                }
+            } catch (\Throwable $e) {
+                // Biarkan jika file hilang
+            }
+        }
+    }
+
+    public function updatedDefaultGudangId(): void
+    {
+        if ($this->importStep === 'preview' && $this->importFilePath && $this->importFormat !== 'sid_retail') {
+            try {
+                $realPath = Storage::disk('local')->path($this->importFilePath);
+                if (file_exists($realPath)) {
+                    $this->importPreview = app(ImportProdukService::class)->preview(
+                        $realPath,
+                        $this->thresholdKemiripan,
+                        $this->resolusiDuplikat,
+                        $this->resolusiBarcode,
+                        $this->resolusiErrorBaris,
+                        null,
+                        $this->isCustomMapping ? $this->columnMapping : [],
+                        $this->defaultGudangId
+                    );
                 }
             } catch (\Throwable $e) {
                 // Biarkan jika file hilang

@@ -142,9 +142,9 @@ npm run build
     - Sebelum ubah kode, tarik update: `git fetch origin && git pull origin main && git pull origin <branch>`
     - Push harian ke branch masing-masing, buat Pull Request ke `main` via GitHub untuk direview.
   - **Protokol Push/Merge ke `main`**:
-    - Akun owner (`bremspace`) diizinkan langsung push atau merge ke `main` tanpa token konfirmasi, kecuali ada instruksi khusus dari user.
-    - Urutan rilis ke `main`: pull origin main -> merge/commit -> automated test -> push origin main.
-    - Kolaborator non-admin tetap wajib melalui PR (ditegakkan via GitHub branch protection).
+    - DILARANG KERAS push atau merge langsung ke branch `main` tanpa instruksi eksplisit langsung dari user pada turn tersebut.
+    - Setiap rilis/push ke `main` WAJIB atas perintah eksplisit user dan melewati urutan: pull origin main -> merge/commit -> automated check -> push origin main.
+    - Tanpa instruksi langsung dari user, push harian hanya boleh ke branch kerja masing-masing (`origin/brem`, `origin/Unas`, dll).
 - **Model subagent = model main agent / orchestrator SAAT INI** — JANGAN pernah spawn subagent tanpa `model:` yang sama dengan model orkestrator. Saat ini orkestrator = **Big Pickle** → `model: "opencode/big-pickle"`. Setiap sesi baru: cek model orkestrator (jika berubah, ikuti perubahan itu; verifikasi via `opencode models` bila ragu). Berlaku untuk SEMUA subagent (explorer, fixer, designer, oracle, librarian).
 - **Implement-plan checklist flow**: untuk SETIAP plan/implement-plan → (1) baca plan, (2) verifikasi kebutuhan ke kode aktual, (3) eksekusi task, (4) review acceptance criteria, (5) centang checkbox `- [x]` di implement-plan.md HANYA jika sudah terverifikasi benar, (6) lanjut otomatis ke task/fase berikutnya. Jangan centang task yang belum diverifikasi.
 - **Izin akses**: user memberi izin penuh semua akses sesi kerja (per 2026-09-20) — lanjut tanpa minta konfirmasi berulang untuk eksekusi kode/deploy/dev.

@@ -288,7 +288,12 @@ class ImportAtributService
 
                 $gudangId = $gudangDefault?->id;
                 if (! empty($gudangRaw)) {
-                    $g = Gudang::whereRaw('LOWER(nama) = ?', [strtolower($gudangRaw)])->first();
+                    $g = Gudang::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                        ->where(function ($q) use ($gudangRaw) {
+                            $q->whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($gudangRaw)])
+                                ->orWhereRaw('LOWER(TRIM(kode)) = ?', [strtolower($gudangRaw)])
+                                ->orWhere('kode', Str::upper(Str::slug($gudangRaw)));
+                        })->first();
                     if ($g) {
                         $gudangId = $g->id;
                     }

@@ -1093,7 +1093,20 @@ class ServisService
                 }
             }
 
-            TiketServisItem::where('id', $item->id)->update(['dibatalkan_at' => now()]);
+            TiketServisItem::where('id', $item->id)->update([
+                'dibatalkan_at' => now(),
+                'alasan_batal' => $alasan ?: 'Dibatalkan oleh staf',
+                'dibatalkan_by' => $user->id,
+            ]);
+
+            $this->logStatus(
+                $tiket,
+                $tiket->status,
+                $tiket->status,
+                $user,
+                'batal_item',
+                "Batal item [{$item->tipe}] {$item->nama_item}".($alasan ? " — Alasan: {$alasan}" : '')
+            );
         });
     }
 

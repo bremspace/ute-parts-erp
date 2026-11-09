@@ -42,12 +42,12 @@
                 class="flex items-center gap-0.5 rounded-xl bg-white/5 border border-white/10 p-0.5 flex-shrink-0"
                 role="tablist"
                 aria-label="Mode tampilan papan servis"
-                x-init="(() => { const saved = localStorage.getItem('servis-board-view-mode'); if (saved === 'list' || saved === 'kanban') { $wire.viewMode = saved; } })()"
+                x-init="(() => { const saved = localStorage.getItem('servis-board-view-mode'); if (saved === 'list' || saved === 'kanban') { if ($wire.viewMode !== saved) { $wire.setViewMode(saved); } } })()"
             >
                 <button
                     type="button"
                     wire:key="view-kanban"
-                    @click="localStorage.setItem('servis-board-view-mode', 'kanban'); $wire.viewMode = 'kanban'"
+                    @click="localStorage.setItem('servis-board-view-mode', 'kanban'); $wire.setViewMode('kanban')"
                     role="tab"
                     aria-selected="{{ $viewMode === 'kanban' ? 'true' : 'false' }}"
                     title="Tampilan Papan Kanban"
@@ -61,7 +61,7 @@
                 <button
                     type="button"
                     wire:key="view-list"
-                    @click="localStorage.setItem('servis-board-view-mode', 'list'); $wire.viewMode = 'list'"
+                    @click="localStorage.setItem('servis-board-view-mode', 'list'); $wire.setViewMode('list')"
                     role="tab"
                     aria-selected="{{ $viewMode === 'list' ? 'true' : 'false' }}"
                     title="Tampilan Daftar Tiket"
@@ -1934,11 +1934,11 @@
                             <button
                                 type="button"
                                 wire:click="bukaStrukServis({{ $selectedTiket->id }})"
-                                class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white border border-white/10 font-bold text-xs transition-[background-color,color,transform] duration-100 active:scale-[0.98] cursor-pointer inline-flex items-center gap-1.5"
-                                title="Cetak struk thermal 58mm / nota servis"
+                                class="px-3.5 py-2 rounded-xl {{ $selectedTiket->status_pembayaran === 'lunas' ? 'bg-up-mint/15 text-up-mint border-up-mint/30 hover:bg-up-mint/25' : 'bg-white/5 text-ink-200 border-white/10 hover:bg-white/10 hover:text-white' }} border font-bold text-xs transition-[background-color,color,transform] duration-100 active:scale-[0.98] cursor-pointer inline-flex items-center gap-1.5"
+                                title="{{ $selectedTiket->status_pembayaran === 'lunas' ? 'Cetak Kwitansi Pelunasan Servis' : 'Cetak SPK / Tanda Terima Estimasi' }}"
                             >
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                                <span>Cetak Struk</span>
+                                <span>{{ $selectedTiket->status_pembayaran === 'lunas' ? 'Cetak Kwitansi' : 'Cetak SPK' }}</span>
                             </button>
                         @if($selectedTiket->status_pembayaran !== 'lunas' && in_array($selectedTiket->status, ['selesai', 'diambil'], true))
                             @canany(['pos.view', 'pos.view-own', 'pos.create'])
@@ -2349,9 +2349,8 @@
                                             @if(in_array($selectedTiket->status, ['disetujui', 'dikerjakan', 'qc'], true))
                                                 <button
                                                     type="button"
-                                                    wire:click="batalkanItem({{ $it->id }})"
-                                                    wire:confirm="Batalkan item '{{ $it->nama_item }}'? Stok suku cadang akan dikembalikan ke gudang jika berupa part."
-                                                    class="text-up-red/70 hover:text-up-red text-[11px] px-1.5 py-0.5 rounded hover:bg-up-red/10 cursor-pointer"
+                                                    wire:click="bukaModalBatalItem({{ $it->id }})"
+                                                    class="text-up-red/70 hover:text-up-red text-[11px] px-2 py-1 rounded-lg hover:bg-up-red/10 border border-up-red/20 font-semibold cursor-pointer transition-colors"
                                                     title="Batalkan item pekerjaan ini"
                                                 >
                                                     Batalkan
@@ -2365,10 +2364,13 @@
                                     <div class="pt-2 border-t border-white/5 space-y-1">
                                         <p class="text-[9px] text-ink-500 uppercase font-semibold">Item Dibatalkan ({{ $canceledItems->count() }})</p>
                                         @foreach($canceledItems as $c)
-                                            <div class="flex justify-between text-[11px] text-ink-500 line-through">
+                                            <div class="flex items-center justify-between text-[11px] text-ink-500 line-through">
                                                 <span>[{{ strtoupper($c->tipe) }}] {{ $c->nama_item }} × {{ $c->qty }}</span>
                                                 <span class="tabular-nums">Rp {{ number_format($c->harga * $c->qty, 0, ',', '.') }}</span>
                                             </div>
+                                            @if($c->alasan_batal)
+                                                <p class="text-[9px] text-up-red/80 -mt-0.5 ml-2">Alasan: {{ $c->alasan_batal }}</p>
+                                            @endif
                                         @endforeach
                                     </div>
                                 @endif
@@ -2933,6 +2935,55 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                         Simpan & Terima Fisik Unit
                     </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- ===== MODAL: KONFIRMASI PEMBATALAN ITEM PEKERJAAN (ISO 9001 TRACEABILITY) ===== -->
+    @if($showBatalItemModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Batalkan Item Pekerjaan</h3>
+                        <p class="text-xs text-ink-400 mt-0.5">Penghapusan item jasa atau sparepart dari tiket servis</p>
+                    </div>
+                    <button wire:click="$set('showBatalItemModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+
+                <div class="space-y-3.5">
+                    <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/20 text-xs text-ink-200">
+                        <p class="font-bold text-up-red mb-1">Item: {{ $batalItemNama }}</p>
+                        <p class="text-[11px] text-ink-300">Jika berupa suku cadang/part, sistem otomatis mengembalikan stok ke gudang asal dan melepas klaim Serial Number (SN).</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Alasan Pembatalan <span class="text-up-red">*</span></label>
+                        <textarea
+                            wire:model="batalItemAlasan"
+                            rows="2"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                            placeholder="Contoh: Part tidak cocok / dibatalkan pelanggan / stok cacat..."
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            wire:click="$set('showBatalItemModal', false)"
+                            class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs transition-colors cursor-pointer"
+                        >
+                            Kembali
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="batalkanItem"
+                            class="px-4 py-2 rounded-xl bg-up-red hover:bg-rose-700 text-white font-bold text-xs transition-colors shadow-md shadow-up-red/30 cursor-pointer"
+                        >
+                            Ya, Batalkan Item
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

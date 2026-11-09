@@ -579,8 +579,9 @@ class ImportProdukService
 
         $g = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
             ->where(function ($q) use ($raw) {
-                $q->whereRaw('LOWER(kode) = ?', [strtolower($raw)])
-                    ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)]);
+                $q->whereRaw('LOWER(TRIM(kode)) = ?', [strtolower($raw)])
+                    ->orWhereRaw('LOWER(TRIM(nama)) = ?', [strtolower($raw)])
+                    ->orWhere('kode', Str::upper(Str::slug($raw)));
             })
             ->first();
 
@@ -589,7 +590,12 @@ class ImportProdukService
         }
 
         // Jika menyebut "Gudang Utama", "Gudang Pusat", atau variasi nama utama
-        if (strcasecmp($raw, 'Gudang Utama') === 0 || strcasecmp($raw, 'Gudang Pusat') === 0) {
+        if (
+            strcasecmp($raw, 'Gudang Utama') === 0 ||
+            strcasecmp($raw, 'Gudang Pusat') === 0 ||
+            stripos($raw, 'utama') !== false ||
+            stripos($raw, 'pusat') !== false
+        ) {
             $effectiveCabangId = $cabangId ?? $this->resolveCabangDefault();
             $gDefault = Gudang::where('cabang_id', $effectiveCabangId)
                 ->where('is_active', true)
@@ -822,8 +828,9 @@ class ImportProdukService
 
         $g = Gudang::where('cabang_id', $cabangId)
             ->where(function ($q) use ($raw) {
-                $q->whereRaw('LOWER(kode) = ?', [strtolower($raw)])
-                    ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)]);
+                $q->whereRaw('LOWER(TRIM(kode)) = ?', [strtolower($raw)])
+                    ->orWhereRaw('LOWER(TRIM(nama)) = ?', [strtolower($raw)])
+                    ->orWhere('kode', Str::upper(Str::slug($raw)));
             })
             ->first();
 
@@ -831,8 +838,26 @@ class ImportProdukService
             return $this->gudangCache[$cacheKey] = $g->id;
         }
 
-        if (strcasecmp($raw, 'Gudang Utama') === 0 || strcasecmp($raw, 'Gudang Pusat') === 0) {
+        // Jika menyebut "Gudang Utama", "Gudang Pusat", atau variasi nama utama
+        if (
+            strcasecmp($raw, 'Gudang Utama') === 0 ||
+            strcasecmp($raw, 'Gudang Pusat') === 0 ||
+            stripos($raw, 'utama') !== false ||
+            stripos($raw, 'pusat') !== false
+        ) {
             return $this->gudangCache[$cacheKey] = $this->resolveOrCreateGudangDefault($cabangId);
+        }
+
+        // Cek apakah ada gudang aktif di cabang ini dengan slug sama
+        $slugRaw = Str::upper(Str::slug($raw));
+        $gSlug = Gudang::where('cabang_id', $cabangId)
+            ->where(function ($q) use ($slugRaw) {
+                $q->where('kode', $slugRaw)
+                    ->orWhereRaw('UPPER(REPLACE(REPLACE(nama, " ", "-"), "_", "-")) = ?', [$slugRaw]);
+            })
+            ->first();
+        if ($gSlug) {
+            return $this->gudangCache[$cacheKey] = $gSlug->id;
         }
 
         // Buat gudang baru jika belum terdaftar
