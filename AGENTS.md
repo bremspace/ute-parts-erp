@@ -170,6 +170,21 @@ npm run build
 - **Izin akses**: user memberi izin penuh semua akses sesi kerja (per 2026-09-20) — lanjut tanpa minta konfirmasi berulang untuk eksekusi kode/deploy/dev.
 - **Template checklist**: setiap implement-plan baru harus punya checkbox per task (format `- [ ] T-XX — ...` di Acceptance Criteria) yang dicentang hanya setelah verified.
 
+### Aturan Git Kolaborasi (Permanen — Branch Unas)
+- Branch kerja eksklusif: **Unas**. Semua modifikasi kode, commit, dan push HANYA di branch Unas.
+- WAJIB sebelum mengedit kode apa pun di setiap sesi/task:
+  ```sh
+  git fetch origin
+  git pull origin main
+  git pull origin Unas
+  ```
+- DILARANG KERAS push atau merge langsung ke branch `main`.
+- Push harian hanya ke remote branch sendiri:
+  ```sh
+  git push origin Unas
+  ```
+- Penggabungan ke main wajib melalui Pull Request (PR) dari Unas ke main dan menunggu review/merge dari pemilik repositori (tim branch brem).
+
 ## Agent Skills (configured in docs/agents/)
 ### Issue tracker
 GitHub Issues (`bremspace/ute-parts-erp`). Uses `gh` CLI. See `docs/agents/issue-tracker.md`.
