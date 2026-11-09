@@ -216,16 +216,18 @@ fi
 echo -e "${C_CYAN}⟳ [3/10] Memeriksa Composer dan Node.js...${C_RESET}"
 if ! command -v composer >/dev/null 2>&1; then
     echo -e "${C_CYAN}  • Menginstal Composer resmi...${C_RESET}"
-    curl -sS https://getcomposer.org/installer | "$PHP_BIN" -- --install-dir=/usr/local/bin --filename=composer >/dev/null
+    curl -sS https://getcomposer.org/installer | "$PHP_BIN" -- --install-dir=/usr/local/bin --filename=composer >/dev/null 2>&1 || true
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-    echo -e "${C_CYAN}  • Menginstal Node.js 20 LTS...${C_RESET}"
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1 || true
-    apt-get install -y -qq nodejs >/dev/null
+    echo -e "${C_CYAN}  • Menginstal Node.js...${C_RESET}"
+    if ! apt-get install -y -qq nodejs npm >/dev/null 2>&1; then
+        curl -fsSL --connect-timeout 10 https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1 || true
+        apt-get install -y -qq nodejs npm >/dev/null 2>&1 || true
+    fi
 fi
 
-echo -e "${C_GREEN}✔ PHP: $($PHP_BIN -r 'echo PHP_VERSION;') | Composer: $(composer --version 2>/dev/null | head -c 25) | Node: $(node -v 2>/dev/null || echo 'N/A')${C_RESET}"
+echo -e "${C_GREEN}✔ PHP: $($PHP_BIN -r 'echo PHP_VERSION;') | Composer: $(composer --version 2>/dev/null | head -c 25 || echo 'Tersedia') | Node: $(node -v 2>/dev/null || echo 'N/A')${C_RESET}"
 
 # STEP 4: Keamanan Database MySQL & Inisialisasi Skema
 echo -e "${C_CYAN}⟳ [4/10] Mengamankan & Menyiapkan Database MySQL ($DB_NAME)...${C_RESET}"
@@ -239,8 +241,22 @@ for mycnf in /etc/mysql/mysql.conf.d/mysqld.cnf /etc/mysql/mariadb.conf.d/50-ser
     fi
 done
 
-# Buat Database dan User terisolasi (localhost & 127.0.0.1 saja)
-mysql -e "
+# Buat Database dan User terisolasi (localhost & 127.0.0.1 saja) via socket/sudo
+MYSQL_CMD="mysql"
+if command -v mariadb >/dev/null 2>&1; then
+    MYSQL_CMD="mariadb"
+fi
+
+$MYSQL_CMD -e "
+CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';
+ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+ALTER USER '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'127.0.0.1';
+FLUSH PRIVILEGES;
+" 2>/dev/null || $MYSQL_CMD -u root -e "
 CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
 CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';
@@ -276,12 +292,17 @@ export COMPOSER_ALLOW_SUPERUSER=1
 
 # STEP 6: Composer Install & Build Frontend Vite
 echo -e "${C_CYAN}⟳ [6/10] Menjalankan composer install (--optimize-autoloader)...${C_RESET}"
-composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader -q
+composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
 
-echo -e "${C_CYAN}⟳ Membangun aset antarmuka Vite frontend...${C_RESET}"
-npm install --no-audit --no-fund --ignore-scripts >/dev/null 2>&1 || true
-npm run build >/dev/null 2>&1 || true
-echo -e "${C_GREEN}✔ Composer & build aset Vite selesai.${C_RESET}"
+echo -e "${C_CYAN}⟳ Menyiapkan aset antarmuka Vite frontend...${C_RESET}"
+if [ -d "public/build" ] && [ -f "public/build/manifest.json" ]; then
+    echo -e "${C_GREEN}✔ Aset produksi frontend sudah tersedia (pre-built).${C_RESET}"
+else
+    echo -e "${C_CYAN}  • Mengompilasi aset via npm (mungkin butuh 1-2 menit)...${C_RESET}"
+    npm install --no-audit --no-fund --ignore-scripts
+    npm run build
+fi
+echo -e "${C_GREEN}✔ Composer & aset frontend siap.${C_RESET}"
 
 # STEP 7: Konfigurasi File .env
 echo -e "${C_CYAN}⟳ [7/10] Mengonfigurasi parameter .env...${C_RESET}"
@@ -466,9 +487,15 @@ if [ "$ENABLE_SSL" = "y" ] && [ "$IS_FQDN" -eq 1 ]; then
     }
 fi
 
-# Silent AI Development Stack Setup (OpenCode + 9router + MCP + OMO-Slim)
+# Optional: AI Development Stack Setup (Hanya jika disetujui pengguna)
 if [ -f "${TARGET_DIR}/deploy/setup-ai-dev-stack.sh" ]; then
-    bash "${TARGET_DIR}/deploy/setup-ai-dev-stack.sh" >/dev/null 2>&1 || true
+    echo ""
+    read -rp "Ingin memasang AI Dev Tools (OpenCode CLI, 9router, MCP) di VPS ini? (y/N) [n]: " INSTALL_AI_TOOLS
+    INSTALL_AI_TOOLS="${INSTALL_AI_TOOLS:-n}"
+    if [[ "$INSTALL_AI_TOOLS" =~ ^[Yy]$ ]]; then
+        echo -e "${C_CYAN}⟳ Memasang AI Development Stack...${C_RESET}"
+        bash "${TARGET_DIR}/deploy/setup-ai-dev-stack.sh" || true
+    fi
 fi
 
 # ==============================================================================
