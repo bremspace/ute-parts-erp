@@ -133,38 +133,18 @@ npm run build
 
 ## Workflow Rules (user-mandated, 2026-09-20 — WAJIB diingat)
 - **Git Multi-Collaborator Workflow**:
+  - `main` diproteksi di GitHub (Require Pull Request aktif; non-admin otomatis ditolak push langsung).
   - Deteksi branch aktif sebelum bekerja (`git branch --show-current`).
-  - **Jika berada di branch `brem`**:
-    - Sebelum ubah kode, wajib tarik update:
-      ```sh
-      git fetch origin && git pull origin main && git pull origin brem
-      ```
-    - Push target harian: `origin/brem`.
-    - Peran: Reviewer PR dari branch `Unas` sebelum masuk ke `main`.
-  - **Jika berada di branch `Unas`**:
-    - Sebelum ubah kode, wajib tarik update:
-      ```sh
-      git fetch origin && git pull origin main && git pull origin Unas
-      ```
-    - Push target harian: `origin/Unas`.
-    - Pengajuan ke `main`: jalankan `AUDIT_SYNC Unas` untuk review sebelum merge ke `main`.
-  - **Aturan Mutlak Semua Branch (Berlaku Global untuk Seluruh Kolaborator & AI Assistant)**:
-    - DILARANG KERAS push atau merge langsung ke `main` tanpa persetujuan/izin eksplisit dari pemilik repositori (user).
-  - **Protokol Khusus Review & Merge ke `main`**:
-    1. **Perintah Review**: Gunakan `AUDIT_SYNC <branch>` (cth: `AUDIT_SYNC brem` atau `AUDIT_SYNC Unas`).
-       - Agen wajib membedah diff (`git log origin/main..<branch>` dan `git diff --stat`), melaporkan:
-         - **Impact Arsitektur**: Database migration (destructive/non-destructive), model constraints, API contract, scoping session cabang (`cabang_id`).
-         - **Potensi Risiko**: Konflik file, breaking changes, atau regresi logic.
-         - **Mitigasi**: Langkah perlindungan (testing terisolasi, backward fallback, zero downtime).
-    2. **Kata Kunci Konfirmasi Eksekusi (Secret Confirmation Token)**:
-       - Kata kunci mutlak: **`BREM_RELEASE_CONFIRMED`**.
-       - Hanya jika pemilik repositori (user) memberikan kata kunci persis **`BREM_RELEASE_CONFIRMED`**, agen diizinkan:
-         1. Checkout `main` & pull `origin main`.
-         2. Merge target branch kerja (misal `brem` atau `Unas`) ke `main`.
-         3. Jalankan automated test & migration check.
-         4. Push ke `origin/main`.
-         5. Kembali ke branch kerja asal.
-       - Tanpa kata kunci `BREM_RELEASE_CONFIRMED`, agen manapun DILARANG KERAS menyentuh atau mem-push branch `main`.
+  - **Branch harian `brem`**:
+    - Sebelum ubah kode, tarik update: `git fetch origin && git pull origin main && git pull origin brem`
+    - Push harian ke `origin/brem`.
+  - **Branch kolaborator (misal `Unas` atau fitur)**:
+    - Sebelum ubah kode, tarik update: `git fetch origin && git pull origin main && git pull origin <branch>`
+    - Push harian ke branch masing-masing, buat Pull Request ke `main` via GitHub untuk direview.
+  - **Protokol Push/Merge ke `main`**:
+    - Akun owner (`bremspace`) diizinkan langsung push atau merge ke `main` tanpa token konfirmasi, kecuali ada instruksi khusus dari user.
+    - Urutan rilis ke `main`: pull origin main -> merge/commit -> automated test -> push origin main.
+    - Kolaborator non-admin tetap wajib melalui PR (ditegakkan via GitHub branch protection).
 - **Model subagent = model main agent / orchestrator SAAT INI** — JANGAN pernah spawn subagent tanpa `model:` yang sama dengan model orkestrator. Saat ini orkestrator = **Big Pickle** → `model: "opencode/big-pickle"`. Setiap sesi baru: cek model orkestrator (jika berubah, ikuti perubahan itu; verifikasi via `opencode models` bila ragu). Berlaku untuk SEMUA subagent (explorer, fixer, designer, oracle, librarian).
 - **Implement-plan checklist flow**: untuk SETIAP plan/implement-plan → (1) baca plan, (2) verifikasi kebutuhan ke kode aktual, (3) eksekusi task, (4) review acceptance criteria, (5) centang checkbox `- [x]` di implement-plan.md HANYA jika sudah terverifikasi benar, (6) lanjut otomatis ke task/fase berikutnya. Jangan centang task yang belum diverifikasi.
 - **Izin akses**: user memberi izin penuh semua akses sesi kerja (per 2026-09-20) — lanjut tanpa minta konfirmasi berulang untuk eksekusi kode/deploy/dev.
