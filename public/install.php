@@ -20,7 +20,7 @@ declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
-// Deteksi jika sistem sudah terinstall
+// Deteksi jika sistem sudah terinstall (One-time Setup Protection)
 $envFile = __DIR__.'/../.env';
 $lockFile = __DIR__.'/../storage/installed.lock';
 $isInstalled = file_exists($lockFile);
@@ -31,6 +31,48 @@ if (! $isInstalled && file_exists($envFile)) {
     if ($hasKey && $hasDb) {
         $isInstalled = true;
     }
+}
+
+// Blokir total jika instalasi sudah pernah sukses dijalankan (Mencegah modifikasi / pengrusakan)
+if ($isInstalled) {
+    http_response_code(403);
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false,
+            'message' => 'Aplikasi sudah terpasang. Installer dinonaktifkan demi keamanan.',
+        ]);
+        exit;
+    }
+    ?>
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Setup Installer Terkunci — Bremspace ERP</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-4 font-sans">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center space-y-4 shadow-2xl">
+            <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">✓</div>
+            <h1 class="text-xl font-bold text-white tracking-tight">Sistem Sudah Terpasang</h1>
+            <p class="text-xs text-slate-400 leading-relaxed">
+                Setup wizard telah selesai dijalankan. Demi alasan keamanan data & kestabilan sistem, berkas installer ini telah dinonaktifkan secara permanen.
+            </p>
+            <div class="pt-2">
+                <a href="/app/login" class="inline-flex items-center justify-center w-full px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition">
+                    Menuju Halaman Login &rarr;
+                </a>
+            </div>
+            <div class="text-[11px] text-slate-500 pt-2 border-t border-slate-800/80">
+                Untuk setup ulang dari nol: hapus file <code class="text-slate-400 font-mono">storage/installed.lock</code> dan <code class="text-slate-400 font-mono">.env</code> via terminal server.
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
 }
 
 // =============================================================================

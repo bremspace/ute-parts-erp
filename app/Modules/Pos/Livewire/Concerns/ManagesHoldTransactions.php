@@ -5,6 +5,7 @@ namespace App\Modules\Pos\Livewire\Concerns;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Support\Facades\DB;
 
 /**
