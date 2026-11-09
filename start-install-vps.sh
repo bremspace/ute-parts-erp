@@ -214,20 +214,28 @@ fi
 
 # STEP 3: Pastikan Composer & Node.js Tersedia
 echo -e "${C_CYAN}⟳ [3/10] Memeriksa Composer dan Node.js...${C_RESET}"
+export COMPOSER_ALLOW_SUPERUSER=1
+
 if ! command -v composer >/dev/null 2>&1; then
     echo -e "${C_CYAN}  • Menginstal Composer resmi...${C_RESET}"
-    curl -sS https://getcomposer.org/installer | "$PHP_BIN" -- --install-dir=/usr/local/bin --filename=composer >/dev/null 2>&1 || true
-fi
-
-if ! command -v node >/dev/null 2>&1; then
-    echo -e "${C_CYAN}  • Menginstal Node.js...${C_RESET}"
-    if ! apt-get install -y -qq nodejs npm >/dev/null 2>&1; then
-        curl -fsSL --connect-timeout 10 https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1 || true
-        apt-get install -y -qq nodejs npm >/dev/null 2>&1 || true
+    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" 2>/dev/null || true
+    if [ -f composer-setup.php ]; then
+        "$PHP_BIN" composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet 2>/dev/null || true
+        rm -f composer-setup.php
+    fi
+    if ! command -v composer >/dev/null 2>&1; then
+        apt-get install -y -qq composer >/dev/null 2>&1 || true
     fi
 fi
 
-echo -e "${C_GREEN}✔ PHP: $($PHP_BIN -r 'echo PHP_VERSION;') | Composer: $(composer --version 2>/dev/null | head -c 25 || echo 'Tersedia') | Node: $(node -v 2>/dev/null || echo 'N/A')${C_RESET}"
+if ! command -v node >/dev/null 2>&1; then
+    echo -e "${C_CYAN}  • Menginstal Node.js & NPM via apt...${C_RESET}"
+    apt-get install -y -qq nodejs npm >/dev/null 2>&1 || true
+fi
+
+NODE_VER=$(node -v 2>/dev/null || echo 'N/A')
+COMPOSER_VER=$($PHP_BIN $(which composer) --version 2>/dev/null | grep -o 'Composer version [^ ]*' || echo 'Composer Ready')
+echo -e "${C_GREEN}✔ PHP: $($PHP_BIN -r 'echo PHP_VERSION;') | ${COMPOSER_VER} | Node: ${NODE_VER}${C_RESET}"
 
 # STEP 4: Keamanan Database MySQL & Inisialisasi Skema
 echo -e "${C_CYAN}⟳ [4/10] Mengamankan & Menyiapkan Database MySQL ($DB_NAME)...${C_RESET}"
