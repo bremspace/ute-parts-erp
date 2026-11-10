@@ -37,7 +37,7 @@ trait ManagesKasLaci
         // Validasi Livewire: nominal wajib angka, tidak negatif
         if ($this->kasModeBuka) {
             $this->validate([
-                'kasSaldoAwalRaw' => ['required', 'string'],
+                'kasSaldoAwalRaw' => ['required'],
             ], [], [
                 'kasSaldoAwalRaw' => 'Saldo awal',
             ]);
@@ -45,7 +45,7 @@ trait ManagesKasLaci
             $this->formatKasSaldoAwal();
         } else {
             $this->validate([
-                'kasSaldoFisikRaw' => ['required', 'string'],
+                'kasSaldoFisikRaw' => ['required'],
             ], [], [
                 'kasSaldoFisikRaw' => 'Saldo fisik akhir',
             ]);

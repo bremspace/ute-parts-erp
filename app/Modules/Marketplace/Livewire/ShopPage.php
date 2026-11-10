@@ -553,6 +553,12 @@ class ShopPage extends Component
             return;
         }
 
+        if ($produk->stok_total <= 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk ini sedang habis stok.']);
+
+            return;
+        }
+
         $activeVariantId = $variantId;
         if ($produkId) {
             if ($activeVariantId === null) {
@@ -585,6 +591,12 @@ class ShopPage extends Component
     {
         $produk = $produkId ? Produk::with('skuVariants')->find($produkId) : $this->productDetail;
         if (! $produk) {
+            return;
+        }
+
+        if ($produk->stok_total <= 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk ini sedang habis stok.']);
+
             return;
         }
 

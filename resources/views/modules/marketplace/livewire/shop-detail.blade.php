@@ -728,7 +728,7 @@
                     type="button"
                     wire:click="addToCart"
                     {{ $stokTotal <= 0 ? 'disabled' : '' }}
-                    class="py-2.5 px-3 rounded-xl font-bold text-xs bg-ink-100 dark:bg-white/10 hover:bg-ink-200 text-ink-800 dark:text-white active:scale-[0.96] transition-[background-color,transform] duration-140 flex items-center gap-1 cursor-pointer disabled:opacity-40 min-h-[42px]"
+                    class="py-2.5 px-3 rounded-xl font-bold text-xs bg-ink-100 dark:bg-white/10 hover:bg-ink-200 text-ink-800 dark:text-white active:scale-[0.96] transition-[background-color,transform] duration-140 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[42px]"
                     title="Tambah ke Keranjang"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -740,7 +740,7 @@
                     type="button"
                     wire:click="beliLangsung"
                     {{ $stokTotal <= 0 ? 'disabled' : '' }}
-                    class="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-up-primary hover:bg-up-primary-dark text-white shadow-md active:scale-[0.96] transition-[background-color,transform] duration-140 flex items-center gap-1 cursor-pointer disabled:opacity-40 min-h-[42px]"
+                    class="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-up-primary hover:bg-up-primary-dark text-white shadow-md active:scale-[0.96] transition-[background-color,transform] duration-140 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[42px]"
                 >
                     <span>Beli</span>
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

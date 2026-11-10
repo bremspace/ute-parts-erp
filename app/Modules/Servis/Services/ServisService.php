@@ -840,11 +840,15 @@ class ServisService
             throw new \Exception('Tiket tidak dalam status menunggu approval');
         }
 
+        if (! in_array($action, ['approve', 'reject'], true)) {
+            throw new \InvalidArgumentException("Action approval tidak valid: '{$action}'. Hanya 'approve' atau 'reject' yang diizinkan.");
+        }
+
         if ($action === 'approve') {
             return $this->updateStatus($tiket, 'disetujui', null, $alasan);
-        } else {
-            return $this->updateStatus($tiket, 'ditolak', null, $alasan ?: 'Estimasi ditolak oleh pelanggan');
         }
+
+        return $this->updateStatus($tiket, 'ditolak', null, $alasan ?: 'Estimasi ditolak oleh pelanggan');
     }
 
     /**
