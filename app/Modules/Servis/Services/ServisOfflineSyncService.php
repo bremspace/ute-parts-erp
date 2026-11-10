@@ -147,17 +147,20 @@ class ServisOfflineSyncService
 
                     // 3. Jika tiket sudah berstatus diambil
                     if ($tiket->status === 'diambil') {
-                        $tiket->update([
-                            'offline_pickup_uuid' => $uuid,
-                            'is_offline_pickup' => true,
-                            'pickup_synced_at' => now(),
-                        ]);
+                        if ($tiket->offline_pickup_uuid === $uuid) {
+                            return [
+                                'uuid' => $uuid,
+                                'no_tiket' => $tiket->no_tiket,
+                                'status' => 'already_synced',
+                                'message' => 'Tiket sudah pernah disinkronkan sebelumnya',
+                            ];
+                        }
 
                         return [
                             'uuid' => $uuid,
                             'no_tiket' => $tiket->no_tiket,
-                            'status' => 'already_synced',
-                            'message' => 'Tiket sudah berstatus diambil di server',
+                            'status' => 'conflict',
+                            'message' => 'Tiket sudah diserahkan oleh kasir/perangkat lain (Unit sudah berstatus diambil)',
                         ];
                     }
 

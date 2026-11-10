@@ -84,6 +84,21 @@ class ReturnOfflineSyncService
                 continue;
             }
 
+            $tipeRetur = (string) ($returData['tipe_retur'] ?? 'tukar_unit');
+            $metodePengembalian = (string) ($returData['metode_pengembalian'] ?? '');
+
+            // Kebijakan ISO & Anti-Fraud: No Cash Refund Offline (hanya tukar unit)
+            if ($tipeRetur === 'refund' || $metodePengembalian === 'kas') {
+                $failedCount++;
+                $results[] = [
+                    'uuid' => $uuid,
+                    'no_return' => null,
+                    'status' => 'failed',
+                    'message' => 'Kebijakan ISO: Pengembalian dana tunai (refund) tidak diizinkan saat offline. Hanya tukar unit 1-to-1.',
+                ];
+                continue;
+            }
+
             try {
                 $res = DB::transaction(function () use (
                     $uuid, $noTransaksiAsal, $alasan, $items,
