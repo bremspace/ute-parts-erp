@@ -114,6 +114,7 @@ class ReturnPenjualanController extends Controller
     public function syncOffline(Request $request)
     {
         $request->validate([
+            'schema_version' => 'nullable|integer',
             'returns' => 'required|array|min:1',
             'returns.*.retur_uuid' => 'required|string',
             'returns.*.no_transaksi_asal' => 'required|string',

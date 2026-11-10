@@ -226,6 +226,7 @@ class PosController extends Controller
     public function syncOffline(Request $request)
     {
         $request->validate([
+            'schema_version' => 'nullable|integer',
             'transactions' => 'required|array|min:1',
             'transactions.*.offline_uuid' => 'required|string',
             'transactions.*.items' => 'required|array|min:1',

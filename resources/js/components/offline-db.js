@@ -107,13 +107,16 @@ export const UteOfflineDB = {
     /**
      * Simpan kumpulan master produk ke IndexedDB
      */
-    async saveMasterProduk(products = []) {
+    async saveMasterProduk(products = [], clearOld = false) {
         const db = await openOfflineDB();
         if (!db) return false;
 
         return new Promise((resolve, reject) => {
             const tx = db.transaction('master_produk', 'readwrite');
             const store = tx.objectStore('master_produk');
+            if (clearOld) {
+                store.clear();
+            }
 
             products.forEach((p) => {
                 store.put(p);
@@ -313,29 +316,108 @@ export const UteOfflineDB = {
     },
 
     /**
-     * Hapus outbox yang sudah tersinkron lebih dari N hari (default 7 hari)
+     * Hapus satu item outbox (dismiss conflict/failed)
      */
-    async pruneSyncedOutbox(daysToKeep = 7) {
-        const all = await this.getAllOutbox();
-        const cutoffTime = Date.now() - daysToKeep * 24 * 60 * 60 * 1000;
+    async deleteOutboxItem(type, key) {
+        const db = await openOfflineDB();
+        if (!db) return false;
+
+        const storeName = type === 'servis' || type === 'pickup'
+            ? 'servis_pickup_outbox'
+            : (type === 'retur' ? 'retur_outbox' : 'pos_outbox');
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const req = store.delete(key);
+            req.onsuccess = () => resolve(true);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    /**
+     * Reset status item outbox kembali ke 'pending' untuk diulang (retry)
+     */
+    async retryOutboxItem(type, key) {
+        const db = await openOfflineDB();
+        if (!db) return false;
+
+        const storeName = type === 'servis' || type === 'pickup'
+            ? 'servis_pickup_outbox'
+            : (type === 'retur' ? 'retur_outbox' : 'pos_outbox');
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const getReq = store.get(key);
+
+            getReq.onsuccess = () => {
+                const item = getReq.result;
+                if (!item) return resolve(false);
+
+                item.status = 'pending';
+                delete item.error_message;
+                item.updated_at = new Date().toISOString();
+
+                store.put(item);
+                resolve(true);
+            };
+
+            getReq.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    /**
+     * Hapus seluruh outbox yang sudah tersinkron (POS, Servis, Retur) lebih dari N hari
+     */
+    async pruneAllSyncedOutbox(daysToKeep = 7) {
         const db = await openOfflineDB();
         if (!db) return 0;
 
+        const cutoffTime = Date.now() - daysToKeep * 24 * 60 * 60 * 1000;
         let prunedCount = 0;
-        const tx = db.transaction('pos_outbox', 'readwrite');
-        const store = tx.objectStore('pos_outbox');
 
-        for (const item of all) {
-            if (item.status === 'synced' && item.synced_at) {
-                const itemTime = new Date(item.synced_at).getTime();
-                if (itemTime < cutoffTime) {
-                    store.delete(item.offline_uuid);
-                    prunedCount++;
-                }
+        const stores = [
+            { name: 'pos_outbox', key: 'offline_uuid' },
+            { name: 'servis_pickup_outbox', key: 'pickup_uuid' },
+            { name: 'retur_outbox', key: 'retur_uuid' },
+        ];
+
+        for (const s of stores) {
+            try {
+                const tx = db.transaction(s.name, 'readwrite');
+                const store = tx.objectStore(s.name);
+                const req = store.getAll();
+
+                await new Promise((res) => {
+                    req.onsuccess = () => {
+                        const items = req.result || [];
+                        items.forEach((item) => {
+                            if (item.status === 'synced' && item.synced_at) {
+                                const t = new Date(item.synced_at).getTime();
+                                if (t < cutoffTime) {
+                                    store.delete(item[s.key]);
+                                    prunedCount++;
+                                }
+                            }
+                        });
+                        res();
+                    };
+                    req.onerror = () => res();
+                });
+            } catch (err) {
+                console.warn(`[OfflineDB] Gagal pruning ${s.name}:`, err);
             }
         }
 
         return prunedCount;
+    },
+
+    /**
+     * Hapus outbox yang sudah tersinkron lebih dari N hari (default 7 hari)
+     */
+    async pruneSyncedOutbox(daysToKeep = 7) {
+        return this.pruneAllSyncedOutbox(daysToKeep);
     },
 
     /**
@@ -364,7 +446,7 @@ export const UteOfflineDB = {
             const json = await response.json();
             if (json.success && json.data) {
                 const { products = [], customers = [] } = json.data;
-                await this.saveMasterProduk(products);
+                await this.saveMasterProduk(products, true);
                 await this.saveMasterCustomers(customers);
 
                 console.log(`[OfflineDB] Cache master sukses: ${products.length} produk, ${customers.length} pelanggan.`);
@@ -385,6 +467,7 @@ export const UteOfflineDB = {
         return new Promise((resolve, reject) => {
             const tx = db.transaction('servis_active_cache', 'readwrite');
             const store = tx.objectStore('servis_active_cache');
+            store.clear();
 
             tickets.forEach((t) => {
                 store.put(t);

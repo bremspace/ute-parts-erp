@@ -99,6 +99,22 @@ export default defineConfig({
                 additionalManifestEntries: [{ url: '/offline.html', revision: null }],
                 runtimeCaching: [
                     {
+                        // Cache App Shell halaman Kasir POS agar bisa dibuka saat offline (Cold boot resilience)
+                        urlPattern: /\/app\/pos/i,
+                        handler: 'NetworkFirst',
+                        options: {
+                            cacheName: 'pos-shell-cache',
+                            expiration: {
+                                maxEntries: 5,
+                                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+                            },
+                            networkTimeoutSeconds: 3,
+                            cacheableResponse: {
+                                statuses: [0, 200],
+                            },
+                        },
+                    },
+                    {
                         // Jangan cache endpoint Livewire di service worker
                         urlPattern: /\/livewire/i,
                         handler: 'NetworkOnly',

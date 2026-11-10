@@ -404,6 +404,7 @@ class ServisController extends Controller
     public function syncPickupOffline(Request $request)
     {
         $request->validate([
+            'schema_version' => 'nullable|integer',
             'pickups' => 'required|array|min:1',
             'pickups.*.pickup_uuid' => 'required|string',
             'client_batch_id' => 'nullable|string|max:100',

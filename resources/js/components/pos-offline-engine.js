@@ -34,6 +34,8 @@ export function initPosOfflineStore() {
     window.Alpine.store('posOffline', {
         isOnline: navigator.onLine,
         isSyncing: false,
+        authExpired: false,
+        authErrorMessage: '',
         pendingCount: 0,
         outboxItems: [],
         drawerOpen: false,
@@ -42,6 +44,11 @@ export function initPosOfflineStore() {
 
         async init() {
             await this.refreshOutbox();
+
+            // Prune outbox lama yang sudah tersinkron (> 7 hari)
+            if (window.UteOfflineDB?.pruneAllSyncedOutbox) {
+                window.UteOfflineDB.pruneAllSyncedOutbox(7).catch(() => {});
+            }
 
             // Background pre-fetch snapshot servis jika online
             if (navigator.onLine && window.UteOfflineDB?.syncServisActiveFromServer) {
@@ -445,12 +452,23 @@ export function initPosOfflineStore() {
                         method: 'POST',
                         headers: defaultHeaders,
                         body: JSON.stringify({
+                            schema_version: 2,
                             client_batch_id: batchId,
                             transactions: chunk,
                         }),
                     });
 
+                    if (res.status === 401 || res.status === 419) {
+                        this.authExpired = true;
+                        this.authErrorMessage = res.status === 419
+                            ? 'Token CSRF / sesi telah kedaluwarsa (419). Silakan refresh halaman atau login ulang untuk menyinkronkan data.'
+                            : 'Sesi login telah berakhir (401). Silakan login kembali untuk melanjutkan sinkronisasi.';
+                        return;
+                    }
+
                     if (res.ok) {
+                        this.authExpired = false;
+                        this.authErrorMessage = '';
                         const resJson = await res.json();
                         if (resJson.success && resJson.data?.results) {
                             for (const r of resJson.data.results) {
@@ -478,12 +496,23 @@ export function initPosOfflineStore() {
                         method: 'POST',
                         headers: defaultHeaders,
                         body: JSON.stringify({
+                            schema_version: 2,
                             client_batch_id: batchId,
                             pickups: chunkPickups,
                         }),
                     });
 
+                    if (resPickup.status === 401 || resPickup.status === 419) {
+                        this.authExpired = true;
+                        this.authErrorMessage = resPickup.status === 419
+                            ? 'Token CSRF / sesi telah kedaluwarsa (419). Silakan refresh halaman atau login ulang untuk menyinkronkan data.'
+                            : 'Sesi login telah berakhir (401). Silakan login kembali untuk melanjutkan sinkronisasi.';
+                        return;
+                    }
+
                     if (resPickup.ok) {
+                        this.authExpired = false;
+                        this.authErrorMessage = '';
                         const jsonPickup = await resPickup.json();
                         if (jsonPickup.success && jsonPickup.data?.results) {
                             for (const r of jsonPickup.data.results) {
@@ -510,12 +539,23 @@ export function initPosOfflineStore() {
                         method: 'POST',
                         headers: defaultHeaders,
                         body: JSON.stringify({
+                            schema_version: 2,
                             client_batch_id: batchId,
                             returns: chunkReturs,
                         }),
                     });
 
+                    if (resRetur.status === 401 || resRetur.status === 419) {
+                        this.authExpired = true;
+                        this.authErrorMessage = resRetur.status === 419
+                            ? 'Token CSRF / sesi telah kedaluwarsa (419). Silakan refresh halaman atau login ulang untuk menyinkronkan data.'
+                            : 'Sesi login telah berakhir (401). Silakan login kembali untuk melanjutkan sinkronisasi.';
+                        return;
+                    }
+
                     if (resRetur.ok) {
+                        this.authExpired = false;
+                        this.authErrorMessage = '';
                         const jsonRetur = await resRetur.json();
                         if (jsonRetur.success && jsonRetur.data?.results) {
                             for (const r of jsonRetur.data.results) {
@@ -540,6 +580,22 @@ export function initPosOfflineStore() {
                 this.isSyncing = false;
                 await this.refreshOutbox();
             }
+        },
+
+        async dismissOutboxItem(type, id) {
+            if (!window.UteOfflineDB?.deleteOutboxItem) return;
+            const confirmed = confirm('Apakah Anda yakin ingin menghapus / mengabaikan item ini dari outbox?');
+            if (!confirmed) return;
+
+            await window.UteOfflineDB.deleteOutboxItem(type, id);
+            await this.refreshOutbox();
+        },
+
+        async retryOutboxItem(type, id) {
+            if (!window.UteOfflineDB?.retryOutboxItem) return;
+            await window.UteOfflineDB.retryOutboxItem(type, id);
+            await this.refreshOutbox();
+            this.triggerAutoSync();
         },
     });
 }

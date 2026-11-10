@@ -86,6 +86,18 @@
             </div>
 
             <div class="flex-1 overflow-y-auto flex flex-col gap-2">
+                <template x-if="$store.posOffline.authExpired">
+                    <div class="p-3 mb-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs flex flex-col gap-1.5">
+                        <div class="font-semibold flex items-center gap-1.5">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            Sesi Login Kedaluwarsa
+                        </div>
+                        <p class="text-[11px]" x-text="$store.posOffline.authErrorMessage"></p>
+                        <button type="button" onclick="location.reload()" class="mt-1 py-1 px-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-[11px] self-start transition-colors">
+                            Muat Ulang Halaman
+                        </button>
+                    </div>
+                </template>
                 <template x-if="$store.posOffline.outboxItems.length === 0">
                     <div class="p-8 text-center text-xs text-ink-400">
                         Tidak ada antrean transaksi offline saat ini.
@@ -111,6 +123,24 @@
                         </div>
                         <template x-if="item.error_message">
                             <div class="text-[11px] text-rose-500 font-medium" x-text="item.error_message"></div>
+                        </template>
+                        <template x-if="item.status === 'conflict' || item.status === 'failed'">
+                            <div class="flex items-center gap-2 pt-1 border-t border-ink-100 dark:border-white/5 mt-1">
+                                <button
+                                    type="button"
+                                    @click.stop="$store.posOffline.retryOutboxItem(item.item_type || 'pos', item.offline_uuid || item.pickup_uuid || item.retur_uuid)"
+                                    class="px-2 py-0.5 rounded bg-primary-50 dark:bg-primary-500/10 text-up-primary hover:bg-primary-100 text-[10px] font-semibold"
+                                >
+                                    Ulangi
+                                </button>
+                                <button
+                                    type="button"
+                                    @click.stop="$store.posOffline.dismissOutboxItem(item.item_type || 'pos', item.offline_uuid || item.pickup_uuid || item.retur_uuid)"
+                                    class="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 text-[10px] font-semibold"
+                                >
+                                    Hapus
+                                </button>
+                            </div>
                         </template>
                     </div>
                 </template>
