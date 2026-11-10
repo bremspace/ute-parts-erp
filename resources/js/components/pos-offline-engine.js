@@ -43,8 +43,16 @@ export function initPosOfflineStore() {
         async init() {
             await this.refreshOutbox();
 
+            // Background pre-fetch snapshot servis jika online
+            if (navigator.onLine && window.UteOfflineDB?.syncServisActiveFromServer) {
+                window.UteOfflineDB.syncServisActiveFromServer().catch(() => {});
+            }
+
             window.addEventListener('online', () => {
                 this.isOnline = true;
+                if (window.UteOfflineDB?.syncServisActiveFromServer) {
+                    window.UteOfflineDB.syncServisActiveFromServer().catch(() => {});
+                }
                 this.triggerAutoSync();
             });
 
@@ -62,9 +70,39 @@ export function initPosOfflineStore() {
 
         async refreshOutbox() {
             if (!window.UteOfflineDB) return;
-            const all = await window.UteOfflineDB.getAllOutbox();
-            this.outboxItems = all.sort((a, b) => new Date(b.client_created_at) - new Date(a.client_created_at));
-            this.pendingCount = all.filter((x) => x.status === 'pending' || x.status === 'failed').length;
+            const allPos = (await window.UteOfflineDB.getAllOutbox?.()) || [];
+            const allPickups = (await window.UteOfflineDB.getAllServisPickups?.()) || [];
+            const allReturs = (await window.UteOfflineDB.getAllReturOutbox?.()) || [];
+
+            const formattedPos = allPos.map((p) => ({
+                ...p,
+                entry_type: 'pos',
+                display_title: p.server_no_transaksi || `TRX-${p.offline_uuid.slice(0, 8).toUpperCase()}`,
+                display_subtitle: `${p.items ? p.items.length : 0} produk • Tunai Rp ${Number(p.total_nominal || 0).toLocaleString('id-ID')}`,
+            }));
+
+            const formattedPickups = allPickups.map((s) => ({
+                ...s,
+                entry_type: 'servis_pickup',
+                display_title: `SERVIS: ${s.no_tiket}`,
+                display_subtitle: `Diambil: ${s.nama_pengambil} • Pelunasan Rp ${Number(s.nominal_pelunasan || 0).toLocaleString('id-ID')}`,
+            }));
+
+            const formattedReturs = allReturs.map((r) => ({
+                ...r,
+                entry_type: 'retur',
+                display_title: `RETUR: ${r.no_transaksi_asal}`,
+                display_subtitle: `Tukar Unit: ${r.alasan || 'Kerusakan komponen'}`,
+            }));
+
+            const combined = [...formattedPos, ...formattedPickups, ...formattedReturs];
+            this.outboxItems = combined.sort((a, b) => new Date(b.client_created_at) - new Date(a.client_created_at));
+
+            const pendingPosCount = allPos.filter((x) => x.status === 'pending' || x.status === 'failed').length;
+            const pendingPickupCount = allPickups.filter((x) => x.status === 'pending' || x.status === 'failed').length;
+            const pendingReturCount = allReturs.filter((x) => x.status === 'pending' || x.status === 'failed').length;
+
+            this.pendingCount = pendingPosCount + pendingPickupCount + pendingReturCount;
         },
 
         toggleDrawer() {
@@ -205,12 +243,183 @@ export function initPosOfflineStore() {
             return true;
         },
 
+        // ================= Servis Offline Handover =================
+        async searchServisActive(query = '') {
+            if (!window.UteOfflineDB?.getAllServisActiveCache) return [];
+            const tickets = await window.UteOfflineDB.getAllServisActiveCache();
+            if (!query.trim()) return tickets;
+
+            const q = query.toLowerCase().trim();
+            return tickets.filter((t) =>
+                (t.no_tiket && t.no_tiket.toLowerCase().includes(q)) ||
+                (t.nama_pelanggan && t.nama_pelanggan.toLowerCase().includes(q)) ||
+                (t.no_wa && t.no_wa.includes(q)) ||
+                (t.tipe_gadget && t.tipe_gadget.toLowerCase().includes(q)) ||
+                (t.imei && t.imei.toLowerCase().includes(q))
+            );
+        },
+
+        async processOfflineServisPickup(pickupData = {}) {
+            const {
+                no_tiket,
+                nama_pengambil,
+                nominal_pelunasan = 0,
+                metode_pembayaran = 'tunai',
+                catatan = '',
+            } = pickupData;
+
+            if (!no_tiket) {
+                throw new Error('Nomor tiket servis wajib diisi.');
+            }
+            if (!nama_pengambil) {
+                throw new Error('Nama pengambil unit wajib diisi.');
+            }
+
+            const uuid = generateUuidV7();
+            const record = {
+                pickup_uuid: uuid,
+                no_tiket,
+                nama_pengambil,
+                nominal_pelunasan: Number(nominal_pelunasan) || 0,
+                metode_pembayaran,
+                catatan,
+                cabang_id: window.ACTIVE_CABANG_ID || 1,
+                user_id: window.CURRENT_USER_ID || 1,
+                client_created_at: new Date().toISOString(),
+                status: 'pending',
+            };
+
+            await window.UteOfflineDB.saveServisPickup(record);
+
+            // Update local snapshot cache status to 'diambil'
+            const cached = await window.UteOfflineDB.getServisActiveCache(no_tiket);
+            if (cached) {
+                cached.status = 'diambil';
+                cached.diambil_offline = true;
+                await window.UteOfflineDB.saveServisActiveCache([cached]);
+            }
+
+            // ESC/POS Thermal Print jika ada printer Bluetooth
+            if (window.UteThermalPrint) {
+                try {
+                    await window.UteThermalPrint.printReceipt({
+                        nama_toko: window.APP_NAME || 'Ute Parts Store',
+                        cabang: 'Cabang POS Servis',
+                        no_transaksi: `PICKUP-${no_tiket}`,
+                        waktu: new Date().toLocaleString('id-ID'),
+                        kasir: 'Kasir Offline',
+                        pelanggan: nama_pengambil,
+                        is_offline: true,
+                        items: [
+                            {
+                                nama: `Pelunasan Servis [${no_tiket}]`,
+                                qty: 1,
+                                harga: Number(nominal_pelunasan) || 0,
+                                subtotal: Number(nominal_pelunasan) || 0,
+                            },
+                        ],
+                        total_akhir: Number(nominal_pelunasan) || 0,
+                        bayar: Number(nominal_pelunasan) || 0,
+                        kembali: 0,
+                        metode_bayar: (metode_pembayaran || 'TUNAI').toUpperCase(),
+                    });
+                } catch (e) {
+                    console.warn('[OfflinePickup] Gagal cetak nota serah terima:', e);
+                }
+            }
+
+            await this.refreshOutbox();
+
+            if (navigator.onLine) {
+                this.triggerAutoSync();
+            }
+
+            return { success: true, pickup_uuid: uuid, no_tiket };
+        },
+
+        // ================= Retur Offline (No Cash Refund) =================
+        async processOfflineRetur(returData = {}) {
+            const {
+                no_transaksi_asal,
+                alasan = 'Tukar unit 1-to-1 offline',
+                tipe_retur = 'tukar_unit',
+                items = [],
+            } = returData;
+
+            if (!no_transaksi_asal) {
+                throw new Error('Nomor transaksi asal wajib diisi.');
+            }
+            if (!items || items.length === 0) {
+                throw new Error('Minimal harus ada 1 item yang diretur.');
+            }
+
+            // ISO / Business Rule: No Cash Refund Offline!
+            if (tipe_retur === 'refund') {
+                throw new Error('Kebijakan ISO: Pengembalian uang tunai (Refund) tidak diizinkan saat offline. Hanya tukar barang 1-to-1.');
+            }
+
+            const uuid = generateUuidV7();
+            const record = {
+                retur_uuid: uuid,
+                no_transaksi_asal,
+                alasan,
+                tipe_retur: 'tukar_unit',
+                items,
+                cabang_id: window.ACTIVE_CABANG_ID || 1,
+                user_id: window.CURRENT_USER_ID || 1,
+                client_created_at: new Date().toISOString(),
+                status: 'pending',
+            };
+
+            await window.UteOfflineDB.saveReturOutbox(record);
+
+            // ESC/POS Thermal Print bukti tukar unit
+            if (window.UteThermalPrint) {
+                try {
+                    await window.UteThermalPrint.printReceipt({
+                        nama_toko: window.APP_NAME || 'Ute Parts Store',
+                        cabang: 'Cabang POS Retur',
+                        no_transaksi: `RETUR-${uuid.slice(0, 8).toUpperCase()}`,
+                        waktu: new Date().toLocaleString('id-ID'),
+                        kasir: 'Kasir Offline',
+                        pelanggan: 'Konsumen Retur',
+                        is_offline: true,
+                        items: items.map((it) => ({
+                            nama: `Tukar: ${it.nama || 'Item #' + it.produk_id} (1-to-1)`,
+                            qty: it.qty || 1,
+                            harga: 0,
+                            subtotal: 0,
+                        })),
+                        total_akhir: 0,
+                        bayar: 0,
+                        kembali: 0,
+                        metode_bayar: 'TUKAR UNIT (NO REFUND)',
+                    });
+                } catch (e) {
+                    console.warn('[OfflineRetur] Gagal cetak bukti retur:', e);
+                }
+            }
+
+            await this.refreshOutbox();
+
+            if (navigator.onLine) {
+                this.triggerAutoSync();
+            }
+
+            return { success: true, retur_uuid: uuid };
+        },
+
         // ================= Auto-Sync Protocol =================
         async triggerAutoSync() {
             if (this.isSyncing || !navigator.onLine) return;
 
-            const pending = await window.UteOfflineDB.getPendingOutbox();
-            if (pending.length === 0) return;
+            const pendingPos = (await window.UteOfflineDB?.getPendingOutbox?.()) || [];
+            const pendingPickups = (await window.UteOfflineDB?.getPendingServisPickups?.()) || [];
+            const pendingReturs = (await window.UteOfflineDB?.getPendingReturOutbox?.()) || [];
+
+            if (pendingPos.length === 0 && pendingPickups.length === 0 && pendingReturs.length === 0) {
+                return;
+            }
 
             this.isSyncing = true;
 
@@ -218,44 +427,115 @@ export function initPosOfflineStore() {
             const jitter = Math.floor(Math.random() * 1500) + 500;
             await new Promise((r) => setTimeout(r, jitter));
 
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const defaultHeaders = {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+            };
+
             try {
-                // Batch chunks of max 10
-                const chunk = pending.slice(0, 10);
-                const batchId = `BATCH-${Date.now()}`;
+                // 1. Sync POS Outbox
+                if (pendingPos.length > 0) {
+                    const chunk = pendingPos.slice(0, 10);
+                    const batchId = `BATCH-POS-${Date.now()}`;
 
-                const response = await fetch('/api/pos/sync-offline', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    },
-                    body: JSON.stringify({
-                        client_batch_id: batchId,
-                        transactions: chunk,
-                    }),
-                });
+                    const res = await fetch('/api/pos/sync-offline', {
+                        method: 'POST',
+                        headers: defaultHeaders,
+                        body: JSON.stringify({
+                            client_batch_id: batchId,
+                            transactions: chunk,
+                        }),
+                    });
 
-                if (response.ok) {
-                    const resJson = await response.json();
-                    if (resJson.success && resJson.data?.results) {
-                        for (const r of resJson.data.results) {
-                            if (r.status === 'synced' || r.status === 'already_synced') {
-                                await window.UteOfflineDB.updateOutboxStatus(r.offline_uuid, 'synced', {
-                                    synced_at: new Date().toISOString(),
-                                    server_no_transaksi: r.no_transaksi,
-                                });
-                            } else {
-                                await window.UteOfflineDB.updateOutboxStatus(r.offline_uuid, 'conflict', {
-                                    error_message: r.message,
-                                });
+                    if (res.ok) {
+                        const resJson = await res.json();
+                        if (resJson.success && resJson.data?.results) {
+                            for (const r of resJson.data.results) {
+                                if (r.status === 'synced' || r.status === 'already_synced') {
+                                    await window.UteOfflineDB.updateOutboxStatus(r.offline_uuid, 'synced', {
+                                        synced_at: new Date().toISOString(),
+                                        server_no_transaksi: r.no_transaksi,
+                                    });
+                                } else {
+                                    await window.UteOfflineDB.updateOutboxStatus(r.offline_uuid, 'conflict', {
+                                        error_message: r.message,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Sync Servis Pickups
+                if (pendingPickups.length > 0) {
+                    const chunkPickups = pendingPickups.slice(0, 10);
+                    const batchId = `BATCH-PICKUP-${Date.now()}`;
+
+                    const resPickup = await fetch('/api/servis/sync-pickup', {
+                        method: 'POST',
+                        headers: defaultHeaders,
+                        body: JSON.stringify({
+                            client_batch_id: batchId,
+                            pickups: chunkPickups,
+                        }),
+                    });
+
+                    if (resPickup.ok) {
+                        const jsonPickup = await resPickup.json();
+                        if (jsonPickup.success && jsonPickup.data?.results) {
+                            for (const r of jsonPickup.data.results) {
+                                if (r.status === 'synced' || r.status === 'already_synced') {
+                                    await window.UteOfflineDB.updateServisPickupStatus(r.uuid, 'synced', {
+                                        synced_at: new Date().toISOString(),
+                                    });
+                                } else {
+                                    await window.UteOfflineDB.updateServisPickupStatus(r.uuid, 'failed', {
+                                        error_message: r.message,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Sync Returs
+                if (pendingReturs.length > 0) {
+                    const chunkReturs = pendingReturs.slice(0, 10);
+                    const batchId = `BATCH-RETUR-${Date.now()}`;
+
+                    const resRetur = await fetch('/api/pos/sync-retur', {
+                        method: 'POST',
+                        headers: defaultHeaders,
+                        body: JSON.stringify({
+                            client_batch_id: batchId,
+                            returns: chunkReturs,
+                        }),
+                    });
+
+                    if (resRetur.ok) {
+                        const jsonRetur = await resRetur.json();
+                        if (jsonRetur.success && jsonRetur.data?.results) {
+                            for (const r of jsonRetur.data.results) {
+                                if (r.status === 'synced' || r.status === 'already_synced' || r.status === 'draft_created') {
+                                    await window.UteOfflineDB.updateReturOutboxStatus(r.uuid, 'synced', {
+                                        server_no_return: r.no_return,
+                                        sync_result_status: r.status,
+                                        synced_at: new Date().toISOString(),
+                                    });
+                                } else {
+                                    await window.UteOfflineDB.updateReturOutboxStatus(r.uuid, 'failed', {
+                                        error_message: r.message,
+                                    });
+                                }
                             }
                         }
                     }
                 }
             } catch (err) {
-                console.warn('[PosOfflineSync] Network error during batch sync:', err);
+                console.warn('[OfflineSync] Network error during batch sync:', err);
             } finally {
                 this.isSyncing = false;
                 await this.refreshOutbox();

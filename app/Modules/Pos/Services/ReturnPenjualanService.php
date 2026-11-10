@@ -59,6 +59,18 @@ class ReturnPenjualanService
         return (int) $gudang->id;
     }
 
+    public function generateNoReturn(string $prefix = 'RTJ', ?int $cabangId = null): string
+    {
+        $today = now()->format('Ymd');
+        $count = ReturnPenjualan::whereDate('created_at', now()->toDateString())->count() + 1;
+
+        if ($cabangId) {
+            return sprintf('%s-C%d-%s-%04d', $prefix, $cabangId, $today, $count);
+        }
+
+        return sprintf('%s-%s-%04d', $prefix, $today, $count);
+    }
+
     /**
      * Buat transaksi retur penjualan dari transaksi yang valid.
      *
@@ -296,9 +308,7 @@ class ReturnPenjualanService
                 }
             }
 
-            $today = now()->format('Ymd');
-            $count = ReturnPenjualan::whereDate('created_at', now()->toDateString())->count() + 1;
-            $noReturn = sprintf('RTJ-%s-%04d', $today, $count);
+            $noReturn = $this->generateNoReturn();
 
             $retur = ReturnPenjualan::create([
                 'no_return' => $noReturn,

@@ -87,6 +87,7 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::get('/retur', [ReturnPenjualanController::class, 'index'])->middleware('permission:pos.view');
             Route::get('/retur/{id}', [ReturnPenjualanController::class, 'show'])->middleware('permission:pos.view');
             Route::post('/retur', [ReturnPenjualanController::class, 'store'])->middleware('permission:pos.create');
+            Route::post('/sync-retur', [ReturnPenjualanController::class, 'syncOffline'])->middleware('permission:pos.create|pos.view-own');
         });
         Route::get('/pricing/{produk_id}', [PosController::class, 'resolvePrice'])->middleware('permission:pos.view');
 
@@ -152,6 +153,8 @@ Route::middleware(['throttle:60,1'])->group(function () {
 
         // [API: SERVICE-01..06] Modul Servis HP
         Route::prefix('servis')->group(function () {
+            Route::get('/active-offline', [ServisController::class, 'activeOffline'])->middleware('permission:servis.view|pos.view');
+            Route::post('/sync-pickup', [ServisController::class, 'syncPickupOffline'])->middleware('permission:servis.payment|pos.create');
             Route::get('/', [ServisController::class, 'index'])->middleware('permission:servis.view');
             Route::post('/', [ServisController::class, 'store'])->middleware('permission:servis.create');
             Route::get('/{id}', [ServisController::class, 'show'])->middleware('permission:servis.view');

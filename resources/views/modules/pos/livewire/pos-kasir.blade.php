@@ -91,10 +91,10 @@
                         Tidak ada antrean transaksi offline saat ini.
                     </div>
                 </template>
-                <template x-for="item in $store.posOffline.outboxItems" :key="item.offline_uuid">
+                <template x-for="item in $store.posOffline.outboxItems" :key="item.offline_uuid || item.pickup_uuid || item.retur_uuid">
                     <div class="p-3 rounded-xl border border-ink-100 dark:border-white/10 bg-ink-50/50 dark:bg-white/[0.02] flex flex-col gap-1.5 text-xs">
                         <div class="flex items-center justify-between">
-                            <span class="font-bold text-ink-900 dark:text-white" x-text="item.server_no_transaksi || item.offline_uuid.slice(0, 8)"></span>
+                            <span class="font-bold text-ink-900 dark:text-white" x-text="item.display_title || item.server_no_transaksi || (item.offline_uuid ? item.offline_uuid.slice(0, 8) : 'Item')"></span>
                             <span
                                 class="px-2 py-0.5 rounded-full text-[10px] font-bold"
                                 :class="{
@@ -106,10 +106,12 @@
                             ></span>
                         </div>
                         <div class="flex items-center justify-between text-ink-500">
-                            <span x-text="new Date(item.client_created_at).toLocaleTimeString('id-ID')"></span>
-                            <span class="font-semibold text-ink-900 dark:text-white" x-text="'Rp ' + Number(item.total_nominal || 0).toLocaleString('id-ID')"></span>
+                            <span x-text="item.client_created_at ? new Date(item.client_created_at).toLocaleTimeString('id-ID') : '-'"></span>
+                            <span class="font-semibold text-ink-900 dark:text-white" x-text="item.display_subtitle || ('Rp ' + Number(item.total_nominal || 0).toLocaleString('id-ID'))"></span>
                         </div>
-                        <div class="text-[11px] text-ink-400" x-text="(item.items ? item.items.length : 0) + ' item produk'"></div>
+                        <template x-if="item.error_message">
+                            <div class="text-[11px] text-rose-500 font-medium" x-text="item.error_message"></div>
+                        </template>
                     </div>
                 </template>
             </div>

@@ -25,6 +25,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'status_sla_kpi', 'warning_overdue_sent_at', 'token_approval', 'tanggal_terima', 'tanggal_selesai',
     'tanggal_diambil', 'catatan_admin',
     'status_pembayaran', 'tanggal_bayar', 'metode_pembayaran', 'no_jurnal_bayar',
+    'offline_pickup_uuid', 'is_offline_pickup', 'pickup_synced_at',
 ])]
 class TiketServis extends Model
 {
@@ -54,6 +55,8 @@ class TiketServis extends Model
         'tanggal_selesai' => 'datetime',
         'tanggal_diambil' => 'datetime',
         'tanggal_bayar' => 'datetime',
+        'is_offline_pickup' => 'boolean',
+        'pickup_synced_at' => 'datetime',
         'kunci_terenkripsi' => 'encrypted', // [T-19] terenkripsi at-rest
     ];
 

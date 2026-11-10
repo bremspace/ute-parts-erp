@@ -106,4 +106,37 @@ class ReturnPenjualanController extends Controller
             return $this->error($e->getMessage(), 422);
         }
     }
+
+    /**
+     * [API: POS-OFFLINE-03] Sinkronisasi antrean retur penjualan offline dari kasir.
+     * Menerapkan aturan No-Cash-Refund Offline (Hanya Tukar Unit 1-to-1).
+     */
+    public function syncOffline(Request $request)
+    {
+        $request->validate([
+            'returns' => 'required|array|min:1',
+            'returns.*.retur_uuid' => 'required|string',
+            'returns.*.no_transaksi_asal' => 'required|string',
+            'returns.*.items' => 'required|array|min:1',
+            'client_batch_id' => 'nullable|string|max:100',
+        ]);
+
+        $cabangId = session('cabang_id')
+            ?? auth()->user()?->cabangs()->first()?->id
+            ?? (int) $request->input('cabang_id', 1);
+
+        $userId = auth()->id() ?? (int) $request->input('user_id', 1);
+
+        $syncService = app(\App\Modules\Pos\Services\ReturnOfflineSyncService::class);
+        $result = $syncService->syncReturBatch(
+            returns: $request->input('returns'),
+            cabangId: $cabangId,
+            userId: $userId,
+            batchId: $request->input('client_batch_id'),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent()
+        );
+
+        return $this->success($result, 'Sinkronisasi retur offline selesai diproses');
+    }
 }

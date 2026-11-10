@@ -11,7 +11,7 @@
  */
 
 const DB_NAME = 'UtePartsOfflineDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance = null;
 
@@ -62,6 +62,30 @@ export function openOfflineDB() {
             // 5. app_meta
             if (!db.objectStoreNames.contains('app_meta')) {
                 db.createObjectStore('app_meta', { keyPath: 'key' });
+            }
+
+            // 6. servis_active_cache (Snapshot tiket QC & Selesai untuk pengambilan offline)
+            if (!db.objectStoreNames.contains('servis_active_cache')) {
+                const storeServisCache = db.createObjectStore('servis_active_cache', { keyPath: 'no_tiket' });
+                storeServisCache.createIndex('idx_id', 'id', { unique: false });
+                storeServisCache.createIndex('idx_status', 'status', { unique: false });
+                storeServisCache.createIndex('idx_pelanggan', 'nama_pelanggan', { unique: false });
+            }
+
+            // 7. servis_pickup_outbox (Event penyerahan unit servis saat offline)
+            if (!db.objectStoreNames.contains('servis_pickup_outbox')) {
+                const storeServisPickup = db.createObjectStore('servis_pickup_outbox', { keyPath: 'pickup_uuid' });
+                storeServisPickup.createIndex('idx_status', 'status', { unique: false });
+                storeServisPickup.createIndex('idx_no_tiket', 'no_tiket', { unique: false });
+                storeServisPickup.createIndex('idx_created_at', 'client_created_at', { unique: false });
+            }
+
+            // 8. retur_outbox (Event retur penjualan offline - No-Cash-Refund)
+            if (!db.objectStoreNames.contains('retur_outbox')) {
+                const storeRetur = db.createObjectStore('retur_outbox', { keyPath: 'retur_uuid' });
+                storeRetur.createIndex('idx_status', 'status', { unique: false });
+                storeRetur.createIndex('idx_no_transaksi', 'no_transaksi_asal', { unique: false });
+                storeRetur.createIndex('idx_created_at', 'client_created_at', { unique: false });
             }
         };
 
@@ -351,6 +375,236 @@ export const UteOfflineDB = {
         }
 
         return false;
+    },
+
+    // ================= SERVIS ACTIVE CACHE =================
+    async saveServisActiveCache(tickets = []) {
+        const db = await openOfflineDB();
+        if (!db) return false;
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('servis_active_cache', 'readwrite');
+            const store = tx.objectStore('servis_active_cache');
+
+            tickets.forEach((t) => {
+                store.put(t);
+            });
+
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async getServisActiveCache(noTiket) {
+        const db = await openOfflineDB();
+        if (!db) return null;
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('servis_active_cache', 'readonly');
+            const store = tx.objectStore('servis_active_cache');
+            const req = store.get(noTiket);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async getAllServisActiveCache() {
+        const db = await openOfflineDB();
+        if (!db) return [];
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('servis_active_cache', 'readonly');
+            const store = tx.objectStore('servis_active_cache');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async syncServisActiveFromServer(cabangId = null) {
+        if (!navigator.onLine) return false;
+
+        try {
+            const url = cabangId ? `/api/servis/active-offline?cabang_id=${cabangId}` : '/api/servis/active-offline';
+            const response = await fetch(url, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response.ok) return false;
+
+            const json = await response.json();
+            if (json.success && Array.isArray(json.data)) {
+                await this.saveServisActiveCache(json.data);
+                return true;
+            }
+        } catch (err) {
+            console.warn('[OfflineDB] Error sync servis active:', err);
+        }
+
+        return false;
+    },
+
+    // ================= SERVIS PICKUP OUTBOX =================
+    async saveServisPickup(pickupData) {
+        const db = await openOfflineDB();
+        if (!db) return false;
+
+        const record = {
+            status: 'pending',
+            client_created_at: new Date().toISOString(),
+            ...pickupData,
+        };
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('servis_pickup_outbox', 'readwrite');
+            const store = tx.objectStore('servis_pickup_outbox');
+            store.put(record);
+            tx.oncomplete = () => resolve(record);
+            tx.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async getPendingServisPickups() {
+        const db = await openOfflineDB();
+        if (!db) return [];
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('servis_pickup_outbox', 'readonly');
+            const store = tx.objectStore('servis_pickup_outbox');
+            const req = store.getAll();
+
+            req.onsuccess = () => {
+                const pending = (req.result || []).filter(
+                    (p) => p.status === 'pending' || p.status === 'failed'
+                );
+                resolve(pending);
+            };
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async getAllServisPickups() {
+        const db = await openOfflineDB();
+        if (!db) return [];
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('servis_pickup_outbox', 'readonly');
+            const store = tx.objectStore('servis_pickup_outbox');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async updateServisPickupStatus(pickupUuid, status, extraData = {}) {
+        const db = await openOfflineDB();
+        if (!db) return false;
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('servis_pickup_outbox', 'readwrite');
+            const store = tx.objectStore('servis_pickup_outbox');
+            const getReq = store.get(pickupUuid);
+
+            getReq.onsuccess = () => {
+                const item = getReq.result;
+                if (!item) return resolve(false);
+
+                const updated = {
+                    ...item,
+                    status,
+                    ...extraData,
+                    updated_at: new Date().toISOString(),
+                };
+
+                store.put(updated);
+                resolve(true);
+            };
+
+            getReq.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    // ================= RETUR OUTBOX =================
+    async saveReturOutbox(returData) {
+        const db = await openOfflineDB();
+        if (!db) return false;
+
+        const record = {
+            status: 'pending',
+            client_created_at: new Date().toISOString(),
+            ...returData,
+        };
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('retur_outbox', 'readwrite');
+            const store = tx.objectStore('retur_outbox');
+            store.put(record);
+            tx.oncomplete = () => resolve(record);
+            tx.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async getPendingReturOutbox() {
+        const db = await openOfflineDB();
+        if (!db) return [];
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('retur_outbox', 'readonly');
+            const store = tx.objectStore('retur_outbox');
+            const req = store.getAll();
+
+            req.onsuccess = () => {
+                const pending = (req.result || []).filter(
+                    (r) => r.status === 'pending' || r.status === 'failed'
+                );
+                resolve(pending);
+            };
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async getAllReturOutbox() {
+        const db = await openOfflineDB();
+        if (!db) return [];
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('retur_outbox', 'readonly');
+            const store = tx.objectStore('retur_outbox');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async updateReturOutboxStatus(returUuid, status, extraData = {}) {
+        const db = await openOfflineDB();
+        if (!db) return false;
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('retur_outbox', 'readwrite');
+            const store = tx.objectStore('retur_outbox');
+            const getReq = store.get(returUuid);
+
+            getReq.onsuccess = () => {
+                const item = getReq.result;
+                if (!item) return resolve(false);
+
+                const updated = {
+                    ...item,
+                    status,
+                    ...extraData,
+                    updated_at: new Date().toISOString(),
+                };
+
+                store.put(updated);
+                resolve(true);
+            };
+
+            getReq.onerror = (e) => reject(e.target.error);
+        });
     },
 };
 

@@ -381,4 +381,47 @@ class ServisController extends Controller
 
         return $this->success($data, 'Status servis berhasil dimuat');
     }
+
+    /**
+     * [API: SERVICE-OFFLINE-01] Ambil daftar tiket servis siap diserahkan (qc/selesai) untuk cache offline kasir.
+     */
+    public function activeOffline(Request $request)
+    {
+        $cabangId = $this->resolveCabangId($request) ?? (int) $request->input('cabang_id', 1);
+        $syncService = app(\App\Modules\Servis\Services\ServisOfflineSyncService::class);
+        $tickets = $syncService->getActiveTicketsForCache($cabangId, (int) $request->input('limit', 200));
+
+        return $this->success([
+            'cabang_id' => $cabangId,
+            'synced_at' => now()->toIso8601String(),
+            'tickets' => $tickets,
+        ], 'Master cache tiket servis offline berhasil dimuat');
+    }
+
+    /**
+     * [API: SERVICE-OFFLINE-02] Sinkronisasi pengambilan unit servis offline dari kasir.
+     */
+    public function syncPickupOffline(Request $request)
+    {
+        $request->validate([
+            'pickups' => 'required|array|min:1',
+            'pickups.*.pickup_uuid' => 'required|string',
+            'client_batch_id' => 'nullable|string|max:100',
+        ]);
+
+        $cabangId = $this->resolveCabangId($request) ?? (int) $request->input('cabang_id', 1);
+        $userId = auth()->id() ?? (int) $request->input('user_id', 1);
+
+        $syncService = app(\App\Modules\Servis\Services\ServisOfflineSyncService::class);
+        $result = $syncService->syncPickupBatch(
+            pickups: $request->input('pickups'),
+            cabangId: $cabangId,
+            userId: $userId,
+            batchId: $request->input('client_batch_id'),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent()
+        );
+
+        return $this->success($result, 'Sinkronisasi pengambilan servis offline selesai diproses');
+    }
 }
