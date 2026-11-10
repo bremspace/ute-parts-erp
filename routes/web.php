@@ -855,7 +855,7 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
         ->middleware('permission:kelola-hr');
     Route::get('/hr/absensi/{tab}', HrAbsensiKpiPage::class)
         ->name('hr.absensi.tab')
-        ->whereIn('tab', ['shift', 'roster', 'absensi', 'kpi'])
+        ->whereIn('tab', ['kiosk', 'shift', 'roster', 'absensi', 'kpi'])
         ->middleware('permission:kelola-hr');
 
     // [F3-8b] Absensi & KPI karyawan (lihat milik sendiri)

@@ -253,6 +253,99 @@ class AbsensiService
     }
 
     /**
+     * [F3-8c] Mesin Absensi Kiosk Barcode Scanner.
+     * Menerima scan barcode/NIK/ID karyawan.
+     * Otomatis menentukan Check-In atau Check-Out.
+     * Langsung memicu pembaruan KPI kehadiran karyawan.
+     */
+    public function scanBarcode(string $barcode, ?int $cabangId = null): array
+    {
+        $code = trim($barcode);
+        if ($code === '') {
+            return [
+                'success' => false,
+                'message' => 'Kode barcode tidak boleh kosong.',
+            ];
+        }
+
+        // Cari karyawan berdasarkan NIK, ID, nomor telepon, atau format EMP-0001
+        $karyawan = Karyawan::where('nik', $code)
+            ->orWhere('id', is_numeric($code) ? (int) $code : 0)
+            ->orWhere('telepon', $code)
+            ->orWhereRaw("CONCAT('EMP-', LPAD(id, 4, '0')) = ?", [$code])
+            ->first();
+
+        if (! $karyawan) {
+            return [
+                'success' => false,
+                'message' => "Karyawan dengan barcode \"{$code}\" tidak ditemukan.",
+            ];
+        }
+
+        if (! $karyawan->status_aktif) {
+            return [
+                'success' => false,
+                'message' => "Karyawan {$karyawan->nama} ({$karyawan->nik}) berstatus non-aktif.",
+            ];
+        }
+
+        $tanggal = now()->toDateString();
+        $logHariIni = AbsensiLog::where('karyawan_id', $karyawan->id)
+            ->where('tanggal', $tanggal)
+            ->first();
+
+        $action = '';
+        $message = '';
+        $log = null;
+
+        if (! $logHariIni || ! $logHariIni->jam_masuk) {
+            // Belum Check-in -> Jalankan Clock-In
+            $log = $this->clockIn($karyawan->id, null, 'Mesin Absensi Barcode', null, 'Check-in via Barcode Scanner');
+            $action = 'checkin';
+            $statusLabel = $log->status === AbsensiLog::STATUS_TERLAMBAT ? 'Terlambat' : 'Tepat Waktu';
+            $message = "Check-in BERHASIL: {$karyawan->nama} ({$karyawan->nik}) masuk pukul {$log->jam_masuk} [{$statusLabel}].";
+        } elseif (! $logHariIni->jam_keluar) {
+            // Sudah Check-in tapi belum Check-out -> Jalankan Clock-Out
+            $log = $this->clockOut($karyawan->id, 'Check-out via Mesin Barcode');
+            $action = 'checkout';
+            $message = "Check-out BERHASIL: {$karyawan->nama} ({$karyawan->nik}) pulang pukul {$log->jam_keluar}.";
+        } else {
+            // Sudah Check-in dan Check-out hari ini
+            $action = 'completed';
+            $log = $logHariIni;
+            $message = "{$karyawan->nama} sudah selesai absensi hari ini (Masuk: {$log->jam_masuk}, Pulang: {$log->jam_keluar}).";
+        }
+
+        // Auto-refresh kalkulasi KPI periode berjalan
+        try {
+            $periode = now()->format('Y-m');
+            app(KpiService::class)->hitung($periode);
+        } catch (\Throwable $e) {
+            // abaikan error kalkulasi KPI agar absensi karyawan tidak terblokir
+        }
+
+        return [
+            'success' => true,
+            'action' => $action,
+            'karyawan' => [
+                'id' => $karyawan->id,
+                'nama' => $karyawan->nama,
+                'nik' => $karyawan->nik ?? ('EMP-'.str_pad((string) $karyawan->id, 4, '0', STR_PAD_LEFT)),
+                'jabatan' => $karyawan->jabatan,
+                'cabang' => $karyawan->cabang?->nama ?? 'Semua Cabang',
+            ],
+            'log' => [
+                'tanggal' => $log->tanggal,
+                'jam_masuk' => $log->jam_masuk,
+                'jam_keluar' => $log->jam_keluar,
+                'status' => $log->status,
+            ],
+            'message' => $message,
+            'timestamp' => now()->format('H:i:s d/m/Y'),
+        ];
+    }
+
+    /**
      * @return array{mulai: string, selesai: string}
      */
     protected function rentangPeriode(string $periode): array

@@ -18,9 +18,13 @@ use Livewire\Component;
  */
 class HrAbsensiKpiPage extends Component
 {
-    public const VALID_TABS = ['shift', 'roster', 'absensi', 'kpi'];
+    public const VALID_TABS = ['kiosk', 'shift', 'roster', 'absensi', 'kpi'];
 
-    public string $tab = 'shift';
+    public string $tab = 'kiosk';
+
+    // Mesin Absensi Kiosk Barcode
+    public string $barcodeInput = '';
+    public ?array $kioskResult = null;
 
     // Shift form
     public string $shiftNama = '';
@@ -178,6 +182,39 @@ class HrAbsensiKpiPage extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Auto absen selesai ('.$dibuat.' log dibuat)']);
     }
 
+    // ===== MESIN ABSENSI KIOSK BARCODE =====
+    public function scanKaryawan(string $code): void
+    {
+        $this->barcodeInput = $code;
+        $this->scanBarcodeKiosk();
+    }
+
+    public function scanBarcodeKiosk(): void
+    {
+        $barcode = trim($this->barcodeInput);
+        if ($barcode === '') {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Silakan scan atau masukkan barcode/NIK karyawan.']);
+            return;
+        }
+
+        $res = app(AbsensiService::class)->scanBarcode($barcode, session('cabang_id'));
+        $this->kioskResult = $res;
+        $this->barcodeInput = '';
+
+        if ($res['success']) {
+            $this->dispatch('alert', ['type' => 'success', 'message' => $res['message']]);
+            $this->dispatch('kiosk-beep', ['success' => true]);
+        } else {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $res['message']]);
+            $this->dispatch('kiosk-beep', ['success' => false]);
+        }
+    }
+
+    public function resetKioskResult(): void
+    {
+        $this->kioskResult = null;
+    }
+
     // ===== KPI =====
     public function hitungKpi(): void
     {
@@ -214,6 +251,13 @@ class HrAbsensiKpiPage extends Component
             ->limit(100)
             ->get();
 
+        $todayLogs = AbsensiLog::with('karyawan.cabang', 'shift')
+            ->when($cabangId, fn ($q) => $q->whereHas('karyawan', fn ($k) => $k->where('cabang_id', $cabangId)))
+            ->where('tanggal', now()->toDateString())
+            ->orderByDesc('updated_at')
+            ->limit(30)
+            ->get();
+
         $kpiHasil = KpiHasil::with('karyawan.cabang', 'metric')
             ->when($cabangId, fn ($q) => $q->whereHas('karyawan', fn ($k) => $k->where('cabang_id', $cabangId)))
             ->where('periode', $this->kpiPeriode)
@@ -229,6 +273,7 @@ class HrAbsensiKpiPage extends Component
             'shifts' => $shifts,
             'roster' => $roster,
             'absensi' => $absensi,
+            'todayLogs' => $todayLogs,
             'kpiHasil' => $kpiHasil,
             'karyawans' => $karyawans,
             'metrics' => KpiMetric::where('is_aktif', true)->orderBy('kode')->get(),

@@ -9,7 +9,7 @@
     {{-- Tabs & Period Picker --}}
     <div class="glass-card p-2 sm:p-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
-            @foreach(['shift' => 'Shift', 'roster' => 'Roster', 'absensi' => 'Absensi', 'kpi' => 'KPI'] as $key => $label)
+            @foreach(['kiosk' => '⚡ Mesin Absensi', 'shift' => 'Shift', 'roster' => 'Roster', 'absensi' => 'Absensi', 'kpi' => 'KPI'] as $key => $label)
                 <a
                     href="{{ url('/app/hr/absensi/'.$key) }}"
                     wire:click.prevent="pilihTab('{{ $key }}')"
@@ -19,7 +19,7 @@
                 </a>
             @endforeach
         </div>
-        @if($tab !== 'shift')
+        @if(!in_array($tab, ['shift', 'kiosk']))
             <div class="flex items-center gap-2 px-1">
                 <label class="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider whitespace-nowrap">Periode:</label>
                 <input type="month" wire:model.live="kpiPeriode"
@@ -27,6 +27,229 @@
             </div>
         @endif
     </div>
+
+    {{-- Tab: Mesin Absensi Kiosk --}}
+    @if($tab === 'kiosk')
+    <div
+        x-data="{
+            timeStr: '',
+            dateStr: '',
+            init() {
+                const updateTime = () => {
+                    const now = new Date();
+                    this.timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    this.dateStr = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                };
+                updateTime();
+                setInterval(updateTime, 1000);
+            },
+            playBeep(success) {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    if (success) {
+                        osc.frequency.setValueAtTime(880, ctx.currentTime);
+                        osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.1);
+                        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                        osc.start(ctx.currentTime);
+                        osc.stop(ctx.currentTime + 0.25);
+                    } else {
+                        osc.frequency.setValueAtTime(300, ctx.currentTime);
+                        osc.frequency.setValueAtTime(200, ctx.currentTime + 0.15);
+                        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+                        osc.start(ctx.currentTime);
+                        osc.stop(ctx.currentTime + 0.35);
+                    }
+                } catch(e) {}
+            }
+        }"
+        x-on:kiosk-beep.window="playBeep($event.detail.success)"
+        class="space-y-6">
+
+        {{-- Hero Header Mesin Absensi --}}
+        <div class="glass-card p-6 sm:p-8 bg-gradient-to-br from-up-primary/10 via-transparent to-up-mint/5 border border-up-primary/20 rounded-2xl relative overflow-hidden">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+                <div class="text-center md:text-left space-y-2">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-up-primary/20 border border-up-primary/30 text-up-primary text-xs font-bold uppercase tracking-wider">
+                        <span class="w-2 h-2 rounded-full bg-up-mint animate-ping"></span>
+                        Mesin Absensi Karyawan Aktif
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-ink-900 dark:text-white tracking-tight">
+                        Scan Barcode / NIK untuk Check-In &amp; Check-Out
+                    </h2>
+                    <p class="text-sm text-ink-600 dark:text-ink-400 max-w-xl">
+                        Arahkan barcode scanner fisik atau ketik NIK/ID karyawan. Sistem secara otomatis mencatat kehadiran real-time dan memperbarui skor KPI kehadiran.
+                    </p>
+                </div>
+
+                {{-- Live Clock Display --}}
+                <div class="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl px-6 py-4 text-center min-w-[220px] shadow-sm backdrop-blur-md">
+                    <div class="text-3xl sm:text-4xl font-mono font-black text-up-primary tracking-widest" x-text="timeStr || '--:--:--'">--:--:--</div>
+                    <div class="text-xs font-semibold text-ink-500 dark:text-ink-400 mt-1 uppercase" x-text="dateStr || 'Hari ini'">Hari ini</div>
+                </div>
+            </div>
+
+            {{-- Scanner Input Form --}}
+            <div class="mt-8 max-w-2xl mx-auto">
+                <form wire:submit="scanBarcodeKiosk" class="relative flex items-center shadow-lg rounded-2xl">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-up-primary">
+                        <svg class="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                    </div>
+                    <input
+                        type="text"
+                        wire:model="barcodeInput"
+                        wire:keydown.enter.prevent="scanBarcodeKiosk"
+                        autofocus
+                        id="kiosk-barcode-input"
+                        placeholder="Scan barcode kartu atau ketik NIK (misal: EMP-0001 lalu tekan Enter)..."
+                        class="w-full pl-12 pr-32 py-4 text-base sm:text-lg font-mono rounded-2xl border-2 border-up-primary/40 focus:border-up-primary bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-inner focus:ring-4 focus:ring-up-primary/20 transition-all outline-none"
+                    />
+                    <button
+                        type="button"
+                        wire:click="scanBarcodeKiosk"
+                        class="absolute right-2 px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-sm shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer">
+                        <span>Check</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                    </button>
+                </form>
+
+                {{-- Quick employee scan chips for testing --}}
+                <div class="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs text-ink-500">
+                    <span class="font-medium">Scan Cepat Demo:</span>
+                    @foreach($karyawans as $k)
+                        <button
+                            type="button"
+                            wire:click="scanKaryawan('{{ $k->nik ?? ('EMP-'.str_pad($k->id, 4, '0', STR_PAD_LEFT)) }}')"
+                            class="px-2.5 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-up-primary/10 hover:text-up-primary border border-black/10 dark:border-white/10 font-mono transition-colors cursor-pointer">
+                            {{ $k->nama }} ({{ $k->nik ?? 'EMP-'.$k->id }})
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        {{-- Result Banner Popup/Card --}}
+        @if($kioskResult)
+            <div class="glass-card p-6 rounded-2xl border-2 {{ ($kioskResult['success'] ?? false) ? (($kioskResult['action'] ?? '') === 'checkin' ? 'border-emerald-500/50 bg-emerald-500/10' : (($kioskResult['action'] ?? '') === 'checkout' ? 'border-blue-500/50 bg-blue-500/10' : 'border-amber-500/50 bg-amber-500/10')) : 'border-red-500/50 bg-red-500/10' }} transition-all">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-md {{ ($kioskResult['success'] ?? false) ? (($kioskResult['action'] ?? '') === 'checkin' ? 'bg-emerald-500 text-white' : 'bg-blue-600 text-white') : 'bg-red-500 text-white' }}">
+                            @if(($kioskResult['success'] ?? false))
+                                @if(($kioskResult['action'] ?? '') === 'checkin')
+                                    ✓
+                                @elseif(($kioskResult['action'] ?? '') === 'checkout')
+                                    👋
+                                @else
+                                    ℹ
+                                @endif
+                            @else
+                                ✕
+                            @endif
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold uppercase tracking-wider {{ ($kioskResult['success'] ?? false) ? 'text-up-primary' : 'text-red-500' }}">
+                                {{ ($kioskResult['success'] ?? false) ? (strtoupper($kioskResult['action'] ?? 'ABSENSI')) : 'GAGAL' }}
+                            </div>
+                            <h3 class="text-xl font-black text-ink-900 dark:text-white mt-0.5">
+                                {{ $kioskResult['message'] ?? '' }}
+                            </h3>
+                            @if(isset($kioskResult['karyawan']))
+                                <p class="text-xs text-ink-600 dark:text-ink-400 mt-1">
+                                    <span class="font-bold">{{ $kioskResult['karyawan']['nama'] }}</span> •
+                                    NIK: <span class="font-mono">{{ $kioskResult['karyawan']['nik'] }}</span> •
+                                    Posisi: {{ ucfirst($kioskResult['karyawan']['jabatan']) }} •
+                                    Lokasi: {{ $kioskResult['karyawan']['cabang'] }}
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="resetKioskResult"
+                        class="px-4 py-2 text-xs font-semibold rounded-xl bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 text-ink-700 dark:text-ink-300 transition-colors">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        @endif
+
+        {{-- Stream Aktivitas Absensi Hari Ini --}}
+        <div class="glass-card p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-up-mint animate-pulse"></div>
+                    <h3 class="text-lg font-bold text-ink-900 dark:text-white">Log Kehadiran Hari Ini ({{ now()->translatedFormat('d F Y') }})</h3>
+                </div>
+                <span class="text-xs text-ink-500">Total Hari Ini: {{ count($todayLogs) }} Karyawan</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="border-b border-ink-100 dark:border-white/10 text-xs font-bold text-ink-500 uppercase tracking-wider">
+                            <th class="py-3 px-4">Karyawan</th>
+                            <th class="py-3 px-4">Shift</th>
+                            <th class="py-3 px-4 text-center">Jam Masuk</th>
+                            <th class="py-3 px-4 text-center">Jam Pulang</th>
+                            <th class="py-3 px-4 text-center">Status</th>
+                            <th class="py-3 px-4 text-right">Metode</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-ink-100 dark:divide-white/5 font-medium">
+                        @forelse($todayLogs as $tl)
+                            <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                <td class="py-3 px-4">
+                                    <div class="font-bold text-ink-900 dark:text-white">{{ $tl->karyawan?->nama ?? '-' }}</div>
+                                    <div class="text-xs text-ink-400 font-mono">{{ $tl->karyawan?->nik ?? ('EMP-'.$tl->karyawan_id) }} • {{ ucfirst($tl->karyawan?->jabatan ?? '') }}</div>
+                                </td>
+                                <td class="py-3 px-4 text-xs text-ink-600 dark:text-ink-400">
+                                    {{ $tl->shift?->nama ?? 'Reguler' }}
+                                </td>
+                                <td class="py-3 px-4 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                    {{ $tl->jam_masuk ?? '-' }}
+                                </td>
+                                <td class="py-3 px-4 text-center font-mono font-bold text-blue-600 dark:text-blue-400">
+                                    {{ $tl->jam_keluar ?? '-' }}
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    @php
+                                        $badgeColor = match($tl->status) {
+                                            'hadir' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+                                            'terlambat' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+                                            'izin', 'cuti' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+                                            default => 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+                                        };
+                                    @endphp
+                                    <span class="inline-flex px-2.5 py-0.5 text-xs font-bold rounded-full {{ $badgeColor }}">
+                                        {{ ucfirst($tl->status) }}
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4 text-right text-xs text-ink-500">
+                                    {{ $tl->lokasi_masuk ?? 'Kiosk Barcode' }}
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="py-8 text-center text-ink-400 text-sm">
+                                    Belum ada absensi tercatat hari ini. Scan kartu barcode karyawan untuk memulai.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- Tab: Shift --}}
     @if($tab === 'shift')
