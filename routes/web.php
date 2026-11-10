@@ -543,9 +543,9 @@ Route::post('/app/login', function (Request $request) {
     );
     session(['device_token' => $deviceToken]);
 
-    // [FIX-INTENDED] Backoffice staff selalu diarahkan ke dashboard staff, jangan lempar ke url customer / non-app
+    // [FIX-INTENDED] Backoffice staff selalu diarahkan ke dashboard staff, jangan lempar ke url customer / non-app (izinkan /absen untuk scan absensi)
     $intended = session()->get('url.intended');
-    if ($intended && ! str_contains($intended, '/app/')) {
+    if ($intended && ! str_contains($intended, '/app/') && ! str_contains($intended, '/absen')) {
         session()->forget('url.intended');
     }
 

@@ -12,7 +12,11 @@
     @livewireStyles
     <style>
         body { font-family: 'Instrument Sans', sans-serif; }
+        .fixed:has(#ute-perm-allow-btn) { display: none !important; }
     </style>
+    <script>
+        try { localStorage.setItem('ute_camera_perm_dismissed', '1'); } catch(e) {}
+    </script>
 </head>
 <body class="bg-[#0b0f19] text-white min-h-screen flex flex-col justify-center items-center p-4 selection:bg-indigo-500 selection:text-white">
     <main class="w-full max-w-md mx-auto">

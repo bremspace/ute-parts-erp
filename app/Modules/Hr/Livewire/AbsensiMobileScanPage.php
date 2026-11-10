@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Hr\Livewire;
 
+use App\Models\User;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Services\AbsensiQrService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cookie;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -20,54 +20,122 @@ class AbsensiMobileScanPage extends Component
     #[Url(as: 't')]
     public string $token = '';
 
-    public string $nikInput = '';
-    public bool $rememberDevice = true;
+    // Auth state
+    public bool $isLoggedIn = false;
+    public ?Karyawan $karyawan = null;
+
+    // Login form fields (jika belum login)
+    public string $loginIdentifier = '';
+    public string $password = '';
+    public bool $rememberMe = true;
+
+    // Feedback state
     public ?array $result = null;
     public ?string $errorMessage = null;
 
     public function mount(): void
     {
-        // Ambil token dari URL jika ada
         $this->token = trim((string) request()->query('t', $this->token));
 
-        if ($this->token === '') {
-            $this->errorMessage = 'Tautan tidak valid atau tidak memiliki token QR absensi.';
-            return;
-        }
-
-        // Cek apakah perangkat sudah mengingat NIK karyawan sebelumnya
-        $savedNik = Cookie::get('karyawan_device_nik');
-        if ($savedNik) {
-            $this->nikInput = (string) $savedNik;
-        }
-
-        // Jika user sedang login di backoffice/portal, utamakan akun mereka
+        // 1. Cek apakah user sedang terautentikasi
         if (Auth::check()) {
-            $userId = Auth::id();
-            if ($userId) {
-                $karyawan = Karyawan::where('user_id', $userId)->first();
-                if ($karyawan && $karyawan->nik) {
-                    $this->nikInput = $karyawan->nik;
-                }
-            }
+            $this->isLoggedIn = true;
+            $this->initAndAutoAbsen();
+        } else {
+            $this->isLoggedIn = false;
+            // Simpan intended URL agar jika login lewat /app/login tetap kembali ke token ini
+            session()->put('url.intended', request()->fullUrl());
         }
     }
 
-    public function submitAbsensi(): void
+    /**
+     * Inisialisasi data karyawan dari user login & langsung eksekusi auto-checkin
+     */
+    protected function initAndAutoAbsen(): void
     {
-        $nik = trim($this->nikInput);
-        if ($nik === '') {
-            $this->errorMessage = 'Silakan masukkan NIK atau ID Karyawan Anda.';
+        $user = Auth::user();
+        if (! $user) {
+            $this->isLoggedIn = false;
             return;
         }
 
-        if ($this->token === '') {
-            $this->errorMessage = 'Token QR tidak valid.';
+        $this->karyawan = Karyawan::where('user_id', $user->id)
+            ->orWhere('email', $user->email)
+            ->first();
+
+        if (! $this->karyawan) {
+            $this->errorMessage = 'Akun login Anda ('.$user->email.') belum tertaut dengan data Karyawan. Hubungi HR.';
+            return;
+        }
+
+        if (empty($this->token)) {
+            $this->errorMessage = 'Token QR absensi tidak ditemukan. Silakan scan QR Code terbaru di mesin absensi toko.';
+            return;
+        }
+
+        // Jalankan auto check-in / check-out seketika!
+        $this->eksekusiAbsen();
+    }
+
+    /**
+     * Login dari form mobile scan lalu langsung auto check-in
+     */
+    public function loginDanAbsen(): void
+    {
+        $this->errorMessage = null;
+        $identifier = trim($this->loginIdentifier);
+        $password = (string) $this->password;
+
+        if ($identifier === '' || $password === '') {
+            $this->errorMessage = 'Silakan masukkan Email / NIK dan kata sandi Anda.';
+            return;
+        }
+
+        $email = $identifier;
+        if (! str_contains($identifier, '@')) {
+            // Identifier berupa NIK: cari user email yang tertaut
+            $k = Karyawan::where('nik', $identifier)->first();
+            if ($k && $k->user) {
+                $email = $k->user->email;
+            } elseif ($k && ! empty($k->email)) {
+                $email = $k->email;
+            }
+        }
+
+        if (! Auth::attempt(['email' => $email, 'password' => $password], $this->rememberMe)) {
+            $this->errorMessage = 'Email / NIK atau kata sandi yang Anda masukkan salah.';
+            return;
+        }
+
+        $user = Auth::user();
+        if (! ($user->is_active ?? true)) {
+            Auth::logout();
+            $this->errorMessage = 'Akun Anda dinonaktifkan. Hubungi HR / Administrator.';
+            return;
+        }
+
+        $this->isLoggedIn = true;
+        $this->password = '';
+        $this->initAndAutoAbsen();
+    }
+
+    /**
+     * Eksekusi presensi via AbsensiQrService
+     */
+    public function eksekusiAbsen(): void
+    {
+        if (! $this->karyawan) {
+            $this->errorMessage = 'Data profil karyawan tidak ditemukan.';
+            return;
+        }
+
+        if (empty($this->token)) {
+            $this->errorMessage = 'Token QR Code tidak valid atau sudah kedaluwarsa.';
             return;
         }
 
         $qrService = app(AbsensiQrService::class);
-        $res = $qrService->processScan($this->token, $nik, request()->ip());
+        $res = $qrService->processScan($this->token, $this->karyawan->nik ?? (string) $this->karyawan->id, request()->ip());
 
         if (! ($res['success'] ?? false)) {
             $this->errorMessage = $res['message'] ?? 'Gagal memproses absensi.';
@@ -78,15 +146,21 @@ class AbsensiMobileScanPage extends Component
         $this->errorMessage = null;
         $this->result = $res;
 
-        // Simpan NIK di cookie jika opsi ingat perangkat dicentang
-        if ($this->rememberDevice) {
-            Cookie::queue('karyawan_device_nik', $nik, 60 * 24 * 30); // 30 hari
-        }
-
         $this->dispatch('absensi-success', [
             'action' => $res['action'] ?? 'absen',
-            'nama' => $res['karyawan']['nama'] ?? 'Karyawan',
+            'nama' => $res['karyawan']['nama'] ?? $this->karyawan->nama,
         ]);
+    }
+
+    public function logout(): void
+    {
+        Auth::logout();
+        session()->invalidate();
+        session()->regenerateToken();
+        $this->isLoggedIn = false;
+        $this->karyawan = null;
+        $this->result = null;
+        $this->errorMessage = 'Anda berhasil keluar dari akun.';
     }
 
     public function render()
