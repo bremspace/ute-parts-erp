@@ -16,6 +16,7 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Dashboard\Livewire\DashboardIndex;
+use App\Modules\Hr\Livewire\AbsensiMobileScanPage;
 use App\Modules\Hr\Livewire\HrAbsensiKpiPage;
 use App\Modules\Hr\Livewire\HrSayaPage;
 use App\Modules\Hr\Livewire\KaryawanPage;
@@ -459,6 +460,9 @@ Route::get('/print-barcode', function (Request $request) {
         'labelConfig' => $labelConfig,
     ]);
 })->middleware('auth')->name('barcode.print');
+
+// [HR] Mesin Absensi Mobile Scan (Public/Karyawan HP)
+Route::get('/absen/scan', AbsensiMobileScanPage::class)->name('absen.scan');
 
 // ===== Zona Backoffice (internal staff, dark mode) =====
 Route::get('/app/login', function () {

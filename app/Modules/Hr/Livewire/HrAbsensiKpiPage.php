@@ -8,6 +8,7 @@ use App\Modules\Hr\Models\KpiHasil;
 use App\Modules\Hr\Models\KpiMetric;
 use App\Modules\Hr\Models\Shift;
 use App\Modules\Hr\Models\ShiftJadwal;
+use App\Modules\Hr\Services\AbsensiQrService;
 use App\Modules\Hr\Services\AbsensiService;
 use App\Modules\Hr\Services\KpiService;
 use Livewire\Component;
@@ -18,13 +19,16 @@ use Livewire\Component;
  */
 class HrAbsensiKpiPage extends Component
 {
-    public const VALID_TABS = ['kiosk', 'shift', 'roster', 'absensi', 'kpi'];
+    public const VALID_TABS = ['absensi', 'shift', 'roster', 'kpi'];
 
-    public string $tab = 'kiosk';
+    public string $tab = 'absensi';
 
-    // Mesin Absensi Kiosk Barcode
-    public string $barcodeInput = '';
-    public ?array $kioskResult = null;
+    // Mesin Absensi Dynamic Rolling QR Modal
+    public bool $showQrModal = false;
+    public string $qrToken = '';
+    public string $qrSvg = '';
+    public int $qrExpiresAt = 0;
+    public ?array $latestScannedEmployee = null;
 
     // Shift form
     public string $shiftNama = '';
@@ -182,37 +186,46 @@ class HrAbsensiKpiPage extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Auto absen selesai ('.$dibuat.' log dibuat)']);
     }
 
-    // ===== MESIN ABSENSI KIOSK BARCODE =====
-    public function scanKaryawan(string $code): void
+    // ===== MESIN ABSENSI DYNAMIC ROLLING QR MODAL =====
+    public function bukaQrModal(): void
     {
-        $this->barcodeInput = $code;
-        $this->scanBarcodeKiosk();
+        $this->showQrModal = true;
+        $this->latestScannedEmployee = null;
+        $this->generateNextQr();
     }
 
-    public function scanBarcodeKiosk(): void
+    public function tutupQrModal(): void
     {
-        $barcode = trim($this->barcodeInput);
-        if ($barcode === '') {
-            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Silakan scan atau masukkan barcode/NIK karyawan.']);
+        $this->showQrModal = false;
+    }
+
+    public function generateNextQr(): void
+    {
+        $qrData = app(AbsensiQrService::class)->generateRollingQr(session('cabang_id'));
+        $this->qrToken = $qrData['token'];
+        $this->qrSvg = $qrData['svg'];
+        $this->qrExpiresAt = $qrData['expires_at'];
+    }
+
+    public function pollQrStatus(): void
+    {
+        if (! $this->showQrModal || empty($this->qrToken)) {
             return;
         }
 
-        $res = app(AbsensiService::class)->scanBarcode($barcode, session('cabang_id'));
-        $this->kioskResult = $res;
-        $this->barcodeInput = '';
-
-        if ($res['success']) {
-            $this->dispatch('alert', ['type' => 'success', 'message' => $res['message']]);
+        // Cek apakah token saat ini sudah discan & divalidasi oleh karyawan
+        $consumed = app(AbsensiQrService::class)->checkConsumed($this->qrToken);
+        if ($consumed) {
+            $this->latestScannedEmployee = $consumed;
             $this->dispatch('kiosk-beep', ['success' => true]);
-        } else {
-            $this->dispatch('alert', ['type' => 'error', 'message' => $res['message']]);
-            $this->dispatch('kiosk-beep', ['success' => false]);
+            $this->generateNextQr();
+            return;
         }
-    }
 
-    public function resetKioskResult(): void
-    {
-        $this->kioskResult = null;
+        // Jika token sudah kedaluwarsa waktu rotasinya, ganti ke QR baru
+        if (now()->timestamp >= $this->qrExpiresAt) {
+            $this->generateNextQr();
+        }
     }
 
     // ===== KPI =====
