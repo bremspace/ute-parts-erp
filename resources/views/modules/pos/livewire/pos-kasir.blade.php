@@ -2,12 +2,6 @@
     $activeCabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
     $activeCabangName = \App\Modules\Rbac\Models\Cabang::find($activeCabangId)?->nama ?? 'Cabang Utama';
 @endphp
-<script>
-    window.CURRENT_USER_ID = {{ auth()->id() ?? 1 }};
-    window.CURRENT_USER_NAME = {!! json_encode(auth()->user()?->name ?? 'Kasir') !!};
-    window.ACTIVE_CABANG_ID = {{ $activeCabangId }};
-    window.ACTIVE_CABANG_NAME = {!! json_encode($activeCabangName) !!};
-</script>
 
 <div
     class="flex flex-col gap-2.5 sm:gap-3.5 min-w-0 flex-1 min-h-[calc(100dvh-12rem)] md:min-h-0 md:h-[calc(100dvh-6.5rem)] pb-4 md:pb-0"
@@ -22,6 +16,11 @@
             localStorage.setItem('pos_cart_view_mode', mode);
         },
         init() {
+            window.CURRENT_USER_ID = {{ auth()->id() ?? 1 }};
+            window.CURRENT_USER_NAME = {!! json_encode(auth()->user()?->name ?? 'Kasir') !!};
+            window.ACTIVE_CABANG_ID = {{ $activeCabangId }};
+            window.ACTIVE_CABANG_NAME = {!! json_encode($activeCabangName) !!};
+
             window.addEventListener('beforeunload', (e) => {
                 if (this.$wire.cart && Object.keys(this.$wire.cart).length > 0) {
                     e.preventDefault();

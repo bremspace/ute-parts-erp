@@ -872,7 +872,7 @@
         <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative" @click.outside="branchModal = false">
             <div class="flex items-center justify-between pb-4 mb-4 border-b border-black/10 dark:border-white/10">
                 <h3 class="text-lg font-bold text-ink-900 dark:text-white">Pilih Cabang Aktif</h3>
-                <button @click="branchModal = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white">✕</button>
+                <button type="button" @click="branchModal = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5" aria-label="Tutup">✕</button>
             </div>
 
             <p class="text-xs text-ink-500 dark:text-ink-400 mb-3">Cabang aktif akan dipakai Dashboard, POS, WMS, dan modul lain.</p>

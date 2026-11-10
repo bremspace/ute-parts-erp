@@ -131,7 +131,7 @@
                     wire:click="$set('showKasModal', false)"
                     class="flex-1 py-3 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs cursor-pointer min-h-[44px] transition-colors"
                 >
-                    Tutup
+                    {{ $kasHasil ? 'Tutup' : 'Batal' }}
                 </button>
                 @if(!$kasHasil)
                     <button
