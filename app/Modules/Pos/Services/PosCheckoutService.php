@@ -92,6 +92,18 @@ class PosCheckoutService
                 throw new \InvalidArgumentException('Transaksi kasbon/piutang wajib memilih data pelanggan.');
             }
 
+            // Validasi pelanggan wajib berstatus aktif (tidak boleh pending/unapproved/nonaktif/ditolak)
+            if (! empty($data['pelanggan_id'])) {
+                $pelanggan = Pelanggan::find($data['pelanggan_id']);
+                if (! $pelanggan) {
+                    throw new \InvalidArgumentException('Data pelanggan tidak ditemukan.');
+                }
+                $isAllowedStatus = in_array($pelanggan->status, ['aktif', 'approved'], true);
+                if (! $isAllowedStatus) {
+                    throw new \InvalidArgumentException("Pelanggan {$pelanggan->nama} belum diverifikasi/diapprove (status: {$pelanggan->status}).");
+                }
+            }
+
             $noTransaksi = $this->sequenceService->generateNoTransaksi($cabangId);
 
             $transaksi = Transaksi::create([

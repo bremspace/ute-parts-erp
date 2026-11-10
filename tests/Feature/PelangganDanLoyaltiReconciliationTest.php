@@ -102,7 +102,7 @@ class PelangganDanLoyaltiReconciliationTest extends TestCase
         $kasir = User::factory()->create();
         $kasir->assignRole('kasir');
 
-        Livewire::actingAs($kasir)
+        $component = Livewire::actingAs($kasir)
             ->test(PosKasir::class)
             ->set('pelangganBaruForm.nama', 'Pelanggan POS Baru')
             ->set('pelangganBaruForm.telepon', '+6287712345678')
@@ -111,6 +111,11 @@ class PelangganDanLoyaltiReconciliationTest extends TestCase
         $pelanggan = Pelanggan::where('telepon', '087712345678')->first();
         $this->assertNotNull($pelanggan);
         $this->assertEquals('pending', $pelanggan->status);
+
+        // Member pending tidak boleh otomatis terpilih atau dipilih manual
+        $this->assertNull($component->get('selectedCustomerId'));
+        $component->call('setPelanggan', $pelanggan->id);
+        $this->assertNull($component->get('selectedCustomerId'));
 
         $this->assertDatabaseHas('approval_requests', [
             'entity_type' => 'member',

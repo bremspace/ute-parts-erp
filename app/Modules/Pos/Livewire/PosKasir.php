@@ -1925,6 +1925,19 @@ class PosKasir extends Component
 
     public function setPelanggan(?int $customerId)
     {
+        if ($customerId) {
+            $cust = Pelanggan::find($customerId);
+            if (! $cust || ! in_array($cust->status, ['aktif', 'approved'], true)) {
+                $statusLabel = strtoupper($cust->status ?? 'BELUM AKTIF');
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => "Pelanggan '{$cust?->nama}' masih berstatus {$statusLabel} (menunggu approval) dan tidak dapat digunakan untuk transaksi.",
+                ]);
+
+                return;
+            }
+        }
+
         $this->selectedCustomerId = $customerId;
         $this->pelangganSearch = '';
         $this->poinDitukar = 0;
@@ -1988,6 +2001,23 @@ class PosKasir extends Component
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Keranjang transaksi masih kosong']);
 
             return;
+        }
+
+        // Validasi member aktif: jika memilih member, wajib berstatus 'aktif'
+        if ($this->selectedCustomerId) {
+            $cust = Pelanggan::find($this->selectedCustomerId);
+            if (! $cust || ! in_array($cust->status, ['aktif', 'approved'], true)) {
+                $statusLabel = strtoupper($cust->status ?? 'BELUM AKTIF');
+                $this->selectedCustomerId = null;
+                $this->resetComputedTotals();
+                $this->recalcPajak();
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => "Pelanggan berstatus {$statusLabel} (belum diverifikasi/diapprove). Pelanggan dilepas dari transaksi.",
+                ]);
+
+                return;
+            }
         }
 
         // [F2-3] Item sn=true wajib SN lengkap sebelum bayar
@@ -2467,6 +2497,20 @@ class PosKasir extends Component
             return;
         }
 
+        // Validasi status member aktif: transaksi tidak boleh menggunakan pelanggan pending/unapproved
+        if (! empty($this->selectedCustomerId)) {
+            $cust = Pelanggan::find($this->selectedCustomerId);
+            if (! $cust || ! in_array($cust->status, ['aktif', 'approved'], true)) {
+                $statusLabel = strtoupper($cust?->status ?? 'BELUM AKTIF');
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => "Pelanggan berstatus {$statusLabel} dan belum diverifikasi/diapprove. Transaksi tidak dapat dilanjutkan.",
+                ]);
+
+                return;
+            }
+        }
+
         // Validasi kasbon / piutang wajib memilih pelanggan
         if ($this->metodeBayar === 'piutang') {
             if (empty($this->selectedCustomerId)) {
@@ -2939,6 +2983,7 @@ class PosKasir extends Component
         $term = trim($this->pelangganSearch);
 
         return Pelanggan::with('tierMembership')
+            ->whereIn('status', ['aktif', 'approved'])
             ->when(strlen($term) >= 1, function ($q) use ($term) {
                 $q->where(function ($sub) use ($term) {
                     $sub->where('nama', 'like', "%{$term}%")
@@ -2960,7 +3005,6 @@ class PosKasir extends Component
                 auth()->id()
             );
 
-            $this->setPelanggan($pelanggan->id);
             $this->showPelangganBaruModal = false;
             $this->pelangganBaruForm = [
                 'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
@@ -2968,10 +3012,19 @@ class PosKasir extends Component
                 'kode_agen' => '', 'referral_kode' => '',
             ];
 
-            $pesan = $pelanggan->status === 'pending'
-                ? 'Pelanggan baru disimpan dan diajukan ke approval owner (status: pending)'
-                : 'Pelanggan baru disimpan & dipilih (sinkron ke CRM)';
-            $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
+            if ($pelanggan->status === 'aktif' || $pelanggan->status === 'approved') {
+                $this->setPelanggan($pelanggan->id);
+                $this->dispatch('alert', [
+                    'type' => 'success',
+                    'message' => 'Pelanggan baru disimpan & dipilih (sinkron ke CRM)',
+                ]);
+            } else {
+                $this->selectedCustomerId = null;
+                $this->dispatch('alert', [
+                    'type' => 'warning',
+                    'message' => "Pelanggan baru '{$pelanggan->nama}' diajukan ke Approval Owner (Status: PENDING). Transaksi belum dapat menggunakan member ini sampai diverifikasi/disetujui.",
+                ]);
+            }
         } catch (ValidationException $e) {
             $this->setErrorBag($e->validator->getMessageBag());
         } catch (\Exception $e) {
@@ -3765,7 +3818,7 @@ class PosKasir extends Component
         $adaLebihBanyak = $products->count() > $this->batasProduk;
         $products = $products->take($this->batasProduk)->values();
 
-        $customers = Pelanggan::with('tierMembership')->take(10)->get();
+        $customers = Pelanggan::with('tierMembership')->whereIn('status', ['aktif', 'approved'])->take(10)->get();
 
         // [B-02/P1-2] Dropdown gudang HANYA milik cabang aktif
         $gudangs = Gudang::where('cabang_id', session('cabang_id'))

@@ -73,4 +73,64 @@ class PosCheckoutServiceTest extends TestCase
         $sisaStok = (int) StokItem::where('produk_id', $produk->id)->where('gudang_id', $gudang->id)->value('jumlah');
         $this->assertEquals(8, $sisaStok);
     }
+
+    public function test_checkout_fails_if_customer_is_not_active(): void
+    {
+        $user = User::factory()->create();
+        $cabang = Cabang::create(['kode' => 'CB2', 'nama' => 'Cabang Test 2', 'is_active' => true]);
+        $gudang = Gudang::create(['kode' => 'GD2', 'nama' => 'Gudang Utama 2', 'cabang_id' => $cabang->id, 'is_active' => true]);
+
+        AkunCOA::firstOrCreate(['kode' => '110-04'], ['nama' => 'Kas Laci', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit']);
+        AkunCOA::firstOrCreate(['kode' => '410-01'], ['nama' => 'Pendapatan Penjualan', 'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit']);
+        AkunCOA::firstOrCreate(['kode' => '510-02'], ['nama' => 'HPP Penjualan', 'tipe' => 'beban', 'kelompok' => 'hpp', 'saldo_normal' => 'debit']);
+        AkunCOA::firstOrCreate(['kode' => '130-01'], ['nama' => 'Persediaan Barang', 'tipe' => 'aset', 'kelompok' => 'persediaan', 'saldo_normal' => 'debit']);
+
+        $produk = Produk::create([
+            'kode' => 'PRD-02',
+            'nama' => 'Baterai Test',
+            'harga_beli' => 20000,
+            'harga_jual' => 40000,
+            'satuan' => 'pcs',
+            'is_aktif' => true,
+        ]);
+
+        StokItem::create([
+            'produk_id' => $produk->id,
+            'gudang_id' => $gudang->id,
+            'jumlah' => 5,
+        ]);
+
+        $pelangganPending = \App\Modules\Crm\Models\Pelanggan::create([
+            'kode' => 'CUST-PENDING',
+            'nama' => 'Budi Pending',
+            'telepon' => '0899999999',
+            'status' => 'pending',
+        ]);
+
+        $service = app(PosCheckoutService::class);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('belum diverifikasi/diapprove');
+
+        $service->checkout([
+            'cabang_id' => $cabang->id,
+            'kasir_id' => $user->id,
+            'gudang_id' => $gudang->id,
+            'pelanggan_id' => $pelangganPending->id,
+            'subtotal' => 40000,
+            'dpp' => 40000,
+            'pajak_nominal' => 0,
+            'total_akhir' => 40000,
+            'metode_bayar' => 'tunai',
+            'jumlah_bayar' => 40000,
+            'kembalian' => 0,
+        ], [
+            [
+                'produk_id' => $produk->id,
+                'jumlah' => 1,
+                'harga_satuan' => 40000,
+                'subtotal' => 40000,
+            ],
+        ]);
+    }
 }

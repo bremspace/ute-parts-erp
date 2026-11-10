@@ -153,7 +153,11 @@ class PosOfflineSyncService
 
             // 3. Rekalkulasi Harga & Anti-Tamper (Prinsip Server Pricing Authority)
             $pelangganId = $tx['pelanggan_id'] ?? null;
-            $pelanggan = $pelangganId ? Pelanggan::with('tierMembership')->find($pelangganId) : null;
+            $pelanggan = $pelangganId ? Pelanggan::with('tierMembership')->whereIn('status', ['aktif', 'approved'])->find($pelangganId) : null;
+            if ($pelangganId && ! $pelanggan) {
+                // Pelanggan belum diapprove / non-aktif: jangan gunakan benefit member
+                $pelangganId = null;
+            }
 
             $itemsData = [];
             $serverCalculatedSubtotal = 0.0;

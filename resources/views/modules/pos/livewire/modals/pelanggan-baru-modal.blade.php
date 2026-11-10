@@ -111,6 +111,13 @@
                         <span>Daftarkan Sebagai Mitra Reseller (Akses Komisi & Harga Khusus)</span>
                     </label>
                 </div>
+
+                <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[11px] flex items-start gap-2 mt-2">
+                    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Member baru diajukan ke antrean Approval Owner dan baru dapat digunakan bertransaksi setelah disetujui.</span>
+                </div>
             </div>
 
             <div class="flex gap-2.5 pt-4 border-t border-ink-200/70 dark:border-white/10 mt-5">
