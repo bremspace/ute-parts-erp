@@ -105,7 +105,7 @@ class ImportAtributService
         $gudangDefault = Gudang::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->first()
             ?? Gudang::first();
 
-        DB::transaction(function () use (&$hasil, $parsedItems, $gudangDefault) {
+        DB::transaction(function () use (&$hasil, $parsedItems, $gudangDefault, $cabangId) {
             // 1. Kategori
             foreach ($parsedItems['kategori'] ?? [] as $item) {
                 if (($item['status'] ?? '') === 'error') {
