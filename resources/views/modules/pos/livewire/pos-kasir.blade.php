@@ -16,11 +16,6 @@
             localStorage.setItem('pos_cart_view_mode', mode);
         },
         init() {
-            window.CURRENT_USER_ID = {{ auth()->id() ?? 1 }};
-            window.CURRENT_USER_NAME = {!! json_encode(auth()->user()?->name ?? 'Kasir') !!};
-            window.ACTIVE_CABANG_ID = {{ $activeCabangId }};
-            window.ACTIVE_CABANG_NAME = {!! json_encode($activeCabangName) !!};
-
             window.addEventListener('beforeunload', (e) => {
                 if (this.$wire.cart && Object.keys(this.$wire.cart).length > 0) {
                     e.preventDefault();
@@ -33,6 +28,12 @@
     @keydown.window.f6.prevent="$wire.tahanTransaksi()"
     @keydown.window.escape.prevent="$wire.clearCart()"
 >
+    <script>
+        window.CURRENT_USER_ID = {{ auth()->id() ?? 1 }};
+        window.CURRENT_USER_NAME = @json(auth()->user()?->name ?? 'Kasir');
+        window.ACTIVE_CABANG_ID = {{ $activeCabangId }};
+        window.ACTIVE_CABANG_NAME = @json($activeCabangName);
+    </script>
     <!-- PWA Install Prompt Banner -->
     <x-prism.pwa-install-prompt variant="banner" class="flex-shrink-0" />
 
@@ -560,6 +561,23 @@
                     <span class="w-2 h-2 rounded-full bg-up-primary"></span>
                 @endif
             </button>
+
+            @if(isset($gudangs) && $gudangs->count() > 1)
+                <!-- Gudang Selector -->
+                <div class="w-full sm:w-36 md:w-44 flex-shrink-0">
+                    <select
+                        wire:model.live="selectedGudangId"
+                        class="w-full px-2.5 py-2.5 rounded-xl glass-input text-xs font-semibold min-h-[44px] cursor-pointer"
+                        title="Pilih Gudang Sumber Stok POS"
+                    >
+                        @foreach($gudangs as $g)
+                            <option value="{{ $g->id }}" class="bg-ink-900 text-white" @selected($g->id == $selectedGudangId)>
+                                {{ $g->nama }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
 
             <!-- Kolom Pencarian Konsumen Optimal (Tanpa Dropdown CRM Berlebih) -->
             <div

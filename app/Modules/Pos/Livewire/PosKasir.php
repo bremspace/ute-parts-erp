@@ -340,7 +340,12 @@ class PosKasir extends Component
         // Set default gudang dari active session cabang
         $cabangId = session('cabang_id');
         if ($cabangId) {
-            $this->selectedGudangId = Gudang::where('cabang_id', $cabangId)->value('id');
+            $this->selectedGudangId = Gudang::where('cabang_id', $cabangId)
+                ->where('is_active', true)
+                ->orderByDesc('is_default')
+                ->orderByRaw("CASE WHEN LOWER(nama) LIKE '%toko%' THEN 0 ELSE 1 END")
+                ->orderBy('id')
+                ->value('id');
         }
 
         $this->loadUserPreferences();
@@ -750,7 +755,12 @@ class PosKasir extends Component
             return;
         }
 
-        $gudangCabang = Gudang::where('cabang_id', $cabangId)->orderByDesc('is_active')->orderBy('id')->value('id');
+        $gudangCabang = Gudang::where('cabang_id', $cabangId)
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderByRaw("CASE WHEN LOWER(nama) LIKE '%toko%' THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->value('id');
 
         if ($this->selectedGudangId !== $gudangCabang) {
             $this->dispatch('alert', [
