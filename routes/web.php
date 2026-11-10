@@ -820,6 +820,7 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
         ->whereIn('tab', [
             'users', 'role', 'cabang', 'master-produk', 'master_produk', 'export-import', 'export_import',
             'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan', 'jaringan',
+            'akses', 'katalog', 'kebijakan', 'operasional', 'sistem',
         ])
         ->middleware('permission:pengaturan.manage|user.view');
 

@@ -120,6 +120,10 @@ class ProdukTab extends Component
         'penyesuaian_harga' => false,
         'rak_id' => false,
         'supplier_id' => false,
+        'gudang_id' => false,
+        'tipe_hp' => false,
+        'min_stock' => false,
+        'kena_pajak' => false,
     ];
 
     public array $bulkEditForm = [
@@ -136,6 +140,12 @@ class ProdukTab extends Component
         'tipe_penyesuaian_harga' => 'margin_persen', // 'margin_persen' | 'tambah_persen' | 'potong_persen' | 'tambah_nominal' | 'potong_nominal'
         'nilai_penyesuaian_harga' => 0,
         'rak_id' => null,
+        'gudang_id' => null,
+        'tipe_hp_ids' => [],
+        'tipe_hp_mode' => 'tambah',
+        'min_stock' => 0,
+        'reorder_point' => 0,
+        'kena_pajak' => 1,
     ];
 
     // Salin Data Modal & Preferences
@@ -3507,6 +3517,10 @@ class ProdukTab extends Component
             'sn' => false,
             'penyesuaian_harga' => false,
             'rak_id' => false,
+            'gudang_id' => false,
+            'tipe_hp' => false,
+            'min_stock' => false,
+            'kena_pajak' => false,
         ];
 
         $this->bulkEditForm = [
@@ -3522,6 +3536,12 @@ class ProdukTab extends Component
             'tipe_penyesuaian_harga' => 'margin_persen',
             'nilai_penyesuaian_harga' => 0,
             'rak_id' => null,
+            'gudang_id' => null,
+            'tipe_hp_ids' => [],
+            'tipe_hp_mode' => 'tambah',
+            'min_stock' => 0,
+            'reorder_point' => 0,
+            'kena_pajak' => 1,
         ];
 
         $this->showBulkEditModal = true;
@@ -3652,8 +3672,53 @@ class ProdukTab extends Component
                     }
                 }
 
+                if (! empty($activeFields['min_stock'])) {
+                    $minStock = max(0, (int) $this->bulkEditForm['min_stock']);
+                    $reorderPoint = max(0, (int) $this->bulkEditForm['reorder_point']);
+                    $updates['min_stock'] = $minStock;
+                    $updates['reorder_point'] = $reorderPoint;
+                    StokItem::where('produk_id', $p->id)->update(['jumlah_minimum' => $minStock]);
+                }
+
+                if (! empty($activeFields['kena_pajak'])) {
+                    $updates['kena_pajak'] = (bool) $this->bulkEditForm['kena_pajak'];
+                }
+
                 if (! empty($updates)) {
                     $p->update($updates);
+                }
+
+                if (! empty($activeFields['gudang_id'])) {
+                    $gudangId = (int) $this->bulkEditForm['gudang_id'];
+                    if ($gudangId > 0 && Gudang::where('id', $gudangId)->exists()) {
+                        $variantId = $p->skuVariants()->value('id');
+                        $minStock = isset($updates['min_stock']) ? $updates['min_stock'] : ($p->min_stock ?? 0);
+                        StokItem::firstOrCreate(
+                            [
+                                'produk_id' => $p->id,
+                                'sku_variant_id' => $variantId,
+                                'gudang_id' => $gudangId,
+                            ],
+                            [
+                                'jumlah' => 0,
+                                'jumlah_minimum' => $minStock,
+                            ]
+                        );
+                    }
+                }
+
+                if (! empty($activeFields['tipe_hp'])) {
+                    $tipeHpIds = array_values(array_filter(array_map('intval', (array) ($this->bulkEditForm['tipe_hp_ids'] ?? []))));
+                    $mode = $this->bulkEditForm['tipe_hp_mode'] ?? 'tambah';
+                    if ($mode === 'ganti') {
+                        $p->tipeHps()->sync($tipeHpIds);
+                    } else {
+                        $p->tipeHps()->syncWithoutDetaching($tipeHpIds);
+                    }
+
+                    $p->load('tipeHps');
+                    $modelKompatibel = $p->tipeHps->pluck('model')->filter()->unique()->values()->implode(', ');
+                    $p->update(['model_kompatibel' => $modelKompatibel ?: null]);
                 }
 
                 if ($pindahRak) {

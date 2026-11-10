@@ -33,6 +33,8 @@ use Spatie\Activitylog\Support\LogOptions;
     'sn',
     // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
     'abc_class', 'reorder_point', 'min_stock', 'max_stock', 'is_ondemand',
+    // Pajak
+    'kena_pajak',
 ])]
 class Produk extends Model
 {
@@ -125,6 +127,7 @@ class Produk extends Model
         'reorder_point' => 'integer',
         'min_stock' => 'integer',
         'max_stock' => 'integer',
+        'kena_pajak' => 'boolean',
     ];
 
     public function skuVariants(): HasMany

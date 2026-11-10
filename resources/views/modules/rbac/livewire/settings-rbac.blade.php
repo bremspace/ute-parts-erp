@@ -102,14 +102,28 @@
             }
         }
     }"
-    x-init="$watch('$wire.activeTab', value => {
-        if (['users', 'role', 'cabang'].includes(value)) subModul = 'akses';
-        else if (['master_produk', 'export_import'].includes(value)) subModul = 'katalog';
-        else if (['loyalitas', 'pajak', 'qris'].includes(value)) subModul = 'kebijakan';
-        else if (['master', 'printer'].includes(value)) subModul = (value === 'master' && subModul === 'sistem') ? 'sistem' : 'operasional';
-        else if (value === 'integrasi') subModul = 'integrasi';
-        else if (['database', 'audit', 'keamanan'].includes(value)) subModul = 'sistem';
-    })"
+    x-init="
+        $watch('$wire.activeTab', value => {
+            if (['users', 'role', 'cabang'].includes(value)) subModul = 'akses';
+            else if (['master_produk', 'export_import'].includes(value)) subModul = 'katalog';
+            else if (['loyalitas', 'pajak', 'qris'].includes(value)) subModul = 'kebijakan';
+            else if (['master', 'printer'].includes(value)) subModul = (value === 'master' && subModul === 'sistem') ? 'sistem' : 'operasional';
+            else if (value === 'integrasi') subModul = 'integrasi';
+            else if (['database', 'audit', 'keamanan', 'jaringan'].includes(value)) subModul = 'sistem';
+
+            const slug = value.replace(/_/g, '-');
+            const target = '/pengaturan/' + slug;
+            if (window.location.pathname !== target) {
+                window.history.replaceState({}, '', target);
+            }
+        });
+        window.addEventListener('popstate', () => {
+            const seg = window.location.pathname.split('/').pop().replace(/-/g, '_');
+            if (seg && seg !== $wire.get('activeTab')) {
+                $wire.set('activeTab', seg);
+            }
+        });
+    "
 >
     <!-- TOP TOOLBAR: Redesigned Spotlight Finder & Overview -->
     <div class="glass-panel p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 shadow-sm space-y-4">

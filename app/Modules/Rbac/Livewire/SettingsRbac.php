@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -73,6 +74,7 @@ class SettingsRbac extends Component
         'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan', 'jaringan',
     ];
 
+    #[Url(as: 'tab')]
     public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak, printer, database, qris, jaringan
 
     // Konfigurasi Akses Jaringan & Domain Online (Cloudflare Tunnel / LAN)
@@ -3795,55 +3797,49 @@ class SettingsRbac extends Component
 
     public function render()
     {
-        $kategoriAll = KategoriProduk::with('parent')
-            ->withCount('produk', 'children')
-            ->orderBy('urutan')
-            ->orderBy('nama')
-            ->get();
-        $kategoriByParent = $kategoriAll->groupBy(fn ($kategori) => $kategori->parent_id ?? 0);
-        $kategoriList = collect();
-        foreach ($kategoriByParent->get(0, collect()) as $root) {
-            $kategoriList->push($root);
-            foreach ($kategoriByParent->get($root->id, collect()) as $child) {
-                $kategoriList->push($child);
-            }
-        }
-        // Preserve orphaned rows instead of silently dropping them.
-        $handledIds = $kategoriList->pluck('id');
-        $kategoriList = $kategoriList->concat($kategoriAll->whereNotIn('id', $handledIds));
+        $activeTab = $this->activeTab;
+        $isKatalog = in_array($activeTab, ['master_produk', 'master-produk'], true);
+        $isUsers = $activeTab === 'users';
+        $isRole = $activeTab === 'role';
+        $isCabang = $activeTab === 'cabang';
+        $isAkses = in_array($activeTab, ['users', 'role', 'cabang'], true);
+        $isKeuangan = in_array($activeTab, ['loyalitas', 'pajak', 'qris'], true);
 
-        return view('modules.rbac.livewire.settings-rbac', [
-            'roles' => $this->roles,
-            'rolesFull' => $this->rolesFull,
-            'permissionsList' => $this->permissionsList,
-            'groupedPermissions' => $this->groupedPermissions,
-            'cabangs' => $this->cabangs,
-            'gudangs' => $this->gudangs,
-            'raks' => $this->raks,
-            'users' => $this->users,
-            'jenisServis' => $this->jenisServis,
-            'coaList' => $this->coaList,
-            // Master Produk & Katalog
-            'kategoriList' => $kategoriList,
-            'kategoriParentOptions' => $kategoriAll->whereNull('parent_id'),
-            'kategoriTree' => KategoriProduk::getTree(),
-            'brandList' => Brand::withCount('produk')->orderBy('nama')->get(),
-            'kualitasList' => KualitasProduk::with('brand')->withCount('produk')->orderByRaw('brand_id IS NULL ASC')->orderBy('nama')->get(),
-            'satuanList' => SatuanUnit::orderBy('kode')->get(),
-            'kondisiList' => $this->getKondisiList(),
-            'merkHpList' => TipeHp::select('merk')
+        if ($isKatalog) {
+            $kategoriAll = KategoriProduk::with('parent')
+                ->withCount('produk', 'children')
+                ->orderBy('urutan')
+                ->orderBy('nama')
+                ->get();
+            $kategoriByParent = $kategoriAll->groupBy(fn ($kategori) => $kategori->parent_id ?? 0);
+            $kategoriList = collect();
+            foreach ($kategoriByParent->get(0, collect()) as $root) {
+                $kategoriList->push($root);
+                foreach ($kategoriByParent->get($root->id, collect()) as $child) {
+                    $kategoriList->push($child);
+                }
+            }
+            $handledIds = $kategoriList->pluck('id');
+            $kategoriList = $kategoriList->concat($kategoriAll->whereNotIn('id', $handledIds));
+            $kategoriParentOptions = $kategoriAll->whereNull('parent_id');
+            $kategoriTree = KategoriProduk::getTree();
+            $brandList = Brand::withCount('produk')->orderBy('nama')->get();
+            $kualitasList = KualitasProduk::with('brand')->withCount('produk')->orderByRaw('brand_id IS NULL ASC')->orderBy('nama')->get();
+            $satuanList = SatuanUnit::orderBy('kode')->get();
+            $kondisiList = $this->getKondisiList();
+            $merkHpList = TipeHp::select('merk')
                 ->selectRaw('count(id) as total_model')
                 ->selectRaw('sum(case when is_active = 1 then 1 else 0 end) as total_aktif')
                 ->groupBy('merk')
                 ->orderBy('merk')
-                ->get(),
-            'tipeHpList' => TipeHp::withCount('produk')
+                ->get();
+            $tipeHpList = TipeHp::withCount('produk')
                 ->when($this->filterTipeHpMerk, fn ($q) => $q->where('merk', $this->filterTipeHpMerk))
                 ->orderBy('merk')
                 ->orderBy('model')
-                ->get(),
-            'merekHpOptions' => TipeHp::where('is_active', true)->distinct()->orderBy('merk')->pluck('merk')->filter()->values()->all(),
-            'existingModelsForSelectedMerk' => (! empty($this->tipeHpForm['merk']) && $this->tipeHpForm['merk'] !== '__custom__')
+                ->get();
+            $merekHpOptions = TipeHp::where('is_active', true)->distinct()->orderBy('merk')->pluck('merk')->filter()->values()->all();
+            $existingModelsForSelectedMerk = (! empty($this->tipeHpForm['merk']) && $this->tipeHpForm['merk'] !== '__custom__')
                 ? TipeHp::where('is_active', true)
                     ->where('merk', $this->tipeHpForm['merk'])
                     ->distinct()
@@ -3852,9 +3848,58 @@ class SettingsRbac extends Component
                     ->filter()
                     ->values()
                     ->all()
-                : [],
-            'qrisWebhookLogs' => Cache::get('qris_webhook_log_history', []),
-            'qrisLastWebhook' => Cache::get('qris_last_webhook_received'),
+                : [];
+        } else {
+            $kategoriList = collect();
+            $kategoriParentOptions = collect();
+            $kategoriTree = collect();
+            $brandList = collect();
+            $kualitasList = collect();
+            $satuanList = collect();
+            $kondisiList = [];
+            $merkHpList = collect();
+            $tipeHpList = collect();
+            $merekHpOptions = [];
+            $existingModelsForSelectedMerk = [];
+        }
+
+        $roles = ($isAkses || $this->showUserModal || $this->showRoleModal) ? $this->roles : collect();
+        $rolesFull = ($isRole || $this->showRoleModal) ? $this->rolesFull : collect();
+        $permissionsList = ($isRole || $this->showRoleModal) ? $this->permissionsList : collect();
+        $groupedPermissions = ($isRole || $this->showRoleModal) ? $this->groupedPermissions : [];
+        $cabangs = ($isAkses || $this->showCabangModal || $this->showUserModal || $activeTab === 'printer') ? $this->cabangs : collect();
+        $gudangs = ($isCabang || $this->showGudangModal || $this->showRakModal) ? $this->gudangs : collect();
+        $raks = ($isCabang || $this->showRakModal) ? $this->raks : collect();
+        $users = $isUsers ? $this->users : collect();
+        $jenisServis = ($activeTab === 'master' || $this->showJenisServisModal) ? $this->jenisServis : collect();
+        $coaList = ($isKeuangan || $activeTab === 'master') ? $this->coaList : [];
+        $qrisLogs = ($activeTab === 'qris') ? Cache::get('qris_webhook_log_history', []) : [];
+        $qrisLast = ($activeTab === 'qris') ? Cache::get('qris_last_webhook_received') : null;
+
+        return view('modules.rbac.livewire.settings-rbac', [
+            'roles' => $roles,
+            'rolesFull' => $rolesFull,
+            'permissionsList' => $permissionsList,
+            'groupedPermissions' => $groupedPermissions,
+            'cabangs' => $cabangs,
+            'gudangs' => $gudangs,
+            'raks' => $raks,
+            'users' => $users,
+            'jenisServis' => $jenisServis,
+            'coaList' => $coaList,
+            'kategoriList' => $kategoriList,
+            'kategoriParentOptions' => $kategoriParentOptions,
+            'kategoriTree' => $kategoriTree,
+            'brandList' => $brandList,
+            'kualitasList' => $kualitasList,
+            'satuanList' => $satuanList,
+            'kondisiList' => $kondisiList,
+            'merkHpList' => $merkHpList,
+            'tipeHpList' => $tipeHpList,
+            'merekHpOptions' => $merekHpOptions,
+            'existingModelsForSelectedMerk' => $existingModelsForSelectedMerk,
+            'qrisWebhookLogs' => $qrisLogs,
+            'qrisLastWebhook' => $qrisLast,
         ])->layout('layouts.backoffice', ['header' => 'Pengaturan & RBAC']);
     }
 }

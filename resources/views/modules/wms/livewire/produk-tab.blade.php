@@ -4783,6 +4783,93 @@
                         @endif
                     </div>
 
+                    <!-- Alokasi Gudang Masal -->
+                    <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['gudang_id'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                        <label class="flex items-center justify-between cursor-pointer select-none">
+                            <div>
+                                <span class="text-xs font-semibold text-ink-200 block">Alokasi Gudang</span>
+                                <span class="text-[10px] text-ink-400">Pastikan stok item dialokasikan pada gudang terpilih.</span>
+                            </div>
+                            <input type="checkbox" wire:model.live="bulkEditFields.gudang_id" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                        </label>
+                        @if($bulkEditFields['gudang_id'] ?? false)
+                            <select wire:model="bulkEditForm.gudang_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                <option value="">— Pilih Gudang Tujuan —</option>
+                                @foreach($gudangs as $gd)
+                                    <option value="{{ $gd->id }}">{{ $gd->kode }} — {{ $gd->nama }} ({{ $gd->cabang?->nama ?? 'Cabang' }})</option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+
+                    <!-- Kompatibilitas Tipe HP Masal -->
+                    <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['tipe_hp'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                        <label class="flex items-center justify-between cursor-pointer select-none">
+                            <div>
+                                <span class="text-xs font-semibold text-ink-200 block">Kompatibilitas Tipe HP</span>
+                                <span class="text-[10px] text-ink-400">Tetapkan relasi tipe HP yang cocok untuk produk terpilih.</span>
+                            </div>
+                            <input type="checkbox" wire:model.live="bulkEditFields.tipe_hp" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                        </label>
+                        @if($bulkEditFields['tipe_hp'] ?? false)
+                            <div class="space-y-2 pt-2 border-t border-white/5">
+                                <div class="flex items-center gap-4 text-xs text-ink-300">
+                                    <label class="flex items-center gap-1.5 cursor-pointer">
+                                        <input type="radio" value="tambah" wire:model="bulkEditForm.tipe_hp_mode" class="text-up-primary bg-ink-900 border-white/20">
+                                        <span>Tambah (Append)</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer">
+                                        <input type="radio" value="ganti" wire:model="bulkEditForm.tipe_hp_mode" class="text-up-primary bg-ink-900 border-white/20">
+                                        <span>Ganti Semua (Overwrite)</span>
+                                    </label>
+                                </div>
+                                <select multiple wire:model="bulkEditForm.tipe_hp_ids" class="w-full h-32 px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                    @foreach($tipeHpList as $th)
+                                        <option value="{{ $th->id }}">{{ $th->merk }} {{ $th->model }}</option>
+                                    @endforeach
+                                </select>
+                                <span class="text-[10px] text-ink-400">Tahan Ctrl / Cmd untuk memilih beberapa tipe HP.</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    <!-- Min Stock & Reorder Point (Grid) -->
+                    <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['min_stock'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                        <label class="flex items-center justify-between cursor-pointer select-none">
+                            <div>
+                                <span class="text-xs font-semibold text-ink-200 block">Stok Minimum & Reorder Point</span>
+                                <span class="text-[10px] text-ink-400">Atur batas peringatan stok menipis dan pemesanan kembali.</span>
+                            </div>
+                            <input type="checkbox" wire:model.live="bulkEditFields.min_stock" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                        </label>
+                        @if($bulkEditFields['min_stock'] ?? false)
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/5">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1">Stok Minimum</label>
+                                    <input type="number" min="0" wire:model="bulkEditForm.min_stock" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1">Reorder Point</label>
+                                    <input type="number" min="0" wire:model="bulkEditForm.reorder_point" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    <!-- Status Kena Pajak -->
+                    <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['kena_pajak'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                        <label class="flex items-center justify-between cursor-pointer select-none">
+                            <span class="text-xs font-semibold text-ink-200">Kena Pajak (PPN)</span>
+                            <input type="checkbox" wire:model.live="bulkEditFields.kena_pajak" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                        </label>
+                        @if($bulkEditFields['kena_pajak'] ?? false)
+                            <select wire:model="bulkEditForm.kena_pajak" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                <option value="1">Ya (Kena PPN saat penjualan)</option>
+                                <option value="0">Tidak (Non-PPN)</option>
+                            </select>
+                        @endif
+                    </div>
+
                     <!-- Penyesuaian Harga / Margin Masal -->
                     <div class="p-3.5 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['penyesuaian_harga'] ?? false) ? 'border-up-mint/40 bg-up-mint/5' : 'border-white/5' }} space-y-3">
                         <label class="flex items-center justify-between cursor-pointer select-none">
