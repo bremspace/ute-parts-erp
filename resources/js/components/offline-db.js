@@ -322,7 +322,7 @@ export const UteOfflineDB = {
         const db = await openOfflineDB();
         if (!db) return false;
 
-        const storeName = type === 'servis' || type === 'pickup'
+        const storeName = type === 'servis' || type === 'pickup' || type === 'servis_pickup'
             ? 'servis_pickup_outbox'
             : (type === 'retur' ? 'retur_outbox' : 'pos_outbox');
 
@@ -342,7 +342,7 @@ export const UteOfflineDB = {
         const db = await openOfflineDB();
         if (!db) return false;
 
-        const storeName = type === 'servis' || type === 'pickup'
+        const storeName = type === 'servis' || type === 'pickup' || type === 'servis_pickup'
             ? 'servis_pickup_outbox'
             : (type === 'retur' ? 'retur_outbox' : 'pos_outbox');
 
@@ -461,14 +461,16 @@ export const UteOfflineDB = {
     },
 
     // ================= SERVIS ACTIVE CACHE =================
-    async saveServisActiveCache(tickets = []) {
+    async saveServisActiveCache(tickets = [], clearOld = true) {
         const db = await openOfflineDB();
         if (!db) return false;
 
         return new Promise((resolve, reject) => {
             const tx = db.transaction('servis_active_cache', 'readwrite');
             const store = tx.objectStore('servis_active_cache');
-            store.clear();
+            if (clearOld) {
+                store.clear();
+            }
 
             tickets.forEach((t) => {
                 store.put(t);
@@ -476,6 +478,44 @@ export const UteOfflineDB = {
 
             tx.oncomplete = () => resolve(true);
             tx.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async removeServisActiveCache(noTiket) {
+        const db = await openOfflineDB();
+        if (!db) return false;
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('servis_active_cache', 'readwrite');
+            const store = tx.objectStore('servis_active_cache');
+            const req = store.delete(noTiket);
+            req.onsuccess = () => resolve(true);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    async decrementLocalStock(items = []) {
+        const db = await openOfflineDB();
+        if (!db || !items || items.length === 0) return false;
+
+        return new Promise((resolve) => {
+            const tx = db.transaction('master_produk', 'readwrite');
+            const store = tx.objectStore('master_produk');
+
+            items.forEach((item) => {
+                const produkId = Number(item.produk_id || item.id);
+                const req = store.get(produkId);
+                req.onsuccess = () => {
+                    const prod = req.result;
+                    if (prod) {
+                        prod.stok_terakhir = Math.max(0, (prod.stok_terakhir || 0) - (Number(item.qty) || 1));
+                        store.put(prod);
+                    }
+                };
+            });
+
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
         });
     },
 

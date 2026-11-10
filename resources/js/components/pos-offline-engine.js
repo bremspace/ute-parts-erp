@@ -107,7 +107,7 @@ export function initPosOfflineStore() {
         },
 
         async searchPickupTickets() {
-            this.pickupSearchResults = await this.searchOfflineServis(this.pickupSearchTerm);
+            this.pickupSearchResults = await this.searchServisActive(this.pickupSearchTerm);
         },
 
         selectPickupTicket(ticket) {
@@ -374,6 +374,11 @@ export function initPosOfflineStore() {
 
             await window.UteOfflineDB.putOutbox(txPayload);
 
+            // Potong stok lokal di IndexedDB master_produk agar sisa stok langsung ter-update
+            if (window.UteOfflineDB?.decrementLocalStock) {
+                window.UteOfflineDB.decrementLocalStock(items).catch(() => {});
+            }
+
             // Cetak Struk Bluetooth Langsung
             if (window.UteThermalPrint) {
                 const receiptData = {
@@ -419,16 +424,21 @@ export function initPosOfflineStore() {
         async searchServisActive(query = '') {
             if (!window.UteOfflineDB?.getAllServisActiveCache) return [];
             const tickets = await window.UteOfflineDB.getAllServisActiveCache();
-            if (!query.trim()) return tickets;
 
-            const q = query.toLowerCase().trim();
-            return tickets.filter((t) =>
-                (t.no_tiket && t.no_tiket.toLowerCase().includes(q)) ||
-                (t.nama_pelanggan && t.nama_pelanggan.toLowerCase().includes(q)) ||
-                (t.no_wa && t.no_wa.includes(q)) ||
-                (t.tipe_gadget && t.tipe_gadget.toLowerCase().includes(q)) ||
-                (t.imei && t.imei.toLowerCase().includes(q))
-            );
+            return tickets.filter((t) => {
+                if (t.status === 'diambil' || t.diambil_offline) return false;
+                if (!query.trim()) return true;
+
+                const q = query.toLowerCase().trim();
+                return (
+                    (t.no_tiket && t.no_tiket.toLowerCase().includes(q)) ||
+                    (t.nama_pelanggan && t.nama_pelanggan.toLowerCase().includes(q)) ||
+                    (t.telepon_pelanggan && t.telepon_pelanggan.includes(q)) ||
+                    (t.tipe_gadget && t.tipe_gadget.toLowerCase().includes(q)) ||
+                    (t.jenis_hp && t.jenis_hp.toLowerCase().includes(q)) ||
+                    (t.seri_hp && t.seri_hp.toLowerCase().includes(q))
+                );
+            });
         },
 
         async processOfflineServisPickup(pickupData = {}) {
@@ -463,12 +473,9 @@ export function initPosOfflineStore() {
 
             await window.UteOfflineDB.saveServisPickup(record);
 
-            // Update local snapshot cache status to 'diambil'
-            const cached = await window.UteOfflineDB.getServisActiveCache(no_tiket);
-            if (cached) {
-                cached.status = 'diambil';
-                cached.diambil_offline = true;
-                await window.UteOfflineDB.saveServisActiveCache([cached]);
+            // Hapus tiket dari cache servis aktif lokal agar tidak bisa diserahkan ganda
+            if (window.UteOfflineDB?.removeServisActiveCache) {
+                await window.UteOfflineDB.removeServisActiveCache(no_tiket);
             }
 
             // ESC/POS Thermal Print jika ada printer Bluetooth

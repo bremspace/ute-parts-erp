@@ -42,6 +42,7 @@ class ServisOfflineSyncService
         return $tickets->map(function (TiketServis $t) {
             $rincian = $t->getRincianBiayaLengkap();
             $totalBiaya = (float) ($rincian['total'] ?? $t->estimasi_biaya ?? 0);
+            $sisaTagihan = $t->status_pembayaran === 'lunas' ? 0.0 : $totalBiaya;
 
             return [
                 'id' => $t->id,
@@ -50,9 +51,11 @@ class ServisOfflineSyncService
                 'telepon_pelanggan' => $t->telepon_pelanggan,
                 'jenis_hp' => $t->jenis_hp,
                 'seri_hp' => $t->seri_hp,
+                'tipe_gadget' => trim($t->jenis_hp.' '.($t->seri_hp ?? '')),
                 'status' => $t->status,
                 'status_pembayaran' => $t->status_pembayaran,
                 'total_biaya' => $totalBiaya,
+                'sisa_tagihan' => $sisaTagihan,
                 'estimasi_biaya' => (float) ($t->estimasi_biaya ?? 0),
                 'updated_at' => $t->updated_at?->toIso8601String(),
             ];

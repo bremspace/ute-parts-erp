@@ -48,7 +48,7 @@
                             <div class="min-w-0 pr-2">
                                 <div class="font-bold text-ink-900 dark:text-white truncate" x-text="p.nama"></div>
                                 <div class="text-[11px] text-ink-400">
-                                    <span x-text="p.kode || p.sku"></span> • Rp <span x-text="Number(p.harga_retail || 0).toLocaleString('id-ID')"></span>
+                                    <span x-text="p.kode || p.sku"></span> • Rp <span x-text="Number(p.harga_retail || 0).toLocaleString('id-ID')"></span> • Stok: <span x-text="p.stok_terakhir ?? 0" class="font-semibold text-ink-700 dark:text-ink-200"></span>
                                 </div>
                             </div>
                             <button
@@ -210,7 +210,7 @@
                                 </span>
                             </div>
                             <div class="text-[11px] text-ink-500 dark:text-ink-400">
-                                <span x-text="t.nama_pelanggan"></span> • <span x-text="t.tipe_gadget"></span>
+                                <span x-text="t.nama_pelanggan"></span> • <span x-text="t.tipe_gadget || (t.jenis_hp + ' ' + (t.seri_hp || ''))"></span>
                             </div>
                         </div>
                     </template>
