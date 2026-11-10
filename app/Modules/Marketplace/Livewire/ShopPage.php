@@ -9,6 +9,7 @@ use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\SmartSearchService;
 use Illuminate\Support\Facades\Cache;
@@ -553,7 +554,8 @@ class ShopPage extends Component
             return;
         }
 
-        if ($produk->stok_total <= 0) {
+        $stokTersedia = (int) StokItem::where('produk_id', $produk->id)->sum('jumlah');
+        if ($stokTersedia <= 0) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk ini sedang habis stok.']);
 
             return;
@@ -562,10 +564,23 @@ class ShopPage extends Component
         $activeVariantId = $variantId;
         if ($produkId) {
             if ($activeVariantId === null) {
-                $activeVariantId = $produk->skuVariants->where('is_active', true)->first()?->id;
+                // Pilih varian aktif yang memiliki stok terlebih dahulu
+                $variantsWithStock = $produk->skuVariants->where('is_active', true)->filter(function ($v) {
+                    return (int) StokItem::where('sku_variant_id', $v->id)->sum('jumlah') > 0;
+                });
+                $activeVariantId = $variantsWithStock->first()?->id
+                    ?? $produk->skuVariants->where('is_active', true)->first()?->id;
             }
         } else {
             $activeVariantId = $this->selectedVariantId;
+            // Jika belum ada varian yang dipilih, pilih otomatis varian aktif pertama yang memiliki stok
+            if ($activeVariantId === null && $produk->skuVariants->isNotEmpty()) {
+                $variantsWithStock = $produk->skuVariants->where('is_active', true)->filter(function ($v) {
+                    return (int) StokItem::where('sku_variant_id', $v->id)->sum('jumlah') > 0;
+                });
+                $activeVariantId = $variantsWithStock->first()?->id
+                    ?? $produk->skuVariants->where('is_active', true)->first()?->id;
+            }
         }
 
         $itemQty = $produkId ? 1 : max(1, $this->qty);
@@ -594,15 +609,17 @@ class ShopPage extends Component
             return;
         }
 
-        if ($produk->stok_total <= 0) {
+        $stokTersedia = (int) StokItem::where('produk_id', $produk->id)->sum('jumlah');
+        if ($stokTersedia <= 0) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk ini sedang habis stok.']);
 
             return;
         }
 
         $activeVariantId = $produkId
-            ? ($produk->skuVariants->where('is_active', true)->first()?->id ?? null)
-            : $this->selectedVariantId;
+            ? ($produk->skuVariants->where('is_active', true)->filter(fn ($v) => (int) StokItem::where('sku_variant_id', $v->id)->sum('jumlah') > 0)->first()?->id
+                ?? $produk->skuVariants->where('is_active', true)->first()?->id)
+            : ($this->selectedVariantId ?? ($produk->skuVariants->where('is_active', true)->filter(fn ($v) => (int) StokItem::where('sku_variant_id', $v->id)->sum('jumlah') > 0)->first()?->id ?? $produk->skuVariants->where('is_active', true)->first()?->id));
 
         $catatan = (! $produkId || ($this->productDetail && $produkId === $this->productDetail->id)) && $this->selectedGadgetModel
             ? "Model: {$this->selectedGadgetModel}"

@@ -235,6 +235,18 @@ class Produk extends Model
     }
 
     /**
+     * Hitung total stok dari relasi stokItems jika sudah loaded, atau agregasi query jika belum.
+     */
+    public function getStokTotalAttribute(): int
+    {
+        if ($this->relationLoaded('stokItems')) {
+            return (int) $this->stokItems->sum('jumlah');
+        }
+
+        return (int) $this->stokItems()->sum('jumlah');
+    }
+
+    /**
      * Seluruh barcode produk (barcode utama + barcode alternatif / QR tambahan).
      *
      * @return array<int, string>

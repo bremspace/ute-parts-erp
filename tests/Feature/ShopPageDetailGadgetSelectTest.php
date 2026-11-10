@@ -153,4 +153,70 @@ class ShopPageDetailGadgetSelectTest extends TestCase
         $responseKatModel->assertSee('LCD &amp; Touchscreen', false);
         $responseKatModel->assertSee('Galaxy A54');
     }
+
+    public function test_katalog_add_to_cart_berhasil_bila_ada_stok(): void
+    {
+        $cabang = Cabang::create(['kode' => 'CB-TEST-2', 'nama' => 'Cabang Test 2', 'is_active' => true]);
+        $gudang = Gudang::create(['kode' => 'GD-TEST-2', 'nama' => 'Gudang Test 2', 'cabang_id' => $cabang->id, 'is_active' => true]);
+
+        $produk = Produk::create([
+            'kode' => 'PRD-TEST-CART',
+            'nama' => 'Kabel Data Fast Charging',
+            'slug' => 'kabel-data-fast-charging',
+            'kategori' => 'Aksesoris',
+            'harga_beli' => 15000,
+            'harga_jual_retail' => 35000,
+            'is_active' => true,
+        ]);
+
+        $variant = SkuVariant::create([
+            'produk_id' => $produk->id,
+            'sku' => 'KBL-FC-01',
+            'nama_varian' => 'Black 1m',
+            'harga_tambahan' => 0,
+        ]);
+
+        StokItem::create([
+            'cabang_id' => $cabang->id,
+            'gudang_id' => $gudang->id,
+            'produk_id' => $produk->id,
+            'sku_variant_id' => $variant->id,
+            'jumlah' => 5,
+            'kondisi' => 'baik',
+        ]);
+
+        Livewire::test(ShopPage::class)
+            ->call('addToCart', $produk->id)
+            ->assertDispatched('alert', function ($event, $params) use ($produk) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'success'
+                    && str_contains($payload['message'] ?? '', $produk->nama);
+            });
+
+        $cart = app(CartService::class)->all();
+        $this->assertNotEmpty($cart);
+    }
+
+    public function test_add_to_cart_gagal_bila_stok_kosong(): void
+    {
+        $produk = Produk::create([
+            'kode' => 'PRD-HABIS-01',
+            'nama' => 'Charger Super Langka',
+            'slug' => 'charger-super-langka',
+            'kategori' => 'Aksesoris',
+            'harga_beli' => 50000,
+            'harga_jual_retail' => 100000,
+            'is_active' => true,
+        ]);
+
+        Livewire::test(ShopPage::class)
+            ->call('addToCart', $produk->id)
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'error'
+                    && str_contains($payload['message'] ?? '', 'habis stok');
+            });
+    }
 }

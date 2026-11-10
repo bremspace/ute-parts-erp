@@ -72,6 +72,11 @@ class CartService
         return $cart;
     }
 
+    public function tambah(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null): array
+    {
+        return $this->isi($produkId, $variantId, $qty, $catatan);
+    }
+
     public function isi(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null): array
     {
         $produk = Produk::findOrFail($produkId);
