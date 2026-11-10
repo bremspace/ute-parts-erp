@@ -749,12 +749,21 @@
                     @foreach($gudangs as $g)
                         <div class="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                             <div>
-                                <p class="text-xs font-bold text-white">{{ $g->nama }} <span class="text-ink-500 font-mono">({{ $g->kode }})</span></p>
+                                <div class="flex items-center gap-1.5">
+                                    <p class="text-xs font-bold text-white">{{ $g->nama }} <span class="text-ink-500 font-mono">({{ $g->kode }})</span></p>
+                                    @if($g->is_default)
+                                        <span class="px-1.5 py-0.5 text-[9px] rounded bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Default</span>
+                                    @endif
+                                </div>
                                 <p class="text-[10px] text-ink-400">{{ $g->cabang?->nama }}</p>
                             </div>
                             <div class="flex items-center gap-2">
                                 <button wire:click="openGudangModal({{ $g->id }})" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Edit</button>
-                                <button wire:click="hapusGudang({{ $g->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan gudang ini?" class="text-up-red hover:underline text-[11px] cursor-pointer">Hapus</button>
+                                @if($g->is_default)
+                                    <span class="text-ink-600 text-[11px] cursor-not-allowed select-none" title="Gudang default tidak dapat dihapus">Hapus</span>
+                                @else
+                                    <button wire:click="hapusGudang({{ $g->id }})" wire:confirm="Hapus gudang ini? Seluruh stok fisik dan riwayat operasional akan dialihkan ke gudang default cabang." class="text-up-red hover:underline text-[11px] cursor-pointer">Hapus</button>
+                                @endif
                             </div>
                         </div>
                     @endforeach
@@ -4915,6 +4924,16 @@
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode *</label>
                         <input type="text" wire:model="gudangForm.kode" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono" placeholder="GDG-04" />
+                    </div>
+                    <div class="pt-2 border-t border-white/5 space-y-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" wire:model="gudangForm.is_default" class="rounded bg-white/5 border-white/10 text-up-primary focus:ring-0" />
+                            <span class="text-xs text-ink-200">Gudang Default Cabang (Penampung Stok Fallback)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" wire:model="gudangForm.is_active" class="rounded bg-white/5 border-white/10 text-up-primary focus:ring-0" />
+                            <span class="text-xs text-ink-200">Status Aktif</span>
+                        </label>
                     </div>
                 </div>
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">

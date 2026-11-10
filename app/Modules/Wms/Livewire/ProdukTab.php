@@ -764,6 +764,18 @@ class ProdukTab extends Component
         $filtered = array_values(array_filter($current, fn ($id) => (int) $id !== (int) $tipeHpId));
         $this->{$formKey}['tipe_hp_ids'] = $filtered;
 
+        if ($target === 'edit') {
+            $this->editKompatibelSelectedTipeHpIds = array_values(array_filter(
+                array_map('intval', $this->editKompatibelSelectedTipeHpIds),
+                fn ($id) => (int) $id !== (int) $tipeHpId
+            ));
+        } else {
+            $this->kompatibelSelectedTipeHpIds = array_values(array_filter(
+                array_map('intval', $this->kompatibelSelectedTipeHpIds),
+                fn ($id) => (int) $id !== (int) $tipeHpId
+            ));
+        }
+
         if (! empty($filtered)) {
             $allTipes = TipeHp::whereIn('id', $filtered)->get();
             $merks = $allTipes->pluck('merk')->filter()->unique()->values();
@@ -1348,52 +1360,88 @@ class ProdukTab extends Component
 
         $tipeHpIds = $p->tipeHps->pluck('id')->all();
 
-        // Resolusi otomatis dari kompatibilitas_hp (array JSON)
-        if (is_array($p->kompatibilitas_hp) && ! empty($p->kompatibilitas_hp)) {
-            foreach ($p->kompatibilitas_hp as $kh) {
-                if (is_array($kh) && ! empty($kh['model'])) {
-                    $m = trim((string) ($kh['merk'] ?? $p->brand_kompatibel ?? 'Universal'));
-                    $mod = trim((string) $kh['model']);
-                    $matched = TipeHp::firstOrCreate(
-                        ['merk' => $m, 'model' => $mod],
-                        ['nama' => $m.' '.$mod, 'is_active' => true]
-                    );
-                    $tipeHpIds[] = $matched->id;
+        // Resolusi otomatis / migrasi legacy hanya jika relasi pivot tipeHps masih kosong
+        if (empty($tipeHpIds)) {
+            if (is_array($p->kompatibilitas_hp) && ! empty($p->kompatibilitas_hp)) {
+                foreach ($p->kompatibilitas_hp as $kh) {
+                    if (is_array($kh) && ! empty($kh['model'])) {
+                        $m = trim((string) ($kh['merk'] ?? $p->brand_kompatibel ?? 'Universal'));
+                        $mod = trim((string) $kh['model']);
+                        $alias = trim((string) ($kh['kode_produk'] ?? ''));
+
+                        // Cek existing alias / model di TipeHp agar tidak membuat dobel record
+                        $matched = TipeHp::where(function ($q) use ($m, $mod, $alias) {
+                            $q->where(function ($sub) use ($m, $mod) {
+                                $sub->where('merk', $m)->where('model', $mod);
+                            });
+                            if ($alias !== '') {
+                                $q->orWhere('kode_produk', $alias);
+                            }
+                            $q->orWhere('model', $mod)
+                              ->orWhere('nama', $mod);
+                        })->first();
+
+                        if (! $matched) {
+                            $matched = TipeHp::create([
+                                'merk' => $m,
+                                'model' => $mod,
+                                'kode_produk' => $alias ?: null,
+                                'nama' => $m.' '.$mod.($alias ? " ({$alias})" : ''),
+                                'is_active' => true,
+                            ]);
+                        }
+                        $tipeHpIds[] = $matched->id;
+                    }
                 }
             }
-        }
 
-        // Resolusi otomatis dari brand_kompatibel & model_kompatibel (comma-separated string)
-        if (empty($tipeHpIds) && ! empty($p->model_kompatibel)) {
-            $m = trim((string) ($p->brand_kompatibel ?: 'Universal'));
-            $brandParts = preg_split('/[,;\/]+/', $m);
-            $primaryBrand = trim($brandParts[0] ?? 'Universal') ?: 'Universal';
-            $models = preg_split('/[,;\/]+/', (string) $p->model_kompatibel);
-            foreach ($models as $mod) {
-                $mod = trim($mod);
-                if ($mod !== '') {
-                    $matched = TipeHp::firstOrCreate(
-                        ['merk' => $primaryBrand, 'model' => $mod],
-                        ['nama' => $primaryBrand.' '.$mod, 'is_active' => true]
-                    );
-                    $tipeHpIds[] = $matched->id;
+            // Resolusi otomatis dari brand_kompatibel & model_kompatibel (comma-separated string)
+            if (empty($tipeHpIds) && ! empty($p->model_kompatibel)) {
+                $m = trim((string) ($p->brand_kompatibel ?: 'Universal'));
+                $brandParts = preg_split('/[,;\/]+/', $m);
+                $primaryBrand = trim($brandParts[0] ?? 'Universal') ?: 'Universal';
+                $models = preg_split('/[,;\/]+/', (string) $p->model_kompatibel);
+                foreach ($models as $mod) {
+                    $mod = trim($mod);
+                    if ($mod !== '') {
+                        $matched = TipeHp::where(function ($q) use ($primaryBrand, $mod) {
+                            $q->where(function ($sub) use ($primaryBrand, $mod) {
+                                $sub->where('merk', $primaryBrand)->where('model', $mod);
+                            })
+                            ->orWhere('kode_produk', $mod)
+                            ->orWhere('model', $mod)
+                            ->orWhere('nama', $mod);
+                        })->first();
+
+                        if (! $matched) {
+                            $matched = TipeHp::create([
+                                'merk' => $primaryBrand,
+                                'model' => $mod,
+                                'nama' => $primaryBrand.' '.$mod,
+                                'is_active' => true,
+                            ]);
+                        }
+                        $tipeHpIds[] = $matched->id;
+                    }
                 }
+            }
+
+            if (! empty($tipeHpIds)) {
+                $p->tipeHps()->syncWithoutDetaching($tipeHpIds);
             }
         }
 
         $tipeHpIds = array_values(array_unique(array_map('intval', $tipeHpIds)));
 
-        // Sinkronkan ke pivot jika ada relasi yang baru di-resolve
         if (! empty($tipeHpIds)) {
-            $p->tipeHps()->syncWithoutDetaching($tipeHpIds);
             $allLoadedTipes = TipeHp::whereIn('id', $tipeHpIds)->get();
             $merks = $allLoadedTipes->pluck('merk')->filter()->unique()->values();
             $models = $allLoadedTipes->pluck('model')->filter()->unique()->values();
             $formBrand = $merks->isNotEmpty() ? $merks->implode(', ') : $p->brand_kompatibel;
             $formModel = $models->isNotEmpty() ? $models->implode(', ') : $p->model_kompatibel;
         } else {
-            $formBrand = $p->brand_kompatibel;
-            $formModel = $p->model_kompatibel;
+            $formBrand = null;
+            $formModel = null;
         }
 
         $defaultMerekHp = null;
@@ -3717,8 +3765,27 @@ class ProdukTab extends Component
                     }
 
                     $p->load('tipeHps');
-                    $modelKompatibel = $p->tipeHps->pluck('model')->filter()->unique()->values()->implode(', ');
-                    $p->update(['model_kompatibel' => $modelKompatibel ?: null]);
+                    if ($p->tipeHps->isNotEmpty()) {
+                        $modelKompatibel = $p->tipeHps->pluck('model')->filter()->unique()->values()->implode(', ');
+                        $brandKompatibel = $p->tipeHps->pluck('merk')->filter()->unique()->values()->implode(', ');
+                        $kompatibilitasHp = $p->tipeHps->map(fn ($t) => [
+                            'merk' => $t->merk,
+                            'model' => $t->model,
+                            'nama' => $t->nama,
+                            'kode_produk' => $t->kode_produk,
+                        ])->toArray();
+                        $p->update([
+                            'model_kompatibel' => $modelKompatibel ?: null,
+                            'brand_kompatibel' => $brandKompatibel ?: null,
+                            'kompatibilitas_hp' => $kompatibilitasHp,
+                        ]);
+                    } else {
+                        $p->update([
+                            'model_kompatibel' => null,
+                            'brand_kompatibel' => null,
+                            'kompatibilitas_hp' => null,
+                        ]);
+                    }
                 }
 
                 if ($pindahRak) {
@@ -4518,7 +4585,15 @@ class ProdukTab extends Component
                 ->all()
             : [];
 
+        $selectedProduksPreview = [];
+        if ($this->showBulkEditModal && ! empty($this->selectedProdukIds)) {
+            $selectedProduksPreview = Produk::with('skuVariants')
+                ->whereIn('id', $this->selectedProdukIds)
+                ->get();
+        }
+
         return view('modules.wms.livewire.produk-tab', [
+            'selectedProduksPreview' => $selectedProduksPreview,
             'gudangs' => $gudangs,
             'gudangsCabang' => $gudangsCabang,
             'raks' => Rak::with('gudang')->get(),

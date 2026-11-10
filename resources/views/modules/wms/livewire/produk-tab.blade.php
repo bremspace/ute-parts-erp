@@ -2624,7 +2624,7 @@
                             @if(!empty($selectedCreateTipeHps) && $selectedCreateTipeHps->isNotEmpty())
                                 <div class="flex flex-wrap gap-2 p-2.5 rounded-xl bg-ink-950/60 border border-white/5 min-h-[44px] items-center">
                                     @foreach($selectedCreateTipeHps as $th)
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-up-primary/15 text-up-primary border border-up-primary/30 transition hover:bg-up-primary/25">
+                                        <span wire:key="chip-create-tipe-{{ $th->id }}" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-up-primary/15 text-up-primary border border-up-primary/30 transition hover:bg-up-primary/25">
                                             <span class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
                                             <strong class="font-bold">{{ $th->merk }}</strong> {{ $th->model }}@if(!empty($th->kode_produk)) <span class="text-[10px] text-up-mint font-mono">({{ $th->kode_produk }})</span>@endif
                                             <button type="button"
@@ -3683,7 +3683,7 @@
                             @if(!empty($selectedEditTipeHps) && $selectedEditTipeHps->isNotEmpty())
                                 <div class="flex flex-wrap gap-2 p-2.5 rounded-xl bg-ink-950/60 border border-white/5 min-h-[44px] items-center">
                                     @foreach($selectedEditTipeHps as $th)
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-up-primary/15 text-up-primary border border-up-primary/30 transition hover:bg-up-primary/25">
+                                        <span wire:key="chip-edit-tipe-{{ $th->id }}" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-up-primary/15 text-up-primary border border-up-primary/30 transition hover:bg-up-primary/25">
                                             <span class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
                                             <strong class="font-bold">{{ $th->merk }}</strong> {{ $th->model }}@if(!empty($th->kode_produk)) <span class="text-[10px] text-up-mint font-mono">({{ $th->kode_produk }})</span>@endif
                                             <button type="button"
@@ -4594,6 +4594,34 @@
                     </button>
                 </div>
 
+                <!-- Preview Daftar Produk & Kode Produk Terpilih -->
+                @if(!empty($selectedProduksPreview))
+                    <div class="p-3 rounded-2xl bg-white/[0.02] border border-white/10 space-y-2">
+                        <div class="flex items-center justify-between text-xs text-ink-300">
+                            <span class="font-semibold text-white flex items-center gap-1.5">
+                                <span>📦</span>
+                                <span>Daftar Produk yang Di-mapping ({{ count($selectedProduksPreview) }})</span>
+                            </span>
+                            <span class="text-[10px] text-ink-400">Kode &amp; Nama Produk</span>
+                        </div>
+                        <div class="max-h-36 overflow-y-auto space-y-1.5 pr-1 divide-y divide-white/5">
+                            @foreach($selectedProduksPreview as $sp)
+                                <div class="pt-1.5 first:pt-0 flex items-center justify-between gap-2 text-xs">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span class="font-mono text-up-primary font-bold text-[11px] bg-up-primary/10 px-2 py-0.5 rounded shrink-0">
+                                            {{ $sp->kode_produk ?? $sp->sku ?? $sp->barcode ?? $sp->kode_lama ?? '-' }}
+                                        </span>
+                                        <span class="text-ink-200 truncate font-medium" title="{{ $sp->nama }}">{{ $sp->nama }}</span>
+                                    </div>
+                                    @if($sp->kategori)
+                                        <span class="text-[10px] text-ink-400 shrink-0 hidden sm:inline">{{ $sp->kategori }}</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 <!-- Form Fields -->
                 <div class="space-y-3.5">
                     <!-- Kategori -->
@@ -4825,7 +4853,7 @@
                                 </div>
                                 <select multiple wire:model="bulkEditForm.tipe_hp_ids" class="w-full h-32 px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
                                     @foreach($tipeHpList as $th)
-                                        <option value="{{ $th->id }}">{{ $th->merk }} {{ $th->model }}</option>
+                                        <option value="{{ $th->id }}">{{ $th->nama_tampilan }}</option>
                                     @endforeach
                                 </select>
                                 <span class="text-[10px] text-ink-400">Tahan Ctrl / Cmd untuk memilih beberapa tipe HP.</span>

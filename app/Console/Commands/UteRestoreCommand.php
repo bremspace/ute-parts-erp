@@ -10,6 +10,7 @@ class UteRestoreCommand extends Command
 {
     protected $signature = 'ute:restore
         {file? : Nama berkas backup .sql.gz di storage/app/backups atau path absolut}
+        {--target-db= : Target nama database MySQL (misal uteparts_test_restore untuk inspeksi tanpa menimpa database utama)}
         {--latest : Otomatis pulihkan dari file backup paling mutakhir}
         {--force : Lewati konfirmasi manual}';
 
@@ -18,6 +19,7 @@ class UteRestoreCommand extends Command
     public function handle(DatabaseManagementService $dbService): int
     {
         $fileArg = $this->argument('file');
+        $targetDb = $this->option('target-db');
         $isLatest = $this->option('latest');
         $force = $this->option('force');
 
@@ -60,7 +62,10 @@ class UteRestoreCommand extends Command
         }
 
         if (! $force) {
-            $confirm = $this->confirm("PERINGATAN: Memulihkan database dari '".basename($targetPath)."' akan menimpa data yang ada saat ini. Lanjutkan?", false);
+            $msg = $targetDb
+                ? "Restore file '".basename($targetPath)."' ke database target '{$targetDb}' (database utama aman). Lanjutkan?"
+                : "PERINGATAN: Memulihkan database dari '".basename($targetPath)."' akan menimpa data yang ada saat ini. Lanjutkan?";
+            $confirm = $this->confirm($msg, (bool) $targetDb);
             if (! $confirm) {
                 $this->warn('Operasi restore dibatalkan.');
 
@@ -71,8 +76,8 @@ class UteRestoreCommand extends Command
         $this->info('Memulai proses restore database...');
 
         try {
-            $result = $dbService->restore($targetPath);
-            $this->info("Restore berhasil dari berkas: {$result['restored_from']}");
+            $result = $dbService->restore($targetPath, $targetDb);
+            $this->info("Restore berhasil dari berkas: {$result['restored_from']} ke database '{$result['target_database']}'");
             if (! empty($result['pre_restore_backup'])) {
                 $this->comment("Snapshot darurat pra-restore disimpan di: {$result['pre_restore_backup']}");
             }

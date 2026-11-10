@@ -342,19 +342,26 @@ class Produk extends Model
      */
     public function getDaftarKompatibelAttribute(): Collection
     {
-        $list = collect();
-
-        if ($this->relationLoaded('tipeHps') && $this->tipeHps->isNotEmpty()) {
-            $list = $this->tipeHps->map(fn ($t) => $t->nama_tampilan);
-        } elseif (is_array($this->kompatibilitas_hp) && ! empty($this->kompatibilitas_hp)) {
-            $list = collect($this->kompatibilitas_hp)->map(fn ($t) => TipeHp::formatNamaTampilan($t['merk'] ?? '', $t['model'] ?? '', $t['nama'] ?? null, $t['kode_produk'] ?? null));
-        } elseif (! empty($this->model_kompatibel)) {
-            $m = trim((string) ($this->brand_kompatibel ?? ''));
-            $rawModels = array_filter(array_map('trim', explode(',', (string) $this->model_kompatibel)));
-            $list = collect($rawModels)->map(fn ($mod) => TipeHp::resolveLabelForModel($mod, $m));
+        if ($this->relationLoaded('tipeHps')) {
+            return $this->tipeHps->map(fn ($t) => $t->nama_tampilan)->filter()->unique()->values();
         }
 
-        return $list->filter()->unique()->values();
+        if ($this->tipeHps()->exists()) {
+            return $this->tipeHps()->get()->map(fn ($t) => $t->nama_tampilan)->filter()->unique()->values();
+        }
+
+        if (is_array($this->kompatibilitas_hp) && ! empty($this->kompatibilitas_hp)) {
+            return collect($this->kompatibilitas_hp)->map(fn ($t) => TipeHp::formatNamaTampilan($t['merk'] ?? '', $t['model'] ?? '', $t['nama'] ?? null, $t['kode_produk'] ?? null))->filter()->unique()->values();
+        }
+
+        if (! empty($this->model_kompatibel)) {
+            $m = trim((string) ($this->brand_kompatibel ?? ''));
+            $rawModels = array_filter(array_map('trim', explode(',', (string) $this->model_kompatibel)));
+
+            return collect($rawModels)->map(fn ($mod) => TipeHp::resolveLabelForModel($mod, $m))->filter()->unique()->values();
+        }
+
+        return collect();
     }
 
     public function channelMappings(): HasMany

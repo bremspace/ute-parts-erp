@@ -186,23 +186,33 @@ class DatabaseManagementService
     /**
      * Restore database dari file .sql.gz lokal server.
      */
-    public function restore(string $filePath): array
+    public function restore(string $filePath, ?string $targetDatabase = null): array
     {
+        @set_time_limit(1800);
+        @ini_set('memory_limit', '512M');
+
         if (! File::exists($filePath)) {
             throw new RuntimeException("File backup tidak ditemukan: {$filePath}");
-        }
-
-        // 1. Ambil emergency pre-restore snapshot otomatis
-        $preBackup = null;
-        try {
-            $preBackup = $this->backup('local', 30);
-        } catch (Throwable $e) {
-            // Lanjut jika pre-backup gagal karena situasi darurat
         }
 
         $connName = config('database.default');
         $conn = config("database.connections.{$connName}");
         $driver = $conn['driver'] ?? 'mysql';
+
+        $isCustomTarget = ! empty($targetDatabase) && $targetDatabase !== ($conn['database'] ?? null);
+        if (! empty($targetDatabase)) {
+            $conn['database'] = $targetDatabase;
+        }
+
+        // 1. Ambil emergency pre-restore snapshot otomatis (hanya jika menimpa database utama)
+        $preBackup = null;
+        if (! $isCustomTarget) {
+            try {
+                $preBackup = $this->backup('local', 30);
+            } catch (Throwable $e) {
+                // Lanjut jika pre-backup gagal karena situasi darurat
+            }
+        }
 
         // 2. Uncompress gzip ke file SQL sementara
         $tempSql = storage_path('app/temp_restore_'.uniqid().'.sql');
@@ -224,12 +234,13 @@ class DatabaseManagementService
             'Database',
             'restore',
             auth()->id() ?? 0,
-            'Database dipulihkan dari: '.basename($filePath)
+            'Database dipulihkan dari: '.basename($filePath).($isCustomTarget ? " (Target DB: {$targetDatabase})" : '')
         );
 
         return [
             'success' => true,
             'restored_from' => basename($filePath),
+            'target_database' => $conn['database'],
             'pre_restore_backup' => $preBackup['filename'] ?? null,
         ];
     }
@@ -853,6 +864,8 @@ class DatabaseManagementService
             $mysql,
             '--host='.($conn['host'] ?? '127.0.0.1'),
             '--user='.($conn['username'] ?? ''),
+            '--max-allowed-packet=128M',
+            '--init-command=SET foreign_key_checks=0; SET unique_checks=0;',
         ];
 
         if (! empty($conn['unix_socket'])) {

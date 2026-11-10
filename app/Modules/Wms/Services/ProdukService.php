@@ -343,28 +343,35 @@ class ProdukService
             }
 
             // Sinkronisasi dua arah: brand_kompatibel, model_kompatibel, dan tipe_hp
-            $brand = $brand ? trim($brand) : null;
-            $model = $model ? trim($model) : null;
-            $finalTipeHpIds = array_values(array_filter($tipeHpIds));
-
-            if (! empty($brand) && ! empty($model) && ! str_contains($brand, ',') && ! str_contains($model, ',')) {
-                $matchedTipeHp = TipeHp::firstOrCreate(
-                    ['merk' => $brand, 'model' => $model],
-                    ['nama' => "{$brand} {$model}", 'is_active' => true]
-                );
-                if (! in_array($matchedTipeHp->id, $finalTipeHpIds, true)) {
-                    $finalTipeHpIds[] = $matchedTipeHp->id;
-                }
-            }
+            $finalTipeHpIds = $tipeHpIds !== null
+                ? array_values(array_filter(array_map('intval', (array) $tipeHpIds)))
+                : null;
 
             $kompatibilitasHp = [];
-            if (! empty($finalTipeHpIds)) {
-                $tipeModels = TipeHp::whereIn('id', $finalTipeHpIds)->get();
-                if ($tipeModels->isNotEmpty()) {
-                    $brand = $tipeModels->pluck('merk')->filter()->unique()->implode(', ');
-                    $model = $tipeModels->pluck('model')->filter()->unique()->implode(', ');
-                    $kompatibilitasHp = $tipeModels->map(fn ($t) => ['merk' => $t->merk, 'model' => $t->model])->toArray();
+            if ($finalTipeHpIds !== null) {
+                if (! empty($finalTipeHpIds)) {
+                    $tipeModels = TipeHp::whereIn('id', $finalTipeHpIds)->get();
+                    if ($tipeModels->isNotEmpty()) {
+                        $brand = $tipeModels->pluck('merk')->filter()->unique()->implode(', ');
+                        $model = $tipeModels->pluck('model')->filter()->unique()->implode(', ');
+                        $kompatibilitasHp = $tipeModels->map(fn ($t) => [
+                            'merk' => $t->merk,
+                            'model' => $t->model,
+                            'nama' => $t->nama,
+                            'kode_produk' => $t->kode_produk,
+                        ])->toArray();
+                    } else {
+                        $brand = null;
+                        $model = null;
+                    }
+                } else {
+                    $brand = null;
+                    $model = null;
+                    $kompatibilitasHp = null;
                 }
+            } else {
+                $brand = $brand ? trim($brand) : null;
+                $model = $model ? trim($model) : null;
             }
 
             $cleanBarcode = $barcode !== null ? (trim($barcode) ?: null) : $produk->barcode;
@@ -380,7 +387,7 @@ class ProdukService
                 'supplier_id' => $supplierId,
                 'brand_kompatibel' => $brand,
                 'model_kompatibel' => $model,
-                'kompatibilitas_hp' => ! empty($kompatibilitasHp) ? $kompatibilitasHp : (empty($brand) && empty($model) ? null : $produk->kompatibilitas_hp),
+                'kompatibilitas_hp' => ! empty($kompatibilitasHp) ? $kompatibilitasHp : null,
                 'kondisi' => ! empty($kondisi) ? trim($kondisi) : 'baru',
                 'satuan' => $satuan,
                 'harga_beli' => $hargaBeli,
@@ -412,7 +419,9 @@ class ProdukService
             $produk->update($updatePayload);
 
             // Sync tipe HP kompatibel
-            $produk->tipeHps()->sync($finalTipeHpIds);
+            if ($finalTipeHpIds !== null) {
+                $produk->tipeHps()->sync($finalTipeHpIds);
+            }
 
             // Sync produk kompatibel / substitusi
             $produk->produkKompatibel()->sync(array_values(array_filter($produkKompatibelIds)));

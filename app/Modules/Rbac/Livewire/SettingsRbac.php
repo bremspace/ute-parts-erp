@@ -1986,18 +1986,33 @@ class SettingsRbac extends Component
     }
 
     // ===== GUDANG =====
-    public function openGudangModal(?int $id = null)
+    public function openGudangModal(?int $id = null): void
     {
         if ($id) {
             $g = Gudang::findOrFail($id);
-            $this->gudangForm = $g->toArray();
+            $this->gudangForm = [
+                'id' => $g->id,
+                'cabang_id' => $g->cabang_id,
+                'nama' => $g->nama,
+                'kode' => $g->kode,
+                'is_active' => (bool) $g->is_active,
+                'is_default' => (bool) ($g->is_default ?? false),
+            ];
         } else {
-            $this->gudangForm = ['id' => null, 'cabang_id' => null, 'nama' => '', 'kode' => '', 'is_active' => true];
+            $defaultCabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::first()?->id;
+            $this->gudangForm = [
+                'id' => null,
+                'cabang_id' => $defaultCabangId,
+                'nama' => '',
+                'kode' => '',
+                'is_active' => true,
+                'is_default' => false,
+            ];
         }
         $this->showGudangModal = true;
     }
 
-    public function saveGudang()
+    public function saveGudang(): void
     {
         if (! $this->boleh('cabang.manage', 'Anda tidak memiliki izin mengelola gudang.')) {
             return;
@@ -2007,23 +2022,41 @@ class SettingsRbac extends Component
             'gudangForm.cabang_id' => 'required|exists:cabang,id',
             'gudangForm.nama' => 'required|string|max:255',
             'gudangForm.kode' => 'required|string|max:20|unique:gudang,kode,'.($this->gudangForm['id'] ?? 'NULL'),
+            'gudangForm.is_active' => 'boolean',
+            'gudangForm.is_default' => 'boolean',
         ]);
 
-        if ($this->gudangForm['id']) {
-            Gudang::findOrFail($this->gudangForm['id'])->update($this->gudangForm);
-        } else {
-            Gudang::create($this->gudangForm);
-        }
+        $cabangId = (int) $this->gudangForm['cabang_id'];
+        $isDefault = (bool) ($this->gudangForm['is_default'] ?? false);
+
+        DB::transaction(function () use ($cabangId, $isDefault) {
+            if ($isDefault) {
+                // Cabut status default dari gudang lain pada cabang yang sama
+                Gudang::where('cabang_id', $cabangId)->update(['is_default' => false]);
+            }
+
+            if ($this->gudangForm['id']) {
+                $gudang = Gudang::findOrFail($this->gudangForm['id']);
+                if ($gudang->is_default && ! ($this->gudangForm['is_active'] ?? true)) {
+                    $this->gudangForm['is_active'] = true;
+                }
+                $gudang->update($this->gudangForm);
+            } else {
+                if (! Gudang::where('cabang_id', $cabangId)->exists()) {
+                    $this->gudangForm['is_default'] = true;
+                }
+                Gudang::create($this->gudangForm);
+            }
+        });
 
         $this->showGudangModal = false;
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Gudang disimpan']);
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Gudang berhasil disimpan']);
     }
 
     /**
-     * Hapus gudang. Hampir semua tabel di bawah memakai cascadeOnDelete
-     * (lihat migration: stok_items, stok_log, stok_opname, rak, PO, transfer),
-     * jadi hard delete gudang yang pernah dipakai = menghapus riwayat stok
-     * tanpa jejak. Kalau ada baris stok/riwayat, gudang hanya dinonaktifkan.
+     * Hapus gudang. Jika gudang memiliki stok atau riwayat data terkait,
+     * seluruh stok fisik digabungkan (merger akumulatif) dan referensi operasional
+     * dialihkan secara atomik ke gudang default cabang via model deleting hook.
      */
     public function hapusGudang(int $id): void
     {
@@ -2033,37 +2066,34 @@ class SettingsRbac extends Component
 
         $gudang = Gudang::findOrFail($id);
 
-        // Baris stok_items = jejak stok fisik. Satu baris pun (walau jumlah 0)
-        // sudah berarti gudang pernah dipakai → hard delete tidak aman.
-        $stok = DB::table('stok_items')->where('gudang_id', $id)->count();
-        $rak = DB::table('rak')->where('gudang_id', $id)->count();
-        $po = DB::table('purchase_order')->where('gudang_tujuan_id', $id)->count();
-        $transfer = DB::table('stok_transfer')
-            ->where('gudang_asal_id', $id)
-            ->orWhere('gudang_tujuan_id', $id)
-            ->count();
-        $opname = DB::table('stok_opname')->where('gudang_id', $id)->count();
-        $mutasi = DB::table('stock_mutation_log')->where('gudang_id', $id)->count();
-        // grn memakai FK tanpa onDelete (RESTRICT) — hard delete akan error SQL.
-        $grn = DB::table('grn')->where('gudang_id', $id)->count();
-        $sparepart = DB::table('servis_sparepart')->where('gudang_id', $id)->count();
-        $transaksi = DB::table('transaksi')->where('gudang_id', $id)->count();
-
-        $total = $stok + $rak + $po + $transfer + $opname + $mutasi + $grn + $sparepart + $transaksi;
-
-        if ($total > 0) {
-            $gudang->update(['is_active' => false]);
+        if ($gudang->is_default) {
             $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => "Gudang '{$gudang->kode}' memiliki {$total} data terkait ({$stok} baris stok, {$mutasi} mutasi, {$po} PO, {$transfer} transfer, {$opname} opname, {$rak} rak, {$grn} GRN, {$sparepart} sparepart servis, {$transaksi} transaksi). Status dinonaktifkan (tidak dihapus permanen).",
+                'type' => 'error',
+                'message' => "Gudang '{$gudang->nama}' adalah gudang default cabang dan tidak dapat dihapus.",
             ]);
 
             return;
         }
 
         $kode = $gudang->kode;
-        $gudang->delete();
-        $this->dispatch('alert', ['type' => 'success', 'message' => "Gudang '{$kode}' berhasil dihapus"]);
+        $nama = $gudang->nama;
+        $stokCount = DB::table('stok_items')->where('gudang_id', $id)->count();
+        $totalStok = (int) DB::table('stok_items')->where('gudang_id', $id)->sum('jumlah');
+        $defaultGudang = Gudang::getDefault($gudang->cabang_id);
+
+        try {
+            DB::transaction(function () use ($gudang) {
+                $gudang->delete();
+            });
+
+            $pesan = "Gudang '{$nama}' ({$kode}) berhasil dihapus.";
+            if ($stokCount > 0) {
+                $pesan .= " Sebanyak {$stokCount} item produk ({$totalStok} pcs stok) dan data operasional terkait telah dialihkan ke gudang default '{$defaultGudang->nama}'.";
+            }
+            $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal menghapus gudang: '.$e->getMessage()]);
+        }
     }
 
     // ===== RAK =====
