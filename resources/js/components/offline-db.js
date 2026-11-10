@@ -432,6 +432,7 @@ export const UteOfflineDB = {
         try {
             const url = cabangId ? `/api/pos/master-offline?cabang_id=${cabangId}` : '/api/pos/master-offline';
             const response = await fetch(url, {
+                credentials: 'same-origin',
                 headers: {
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
@@ -510,6 +511,7 @@ export const UteOfflineDB = {
         try {
             const url = cabangId ? `/api/servis/active-offline?cabang_id=${cabangId}` : '/api/servis/active-offline';
             const response = await fetch(url, {
+                credentials: 'same-origin',
                 headers: {
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',

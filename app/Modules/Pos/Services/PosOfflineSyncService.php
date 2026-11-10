@@ -218,6 +218,10 @@ class PosOfflineSyncService
                 ->where('cabang_id', $cabangId)
                 ->count() + 1;
             $noTransaksi = sprintf('TRX-OFF-C%02d-%s-%04d', $cabangId, $dateStr, $countToday);
+            while (Transaksi::where('no_transaksi', $noTransaksi)->exists()) {
+                $countToday++;
+                $noTransaksi = sprintf('TRX-OFF-C%02d-%s-%04d', $cabangId, $dateStr, $countToday);
+            }
 
             // 5. Kalkulasi PPN & Nilai Akhir
             // Fakta fisik kasir: kasir sudah menerima uang fisik sesuai $clientTotalNominal.

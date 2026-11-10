@@ -1,3 +1,14 @@
+@php
+    $activeCabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
+    $activeCabangName = \App\Modules\Rbac\Models\Cabang::find($activeCabangId)?->nama ?? 'Cabang Utama';
+@endphp
+<script>
+    window.CURRENT_USER_ID = {{ auth()->id() ?? 1 }};
+    window.CURRENT_USER_NAME = {!! json_encode(auth()->user()?->name ?? 'Kasir') !!};
+    window.ACTIVE_CABANG_ID = {{ $activeCabangId }};
+    window.ACTIVE_CABANG_NAME = {!! json_encode($activeCabangName) !!};
+</script>
+
 <div
     class="flex flex-col gap-2.5 sm:gap-3.5 min-w-0 flex-1 min-h-[calc(100dvh-12rem)] md:min-h-0 md:h-[calc(100dvh-6.5rem)] pb-4 md:pb-0"
     x-data="{
@@ -38,6 +49,34 @@
             <span class="font-medium" x-text="!$store.posOffline.isOnline ? 'Mode Kasir Offline Mandiri: Transaksi tersimpan lokal di perangkat' : 'Koneksi Pulih: Ada antrean yang siap disinkronkan'"></span>
         </div>
         <div class="flex items-center gap-2">
+            <template x-if="!$store.posOffline.isOnline">
+                <div class="flex items-center gap-1.5">
+                    <button
+                        type="button"
+                        @click="$store.posOffline.openSaleModal()"
+                        class="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer text-xs flex items-center gap-1 shadow-sm"
+                        title="Buat transaksi kasir offline darurat"
+                    >
+                        <span>+ Transaksi POS</span>
+                    </button>
+                    <button
+                        type="button"
+                        @click="$store.posOffline.openPickupModal()"
+                        class="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold cursor-pointer text-xs flex items-center gap-1 shadow-sm"
+                        title="Ambil unit servis yang sudah selesai"
+                    >
+                        <span>+ Ambil Servis</span>
+                    </button>
+                    <button
+                        type="button"
+                        @click="$store.posOffline.openReturModal()"
+                        class="px-2 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold cursor-pointer text-xs flex items-center gap-1 shadow-sm"
+                        title="Tukar unit barang rusak 1-to-1 offline"
+                    >
+                        <span>+ Retur Tukar</span>
+                    </button>
+                </div>
+            </template>
             <button
                 type="button"
                 @click="$store.posOffline.toggleDrawer()"
@@ -128,14 +167,14 @@
                             <div class="flex items-center gap-2 pt-1 border-t border-ink-100 dark:border-white/5 mt-1">
                                 <button
                                     type="button"
-                                    @click.stop="$store.posOffline.retryOutboxItem(item.item_type || 'pos', item.offline_uuid || item.pickup_uuid || item.retur_uuid)"
+                                    @click.stop="$store.posOffline.retryOutboxItem(item.entry_type || item.item_type || 'pos', item.offline_uuid || item.pickup_uuid || item.retur_uuid)"
                                     class="px-2 py-0.5 rounded bg-primary-50 dark:bg-primary-500/10 text-up-primary hover:bg-primary-100 text-[10px] font-semibold"
                                 >
                                     Ulangi
                                 </button>
                                 <button
                                     type="button"
-                                    @click.stop="$store.posOffline.dismissOutboxItem(item.item_type || 'pos', item.offline_uuid || item.pickup_uuid || item.retur_uuid)"
+                                    @click.stop="$store.posOffline.dismissOutboxItem(item.entry_type || item.item_type || 'pos', item.offline_uuid || item.pickup_uuid || item.retur_uuid)"
                                     class="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-500/10 text-rose-500 hover:bg-rose-100 text-[10px] font-semibold"
                                 >
                                     Hapus
@@ -2195,4 +2234,6 @@
             </div>
         </div>
     </div>
+
+    @include('modules.pos.livewire.modals.offline-actions-modal')
 </div>

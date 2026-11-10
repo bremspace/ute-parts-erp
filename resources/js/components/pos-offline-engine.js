@@ -42,6 +42,168 @@ export function initPosOfflineStore() {
         cart: {}, // Format { produkId: { produk, qty, harga, subtotal } }
         cashReceived: 0,
 
+        // Modal Offline Actions
+        modalSaleOpen: false,
+        modalPickupOpen: false,
+        modalReturOpen: false,
+        saleSearchTerm: '',
+        saleSearchResults: [],
+        pickupSearchTerm: '',
+        pickupSearchResults: [],
+        selectedPickupTicket: null,
+        pickupNamaPengambil: '',
+        pickupNominalBayar: 0,
+        returNotaAsal: '',
+        returAlasan: 'Tukar unit 1-to-1 offline',
+        returItemSearchTerm: '',
+        returItemResults: [],
+        selectedReturItem: null,
+        returSwapSearchTerm: '',
+        returSwapResults: [],
+        selectedSwapItem: null,
+
+        openSaleModal() {
+            this.modalSaleOpen = true;
+            this.saleSearchTerm = '';
+            this.saleSearchResults = [];
+            if (window.UteOfflineDB?.searchProduk) {
+                window.UteOfflineDB.searchProduk('', 10).then((res) => {
+                    this.saleSearchResults = res || [];
+                });
+            }
+        },
+
+        openPickupModal() {
+            this.modalPickupOpen = true;
+            this.pickupSearchTerm = '';
+            this.pickupSearchResults = [];
+            this.selectedPickupTicket = null;
+            this.pickupNamaPengambil = '';
+            this.pickupNominalBayar = 0;
+            this.searchPickupTickets();
+        },
+
+        openReturModal() {
+            this.modalReturOpen = true;
+            this.returNotaAsal = '';
+            this.returAlasan = 'Tukar unit 1-to-1 offline';
+            this.returItemSearchTerm = '';
+            this.returItemResults = [];
+            this.selectedReturItem = null;
+            this.returSwapSearchTerm = '';
+            this.returSwapResults = [];
+            this.selectedSwapItem = null;
+        },
+
+        closeModals() {
+            this.modalSaleOpen = false;
+            this.modalPickupOpen = false;
+            this.modalReturOpen = false;
+        },
+
+        async searchSaleProducts() {
+            if (!window.UteOfflineDB?.searchProduk) return;
+            this.saleSearchResults = await window.UteOfflineDB.searchProduk(this.saleSearchTerm, 20);
+        },
+
+        async searchPickupTickets() {
+            this.pickupSearchResults = await this.searchOfflineServis(this.pickupSearchTerm);
+        },
+
+        selectPickupTicket(ticket) {
+            this.selectedPickupTicket = ticket;
+            this.pickupNamaPengambil = ticket.nama_pelanggan || '';
+            this.pickupNominalBayar = Number(ticket.sisa_tagihan || 0);
+        },
+
+        async searchReturItem() {
+            if (!window.UteOfflineDB?.searchProduk) return;
+            this.returItemResults = await window.UteOfflineDB.searchProduk(this.returItemSearchTerm, 15);
+        },
+
+        async searchSwapItem() {
+            if (!window.UteOfflineDB?.searchProduk) return;
+            this.returSwapResults = await window.UteOfflineDB.searchProduk(this.returSwapSearchTerm, 15);
+        },
+
+        async submitSaleCheckout() {
+            const ok = await this.processOfflineCheckout({
+                nama_toko: window.ACTIVE_CABANG_NAME || window.APP_NAME,
+                cabang_nama: window.ACTIVE_CABANG_NAME,
+                kasir_nama: window.CURRENT_USER_NAME,
+                cabang_id: window.ACTIVE_CABANG_ID,
+                user_id: window.CURRENT_USER_ID,
+            });
+            if (ok) {
+                this.modalSaleOpen = false;
+                this.clearCart();
+                await this.refreshOutbox();
+                alert('Transaksi kasir offline berhasil disimpan ke outbox!');
+            }
+        },
+
+        async submitPickup() {
+            if (!this.selectedPickupTicket) {
+                alert('Pilih tiket servis terlebih dahulu.');
+                return;
+            }
+            if (!this.pickupNamaPengambil.trim()) {
+                alert('Nama pengambil unit wajib diisi.');
+                return;
+            }
+            try {
+                await this.processOfflineServisPickup({
+                    no_tiket: this.selectedPickupTicket.no_tiket,
+                    nama_pengambil: this.pickupNamaPengambil.trim(),
+                    nominal_pelunasan: Number(this.pickupNominalBayar) || 0,
+                    metode_pembayaran: 'tunai',
+                    catatan: `Pelunasan offline tiket ${this.selectedPickupTicket.no_tiket}`,
+                });
+                this.modalPickupOpen = false;
+                await this.refreshOutbox();
+                alert(`Pengambilan servis ${this.selectedPickupTicket.no_tiket} berhasil disimpan ke outbox!`);
+            } catch (err) {
+                alert(err.message || 'Gagal memproses pengambilan unit');
+            }
+        },
+
+        async submitRetur() {
+            if (!this.returNotaAsal.trim()) {
+                alert('Nomor transaksi / nota asal wajib diisi.');
+                return;
+            }
+            if (!this.selectedReturItem) {
+                alert('Pilih produk yang diretur.');
+                return;
+            }
+            if (!this.selectedSwapItem) {
+                alert('Pilih produk unit pengganti.');
+                return;
+            }
+            try {
+                await this.processOfflineRetur({
+                    no_transaksi_asal: this.returNotaAsal.trim(),
+                    alasan: this.returAlasan.trim() || 'Tukar unit 1-to-1 offline',
+                    tipe_retur: 'tukar_unit',
+                    items: [
+                        {
+                            produk_id: this.selectedReturItem.id,
+                            nama: this.selectedReturItem.nama,
+                            qty: 1,
+                            kondisi_barang: 'rusak',
+                            produk_pengganti_id: this.selectedSwapItem.id,
+                            qty_pengganti: 1,
+                        },
+                    ],
+                });
+                this.modalReturOpen = false;
+                await this.refreshOutbox();
+                alert('Retur tukar barang berhasil disimpan ke outbox!');
+            } catch (err) {
+                alert(err.message || 'Gagal memproses retur');
+            }
+        },
+
         async init() {
             await this.refreshOutbox();
 
@@ -84,6 +246,7 @@ export function initPosOfflineStore() {
             const formattedPos = allPos.map((p) => ({
                 ...p,
                 entry_type: 'pos',
+                item_type: 'pos',
                 display_title: p.server_no_transaksi || `TRX-${p.offline_uuid.slice(0, 8).toUpperCase()}`,
                 display_subtitle: `${p.items ? p.items.length : 0} produk • Tunai Rp ${Number(p.total_nominal || 0).toLocaleString('id-ID')}`,
             }));
@@ -91,6 +254,7 @@ export function initPosOfflineStore() {
             const formattedPickups = allPickups.map((s) => ({
                 ...s,
                 entry_type: 'servis_pickup',
+                item_type: 'servis_pickup',
                 display_title: `SERVIS: ${s.no_tiket}`,
                 display_subtitle: `Diambil: ${s.nama_pengambil} • Pelunasan Rp ${Number(s.nominal_pelunasan || 0).toLocaleString('id-ID')}`,
             }));
@@ -98,6 +262,7 @@ export function initPosOfflineStore() {
             const formattedReturs = allReturs.map((r) => ({
                 ...r,
                 entry_type: 'retur',
+                item_type: 'retur',
                 display_title: `RETUR: ${r.no_transaksi_asal}`,
                 display_subtitle: `Tukar Unit: ${r.alasan || 'Kerusakan komponen'}`,
             }));
@@ -450,6 +615,7 @@ export function initPosOfflineStore() {
 
                     const res = await fetch('/api/pos/sync-offline', {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: defaultHeaders,
                         body: JSON.stringify({
                             schema_version: 2,
@@ -494,6 +660,7 @@ export function initPosOfflineStore() {
 
                     const resPickup = await fetch('/api/servis/sync-pickup', {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: defaultHeaders,
                         body: JSON.stringify({
                             schema_version: 2,
@@ -537,6 +704,7 @@ export function initPosOfflineStore() {
 
                     const resRetur = await fetch('/api/pos/sync-retur', {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: defaultHeaders,
                         body: JSON.stringify({
                             schema_version: 2,
