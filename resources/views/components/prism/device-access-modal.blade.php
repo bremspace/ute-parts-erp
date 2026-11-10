@@ -34,6 +34,7 @@
 
     <!-- Trigger Button in App Bar / Toolbar -->
     <button
+        id="btn-device-access-trigger"
         type="button"
         @click="open = true"
         class="inline-flex items-center justify-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 border border-up-primary/30 text-up-primary hover:text-white text-xs font-semibold transition-[transform,background-color,color] duration-150 active:scale-[0.97] cursor-pointer shadow-sm min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px]"
@@ -50,6 +51,7 @@
         <div
             x-show="open"
             x-cloak
+            style="display: none;"
             class="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
             aria-modal="true"
             role="dialog">

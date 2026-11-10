@@ -20,16 +20,45 @@ trait ParsesNominal
             return 0.0;
         }
 
-        if (str_contains($s, ',')) {
-            $s = str_replace('.', '', $s);
-            $s = str_replace(',', '.', $s);
-        } else {
+        $hasDot = str_contains($s, '.');
+        $hasComma = str_contains($s, ',');
+
+        if ($hasDot && $hasComma) {
+            $lastDot = strrpos($s, '.');
+            $lastComma = strrpos($s, ',');
+            if ($lastComma > $lastDot) {
+                // "120.000,50" -> titik ribuan, koma desimal
+                $s = str_replace('.', '', $s);
+                $s = str_replace(',', '.', $s);
+            } else {
+                // "120,000.50" -> koma ribuan, titik desimal
+                $s = str_replace(',', '', $s);
+            }
+        } elseif ($hasComma) {
+            $commaCount = substr_count($s, ',');
+            if ($commaCount > 1) {
+                // "1,000,000"
+                $s = str_replace(',', '', $s);
+            } else {
+                $parts = explode(',', $s);
+                $dec = $parts[1] ?? '';
+                // 3 digit setelah koma tanpa titik = pemisah ribuan ("120,000")
+                if (strlen($dec) === 3 && ! str_contains($parts[0], '.')) {
+                    $s = str_replace(',', '', $s);
+                } else {
+                    // Desimal ("120,50" / "120,5")
+                    $s = str_replace(',', '.', $s);
+                }
+            }
+        } elseif ($hasDot) {
             $dotCount = substr_count($s, '.');
             if ($dotCount > 1) {
+                // "1.000.000"
                 $s = str_replace('.', '', $s);
-            } elseif ($dotCount === 1) {
+            } else {
                 $parts = explode('.', $s);
                 $dec = $parts[1] ?? '';
+                // 3 digit atau lebih setelah titik = ribuan ("120.000")
                 if (strlen($dec) >= 3) {
                     $s = str_replace('.', '', $s);
                 }
