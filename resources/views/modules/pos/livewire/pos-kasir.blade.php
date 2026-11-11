@@ -57,7 +57,7 @@
 @endphp
 
 <div
-    class="flex flex-col gap-2 min-w-0 flex-1 h-full min-h-0 overflow-hidden pb-1"
+    class="flex flex-col gap-2 min-w-0 flex-1 min-h-full md:h-full md:overflow-hidden pb-2 md:pb-0"
     x-data="{
         flexSet: {},
         searchOpen: false,
@@ -614,8 +614,8 @@
             </button>
 
             @if(isset($gudangs) && $gudangs->count() > 1)
-                <!-- Gudang Selector -->
-                <div class="w-full sm:w-36 md:w-44 flex-shrink-0">
+                <!-- Gudang Selector (Desktop Only to save mobile space) -->
+                <div class="hidden sm:block w-36 md:w-44 flex-shrink-0">
                     <select
                         wire:model.live="selectedGudangId"
                         class="w-full px-2.5 py-2.5 rounded-xl glass-input text-xs font-semibold min-h-[44px] cursor-pointer"
@@ -630,9 +630,9 @@
                 </div>
             @endif
 
-            <!-- Kolom Pencarian Konsumen Optimal (Tanpa Dropdown CRM Berlebih) -->
+            <!-- Kolom Pencarian Konsumen Optimal (Desktop Only - Mobile via Chip/Modal) -->
             <div
-                class="w-full sm:w-64 md:w-72 lg:w-80 flex-shrink-0 relative"
+                class="hidden sm:block w-64 md:w-72 lg:w-80 flex-shrink-0 relative"
                 x-data="{ crmOpen: false }"
                 @click.outside="crmOpen = false"
             >
@@ -720,8 +720,8 @@
                 </div>
             </div>
 
-            <!-- SID RETAIL STYLE BIG DISPLAY TOTAL -->
-            <div class="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-ink-900 dark:bg-black/80 border border-ink-700/80 dark:border-white/10 flex sm:flex-col justify-between sm:justify-center items-center sm:items-end min-w-[150px] sm:min-w-[180px] min-h-[44px] flex-shrink-0 shadow-inner">
+            <!-- SID RETAIL STYLE BIG DISPLAY TOTAL (Desktop Only - Mobile shown on Sticky Checkout Bar) -->
+            <div class="hidden sm:flex px-3.5 py-1.5 rounded-xl bg-ink-900 dark:bg-black/80 border border-ink-700/80 dark:border-white/10 flex-col justify-center items-end min-w-[150px] sm:min-w-[180px] min-h-[44px] flex-shrink-0 shadow-inner">
                 <span class="text-[9px] uppercase font-bold text-ink-400 tracking-wider">TOTAL TAGIHAN</span>
                 <span class="text-xl sm:text-2xl font-black font-mono text-up-mint tabular-nums leading-tight">
                     Rp {{ number_format($totalAkhir, 0, ',', '.') }}
@@ -1131,7 +1131,7 @@
     </div>
 
     <!-- MAIN STAGE: TABEL TRANSAKSI KASIR (LELUASA, MODERN & BERSIH) -->
-    <div class="flex-1 min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm overflow-hidden">
+    <div class="flex-1 min-h-[350px] md:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm md:overflow-hidden">
         <!-- Mobile Cart Header: Counter & View Toggle (sm:hidden) -->
         <div class="sm:hidden flex items-center justify-between pb-2.5 mb-2 border-b border-ink-200/70 dark:border-white/10 flex-shrink-0">
             <div class="flex items-center gap-2">
@@ -1895,7 +1895,7 @@
         @endif
 
         <!-- BOTTOM CONTROL CENTER: Status Sesi Kas, Ditahan & Action Bayar -->
-        <div class="border-t border-ink-200/70 dark:border-white/10 pt-3 mt-2.5 flex-shrink-0 flex items-center justify-between gap-3 flex-wrap">
+        <div class="border-t border-ink-200/70 dark:border-white/10 pt-3 mt-2.5 flex-shrink-0 flex items-center justify-between gap-3 flex-wrap pb-20 md:pb-0">
             <!-- Left Info & Sesi Kas -->
             <div class="flex items-center gap-2.5 flex-wrap">
                 <!-- Sesi Kas Indicator -->
