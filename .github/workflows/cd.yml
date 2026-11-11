@@ -61,49 +61,62 @@ jobs:
           path: .
 
       - name: Transfer Pre-built Assets to VPS
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          host: ${{ secrets.SSH_HOST || secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USER || secrets.VPS_USER || 'root' }}
+          key: ${{ secrets.SSH_PRIVATE_KEY || secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || secrets.VPS_PORT || 22 }}
           source: 'public-build.tar.gz'
           target: '/tmp'
 
       - name: Execute Deployment & Proactive Verification over SSH
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.0
         env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/var/www/ute-parts-erp' }}
-          APP_URL: ${{ secrets.APP_URL || 'https://test.uteparts.id' }}
-          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
-          HEALTH_CHECK_SECRET: ${{ secrets.HEALTH_CHECK_SECRET }}
+          DEPLOY_PATH_INPUT: ${{ secrets.DEPLOY_PATH || secrets.VPS_PATH || '' }}
+          APP_URL_INPUT: ${{ secrets.APP_URL || '' }}
+          DEPLOY_SECRET_INPUT: ${{ secrets.DEPLOY_SECRET || '' }}
+          HEALTH_CHECK_SECRET_INPUT: ${{ secrets.HEALTH_CHECK_SECRET || '' }}
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          envs: DEPLOY_PATH,APP_URL,DEPLOY_SECRET,HEALTH_CHECK_SECRET
+          host: ${{ secrets.SSH_HOST || secrets.VPS_HOST }}
+          username: ${{ secrets.SSH_USER || secrets.VPS_USER || 'root' }}
+          key: ${{ secrets.SSH_PRIVATE_KEY || secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || secrets.VPS_PORT || 22 }}
+          envs: DEPLOY_PATH_INPUT,APP_URL_INPUT,DEPLOY_SECRET_INPUT,HEALTH_CHECK_SECRET_INPUT
           script_stop: true
           script: |
             set -e
+
+            # 1. Resolve deployment target path
+            if [ -n "$DEPLOY_PATH_INPUT" ] && [ -d "$DEPLOY_PATH_INPUT/.git" ]; then
+              DEPLOY_PATH="$DEPLOY_PATH_INPUT"
+            elif [ -d "/var/www/uteparts.id/.git" ]; then
+              DEPLOY_PATH="/var/www/uteparts.id"
+            elif [ -d "/var/www/ute-parts-erp/.git" ]; then
+              DEPLOY_PATH="/var/www/ute-parts-erp"
+            else
+              echo "::error::Direktori target deployment tidak ditemukan."
+              exit 1
+            fi
+
+            echo "Target direktori deployment: $DEPLOY_PATH"
             cd "$DEPLOY_PATH"
 
-            # 1. Store last known good commit for rollback reference
+            # 2. Setup dynamic maintenance bypass secret
+            DEPLOY_SECRET="${DEPLOY_SECRET_INPUT:-$(openssl rand -hex 16)}"
+
+            # 3. Store last known good commit for rollback reference
             git rev-parse HEAD > .last_known_good_commit
             LAST_GOOD=$(cat .last_known_good_commit)
-            echo "Last known good commit stored: $LAST_GOOD"
+            echo "Last known good commit tersimpan: $LAST_GOOD"
 
             rollback() {
-              echo "::error::Deployment verification failed! Initiating automated rollback to $LAST_GOOD..."
+              echo "::error::Deployment verification gagal! Melakukan rollback otomatis ke commit: $LAST_GOOD"
               cd "$DEPLOY_PATH"
 
-              # Graceful maintenance while resetting
               php artisan down --render="errors::503" --secret="${DEPLOY_SECRET}" --retry=60 || true
-
-              # Checkout last known good commit
               git checkout -f "$LAST_GOOD" || git reset --hard "$LAST_GOOD"
 
-              # Re-install dependencies & rebuild caches
               COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction || true
               php artisan optimize:clear || true
               php artisan config:cache || true
@@ -111,71 +124,77 @@ jobs:
               php artisan view:cache || true
               php artisan event:cache || true
 
-              # Restart background workers
               php artisan queue:restart || true
-              supervisorctl restart uteparts-worker:* 2>/dev/null || true
+              supervisorctl restart uteparts-worker:* 2>/dev/null || supervisorctl restart ute-parts-prod-queue:* 2>/dev/null || true
               systemctl reload php8.4-fpm 2>/dev/null || true
 
-              # Bring application back online
               php artisan up || true
-              echo "::error::Rollback completed. Application restored to $LAST_GOOD."
+              echo "::error::Rollback selesai. Sistem dikembalikan ke kondisi stabil sebelumnya."
               exit 1
             }
 
             trap 'rollback' ERR
 
-            # 2. Activate graceful maintenance mode with secret bypass
-            echo "Activating maintenance mode..."
+            # 4. Aktifkan graceful maintenance mode
+            echo "Mengaktifkan maintenance mode..."
             php artisan down --render="errors::503" --secret="${DEPLOY_SECRET}" --retry=60
 
-            # 3. Pull latest code on main
-            echo "Pulling latest code from origin/main..."
+            # 5. Tarik update kode terbaru
+            echo "Menarik perubahan dari origin/main..."
             git fetch origin main
             git checkout -f main
             git reset --hard origin/main
 
-            # 4. Sync compiled frontend artifacts
-            echo "Syncing pre-compiled frontend artifacts..."
+            # 6. Ekstrak aset Vite hasil kompilasi GitHub Runner
+            echo "Mengekstrak aset frontend pra-kompilasi..."
             if [ -f /tmp/public-build.tar.gz ]; then
               tar -xzf /tmp/public-build.tar.gz -C "$DEPLOY_PATH/public"
               rm -f /tmp/public-build.tar.gz
             fi
 
-            # 5. Production dependency refresh
-            echo "Updating composer dependencies..."
+            # 7. Update dependensi produksi
+            echo "Menjalankan composer install..."
             COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 
-            # 6. Database schema migrations
-            echo "Running database migrations..."
+            # 8. Migrasi database
+            echo "Menjalankan migrasi database..."
             php artisan migrate --force
 
-            # 7. Refresh production cache layers
-            echo "Refreshing cache layers..."
+            # 9. Pastikan HEALTH_CHECK_SECRET tersedia di .env
+            SECRET_VAL="${HEALTH_CHECK_SECRET_INPUT:-$(grep -E "^HEALTH_CHECK_SECRET=" .env | cut -d '=' -f2- | tr -d ' "\r\n' || echo '')}"
+            if [ -z "$SECRET_VAL" ]; then
+              SECRET_VAL=$(php -r 'echo bin2hex(random_bytes(32));')
+              echo "" >> .env
+              echo "HEALTH_CHECK_SECRET=${SECRET_VAL}" >> .env
+              echo "Generated new HEALTH_CHECK_SECRET in .env"
+            fi
+
+            # 10. Rebuild layer cache Laravel
+            echo "Membangun ulang cache optimasi..."
             php artisan optimize:clear
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
             php artisan event:cache
 
-            # 8. Fix file permissions
-            echo "Enforcing file permissions..."
+            # 11. Perbaiki ownership & permissions
+            echo "Menetapkan permission www-data..."
             chown -R www-data:www-data storage bootstrap/cache public/build
             chmod -R 775 storage bootstrap/cache
 
-            # 9. Restart background workers & reload FPM
-            echo "Restarting background queue workers..."
+            # 12. Restart background queue worker & reload PHP-FPM
+            echo "Me-restart queue workers & PHP-FPM..."
             php artisan queue:restart
-            supervisorctl restart uteparts-worker:* 2>/dev/null || true
+            supervisorctl restart uteparts-worker:* 2>/dev/null || supervisorctl restart ute-parts-prod-queue:* 2>/dev/null || true
             systemctl reload php8.4-fpm 2>/dev/null || true
 
-            # 10. Bring application back online
-            echo "Bringing application online..."
+            # 13. Kembalikan aplikasi online
+            echo "Membuka kembali aplikasi ke publik..."
             php artisan up
 
-            # 11. Verification & Active Health Check (Polling loop 6x at 5s interval)
-            echo "Executing active health check against $APP_URL/api/health..."
-            HEALTH_URL="$APP_URL/api/health"
-            SECRET_VAL="${HEALTH_CHECK_SECRET:-$(grep '^HEALTH_CHECK_SECRET=' .env | cut -d '=' -f2-)}"
+            # 14. Verifikasi Health Check aktif (Probe DB, Cache, Storage)
+            echo "Menjalankan verifikasi sistem health check..."
+            APP_URL_TARGET="${APP_URL_INPUT:-$(grep -E "^APP_URL=" .env | cut -d '=' -f2- | tr -d ' "\r\n' || echo '')}"
 
             MAX_RETRIES=6
             INTERVAL=5
@@ -183,24 +202,33 @@ jobs:
             SUCCESS=0
 
             while [ $RETRY -lt $MAX_RETRIES ]; do
-              HTTP_CODE=$(curl -s -o /tmp/health_status.json -w "%{http_code}" -H "X-Health-Check-Secret: ${SECRET_VAL}" "$HEALTH_URL" || echo "000")
+              # Cek via domain publik jika tersedia, atau fallback langsung ke localhost
+              HTTP_CODE="000"
+              if [ -n "$APP_URL_TARGET" ]; then
+                HTTP_CODE=$(curl -s -k -o /tmp/health_status.json -w "%{http_code}" -H "X-Health-Check-Secret: ${SECRET_VAL}" "${APP_URL_TARGET}/api/health" || echo "000")
+              fi
+
+              # Jika via domain publik gagal/belum tembus (misal DNS/Cloudflare), cek internal localhost
+              if [ "$HTTP_CODE" -ne 200 ]; then
+                HTTP_CODE=$(curl -s -o /tmp/health_status.json -w "%{http_code}" -H "X-Health-Check-Secret: ${SECRET_VAL}" "http://127.0.0.1/api/health" || echo "000")
+              fi
 
               if [ "$HTTP_CODE" -eq 200 ] && grep -q '"status":"healthy"' /tmp/health_status.json 2>/dev/null; then
-                echo "Health check PASSED (HTTP 200 OK):"
+                echo "Health check BERHASIL (HTTP 200 OK):"
                 cat /tmp/health_status.json
                 SUCCESS=1
                 break
               fi
 
               RETRY=$((RETRY + 1))
-              echo "Health check attempt $RETRY/$MAX_RETRIES failed (HTTP $HTTP_CODE). Retrying in ${INTERVAL}s..."
+              echo "Health check percobaan $RETRY/$MAX_RETRIES (HTTP $HTTP_CODE). Coba lagi dalam ${INTERVAL}s..."
               sleep $INTERVAL
             done
 
             if [ "$SUCCESS" -ne 1 ]; then
-              echo "::error::Health check failed after $MAX_RETRIES retries!"
+              echo "::error::Health check gagal setelah $MAX_RETRIES percobaan!"
               cat /tmp/health_status.json 2>/dev/null || true
               rollback
             fi
 
-            echo "Deployment verified healthy and successfully completed."
+            echo "Deployment berhasil diverifikasi dan aktif berjalan."
