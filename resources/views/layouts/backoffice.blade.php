@@ -27,7 +27,7 @@
             try { size = localStorage.getItem('ute-font-size') || 'md'; } catch (e) {}
             root.dataset.fontSize = size;
 
-            var collapsed = true;
+            var collapsed = false;
             try {
                 var stored = localStorage.getItem('ute-sidebar-md-collapsed');
                 if (stored !== null) collapsed = (stored === '1');
@@ -80,18 +80,14 @@
              aria-hidden="true"
              :class="{ 'open': sidebarOpen }"></div>
 
-        <!-- [2026] Sidebar Desktop Spacer (zero jitter/reflow on hover) -->
-        <div class="hidden md:block sidebar-spacer is-collapsed" :class="{ 'is-collapsed': sidebarCollapsed }"></div>
-
-        <!-- [T-46 & 2026] Sidebar 3 kondisi:
-             < 768px  : drawer slide-in + backdrop (hamburger)
-             >= 768px : auto-collapse icon-rail + fluid hover expand (zero layout shift) -->
+        <!-- [T-46] Sidebar: drawer (<768) + collapsible icon-rail (>=768) -->
         <aside
-            class="w-64 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border-r border-ink-200/60 dark:border-white/5 flex flex-col flex-shrink-0
+            id="sidebar"
+            class="bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border-r border-ink-200/60 dark:border-white/5 flex flex-col flex-shrink-0
                    fixed inset-y-0 left-0 z-50 transform-gpu shadow-xl md:shadow-none
                    transition-[width,transform] duration-200 ease-out
-                   md:sticky md:top-0 md:h-screen md:max-h-screen md:inset-auto md:z-30 md:translate-x-0 md:transform-none sidebar-collapsed"
-            :class="[isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : '', sidebarCollapsed ? 'sidebar-collapsed' : '']">
+                   md:static md:top-0 md:h-screen md:max-h-screen md:inset-auto md:z-30 md:translate-x-0 md:transform-none"
+            :class="[isMobile ? (sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64') : (sidebarCollapsed ? 'sidebar-collapsed w-[4.75rem]' : 'w-64')]">
             <!-- Brand -->
             <div class="sidebar-brand h-16 flex items-center justify-between px-5 border-b border-ink-200/60 dark:border-white/5">
                 <x-prism.logo size="md" :with-text="true" mode="auto" subtitle="Backoffice ERP" text-class="sidebar-brand-text" href="/app/dashboard" />
@@ -912,10 +908,10 @@
 
     <script>
         document.addEventListener('alpine:init', () => {
-            // [T-46] Sidebar: drawer (<768) + collapsible md (768-1023, localStorage) + selalu tampil lg + accordion dropdown
+            // [T-46] Sidebar: drawer (<768) + collapsible icon-rail (>=768) + accordion dropdown
             Alpine.data('sidebarManager', () => ({
                 sidebarOpen: false,
-                sidebarCollapsed: typeof window.__INITIAL_SIDEBAR_COLLAPSED !== 'undefined' ? window.__INITIAL_SIDEBAR_COLLAPSED : (window.innerWidth >= 768),
+                sidebarCollapsed: typeof window.__INITIAL_SIDEBAR_COLLAPSED !== 'undefined' ? window.__INITIAL_SIDEBAR_COLLAPSED : false,
                 isMobile: window.innerWidth < 768,
                 defaultDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/approvals*', 'app/audit-log*') ? 'approval' : (request()->is('app/pengaturan*', 'app/keamanan*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : '')))))))) }}',
                 activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/approvals*', 'app/audit-log*') ? 'approval' : (request()->is('app/pengaturan*', 'app/keamanan*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : '')))))))) }}',
@@ -927,9 +923,9 @@
                     } else {
                         try {
                             const stored = localStorage.getItem('ute-sidebar-md-collapsed');
-                            this.sidebarCollapsed = stored !== null ? stored === '1' : true;
+                            this.sidebarCollapsed = stored === '1';
                         } catch (e) {
-                            this.sidebarCollapsed = true;
+                            this.sidebarCollapsed = false;
                         }
                     }
 
