@@ -535,8 +535,7 @@
                             $isKatalog = request()->is('app/pengaturan*') && in_array(request('tab'), ['master_produk', 'export_import']);
                             $isWebKonsumen = request()->routeIs('pengaturan.web-konsumen');
                             $isOperasional = request()->is('app/pengaturan*') && in_array(request('tab'), ['loyalitas', 'pajak', 'qris', 'master', 'printer', 'integrasi']);
-                            $isSistem = (request()->is('app/pengaturan*') && in_array(request('tab'), ['database', 'audit', 'keamanan'])) || request()->is('app/keamanan*');
-                            $isTema = request()->is('app/pengaturan*') && request('tab') === 'tema';
+                            $isSistem = (request()->is('app/pengaturan*') && in_array(request('tab'), ['database', 'audit', 'keamanan', 'tema'])) || request()->is('app/keamanan*');
                         @endphp
 
                         @canany(['pengaturan.manage', 'user.view'])
@@ -564,11 +563,6 @@
                                 <span>Sistem &amp; Keamanan</span>
                             </a>
                         @endcan
-
-                        <a href="/app/pengaturan?tab=tema" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isTema ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $isTema ? 'bg-white' : 'bg-emerald-400' }}"></span>
-                            <span>🎨 Tema &amp; Tampilan</span>
-                        </a>
                     </div>
                 </div>
                 @endif
