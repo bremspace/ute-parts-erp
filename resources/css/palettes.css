@@ -2,6 +2,58 @@
    Supporting Dark & Light mode via [data-palette="..."] attribute on <html> */
 
 /* ============================================================
+   0. DEFAULT (Calm Indigo & Deep Obsidian Slate)
+   ============================================================ */
+:root,
+html[data-palette="default"].dark,
+html[data-palette="default"],
+html:not([data-palette]).dark,
+html:not([data-palette]) {
+    --up-primary: #4F46E5;
+    --up-primary-dark: #3730A3;
+    --up-accent: #D97706;
+    --up-mint: #10B981;
+    --up-amber: #F59E0B;
+    --up-red: #EF4444;
+    --up-bg-root: #090D16;
+    --up-bg-surface: #0F172A;
+    --up-bg-surface-elevated: #141E33;
+    --up-border-subtle: rgba(255, 255, 255, 0.08);
+    --up-border-strong: rgba(255, 255, 255, 0.16);
+    --up-text-main: #F8FAFC;
+    --up-text-muted: #94A3B8;
+    --up-text-faint: #64748B;
+    --up-glass-bg: rgba(15, 23, 42, 0.85);
+    --up-glass-border: rgba(255, 255, 255, 0.08);
+    --up-glass-border-hover: rgba(79, 70, 229, 0.35);
+    --up-glass-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+    --up-gradient-signature: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);
+}
+
+html[data-palette="default"]:not(.dark),
+html:not([data-palette]):not(.dark) {
+    --up-primary: #4F46E5;
+    --up-primary-dark: #3730A3;
+    --up-accent: #D97706;
+    --up-mint: #10B981;
+    --up-amber: #F59E0B;
+    --up-red: #EF4444;
+    --up-bg-root: #F1F5F9;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #F8FAFC;
+    --up-border-subtle: #E2E8F0;
+    --up-border-strong: #CBD5E1;
+    --up-text-main: #0F172A;
+    --up-text-muted: #64748B;
+    --up-text-faint: #94A3B8;
+    --up-glass-bg: rgba(255, 255, 255, 0.9);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+    --up-glass-border-hover: rgba(79, 70, 229, 0.35);
+    --up-glass-shadow: 0 2px 12px -2px rgba(15, 23, 42, 0.04);
+    --up-gradient-signature: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);
+}
+
+/* ============================================================
    1. LINEAR (Obsidian & Indigo Violet)
    ============================================================ */
 html[data-palette="linear"].dark,
@@ -380,4 +432,69 @@ html[data-palette="bronze"]:not(.dark) {
     --up-text-faint: #968E85;
     --up-glass-bg: rgba(255, 255, 255, 0.88);
     --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   UNIVERSAL THEME PROPAGATION & COMPATIBILITY LAYER
+   Ensures background, cards, tables, modals & surfaces adapt evenly
+   ============================================================ */
+
+/* 1. Global root canvas */
+html, body {
+    background-color: var(--up-bg-root) !important;
+    color: var(--up-text-main);
+}
+
+/* 2. Glass panels and structural cards */
+.glass-panel {
+    background-color: var(--up-glass-bg) !important;
+    border-color: var(--up-glass-border) !important;
+}
+
+/* 3. Surface & Card containers across modules */
+html.dark [class*="dark:bg-[#090D16]"],
+html.dark [class*="bg-[#090D16]"] {
+    background-color: var(--up-bg-root) !important;
+}
+
+html.dark [class*="dark:bg-[#0B1120]"],
+html.dark [class*="bg-[#0B1120]"],
+html.dark [class*="dark:bg-[#0F172A]"],
+html.dark [class*="bg-[#0F172A]"],
+html.dark [class*="dark:bg-[#0e1017]"],
+html.dark [class*="dark:bg-[#0D1526]"] {
+    background-color: var(--up-bg-surface) !important;
+}
+
+html.dark [class*="dark:bg-[#060A12]"],
+html.dark [class*="dark:bg-[#141E33]"],
+html.dark [class*="dark:bg-[#1E293B]"] {
+    background-color: var(--up-bg-surface-elevated) !important;
+}
+
+/* 4. Light mode background propagation */
+html:not(.dark) [class*="bg-[#F1F5F9]"],
+html:not(.dark) [class*="bg-[#F8FAFC]"] {
+    background-color: var(--up-bg-root) !important;
+}
+
+/* 5. Seamless borders */
+html.dark [class*="dark:border-white/5"],
+html.dark [class*="dark:border-white/10"],
+html.dark [class*="dark:border-white/[0.08]"],
+html.dark [class*="dark:border-ink-800"] {
+    border-color: var(--up-border-subtle) !important;
+}
+
+html:not(.dark) [class*="border-ink-200"] {
+    border-color: var(--up-border-subtle) !important;
+}
+
+/* 6. Form inputs and dropdown selects */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.bg-transparent),
+html.dark select,
+html.dark textarea {
+    background-color: var(--up-bg-surface) !important;
+    border-color: var(--up-border-subtle) !important;
+    color: var(--up-text-main) !important;
 }

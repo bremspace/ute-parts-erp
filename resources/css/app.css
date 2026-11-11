@@ -23,6 +23,15 @@
     --color-up-amber: var(--up-amber);
     --color-up-red: var(--up-red);
 
+    --color-up-bg-root: var(--up-bg-root);
+    --color-up-bg-surface: var(--up-bg-surface);
+    --color-up-bg-elevated: var(--up-bg-surface-elevated);
+    --color-up-border: var(--up-border-subtle);
+    --color-up-border-strong: var(--up-border-strong);
+    --color-up-text: var(--up-text-main);
+    --color-up-text-muted: var(--up-text-muted);
+    --color-up-text-faint: var(--up-text-faint);
+
     --color-ink-950: #0B0F19;
     --color-ink-900: #0F172A;
     --color-ink-850: #141E33;

@@ -62,7 +62,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/backoffice.js'])
     @livewireStyles
 </head>
-<body class="bg-[#F1F5F9] dark:bg-[#090D16] text-ink-900 dark:text-ink-100 font-sans antialiased h-screen h-[100dvh] flex flex-col overflow-hidden selection:bg-up-primary selection:text-white"
+<body class="bg-[var(--up-bg-root)] text-[var(--up-text-main)] font-sans antialiased h-screen h-[100dvh] flex flex-col overflow-hidden selection:bg-up-primary selection:text-white"
       x-data="sidebarManager()"
       @keydown.escape.window="sidebarOpen = false"
       data-cabang-count="{{ auth()->user()?->daftarCabangAkses()->count() ?? 0 }}"
@@ -90,13 +90,13 @@
         <!-- [T-46] Sidebar: drawer (<768) + collapsible icon-rail (>=768) -->
         <aside
             id="sidebar"
-            class="bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border-r border-ink-200/60 dark:border-white/5 flex flex-col flex-shrink-0
+            class="bg-[var(--up-bg-surface)] backdrop-blur-xl border-r border-[var(--up-border-subtle)] flex flex-col flex-shrink-0
                    fixed inset-y-0 left-0 z-50 transform-gpu shadow-xl md:shadow-none
                    transition-[width,transform] duration-200 ease-out
                    md:static md:top-0 md:h-screen md:max-h-screen md:inset-auto md:z-30 md:translate-x-0 md:transform-none"
             :class="[isMobile ? (sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64') : (sidebarCollapsed ? 'sidebar-collapsed w-[4.75rem]' : 'w-64')]">
             <!-- Brand -->
-            <div class="sidebar-brand h-16 flex items-center justify-between px-5 border-b border-ink-200/60 dark:border-white/5">
+            <div class="sidebar-brand h-16 flex items-center justify-between px-5 border-b border-[var(--up-border-subtle)]">
                 <x-prism.logo size="md" :with-text="true" mode="auto" subtitle="Backoffice ERP" text-class="sidebar-brand-text" href="/app/dashboard" />
                 <button type="button" @click="sidebarOpen = false" class="md:hidden p-1.5 rounded-xl text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer" aria-label="Tutup menu">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,7 +106,7 @@
             </div>
 
             <!-- Branch Context Badge -->
-            <div class="sidebar-branch px-4 py-2.5 border-b border-ink-200/60 dark:border-white/5 bg-ink-100/40 dark:bg-white/[0.02]">
+            <div class="sidebar-branch px-4 py-2.5 border-b border-[var(--up-border-subtle)] bg-[var(--up-bg-surface-elevated)]/40">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2 overflow-hidden">
                         <span class="w-2 h-2 rounded-full bg-up-mint flex-shrink-0 ring-4 ring-up-mint/20"></span>
@@ -536,6 +536,7 @@
                             $isWebKonsumen = request()->routeIs('pengaturan.web-konsumen');
                             $isOperasional = request()->is('app/pengaturan*') && in_array(request('tab'), ['loyalitas', 'pajak', 'qris', 'master', 'printer', 'integrasi']);
                             $isSistem = (request()->is('app/pengaturan*') && in_array(request('tab'), ['database', 'audit', 'keamanan'])) || request()->is('app/keamanan*');
+                            $isTema = request()->is('app/pengaturan*') && request('tab') === 'tema';
                         @endphp
 
                         @canany(['pengaturan.manage', 'user.view'])
@@ -563,13 +564,18 @@
                                 <span>Sistem &amp; Keamanan</span>
                             </a>
                         @endcan
+
+                        <a href="/app/pengaturan?tab=tema" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isTema ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $isTema ? 'bg-white' : 'bg-emerald-400' }}"></span>
+                            <span>🎨 Tema &amp; Tampilan</span>
+                        </a>
                     </div>
                 </div>
                 @endif
             </nav>
 
             <!-- User Footer -->
-            <div class="sidebar-user p-3 border-t border-ink-200/60 dark:border-white/5 bg-ink-100/40 dark:bg-white/[0.02]">
+            <div class="sidebar-user p-3 border-t border-[var(--up-border-subtle)] bg-[var(--up-bg-surface-elevated)]/40">
                 <div class="flex items-center justify-between gap-2.5 p-1 rounded-2xl transition-colors">
                     <div class="flex items-center gap-3 overflow-hidden min-w-0">
                         <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-up-primary to-indigo-500 text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm shadow-up-primary/20">
@@ -594,9 +600,9 @@
         </aside>
 
         <!-- Main Content Area -->
-        <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-ink-50 dark:bg-ink-950">
+        <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-[var(--up-bg-root)]">
             <!-- Top App Bar -->
-            <header class="h-14 sm:h-16 border-b border-ink-200/80 dark:border-white/5 bg-white/80 dark:bg-ink-900/60 backdrop-blur-md px-2.5 sm:px-4 lg:px-6 flex items-center justify-between z-20">
+            <header class="h-14 sm:h-16 border-b border-[var(--up-border-subtle)] bg-[var(--up-bg-surface)]/90 backdrop-blur-md px-2.5 sm:px-4 lg:px-6 flex items-center justify-between z-20">
                 <div class="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1 sm:flex-initial mr-1 sm:mr-0">
                     <!-- Menu Button: <768 toggle drawer · >=768 toggle collapse icon-rail (persist) -->
                     <button @click="toggleSidebar()"
@@ -748,69 +754,6 @@
                             </button>
                         </div>
                     @endif
-
-                    <!-- [T-32 & Taste Palettes] Pengatur Tema & Palet Desain -->
-                    <div class="relative flex items-center gap-1 flex-shrink-0" x-data="themeManager()" @click.outside="paletteOpen = false">
-                        <!-- Quick Palette Dropdown Trigger -->
-                        <button type="button" @click="paletteOpen = !paletteOpen"
-                                title="Pilih Palet Tema Desain" aria-label="Pilih Palet Tema Desain"
-                                class="p-1.5 sm:p-2 rounded-xl text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center gap-1.5">
-                            <span class="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-white/20 shadow-xs flex-shrink-0"
-                                  :style="'background: ' + (palettes.find(p => p.id === palette)?.primary || '#4F46E5')"></span>
-                            <svg class="w-3 h-3 text-ink-400 hidden md:inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-
-                        <!-- Palette Dropdown Popover -->
-                        <div x-show="paletteOpen" x-cloak
-                             x-transition:enter="transition ease-out duration-120"
-                             x-transition:enter-start="opacity-0 scale-95"
-                             x-transition:enter-end="opacity-100 scale-100"
-                             x-transition:leave="transition ease-out duration-100"
-                             x-transition:leave-start="opacity-100 scale-100"
-                             x-transition:leave-end="opacity-0 scale-95"
-                             class="absolute right-8 top-full mt-2 w-64 origin-top-right py-2 rounded-2xl bg-white dark:bg-[#0F172A] border border-ink-200/80 dark:border-white/10 shadow-2xl z-50 max-h-[85vh] overflow-y-auto">
-                            <div class="px-3 py-1.5 flex items-center justify-between border-b border-ink-100 dark:border-white/5 mb-1">
-                                <span class="text-[11px] font-bold text-ink-500 dark:text-ink-400 uppercase tracking-wider">Palet Tampilan (10 Tema)</span>
-                                <a href="/app/pengaturan?tab=tema" class="text-[10px] text-up-primary hover:underline font-semibold">Semua</a>
-                            </div>
-                            <div class="space-y-0.5 px-1">
-                                <template x-for="item in palettes" :key="item.id">
-                                    <button type="button" @click="setPalette(item.id); paletteOpen = false"
-                                            class="w-full px-2.5 py-1.5 rounded-xl text-left text-xs flex items-center justify-between transition hover:bg-black/5 dark:hover:bg-white/5"
-                                            :class="palette === item.id ? 'bg-up-primary/10 text-up-primary font-bold' : 'text-ink-700 dark:text-ink-300'">
-                                        <div class="flex items-center gap-2.5 min-w-0">
-                                            <span class="w-3.5 h-3.5 rounded-full flex-shrink-0 shadow-xs border border-white/20"
-                                                  :style="'background: ' + item.primary"></span>
-                                            <div class="truncate">
-                                                <div class="truncate" x-text="item.name"></div>
-                                                <div class="text-[10px] text-ink-400 font-normal truncate" x-text="item.desc"></div>
-                                            </div>
-                                        </div>
-                                        <svg x-show="palette === item.id" class="w-4 h-4 text-up-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </button>
-                                </template>
-                            </div>
-                        </div>
-
-                        <!-- Toggle mode: sun (gelap) / moon (terang) / monitor (auto) -->
-                        <button type="button" @click="cycleTheme()"
-                                title="Ganti mode terang/gelap" aria-label="Ganti mode terang/gelap"
-                                class="p-1.5 sm:p-2 rounded-xl text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center flex-shrink-0">
-                            <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'dark'" x-cloak>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                            </svg>
-                            <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'light'" x-cloak>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                            </svg>
-                            <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'auto'" x-cloak>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                            </svg>
-                        </button>
-                    </div>
                 </div>
             </header>
 
