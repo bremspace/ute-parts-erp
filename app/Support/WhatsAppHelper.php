@@ -83,7 +83,39 @@ class WhatsAppHelper
 
         $garansiText = ! empty($receiptData['garansi']) ? "Garansi: {$receiptData['garansi']}\n" : '';
 
-        $pembayaranText = "*Total: Rp {$total}*\nMetode: {$metode}";
+        $rincianBiaya = '';
+        if (isset($receiptData['subtotal']) && (float) $receiptData['subtotal'] > 0 && ((float) $receiptData['subtotal'] !== (float) ($receiptData['total'] ?? 0))) {
+            $subtotalFmt = number_format((float) $receiptData['subtotal'], 0, ',', '.');
+            $rincianBiaya .= "Subtotal: Rp {$subtotalFmt}\n";
+        }
+        if (! empty($receiptData['diskon_tier']) && (float) $receiptData['diskon_tier'] > 0) {
+            $tierFmt = number_format((float) $receiptData['diskon_tier'], 0, ',', '.');
+            $rincianBiaya .= "Potongan Tier: -Rp {$tierFmt}\n";
+        }
+        if (! empty($receiptData['diskon_partai']) && (float) $receiptData['diskon_partai'] > 0) {
+            $partaiFmt = number_format((float) $receiptData['diskon_partai'], 0, ',', '.');
+            $rincianBiaya .= "Diskon Partai: -Rp {$partaiFmt}\n";
+        }
+        if (! empty($receiptData['diskon_poin']) && (float) $receiptData['diskon_poin'] > 0) {
+            $poinFmt = number_format((float) $receiptData['diskon_poin'], 0, ',', '.');
+            $rincianBiaya .= "Tukar Poin: -Rp {$poinFmt}\n";
+        }
+        if (! empty($receiptData['diskon']) && (float) $receiptData['diskon'] > 0) {
+            $diskonFmt = number_format((float) $receiptData['diskon'], 0, ',', '.');
+            $lbl = ! empty($receiptData['diskon_persen']) && (float) $receiptData['diskon_persen'] > 0 ? "Diskon Kasir ({$receiptData['diskon_persen']}%)" : 'Diskon Kasir';
+            $rincianBiaya .= "{$lbl}: -Rp {$diskonFmt}\n";
+        }
+        if (! empty($receiptData['pajak']) && (float) $receiptData['pajak'] > 0) {
+            $pajakFmt = number_format((float) $receiptData['pajak'], 0, ',', '.');
+            $ppnLbl = ! empty($receiptData['ppn_persen']) ? "PPN ({$receiptData['ppn_persen']}%)" : 'PPN';
+            $rincianBiaya .= "{$ppnLbl}: +Rp {$pajakFmt}\n";
+        }
+        if (! empty($receiptData['ongkir']) && (float) $receiptData['ongkir'] > 0) {
+            $ongkirFmt = number_format((float) $receiptData['ongkir'], 0, ',', '.');
+            $rincianBiaya .= "Ongkir: +Rp {$ongkirFmt}\n";
+        }
+
+        $pembayaranText = "{$rincianBiaya}*Total: Rp {$total}*\nMetode: {$metode}";
         if (isset($receiptData['bayar']) && (float) $receiptData['bayar'] > 0 && (float) $receiptData['bayar'] !== (float) ($receiptData['total'] ?? 0)) {
             $bayarFmt = number_format((float) $receiptData['bayar'], 0, ',', '.');
             $pembayaranText .= "\nBayar: Rp {$bayarFmt}";

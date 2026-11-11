@@ -247,14 +247,14 @@
                             </div>
                         @endif
 
-                        @if($showBreakdown && !empty($receiptData['diskon_partai']) && (float)$receiptData['diskon_partai'] > 0)
+                        @if(!empty($receiptData['diskon_partai']) && (float)$receiptData['diskon_partai'] > 0)
                             <div class="receipt-row flex justify-between text-emerald-700 font-bold text-[10px]">
                                 <span>Diskon Partai (Member):</span>
                                 <span>-Rp {{ number_format($receiptData['diskon_partai'], 0, ',', '.') }}</span>
                             </div>
                         @endif
 
-                        @if($showBreakdown && !empty($receiptData['diskon_poin']) && (float)$receiptData['diskon_poin'] > 0)
+                        @if(!empty($receiptData['diskon_poin']) && (float)$receiptData['diskon_poin'] > 0)
                             <div class="receipt-row flex justify-between text-emerald-700 font-bold text-[10px]">
                                 <span>Tukar Poin ({{ number_format($receiptData['poin_ditukar'] ?? 0) }} pts):</span>
                                 <span>-Rp {{ number_format($receiptData['diskon_poin'], 0, ',', '.') }}</span>

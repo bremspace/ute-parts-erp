@@ -165,7 +165,11 @@ class ProdukTab extends Component
         'garansi' => false,
         'deskripsi' => false,
         'format' => 'teks', // 'teks' (Chat WA / Catatan) | 'tsv' (Excel / Spreadsheet)
+        'gaya' => 'ringkas',   // 'ringkas' (1 Baris Ringkas per Produk dipisahkan strip) | 'list' (Multi-baris Detail)
+        'tier' => 'default', // 'default' (Ikuti Filter Saat Ini) | 'retail' | 'reseller' | 'agen' | 'tier_{id}' | 'semua'
     ];
+
+    public string $waNomorTujuan = '';
 
     // Filter toggle preferences (checkbox custom)
     public array $visibleFilters = [
@@ -3128,12 +3132,32 @@ class ProdukTab extends Component
         $hasGaransi = ! empty($options['garansi']);
         $hasDeskripsi = ! empty($options['deskripsi']);
 
-        $tierInfo = $this->resolveHargaTierProduk($p);
-        $hargaFmt = 'Rp '.number_format($tierInfo['harga'], 0, ',', '.');
+        $tierOption = $options['tier'] ?? 'default';
+        $hargaLines = [];
 
-        // Jika hanya nama & harga yang dipilih: format klasik standar (nama - harga)
-        if ($hasNama && $hasHarga && ! $hasSku && ! $hasStok && ! $hasRak && ! $hasKategori && ! $hasBrand && ! $hasGaransi && ! $hasKompatibilitas && ! $hasKualitas && ! $hasKondisi && ! $hasDeskripsi) {
-            return "{$p->nama} - {$hargaFmt}";
+        if ($hasHarga) {
+            if ($tierOption === 'semua') {
+                $htRetail = $this->resolveHargaTierProduk($p, 'retail');
+                $htReseller = $this->resolveHargaTierProduk($p, 'reseller');
+                $htAgen = $this->resolveHargaTierProduk($p, 'agen');
+                $hargaLines[] = 'Retail: Rp '.number_format($htRetail['harga'], 0, ',', '.');
+                $hargaLines[] = 'Reseller: Rp '.number_format($htReseller['harga'], 0, ',', '.');
+                $hargaLines[] = 'Agen: Rp '.number_format($htAgen['harga'], 0, ',', '.');
+
+                if ($p->relationLoaded('hargaTier')) {
+                    $extraTiers = $p->hargaTier->filter(fn ($ht) => ! empty($ht->tier_membership_id) && $ht->tierMembership?->is_active);
+                    foreach ($extraTiers as $ht) {
+                        $tmName = $ht->tierMembership->nama;
+                        $res = $this->resolveHargaTierProduk($p, 'tier_'.$ht->tier_membership_id);
+                        $hargaLines[] = "{$tmName}: Rp ".number_format($res['harga'], 0, ',', '.');
+                    }
+                }
+            } else {
+                $filterTier = $tierOption === 'default' ? null : $tierOption;
+                $tierInfo = $this->resolveHargaTierProduk($p, $filterTier);
+                // Tanpa keterangan tier seperti (Retail Standar) - pelanggan tidak perlu tahu itu tier apa
+                $hargaLines[] = 'Rp '.number_format($tierInfo['harga'], 0, ',', '.');
+            }
         }
 
         $sku = $p->relationLoaded('skuVariants') ? $p->skuVariants->first()?->sku : null;
@@ -3157,7 +3181,62 @@ class ProdukTab extends Component
         $garansi = ! empty($p->garansi) ? $p->garansi.' bln' : null;
         $deskripsi = ! empty($p->deskripsi) ? trim(strip_tags($p->deskripsi)) : null;
 
-        // Susun baris rapi dan estetik untuk WhatsApp
+        $gaya = $options['gaya'] ?? 'ringkas';
+
+        // Format 1 baris per produk dipisahkan oleh strip (-)
+        if ($gaya === 'ringkas') {
+            $parts = [];
+            if ($hasNama) {
+                $parts[] = "- *{$p->nama}*";
+            }
+            if ($hasSku && ! empty($sku)) {
+                $parts[] = "[{$sku}]";
+            }
+            if (! empty($hargaLines)) {
+                $parts[] = implode(' - ', $hargaLines);
+            }
+            if ($hasKualitas && ! empty($kualitas)) {
+                $parts[] = "Kualitas: {$kualitas}";
+            }
+            if ($hasKompatibilitas && ! empty($kompatibel)) {
+                $parts[] = "Kompatibel: {$kompatibel}";
+            }
+            if ($hasKondisi && ! empty($kondisi)) {
+                $parts[] = "Kondisi: {$kondisi}";
+            }
+            if ($hasStok) {
+                $parts[] = "Stok: {$stok}";
+            }
+            if ($hasRak && ! empty($raks)) {
+                $parts[] = "Rak: {$raks}";
+            }
+            if ($hasBrand && ! empty($brand)) {
+                $parts[] = "Brand: {$brand}";
+            }
+            if ($hasKategori && ! empty($kat)) {
+                $parts[] = "Kategori: {$kat}";
+            }
+            if ($hasGaransi && ! empty($garansi)) {
+                $parts[] = "Garansi: {$garansi}";
+            }
+            if ($hasDeskripsi && ! empty($deskripsi)) {
+                $parts[] = "Catatan: {$deskripsi}";
+            }
+
+            if (empty($parts)) {
+                return "- {$p->nama}";
+            }
+
+            $first = array_shift($parts);
+            if (! str_starts_with($first, '- ')) {
+                $first = "- {$first}";
+            }
+            array_unshift($parts, $first);
+
+            return implode(' - ', $parts);
+        }
+
+        // Susun baris rapi terstruktur dengan bullet strip (-)
         $lines = [];
 
         $titleParts = [];
@@ -3168,41 +3247,41 @@ class ProdukTab extends Component
             $titleParts[] = "[{$sku}]";
         }
         if (! empty($titleParts)) {
-            $lines[] = '📦 '.implode(' ', $titleParts);
+            $lines[] = '- '.implode(' ', $titleParts);
         }
 
-        if ($hasHarga) {
-            $lines[] = "💰 Harga: *{$hargaFmt}*";
+        foreach ($hargaLines as $hl) {
+            $lines[] = "  - {$hl}";
         }
         if ($hasKualitas && ! empty($kualitas)) {
-            $lines[] = "⭐ Kualitas: {$kualitas}";
+            $lines[] = "  - Kualitas: {$kualitas}";
         }
         if ($hasKompatibilitas && ! empty($kompatibel)) {
-            $lines[] = "📱 Kompatibel: {$kompatibel}";
+            $lines[] = "  - Kompatibel: {$kompatibel}";
         }
         if ($hasKondisi && ! empty($kondisi)) {
-            $lines[] = "⚙️ Kondisi: {$kondisi}";
+            $lines[] = "  - Kondisi: {$kondisi}";
         }
         if ($hasStok) {
-            $lines[] = "📊 Stok: {$stok}";
+            $lines[] = "  - Stok: {$stok}";
         }
         if ($hasRak && ! empty($raks)) {
-            $lines[] = "📍 Rak: {$raks}";
+            $lines[] = "  - Rak: {$raks}";
         }
         if ($hasBrand && ! empty($brand)) {
-            $lines[] = "🏷️ Brand: {$brand}";
+            $lines[] = "  - Brand: {$brand}";
         }
         if ($hasKategori && ! empty($kat)) {
-            $lines[] = "📁 Kategori: {$kat}";
+            $lines[] = "  - Kategori: {$kat}";
         }
         if ($hasGaransi && ! empty($garansi)) {
-            $lines[] = "🛡️ Garansi: {$garansi}";
+            $lines[] = "  - Garansi: {$garansi}";
         }
         if ($hasDeskripsi && ! empty($deskripsi)) {
-            $lines[] = "📝 Catatan: {$deskripsi}";
+            $lines[] = "  - Catatan: {$deskripsi}";
         }
 
-        return implode("\n", $lines) ?: $p->nama;
+        return implode("\n", $lines) ?: "- {$p->nama}";
     }
 
     public function eksekusiSalinData(): void
@@ -3336,21 +3415,51 @@ class ProdukTab extends Component
             }
         }
 
-        $hasExtraOptions = ! empty($this->salinOptions['sku'])
-            || ! empty($this->salinOptions['stok'])
-            || ! empty($this->salinOptions['rak'])
-            || ! empty($this->salinOptions['kualitas'])
-            || ! empty($this->salinOptions['kompatibilitas'])
-            || ! empty($this->salinOptions['kondisi'])
-            || ! empty($this->salinOptions['kategori'])
-            || ! empty($this->salinOptions['brand'])
-            || ! empty($this->salinOptions['garansi'])
-            || ! empty($this->salinOptions['deskripsi']);
-
-        $separator = $isTsv ? "\n" : ($hasExtraOptions ? "\n\n" : "\n");
+        $separator = $isTsv ? "\n" : "\n\n";
         $text = implode($separator, $lines);
 
         $this->dispatch('salin-teks', teks: $text, message: "{$produks->count()} data produk berhasil disalin ke clipboard!");
+        $this->showSalinDataModal = false;
+    }
+
+    public function kirimLangsungWa(): void
+    {
+        if (empty($this->selectedProdukIds)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih minimal satu produk terlebih dahulu.']);
+
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $produks = Produk::with([
+            'skuVariants',
+            'hargaTier.tierMembership',
+            'kategoriRelasi',
+            'brand',
+            'kualitas',
+            'tipeHps',
+            'stokItems' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->with('rak'),
+        ])
+            ->whereIn('id', $this->selectedProdukIds)
+            ->orderBy('nama')
+            ->get();
+
+        if ($produks->isEmpty()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk terpilih tidak ditemukan.']);
+
+            return;
+        }
+
+        $lines = [];
+        foreach ($produks as $p) {
+            $lines[] = $this->formatTeksProduk($p, $this->salinOptions);
+        }
+
+        $text = implode("\n\n", $lines);
+        $waLink = \App\Support\WhatsAppHelper::buatLink($this->waNomorTujuan ?: null, $text);
+
+        $this->dispatch('salin-teks', teks: $text, message: "{$produks->count()} data produk disalin & membuka WhatsApp...");
+        $this->dispatch('buka-tab-baru', url: $waLink);
         $this->showSalinDataModal = false;
     }
 
@@ -3387,18 +3496,8 @@ class ProdukTab extends Component
             $lines[] = $this->formatTeksProduk($p, $this->salinOptions);
         }
 
-        $hasExtraOptions = ! empty($this->salinOptions['sku'])
-            || ! empty($this->salinOptions['stok'])
-            || ! empty($this->salinOptions['rak'])
-            || ! empty($this->salinOptions['kualitas'])
-            || ! empty($this->salinOptions['kompatibilitas'])
-            || ! empty($this->salinOptions['kondisi'])
-            || ! empty($this->salinOptions['kategori'])
-            || ! empty($this->salinOptions['brand'])
-            || ! empty($this->salinOptions['garansi'])
-            || ! empty($this->salinOptions['deskripsi']);
-
-        $text = implode($hasExtraOptions ? "\n\n" : "\n", $lines);
+        // Pisahkan tiap produk dengan 1 baris kosong (\n\n) agar rapi di WhatsApp
+        $text = implode("\n\n", $lines);
 
         $this->dispatch('salin-teks', teks: $text, message: "{$produks->count()} harga produk berhasil disalin ke clipboard!");
     }

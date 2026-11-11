@@ -136,8 +136,12 @@ class MasterProdukUiDanBatchTest extends TestCase
             if (($d['name'] ?? '') === 'salin-teks') {
                 $hasSalinTeks = true;
                 $teks = $d['params']['teks'] ?? '';
-                $this->assertStringContainsString('LCD iPhone 11 - Rp 270.000', $teks);
-                $this->assertStringContainsString('Baterai iPhone 11 - Rp 135.000', $teks);
+                $this->assertStringContainsString('LCD iPhone 11', $teks);
+                $this->assertStringContainsString('270.000', $teks);
+                $this->assertStringContainsString('Baterai iPhone 11', $teks);
+                $this->assertStringContainsString('135.000', $teks);
+                // Pastikan ada pemisah space baris kosong (\n\n) antar produk
+                $this->assertStringContainsString("\n\n", $teks);
             }
         }
         $this->assertTrue($hasSalinTeks, 'Event salin-teks tidak ditemukan di dispatches');
@@ -385,12 +389,17 @@ class MasterProdukUiDanBatchTest extends TestCase
         }
 
         $this->assertNotNull($teks);
-        $this->assertStringContainsString('📦 *LCD Touchscreen iPhone 11* [SKU-LCD-IP11-OEM]', $teks);
-        $this->assertStringContainsString('💰 Harga: *Rp 350.000*', $teks);
-        $this->assertStringContainsString('⭐ Kualitas: Original Equipment Manufacturer', $teks);
-        $this->assertStringContainsString('📱 Kompatibel: Apple iPhone 11 / 11 Pro', $teks);
-        $this->assertStringContainsString('⚙️ Kondisi: Baru', $teks);
-        $this->assertStringContainsString('📝 Catatan: Kualitas kontras tajam & touchscreen presisi', $teks);
+        $this->assertStringNotContainsString('📦', $teks);
+        $this->assertStringNotContainsString('💰', $teks);
+        $this->assertStringNotContainsString('(Retail Standar)', $teks);
+        $this->assertStringContainsString('- *LCD Touchscreen iPhone 11*', $teks);
+        $this->assertStringContainsString('[SKU-LCD-IP11-OEM]', $teks);
+        $this->assertStringContainsString('Rp 350.000', $teks);
+        $this->assertStringContainsString('Kualitas: Original Equipment Manufacturer', $teks);
+        $this->assertStringContainsString('Kompatibel: Apple iPhone 11 / 11 Pro', $teks);
+        $this->assertStringContainsString('Kondisi: Baru', $teks);
+        $this->assertStringContainsString('Catatan: Kualitas kontras tajam & touchscreen presisi', $teks);
+        $this->assertStringContainsString(' - ', $teks);
 
         // 2. Uji salin TSV dengan header dan kolom variatif lengkap
         $testTsv = Livewire::test(ProdukTab::class)
@@ -416,6 +425,96 @@ class MasterProdukUiDanBatchTest extends TestCase
         $lines = explode("\n", $teksTsv);
         $this->assertStringContainsString("Nama Produk\tKualitas\tKompatibilitas\tKondisi\tDeskripsi", $lines[0]);
         $this->assertStringContainsString("LCD Touchscreen iPhone 11\tOriginal Equipment Manufacturer\tApple iPhone 11 / 11 Pro\tBaru\tKualitas kontras tajam & touchscreen presisi", $lines[1]);
+    }
+
+    public function test_salin_data_ke_clipboard_dengan_pemisah_baris_kosong_dan_icon_wa(): void
+    {
+        $p1 = Produk::create([
+            'nama' => 'LCD iPhone 12 Pro',
+            'harga_beli' => 400000,
+            'harga_jual_retail' => 650000,
+            'is_active' => true,
+        ]);
+        $p2 = Produk::create([
+            'nama' => 'Baterai iPhone 12 Pro',
+            'harga_beli' => 180000,
+            'harga_jual_retail' => 300000,
+            'is_active' => true,
+        ]);
+
+        $test = Livewire::test(ProdukTab::class)
+            ->set('selectedProdukIds', [$p1->id, $p2->id])
+            ->set('salinOptions.format', 'teks')
+            ->set('salinOptions.gaya', 'list')
+            ->set('salinOptions.nama', true)
+            ->set('salinOptions.harga', true)
+            ->call('eksekusiSalinData');
+
+        $dispatched = $test->effects['dispatches'] ?? [];
+        $teksWa = null;
+        foreach ($dispatched as $d) {
+            if (($d['name'] ?? '') === 'salin-teks') {
+                $teksWa = $d['params']['teks'] ?? null;
+            }
+        }
+
+        $this->assertNotNull($teksWa);
+        // Pastikan ada pemisah double newline (space baris kosong) antar item produk
+        $this->assertStringContainsString("\n\n", $teksWa);
+
+        // Pastikan TIDAK menggunakan emoji/icon, gunakan format teks bullet strip (-)
+        $this->assertStringNotContainsString('📦', $teksWa);
+        $this->assertStringNotContainsString('💰', $teksWa);
+        $this->assertStringNotContainsString('(Retail Standar)', $teksWa);
+        $this->assertStringContainsString('- *LCD iPhone 12 Pro*', $teksWa);
+        $this->assertStringContainsString('Rp 650.000', $teksWa);
+        $this->assertStringContainsString('- *Baterai iPhone 12 Pro*', $teksWa);
+        $this->assertStringContainsString('Rp 300.000', $teksWa);
+
+        // Verifikasi pemisahan per blok
+        $blocks = explode("\n\n", $teksWa);
+        $this->assertCount(2, $blocks);
+        $this->assertStringContainsString('Baterai iPhone 12 Pro', $blocks[0]);
+        $this->assertStringContainsString('LCD iPhone 12 Pro', $blocks[1]);
+
+        // Uji Direct WhatsApp Link
+        $testWa = Livewire::test(ProdukTab::class)
+            ->set('selectedProdukIds', [$p1->id])
+            ->set('salinOptions.format', 'teks')
+            ->set('salinOptions.nama', true)
+            ->set('salinOptions.harga', true)
+            ->set('waNomorTujuan', '08123456789')
+            ->call('kirimLangsungWa');
+
+        $dispatchedWa = $testWa->effects['dispatches'] ?? [];
+        $urlWa = null;
+        foreach ($dispatchedWa as $d) {
+            if (($d['name'] ?? '') === 'buka-tab-baru') {
+                $urlWa = $d['params']['url'] ?? null;
+            }
+        }
+        $this->assertNotNull($urlWa);
+        $this->assertStringStartsWith('https://wa.me/628123456789?text=', $urlWa);
+
+        // Uji Opsi Harga Tier (Semua Tier)
+        $testTier = Livewire::test(ProdukTab::class)
+            ->set('selectedProdukIds', [$p1->id])
+            ->set('salinOptions.format', 'teks')
+            ->set('salinOptions.tier', 'semua')
+            ->set('salinOptions.nama', true)
+            ->set('salinOptions.harga', true)
+            ->call('eksekusiSalinData');
+
+        $dispatchedTier = $testTier->effects['dispatches'] ?? [];
+        $teksTier = null;
+        foreach ($dispatchedTier as $d) {
+            if (($d['name'] ?? '') === 'salin-teks') {
+                $teksTier = $d['params']['teks'] ?? null;
+            }
+        }
+        $this->assertNotNull($teksTier);
+        $this->assertStringContainsString('Retail: Rp 650.000', $teksTier);
+        $this->assertStringContainsString('Reseller: Rp', $teksTier);
     }
 
     public function test_grid_view_kompatibilitas_kualitas_dan_hak_akses_harga_beli(): void

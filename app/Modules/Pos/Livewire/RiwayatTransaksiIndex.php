@@ -428,6 +428,9 @@ class RiwayatTransaksiIndex extends Component
             'metode_bayar' => $trx->metode_bayar,
             'subtotal' => (float) $trx->subtotal,
             'diskon' => $diskonKasirItem,
+            'diskon_partai' => (float) ($trx->diskon_partai ?? 0),
+            'diskon_poin' => (float) ($trx->diskon_poin ?? 0),
+            'diskon_tier' => (float) ($trx->diskon_tier ?? 0),
             'pajak' => (float) $trx->pajak_nominal,
             'total' => (float) $trx->total_akhir,
             'bayar' => (float) $trx->jumlah_bayar,
@@ -984,6 +987,7 @@ class RiwayatTransaksiIndex extends Component
                 'ppn_persen' => (float) ($trx->ppn_persen ?? 0),
                 'total' => (float) $trx->total_akhir,
                 'bayar' => (float) ($trx->jumlah_bayar ?: $trx->total_akhir),
+                'kembali' => (float) ($trx->kembalian ?? 0),
                 'kembalian' => (float) ($trx->kembalian ?? 0),
                 'hemat_total' => $hematTotal,
                 'metode' => strtoupper($trx->metode_bayar ?: 'ONLINE'),
@@ -1348,6 +1352,14 @@ class RiwayatTransaksiIndex extends Component
             $qServisTrx->where('t.metode_bayar', $metode);
         }
 
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $returJualDeskripsi = $isSqlite
+            ? "COALESCE(r.alasan, 'Retur Penjualan ' || COALESCE(t.no_transaksi, '-')) as deskripsi"
+            : "COALESCE(r.alasan, CONCAT('Retur Penjualan ', COALESCE(t.no_transaksi, '-'))) as deskripsi";
+        $returBeliDeskripsi = $isSqlite
+            ? "COALESCE(rb.alasan, 'Retur Pembelian ' || COALESCE(po.no_po, '-')) as deskripsi"
+            : "COALESCE(rb.alasan, CONCAT('Retur Pembelian ', COALESCE(po.no_po, '-'))) as deskripsi";
+
         // 3b. Riwayat retur penjualan. `tanggal` adalah tanggal bisnis retur,
         // bukan waktu pembuatan draft, sehingga filter tanggal tetap konsisten.
         $qRetur = DB::table('return_penjualan as r')
@@ -1368,7 +1380,7 @@ class RiwayatTransaksiIndex extends Component
                 'r.jumlah as nominal',
                 DB::raw("'keluar' as arah_kas"),
                 'r.status as status',
-                DB::raw("COALESCE(r.alasan, CONCAT('Retur Penjualan ', COALESCE(t.no_transaksi, '-'))) as deskripsi"),
+                DB::raw($returJualDeskripsi),
                 'r.id as target_id',
             ]);
 
@@ -1391,7 +1403,7 @@ class RiwayatTransaksiIndex extends Component
                 'rb.jumlah as nominal',
                 DB::raw("'masuk' as arah_kas"),
                 'rb.status as status',
-                DB::raw("COALESCE(rb.alasan, CONCAT('Retur Pembelian ', COALESCE(po.no_po, '-'))) as deskripsi"),
+                DB::raw($returBeliDeskripsi),
                 'rb.id as target_id',
             ]);
 

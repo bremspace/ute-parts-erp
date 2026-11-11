@@ -189,11 +189,11 @@ function layoutStruk58(data) {
         E.push({ t: 'line', s: pair('Subtotal:', rupiah(data.subtotal), W) });
     }
 
-    if (showBreakdown && Number(data.diskon_partai) > 0) {
+    if (Number(data.diskon_partai) > 0) {
         E.push({ t: 'line', s: pair('Diskon Partai:', '-' + rupiah(data.diskon_partai), W) });
     }
 
-    if (showBreakdown && Number(data.diskon_poin) > 0) {
+    if (Number(data.diskon_poin) > 0) {
         E.push({ t: 'line', s: pair('Tukar Poin (' + (data.poin_ditukar ?? 0) + 'pts):', '-' + rupiah(data.diskon_poin), W) });
     }
 
@@ -327,11 +327,11 @@ function layoutFaktur80(data) {
         E.push({ t: 'line', s: pair('SUBTOTAL', rupiah(data.subtotal), W) });
     }
 
-    if (showBreakdown80 && Number(data.diskon_partai) > 0) {
+    if (Number(data.diskon_partai) > 0) {
         E.push({ t: 'line', s: pair('DISKON PARTAI MEMBER', '-' + rupiah(data.diskon_partai), W) });
     }
 
-    if (showBreakdown80 && Number(data.diskon_poin) > 0) {
+    if (Number(data.diskon_poin) > 0) {
         E.push({ t: 'line', s: pair('TUKAR POIN (' + (data.poin_ditukar ?? 0) + ' PTS)', '-' + rupiah(data.diskon_poin), W) });
     }
 

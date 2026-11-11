@@ -5029,14 +5029,21 @@
                 </div>
 
                 <!-- Format Output Selector -->
-                <div class="p-3 rounded-2xl bg-white/[0.02] border border-white/10 space-y-2">
-                    <label class="block text-xs font-semibold text-ink-200">Format Salinan:</label>
+                <div class="p-3 rounded-2xl bg-white/[0.02] border border-white/10 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-semibold text-ink-200">Format & Gaya Salinan:</label>
+                        @if(($salinOptions['format'] ?? 'teks') === 'teks')
+                            <span class="text-[10px] text-up-mint font-medium bg-up-mint/10 px-2 py-0.5 rounded-full border border-up-mint/20">
+                                💬 WhatsApp Ready (+1 baris kosong antar produk)
+                            </span>
+                        @endif
+                    </div>
                     <div class="grid grid-cols-2 gap-2">
                         <label class="flex items-center gap-2.5 p-2.5 rounded-xl border {{ ($salinOptions['format'] ?? 'teks') === 'teks' ? 'bg-up-mint/10 border-up-mint/40 text-up-mint' : 'bg-white/5 border-white/5 text-ink-300' }} cursor-pointer transition select-none">
                             <input type="radio" value="teks" wire:model.live="salinOptions.format" class="text-up-mint bg-ink-900 focus:ring-0">
                             <div>
-                                <div class="text-xs font-bold">Format Teks Rapi</div>
-                                <div class="text-[10px] text-ink-400 leading-tight">Cocok untuk Chat WA, SMS, atau Catatan</div>
+                                <div class="text-xs font-bold">Format Teks WhatsApp</div>
+                                <div class="text-[10px] text-ink-400 leading-tight">Rapi untuk chat WA, SMS, atau Catatan</div>
                             </div>
                         </label>
                         <label class="flex items-center gap-2.5 p-2.5 rounded-xl border {{ ($salinOptions['format'] ?? 'teks') === 'tsv' ? 'bg-up-mint/10 border-up-mint/40 text-up-mint' : 'bg-white/5 border-white/5 text-ink-300' }} cursor-pointer transition select-none">
@@ -5047,6 +5054,54 @@
                             </div>
                         </label>
                     </div>
+
+                    @if(($salinOptions['format'] ?? 'teks') === 'teks')
+                        <div class="pt-2 border-t border-white/5 space-y-2.5">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-medium text-ink-400">Gaya Teks:</span>
+                                    <div class="flex items-center gap-2 text-xs">
+                                        <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border {{ ($salinOptions['gaya'] ?? 'ringkas') === 'ringkas' ? 'bg-up-mint/15 border-up-mint/40 text-white font-bold' : 'bg-white/5 border-white/5 text-ink-400' }} cursor-pointer select-none transition">
+                                            <input type="radio" value="ringkas" wire:model.live="salinOptions.gaya" class="hidden">
+                                            <span>- 1 Baris per Produk (-)</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border {{ ($salinOptions['gaya'] ?? 'ringkas') === 'list' ? 'bg-up-mint/15 border-up-mint/40 text-white font-bold' : 'bg-white/5 border-white/5 text-ink-400' }} cursor-pointer select-none transition">
+                                            <input type="radio" value="list" wire:model.live="salinOptions.gaya" class="hidden">
+                                            <span>- Multi-baris Detail (-)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-medium text-ink-400">Pilihan Harga Tier:</span>
+                                    <select wire:model.live="salinOptions.tier" class="px-2.5 py-1 rounded-lg bg-ink-900 border border-white/10 text-xs text-white focus:ring-1 focus:ring-up-mint">
+                                        <option value="default">Ikuti Filter ({{ $labelTierAktif }})</option>
+                                        <option value="retail">Retail Standar</option>
+                                        <option value="reseller">Reseller</option>
+                                        <option value="agen">Agen</option>
+                                        @foreach($tierMemberships ?? [] as $tm)
+                                            <option value="tier_{{ $tm->id }}">{{ $tm->nama }}</option>
+                                        @endforeach
+                                        <option value="semua">Semua Tier (Rincian Lengkap)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Opsi Tujuan Nomor WhatsApp Langsung -->
+                            <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div class="text-[11px] text-ink-300">
+                                    <span class="font-bold text-white">Direct WhatsApp Link:</span>
+                                    <span class="text-ink-400 block text-[10px]">Kirim langsung ke chat WhatsApp tanpa ketik atau cari kontak manual.</span>
+                                </div>
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <input type="text"
+                                           wire:model.defer="waNomorTujuan"
+                                           placeholder="Nomor WA (opsional, cth: 0812...)"
+                                           class="w-full sm:w-56 px-3 py-1.5 rounded-lg bg-ink-900/90 border border-white/10 text-xs text-white placeholder-ink-500 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                 </div>
 
                 <!-- Atribut Checkbox Grid -->
@@ -5130,52 +5185,90 @@
                 <!-- Preview Output Salinan -->
                 <div class="p-3 rounded-2xl bg-black/40 border border-white/5 space-y-1.5 font-mono text-[11px] text-ink-300">
                     <div class="text-[10px] uppercase font-bold text-ink-400 flex items-center justify-between">
-                        <span>Contoh Tampilan Salinan WhatsApp:</span>
-                        <span class="text-up-mint font-sans">Preview Rapi</span>
+                        @if(($salinOptions['format'] ?? 'teks') === 'tsv')
+                            <span>Contoh Tampilan Salinan Excel / Spreadsheet (TSV):</span>
+                            <span class="text-up-mint font-sans">Format Kolom</span>
+                        @else
+                            <span>Contoh Tampilan Salinan (Pemisah 1 Baris Kosong Antar-Produk):</span>
+                            <span class="text-up-mint font-sans">{{ ($salinOptions['gaya'] ?? 'ringkas') === 'list' ? 'Format Multi-baris (-)' : 'Format 1 Baris per Produk (-)' }}</span>
+                        @endif
                     </div>
-                    <div class="whitespace-pre-wrap leading-relaxed text-ink-200 bg-white/[0.02] p-2.5 rounded-xl border border-white/5 font-sans text-xs">📦 *Contoh Nama Produk* [SKU-001]
-💰 Harga: *Rp 250.000*
-@if(!empty($salinOptions['kualitas']))
-⭐ Kualitas: Original Equipment Manufacturer
+                    <div class="whitespace-pre-wrap leading-relaxed text-ink-200 bg-white/[0.02] p-2.5 rounded-xl border border-white/5 font-sans text-xs">@if(($salinOptions['format'] ?? 'teks') === 'tsv')Nama Produk	SKU	Harga	Kualitas	Stok	Rak
+LCD iPhone 11	SKU-LCD-01	300000	OEM	15	RAK-B2
+Baterai iPhone 11	SKU-BAT-02	150000	Original	20	RAK-A1
+@elseif(($salinOptions['gaya'] ?? 'ringkas') === 'list')- *LCD iPhone 11* [SKU-LCD-01]
+@if(($salinOptions['tier'] ?? 'default') === 'semua')  - Retail: Rp 300.000
+  - Reseller: Rp 280.000
+  - Agen: Rp 260.000
+@else  - Rp 300.000
 @endif
-@if(!empty($salinOptions['kompatibilitas']))
-📱 Kompatibel: Samsung Galaxy A50 / A50s
+@if(!empty($salinOptions['kualitas']))  - Kualitas: OEM
 @endif
-@if(!empty($salinOptions['kondisi']))
-⚙️ Kondisi: Baru
+@if(!empty($salinOptions['kompatibilitas']))  - Kompatibel: Apple iPhone 11 / 11 Pro
 @endif
-@if(!empty($salinOptions['stok']))
-📊 Stok: 15 pcs
+@if(!empty($salinOptions['kondisi']))  - Kondisi: Baru
 @endif
-@if(!empty($salinOptions['rak']))
-📍 Rak: RAK-B2
+@if(!empty($salinOptions['stok']))  - Stok: 15 pcs
 @endif
-@if(!empty($salinOptions['brand']))
-🏷️ Brand: Samsung
+@if(!empty($salinOptions['rak']))  - Lokasi Rak: RAK-B2
 @endif
-@if(!empty($salinOptions['kategori']))
-📁 Kategori: Sparepart LCD
+@if(!empty($salinOptions['brand']))  - Brand: Apple
 @endif
-@if(!empty($salinOptions['garansi']))
-🛡️ Garansi: 1 bln
+@if(!empty($salinOptions['kategori']))  - Kategori: Sparepart LCD
 @endif
-@if(!empty($salinOptions['deskripsi']))
-📝 Catatan: Sparepart original teruji
+@if(!empty($salinOptions['garansi']))  - Garansi: 1 bln
 @endif
-</div>
+@if(!empty($salinOptions['deskripsi']))  - Catatan: Sparepart original teruji
+@endif
+
+- *Baterai iPhone 11* [SKU-BAT-02]
+@if(($salinOptions['tier'] ?? 'default') === 'semua')  - Retail: Rp 150.000
+  - Reseller: Rp 140.000
+  - Agen: Rp 130.000
+@else  - Rp 150.000
+@endif
+@if(!empty($salinOptions['kualitas']))  - Kualitas: Original
+@endif
+@if(!empty($salinOptions['kompatibilitas']))  - Kompatibel: Apple iPhone 11
+@endif
+@if(!empty($salinOptions['kondisi']))  - Kondisi: Baru
+@endif
+@if(!empty($salinOptions['stok']))  - Stok: 20 pcs
+@endif
+@if(!empty($salinOptions['rak']))  - Lokasi Rak: RAK-A1
+@endif
+@if(!empty($salinOptions['brand']))  - Brand: Apple
+@endif
+@if(!empty($salinOptions['kategori']))  - Kategori: Baterai
+@endif
+@if(!empty($salinOptions['garansi']))  - Garansi: 6 bln
+@endif
+@if(!empty($salinOptions['deskripsi']))  - Catatan: Kapasitas baterai 100% awet
+@endif
+@endif</div>
                 </div>
 
                 <!-- Footer Action Buttons -->
-                <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-white/10">
                     <button type="button" wire:click="closeSalinDataModal" class="px-4 py-2 rounded-xl text-ink-300 hover:text-white text-xs font-semibold hover:bg-white/5 transition cursor-pointer">
                         Batal
                     </button>
-                    <button type="button"
-                            wire:click="eksekusiSalinData"
-                            class="px-5 py-2.5 rounded-xl bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs shadow-lg shadow-up-mint/25 transition active:scale-95 cursor-pointer flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-                        <span>Salin ke Clipboard</span>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        @if(($salinOptions['format'] ?? 'teks') === 'teks')
+                            <button type="button"
+                                    wire:click="kirimLangsungWa"
+                                    class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition active:scale-95 cursor-pointer flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                                <span>Kirim via WhatsApp</span>
+                            </button>
+                        @endif
+                        <button type="button"
+                                wire:click="eksekusiSalinData"
+                                class="px-5 py-2.5 rounded-xl bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs shadow-lg shadow-up-mint/25 transition active:scale-95 cursor-pointer flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                            <span>Salin ke Clipboard</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

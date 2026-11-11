@@ -2193,9 +2193,21 @@
                                 <span>Subtotal</span>
                                 <span class="tabular-nums text-white">Rp {{ number_format($selectedDetail['subtotal'], 0, ',', '.') }}</span>
                             </div>
+                            @if(!empty($selectedDetail['diskon_partai']) && (float)$selectedDetail['diskon_partai'] > 0)
+                                <div class="flex justify-between text-emerald-400">
+                                    <span>Diskon Partai (Member)</span>
+                                    <span class="tabular-nums">- Rp {{ number_format($selectedDetail['diskon_partai'], 0, ',', '.') }}</span>
+                                </div>
+                            @endif
+                            @if(!empty($selectedDetail['diskon_poin']) && (float)$selectedDetail['diskon_poin'] > 0)
+                                <div class="flex justify-between text-emerald-400">
+                                    <span>Tukar Poin</span>
+                                    <span class="tabular-nums">- Rp {{ number_format($selectedDetail['diskon_poin'], 0, ',', '.') }}</span>
+                                </div>
+                            @endif
                             @if($selectedDetail['diskon'] > 0)
                                 <div class="flex justify-between text-up-accent">
-                                    <span>Diskon</span>
+                                    <span>Diskon Kasir</span>
                                     <span class="tabular-nums">- Rp {{ number_format($selectedDetail['diskon'], 0, ',', '.') }}</span>
                                 </div>
                             @endif
