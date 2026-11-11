@@ -1,6 +1,55 @@
 @php
     $activeCabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
     $activeCabangName = \App\Modules\Rbac\Models\Cabang::find($activeCabangId)?->nama ?? 'Cabang Utama';
+
+    // Opsi Kategori untuk searchable-select
+    $posKategoriFilterOptions = [];
+    foreach ($kategoriList as $parent) {
+        $posKategoriFilterOptions[] = [
+            'value' => (string) $parent->id,
+            'label' => $parent->nama,
+            'group' => 'Kategori Utama',
+        ];
+        foreach ($parent->children as $child) {
+            $posKategoriFilterOptions[] = [
+                'value' => (string) $child->id,
+                'label' => '↳ ' . $child->nama,
+                'group' => $parent->nama,
+            ];
+        }
+    }
+
+    // Opsi Brand Part untuk searchable-select
+    $posBrandFilterOptions = [];
+    foreach ($brandList as $b) {
+        $posBrandFilterOptions[] = [
+            'value' => (string) $b->id,
+            'label' => $b->nama,
+        ];
+    }
+
+    // Opsi Tipe HP untuk searchable-select
+    $posGroupedMk = \App\Modules\Wms\Models\TipeHp::groupModelsByBrand($modelKompatibelList, $filterBrandKompatibel ?: null);
+    $posTipeHpFilterOptions = [];
+    if (empty($filterBrandKompatibel) && count($posGroupedMk) > 1) {
+        foreach ($posGroupedMk as $brandName => $models) {
+            foreach ($models as $mk) {
+                $posTipeHpFilterOptions[] = [
+                    'value' => (string) $mk,
+                    'label' => \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $brandName),
+                    'group' => $brandName,
+                ];
+            }
+        }
+    } else {
+        foreach ($modelKompatibelList as $mk) {
+            $posTipeHpFilterOptions[] = [
+                'value' => (string) $mk,
+                'label' => \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null),
+                'group' => $filterBrandKompatibel ?: null,
+            ];
+        }
+    }
 @endphp
 
 <div
@@ -933,32 +982,23 @@
             <!-- Desktop Filter Bar -->
             <div class="hidden sm:flex items-center gap-2 flex-wrap pt-1 text-xs">
                 @if($visibleFilters['kategori'])
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterKategoriId" class="px-2.5 py-1.5 {{ $filterKategoriId ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Kategori</option>
-                            @foreach($kategoriList as $parent)
-                                <option value="{{ $parent->id }}">{{ $parent->nama }}</option>
-                                @foreach($parent->children as $child)
-                                    <option value="{{ $child->id }}">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
-                                @endforeach
-                            @endforeach
-                        </select>
-                        @if($filterKategoriId)
-                            <button type="button" wire:click="$set('filterKategoriId', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kategori">✕</button>
-                        @endif
+                    <div class="min-w-[160px] sm:w-44">
+                        <x-prism.searchable-select
+                            model="filterKategoriId"
+                            :options="$posKategoriFilterOptions"
+                            placeholder="Semua Kategori"
+                            searchPlaceholder="Cari kategori..."
+                        />
                     </div>
                 @endif
                 @if($visibleFilters['brand'])
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterBrandId" class="px-2.5 py-1.5 {{ $filterBrandId ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Merek Part</option>
-                            @foreach($brandList as $b)
-                                <option value="{{ $b->id }}">{{ $b->nama }}</option>
-                            @endforeach
-                        </select>
-                        @if($filterBrandId)
-                            <button type="button" wire:click="$set('filterBrandId', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Brand">✕</button>
-                        @endif
+                    <div class="min-w-[150px] sm:w-40">
+                        <x-prism.searchable-select
+                            model="filterBrandId"
+                            :options="$posBrandFilterOptions"
+                            placeholder="Semua Merek Part"
+                            searchPlaceholder="Cari merek..."
+                        />
                     </div>
                 @endif
                 @if($visibleFilters['kualitas'])
@@ -975,42 +1015,23 @@
                     </div>
                 @endif
                 @if($visibleFilters['brand_kompatibel'])
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterBrandKompatibel" class="px-2.5 py-1.5 {{ $filterBrandKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Merk HP</option>
-                            @foreach($brandKompatibelList as $bk)
-                                <option value="{{ $bk }}">{{ $bk }}</option>
-                            @endforeach
-                        </select>
-                        @if($filterBrandKompatibel)
-                            <button type="button" wire:click="$set('filterBrandKompatibel', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Merk HP">✕</button>
-                        @endif
+                    <div class="min-w-[150px] sm:w-40">
+                        <x-prism.searchable-select
+                            model="filterBrandKompatibel"
+                            :options="$brandKompatibelList"
+                            placeholder="Semua Merk HP"
+                            searchPlaceholder="Cari merk HP..."
+                        />
                     </div>
                 @endif
                 @if($visibleFilters['model_kompatibel'] || $visibleFilters['tipe_hp'])
-                    @php
-                        $groupedMkPos = \App\Modules\Wms\Models\TipeHp::groupModelsByBrand($modelKompatibelList, $filterBrandKompatibel ?: null);
-                    @endphp
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterModelKompatibel" class="px-2.5 py-1.5 {{ $filterModelKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe / Model HP' }}</option>
-                            @if(empty($filterBrandKompatibel) && count($groupedMkPos) > 1)
-                                @foreach($groupedMkPos as $brandName => $models)
-                                    <optgroup label="{{ $brandName }}">
-                                        @foreach($models as $mk)
-                                            <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $brandName) }}</option>
-                                        @endforeach
-                                    </optgroup>
-                                @endforeach
-                            @else
-                                @foreach($modelKompatibelList as $mk)
-                                    <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
-                                @endforeach
-                            @endif
-                        </select>
-                        @if($filterModelKompatibel)
-                            <button type="button" wire:click="$set('filterModelKompatibel', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Tipe / Model HP">✕</button>
-                        @endif
+                    <div class="min-w-[170px] sm:w-52">
+                        <x-prism.searchable-select
+                            model="filterModelKompatibel"
+                            :options="$posTipeHpFilterOptions"
+                            :placeholder="$filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe / Model HP'"
+                            searchPlaceholder="Cari model HP..."
+                        />
                     </div>
                 @endif
                 @if($visibleFilters['kondisi'])
@@ -2096,19 +2117,14 @@
                             <button type="button" wire:click="$set('filterKategoriId', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
                         @endif
                     </div>
-                    <select
-                        wire:model.live="filterKategoriId"
-                        wire:change="$set('visibleFilters.kategori', true)"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
-                    >
-                        <option value="">Semua Kategori</option>
-                        @foreach($kategoriList as $parent)
-                            <option value="{{ $parent->id }}">{{ $parent->nama }}</option>
-                            @foreach($parent->children as $child)
-                                <option value="{{ $child->id }}">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
-                            @endforeach
-                        @endforeach
-                    </select>
+                    <div wire:click="$set('visibleFilters.kategori', true)">
+                        <x-prism.searchable-select
+                            model="filterKategoriId"
+                            :options="$posKategoriFilterOptions"
+                            placeholder="Semua Kategori"
+                            searchPlaceholder="Cari kategori..."
+                        />
+                    </div>
                 </div>
 
                 <!-- 3. Brand Part -->
@@ -2119,16 +2135,14 @@
                             <button type="button" wire:click="$set('filterBrandId', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
                         @endif
                     </div>
-                    <select
-                        wire:model.live="filterBrandId"
-                        wire:change="$set('visibleFilters.brand', true)"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
-                    >
-                        <option value="">Semua Brand Part</option>
-                        @foreach($brandList as $b)
-                            <option value="{{ $b->id }}">{{ $b->nama }}</option>
-                        @endforeach
-                    </select>
+                    <div wire:click="$set('visibleFilters.brand', true)">
+                        <x-prism.searchable-select
+                            model="filterBrandId"
+                            :options="$posBrandFilterOptions"
+                            placeholder="Semua Brand Part"
+                            searchPlaceholder="Cari brand..."
+                        />
+                    </div>
                 </div>
 
                 <!-- 4. Merk HP & Tipe/Model HP (Gadget Kompatibel) -->
@@ -2140,16 +2154,14 @@
                                 <button type="button" wire:click="$set('filterBrandKompatibel', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
                             @endif
                         </div>
-                        <select
-                            wire:model.live="filterBrandKompatibel"
-                            wire:change="$set('visibleFilters.brand_kompatibel', true)"
-                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
-                        >
-                            <option value="">Semua Merk HP</option>
-                            @foreach($brandKompatibelList as $bk)
-                                <option value="{{ $bk }}">{{ $bk }}</option>
-                            @endforeach
-                        </select>
+                        <div wire:click="$set('visibleFilters.brand_kompatibel', true)">
+                            <x-prism.searchable-select
+                                model="filterBrandKompatibel"
+                                :options="$brandKompatibelList"
+                                placeholder="Semua Merk HP"
+                                searchPlaceholder="Cari merk HP..."
+                            />
+                        </div>
                     </div>
 
                     <div>
@@ -2159,29 +2171,14 @@
                                 <button type="button" wire:click="$set('filterModelKompatibel', null)" class="text-[11px] font-semibold text-up-red hover:underline cursor-pointer">Reset</button>
                             @endif
                         </div>
-                        <select
-                            wire:model.live="filterModelKompatibel"
-                            wire:change="$set('visibleFilters.model_kompatibel', true)"
-                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[44px]"
-                        >
-                            <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Model HP' }}</option>
-                            @php
-                                $groupedMkPosMobile = \App\Modules\Wms\Models\TipeHp::groupModelsByBrand($modelKompatibelList, $filterBrandKompatibel ?: null);
-                            @endphp
-                            @if(empty($filterBrandKompatibel) && count($groupedMkPosMobile) > 1)
-                                @foreach($groupedMkPosMobile as $brandName => $models)
-                                    <optgroup label="{{ $brandName }}">
-                                        @foreach($models as $mk)
-                                            <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $brandName) }}</option>
-                                        @endforeach
-                                    </optgroup>
-                                @endforeach
-                            @else
-                                @foreach($modelKompatibelList as $mk)
-                                    <option value="{{ $mk }}">{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($mk, $filterBrandKompatibel ?? null) }}</option>
-                                @endforeach
-                            @endif
-                        </select>
+                        <div wire:click="$set('visibleFilters.model_kompatibel', true)">
+                            <x-prism.searchable-select
+                                model="filterModelKompatibel"
+                                :options="$posTipeHpFilterOptions"
+                                :placeholder="$filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Model HP'"
+                                searchPlaceholder="Cari model HP..."
+                            />
+                        </div>
                     </div>
                 </div>
 

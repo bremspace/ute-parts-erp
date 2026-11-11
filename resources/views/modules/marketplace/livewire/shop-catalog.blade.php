@@ -643,6 +643,89 @@
         @php
             $allowedFilters = (array) ($webConfig['allowed_filters'] ?? []);
             $filtersEnabled = $allowedFilters['enabled'] ?? true;
+
+            // Opsi Kategori untuk searchable-select
+            $shopKategoriOptions = [];
+            foreach ($categories as $cat) {
+                $catId = is_array($cat) ? ($cat['id'] ?? '') : ($cat->id ?? (is_scalar($cat) ? (string) $cat : ''));
+                $catNama = is_array($cat) ? ($cat['nama'] ?? '') : ($cat->nama ?? (is_scalar($cat) ? (string) $cat : ''));
+                $catCount = is_array($cat) ? ($cat['count'] ?? null) : ($cat->count ?? null);
+                $children = is_array($cat) ? ($cat['children'] ?? []) : ($cat->children ?? []);
+                $hasChildren = !empty($children) && (is_countable($children) ? count($children) : 0) > 0;
+
+                if ($hasChildren) {
+                    $shopKategoriOptions[] = [
+                        'value' => (string) $catId,
+                        'label' => 'Semua ' . $catNama . ($catCount !== null ? ' (' . $catCount . ')' : ''),
+                        'group' => $catNama,
+                    ];
+                    foreach ($children as $child) {
+                        $childId = is_array($child) ? ($child['id'] ?? '') : ($child->id ?? (is_scalar($child) ? (string) $child : ''));
+                        $childNama = is_array($child) ? ($child['nama'] ?? '') : ($child->nama ?? (is_scalar($child) ? (string) $child : ''));
+                        $childCount = is_array($child) ? ($child['count'] ?? null) : ($child->count ?? null);
+                        $shopKategoriOptions[] = [
+                            'value' => (string) $childId,
+                            'label' => '↳ ' . $childNama . ($childCount !== null ? ' (' . $childCount . ')' : ''),
+                            'group' => $catNama,
+                        ];
+                    }
+                } elseif (!empty($catNama)) {
+                    $shopKategoriOptions[] = [
+                        'value' => (string) $catId,
+                        'label' => $catNama . ($catCount !== null ? ' (' . $catCount . ')' : ''),
+                    ];
+                }
+            }
+
+            // Opsi Merk HP untuk searchable-select
+            $shopHpMerkOptions = [];
+            foreach ($hpMerkList as $key => $val) {
+                $m = is_numeric($key) ? $val : $key;
+                $count = is_numeric($key) ? null : $val;
+                $shopHpMerkOptions[] = [
+                    'value' => (string) $m,
+                    'label' => $m . ($count !== null ? ' (' . $count . ')' : ''),
+                ];
+            }
+
+            // Opsi Model HP untuk searchable-select (dengan grouping merk)
+            $groupedModelsShop = [];
+            foreach ($hpModelList as $key => $val) {
+                $m = is_numeric($key) ? $val : $key;
+                $cnt = is_numeric($key) ? null : $val;
+                $b = \App\Modules\Wms\Models\TipeHp::resolveBrandForModel($m, $filterHpMerk ?: null);
+                $groupedModelsShop[$b][$m] = $cnt;
+            }
+            uksort($groupedModelsShop, function ($a, $b) {
+                $brandA = (strcasecmp($a, 'Universal') === 0) ? 'ZZZ' : $a;
+                $brandB = (strcasecmp($b, 'Universal') === 0) ? 'ZZZ' : $b;
+                return strcasecmp($brandA, $brandB);
+            });
+
+            $shopHpModelOptions = [];
+            if (empty($filterHpMerk) && count($groupedModelsShop) > 1) {
+                foreach ($groupedModelsShop as $brandName => $models) {
+                    foreach ($models as $m => $count) {
+                        $mLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($m, $brandName);
+                        $shopHpModelOptions[] = [
+                            'value' => (string) $m,
+                            'label' => $mLabel . ($count !== null ? ' (' . $count . ')' : ''),
+                            'group' => $brandName,
+                        ];
+                    }
+                }
+            } else {
+                foreach ($hpModelList as $key => $val) {
+                    $m = is_numeric($key) ? $val : $key;
+                    $count = is_numeric($key) ? null : $val;
+                    $mLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($m, $filterHpMerk ?: null);
+                    $shopHpModelOptions[] = [
+                        'value' => (string) $m,
+                        'label' => $mLabel . ($count !== null ? ' (' . $count . ')' : ''),
+                        'group' => !empty($filterHpMerk) ? $filterHpMerk : null,
+                    ];
+                }
+            }
         @endphp
         @if($filtersEnabled)
         <!-- Filter Selectors Matrix -->
@@ -650,43 +733,12 @@
             @if($allowedFilters['kategori'] ?? true)
             <!-- Kategori -->
             <div class="relative min-w-0 w-full">
-                <select wire:model.live="filterKategori"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Semua Kategori</option>
-                    @foreach($categories as $cat)
-                        @php
-                            $catId = is_array($cat) ? ($cat['id'] ?? '') : ($cat->id ?? (is_scalar($cat) ? (string) $cat : ''));
-                            $catNama = is_array($cat) ? ($cat['nama'] ?? '') : ($cat->nama ?? (is_scalar($cat) ? (string) $cat : ''));
-                            $catCount = is_array($cat) ? ($cat['count'] ?? null) : ($cat->count ?? null);
-                            $children = is_array($cat) ? ($cat['children'] ?? []) : ($cat->children ?? []);
-                            $hasChildren = !empty($children) && (is_countable($children) ? count($children) : 0) > 0;
-                        @endphp
-                        @if($hasChildren)
-                            <optgroup label="{{ $catNama }}">
-                                <option value="{{ $catId }}">— Semua {{ $catNama }}{{ $catCount !== null ? ' (' . $catCount . ')' : '' }} —</option>
-                                @foreach($children as $child)
-                                    @php
-                                        $childId = is_array($child) ? ($child['id'] ?? '') : ($child->id ?? (is_scalar($child) ? (string) $child : ''));
-                                        $childNama = is_array($child) ? ($child['nama'] ?? '') : ($child->nama ?? (is_scalar($child) ? (string) $child : ''));
-                                        $childCount = is_array($child) ? ($child['count'] ?? null) : ($child->count ?? null);
-                                    @endphp
-                                    <option value="{{ $childId }}">{{ $childNama }}{{ $childCount !== null ? ' (' . $childCount . ')' : '' }}</option>
-                                @endforeach
-                            </optgroup>
-                        @elseif(!empty($catNama))
-                            <option value="{{ $catId }}">{{ $catNama }}{{ $catCount !== null ? ' (' . $catCount . ')' : '' }}</option>
-                        @endif
-                    @endforeach
-                </select>
-                @if(!empty($filterKategori))
-                    <button type="button" wire:click="$set('filterKategori', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Kategori">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="filterKategori"
+                    :options="$shopKategoriOptions"
+                    placeholder="Semua Kategori"
+                    searchPlaceholder="Cari kategori..."
+                />
             </div>
             @endif
 
@@ -715,78 +767,22 @@
             @if($allowedFilters['hp'] ?? true)
             <!-- Merk HP -->
             <div class="relative min-w-0 w-full">
-                <select wire:model.live="filterHpMerk"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Merk Gadget</option>
-                    @foreach($hpMerkList as $key => $val)
-                        @php
-                            $m = is_numeric($key) ? $val : $key;
-                            $count = is_numeric($key) ? null : $val;
-                        @endphp
-                        <option value="{{ $m }}">{{ $m }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
-                    @endforeach
-                </select>
-                @if(!empty($filterHpMerk))
-                    <button type="button" wire:click="$set('filterHpMerk', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Merk">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="filterHpMerk"
+                    :options="$shopHpMerkOptions"
+                    placeholder="Merk Gadget"
+                    searchPlaceholder="Cari merk..."
+                />
             </div>
 
             <!-- Model HP -->
             <div class="relative min-w-0 w-full">
-                @php
-                    $groupedModelsShop = [];
-                    foreach ($hpModelList as $key => $val) {
-                        $m = is_numeric($key) ? $val : $key;
-                        $cnt = is_numeric($key) ? null : $val;
-                        $b = \App\Modules\Wms\Models\TipeHp::resolveBrandForModel($m, $filterHpMerk ?: null);
-                        $groupedModelsShop[$b][$m] = $cnt;
-                    }
-                    uksort($groupedModelsShop, function ($a, $b) {
-                        $brandA = (strcasecmp($a, 'Universal') === 0) ? 'ZZZ' : $a;
-                        $brandB = (strcasecmp($b, 'Universal') === 0) ? 'ZZZ' : $b;
-                        return strcasecmp($brandA, $brandB);
-                    });
-                @endphp
-                <select wire:model.live="filterHpModel"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">{{ !empty($filterHpMerk) ? 'Semua Model ' . $filterHpMerk : 'Model Gadget' }}</option>
-                    @if(empty($filterHpMerk) && count($groupedModelsShop) > 1)
-                        @foreach($groupedModelsShop as $brandName => $models)
-                            <optgroup label="{{ $brandName }}">
-                                @foreach($models as $m => $count)
-                                    @php
-                                        $mLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($m, $brandName);
-                                    @endphp
-                                    <option value="{{ $m }}">{{ $mLabel }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
-                                @endforeach
-                            </optgroup>
-                        @endforeach
-                    @else
-                        @foreach($hpModelList as $key => $val)
-                            @php
-                                $m = is_numeric($key) ? $val : $key;
-                                $count = is_numeric($key) ? null : $val;
-                                $mLabel = \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($m, $filterHpMerk ?: null);
-                            @endphp
-                            <option value="{{ $m }}">{{ $mLabel }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
-                        @endforeach
-                    @endif
-                </select>
-                @if(!empty($filterHpModel))
-                    <button type="button" wire:click="$set('filterHpModel', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Model">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="filterHpModel"
+                    :options="$shopHpModelOptions"
+                    :placeholder="!empty($filterHpMerk) ? 'Semua Model ' . $filterHpMerk : 'Model Gadget'"
+                    searchPlaceholder="Cari model..."
+                />
             </div>
             @endif
 
