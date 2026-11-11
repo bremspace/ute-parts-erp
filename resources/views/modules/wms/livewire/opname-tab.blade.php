@@ -167,13 +167,49 @@
                                     </select>
                                 </div>
                             @elseif($opnameTipeTarget === 'kategori')
+                                @php
+                                    $opnameKategoriOptions = [];
+                                    if (!empty($kategoriTree)) {
+                                        foreach ($kategoriTree as $parent) {
+                                            $opnameKategoriOptions[] = [
+                                                'value' => (string) $parent->id,
+                                                'label' => $parent->nama,
+                                                'display_label' => $parent->nama,
+                                                'level' => 0,
+                                                'is_parent' => true,
+                                            ];
+                                            foreach ($parent->children as $child) {
+                                                $hasGrand = !empty($child->children) && $child->children->isNotEmpty();
+                                                $opnameKategoriOptions[] = [
+                                                    'value' => (string) $child->id,
+                                                    'label' => $child->nama,
+                                                    'display_label' => $parent->nama . ' → ' . $child->nama,
+                                                    'level' => 1,
+                                                    'is_child' => true,
+                                                    'is_parent' => $hasGrand,
+                                                ];
+                                                if ($hasGrand) {
+                                                    foreach ($child->children as $grandchild) {
+                                                        $opnameKategoriOptions[] = [
+                                                            'value' => (string) $grandchild->id,
+                                                            'label' => $grandchild->nama,
+                                                            'display_label' => $parent->nama . ' → ' . $child->nama . ' → ' . $grandchild->nama,
+                                                            'level' => 2,
+                                                            'is_child' => true,
+                                                        ];
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                @endphp
                                 <div class="flex-1">
-                                    <select wire:model.live="opnameKategoriId" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[42px]">
-                                        <option value="" class="bg-ink-900">Pilih Kategori Produk...</option>
-                                        @foreach($kategoris as $kat)
-                                            <option value="{{ $kat->id }}" class="bg-ink-900">{{ $kat->nama }}</option>
-                                        @endforeach
-                                    </select>
+                                    <x-prism.searchable-select
+                                        model="opnameKategoriId"
+                                        :options="$opnameKategoriOptions"
+                                        placeholder="Pilih Kategori Produk..."
+                                        searchPlaceholder="Cari kategori opname..."
+                                    />
                                 </div>
                             @elseif($opnameTipeTarget === 'brand')
                                 <div class="flex-1">

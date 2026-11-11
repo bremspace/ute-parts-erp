@@ -18,21 +18,25 @@
             'is_parent' => true,
         ];
         foreach ($parent->children as $child) {
+            $hasSub = !empty($child->children) && $child->children->isNotEmpty();
             $kategoriFilterOptions[] = [
                 'value' => (string) $child->id,
                 'label' => $child->nama,
                 'display_label' => $parent->nama . ' → ' . $child->nama,
                 'level' => 1,
                 'is_child' => true,
+                'is_parent' => $hasSub,
             ];
-            foreach ($child->children as $grandchild) {
-                $kategoriFilterOptions[] = [
-                    'value' => (string) $grandchild->id,
-                    'label' => $grandchild->nama,
-                    'display_label' => $parent->nama . ' → ' . $child->nama . ' → ' . $grandchild->nama,
-                    'level' => 2,
-                    'is_child' => true,
-                ];
+            if ($hasSub) {
+                foreach ($child->children as $grandchild) {
+                    $kategoriFilterOptions[] = [
+                        'value' => (string) $grandchild->id,
+                        'label' => $grandchild->nama,
+                        'display_label' => $parent->nama . ' → ' . $child->nama . ' → ' . $grandchild->nama,
+                        'level' => 2,
+                        'is_child' => true,
+                    ];
+                }
             }
         }
     }

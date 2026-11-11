@@ -160,3 +160,76 @@ motion:
 - DILARANG menggunakan animasi lambat (>200ms) untuk alur kerja transaksi kasir atau scanning barcode.
 - DILARANG menggunakan font berukuran di bawah 16px untuk elemen input pada layar mobile.
 - DILARANG membocorkan ID foreign key internal atau timestamp database mentah di antarmuka publik atau drilldown viewer.
+
+---
+
+## 7. Standar Arsitektur UI/UX Lintas Modul (3 Arketipe Baku)
+
+Untuk mencegah disparitas desain dan inkonsistensi visual antar modul, setiap modul backoffice ERP UTE wajib mengadopsi salah satu dari **3 Arketipe Baku**:
+
+### Arketipe A: Workstation Cockpit (POS Kasir, Kanban Servis)
+- **Karakteristik:** Single-screen cockpit layout. Seluruh antarmuka operasional selesai dalam satu pandangan mata tanpa perlu scrolling vertikal halaman di desktop.
+- **Desktop Behavior (`≥ 1024px`):** Wrapper `h-full md:overflow-hidden`, action bar bawah dipin permanen (`flex-shrink-0`), hotkey keyboard (F2, F4, F6, ESC) tercantum jelas pada tombol aksi.
+- **Mobile Behavior (`< 768px`):** Layout otomatis beralih ke natural vertical flow (`overflow-y-auto`), diberi padding bawah `pb-24` sampai `pb-28` agar tombol aksi tidak tertutup oleh Backoffice Floating Mobile Dock (tinggi 56px).
+
+### Arketipe B: Dense Data Grid (WMS Stok/Katalog, Riwayat Transaksi, CRM, Akunting)
+- **Karakteristik:** Tabel data padat informasi (*high information density*) untuk pemantauan ribuan unit SKU dan transaksi.
+- **Top Control:** Sticky search, filter dropdown kategori/lokasi, dan toggle kolom di bagian atas.
+- **Tabel Core:** Header sticky pekat (`sticky top-0 bg-ink-900/90 backdrop-blur-md`), teks kode/SKU/nominal wajib `font-mono tabular-nums`, zebra striping halus.
+- **Responsive Table:** Horizontal scroll container mandiri (`overflow-x-auto`) dengan shadow scroll indicator di mobile; kartu ringkasan accordion untuk review cepat di layar sempit.
+- **Bottom Bar:** Pinned pagination & status total data (misal: "Menampilkan 1-50 dari 12.450 item").
+
+### Arketipe C: Drawer / Slide-Over & Detail Editor (Form Part, Rincian Tiket Servis, Form Mutasi)
+- **Karakteristik:** Pengeditan dan penambahan data cepat tanpa memutus konteks halaman kerja utama.
+- **Desktop:** Slide-over drawer dari sisi kanan layar (`max-w-xl` atau `max-w-2xl`) dengan overlay backdrop blur tipis.
+- **Mobile:** Bottom sheet yang dapat di-swipe atau drawer full-screen dengan sticky header judul & tombol silang `ESC`.
+- **Action Control:** Tombol CTA Simpan (`.btn-primary-cockpit`) dan Batal (`.btn-erp-ghost`) selalu tersemat di bagian dasar sheet.
+
+---
+
+## 8. Kontrak Responsivitas Multi-Device (Dual-Behavior Rules)
+
+Setiap komponen UI wajib lolos verifikasi di 3 spektrum layar:
+
+1. **Desktop Cockpit (`1440×900` & `1920×1080`):**
+   - Zero body window scrollbar untuk Arketipe A.
+   - Pinned action bar dan status sesi kas/status sistem di baris bawah.
+   - Hardware barcode scanner diutamakan; banner izin kamera otomatis dimatikan.
+2. **Tablet / iPad (`768×1024` s/d `1024×1366`):**
+   - Grid fleksibel 2 kolom (Katalog di kiri, Keranjang/Detail di kanan).
+   - Area sentuh tombol minimal 40×40px.
+3. **Mobile Smartphone (`375×812` s/d `430×932`):**
+   - Vertical natural touch scrolling (`overflow-y-auto`).
+   - Tombol shortcut horizontal carousel wajib memiliki properti `white-space: nowrap !important; flex-shrink: 0 !important;` agar teks tidak terperas secara vertikal menjadi satu huruf per baris.
+   - Kontainer konten wajib menyertakan margin/padding bawah `pb-24` s/d `pb-28` untuk menjamin clearance bersih di atas Backoffice Floating Mobile Dock.
+   - Target sentuhan minimal 44×44px.
+
+---
+
+## 9. Sistem Token, Icon & Hirarki Tombol Baku (Workstation Standard)
+
+1. **Icon Standard:**
+   - Semua icon wajib menggunakan icon Lucide / SVG dengan `stroke-width: 1.75px` baku. Dilarang mencampur icon stroke tipis 1px dengan stroke tebal 2.5px.
+2. **Hirarki Tombol 3-Tier:**
+   - **Tier 1 (Primary Cockpit - `.btn-primary-cockpit`):** Solid Emerald / Electric Indigo untuk aksi mutlak (BAYAR, Simpan Perubahan, Mulai Servis). Tinggi min 42px di desktop, 44px di mobile.
+   - **Tier 2 (Tactile Utility - `.btn-tactile`):** Background netral berbingkai tipis dengan efek tactile saat ditekan (`active:scale-[0.98]`) untuk aksi pendukung (Tahan, Filter, Refresh).
+   - **Tier 3 (Ghost Pill - `.btn-erp-ghost`):** Tombol carousel horizontal hemat ruang untuk shortcut cepat (Retur, Riwayat, Online, Mutasi Kas). Wajib `shrink-0 whitespace-nowrap`.
+3. **Format Angka & Monospace:**
+   - Setiap elemen yang memuat SKU, Serial Number, Barcode, Kuantitas Stok, Nomor Tiket Servis, dan Rupiah wajib memakai kelas Tailwind: `font-mono tabular-nums`.
+
+---
+
+## 10. Kebijakan Performa Livewire & Anti-Bloat DOM
+
+1. **Lazy Modal Inclusions (Mandatori):**
+   - Seluruh modal Livewire dilarang di-render secara permanen dalam DOM jika kondisinya sedang tertutup.
+   - Wajib membungkus `@include(...)` modal dengan conditional Blade:
+     ```blade
+     @if(!empty($showPaymentModal))
+         @include('modules.pos.livewire.modals.payment-modal')
+     @endif
+     ```
+   - Aturan ini memangkas ribuan node DOM tersembunyi dan mempercepat Livewire DOM-diffing hingga >70%.
+2. **Zero N+1 Query Contract:**
+   - Dilarang keras melakukan loop query agregat (seperti hitung stok, subtotal, atau relasi) di dalam view.
+   - Seluruh kalkulasi agregat wajib diselesaikan pada backend controller/Livewire component melalui eager-loading (`with(...)`) atau query agregat tunggal `whereIn` groupBy.

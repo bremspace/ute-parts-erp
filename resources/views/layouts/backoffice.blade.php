@@ -760,7 +760,7 @@
             </header>
 
             <!-- Page Content -->
-            <main id="main-content" tabindex="-1" class="flex-1 min-h-0 {{ request()->is('app/pos*') ? 'overflow-y-auto md:overflow-hidden p-2 sm:p-2.5 pb-28 md:pb-2 flex flex-col' : 'overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6' }} bg-transparent outline-none min-w-0 w-full max-w-full">
+            <main id="main-content" tabindex="-1" class="flex-1 min-h-0 {{ request()->is('app/pos*') ? 'overflow-y-auto md:overflow-hidden p-2 sm:p-2.5 pb-3 md:pb-2 flex flex-col' : 'overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6' }} bg-transparent outline-none min-w-0 w-full max-w-full">
                 {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out, bisa skip per sesi/disimpan) --}}
                 @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*') && ! request()->is('app/pos*'))
                     <div x-data="{
@@ -802,7 +802,8 @@
                 {{ $slot }}
             </main>
 
-            <!-- Backoffice Floating Pill Mobile Dock (md:hidden) -->
+            <!-- Backoffice Floating Pill Mobile Dock (md:hidden, disembunyikan di POS kasir agar tombol bayar & checkout leluasa tanpa tertutup navbar) -->
+            @if(!request()->is('app/pos*'))
             <div class="md:hidden fixed bottom-3 inset-x-0 w-full flex justify-center px-4 z-40 pointer-events-none"
                  style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.25rem);">
                 <nav class="pointer-events-auto bg-white/90 dark:bg-ink-950/90 backdrop-blur-2xl border border-ink-200/90 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] rounded-full px-2 py-1 flex items-center justify-between gap-0.5 sm:gap-1 max-w-sm w-full mx-auto">
@@ -864,6 +865,7 @@
                     </button>
                 </nav>
             </div>
+            @endif
         </div>
     </div>
 

@@ -563,6 +563,7 @@ class OpnameTab extends Component
             'opnames' => $opnames,
             'raks' => Rak::with('gudang')->get(),
             'kategoris' => KategoriProduk::where('is_active', true)->orderBy('nama')->get(),
+            'kategoriTree' => KategoriProduk::getTree(),
             'brands' => Brand::where('is_active', true)->orderBy('nama')->get(),
             'selectedOpname' => $selectedOpname,
             'mutasiLogs' => $mutasiLogs,
