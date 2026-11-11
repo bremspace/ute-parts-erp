@@ -2244,6 +2244,27 @@ class SettingsRbac extends Component
             return;
         }
 
+        if ($this->kategoriForm['parent_id']) {
+            $pId = (int) $this->kategoriForm['parent_id'];
+            $parent = KategoriProduk::find($pId);
+            if ($parent && $parent->depth >= 2) {
+                $this->addError('kategoriForm.parent_id', 'Hirarki kategori maksimal 3 tahap (Kategori Utama → Sub Kategori → Sub-sub Kategori).');
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Hirarki kategori maksimal 3 tahap']);
+
+                return;
+            }
+
+            if ($this->kategoriForm['id']) {
+                $currentKat = KategoriProduk::find($this->kategoriForm['id']);
+                if ($currentKat && in_array($pId, $currentKat->semuaKeturunanIds(), true)) {
+                    $this->addError('kategoriForm.parent_id', 'Kategori tidak dapat memilih sub-kategorinya sendiri sebagai induk.');
+                    $this->dispatch('alert', ['type' => 'error', 'message' => 'Kategori tidak dapat memilih sub-kategorinya sendiri sebagai induk']);
+
+                    return;
+                }
+            }
+        }
+
         $nama = trim($this->kategoriForm['nama']);
         $parentId = $this->kategoriForm['parent_id'] ? (int) $this->kategoriForm['parent_id'] : null;
         $id = $this->kategoriForm['id'] ? (int) $this->kategoriForm['id'] : null;
@@ -3842,16 +3863,43 @@ class SettingsRbac extends Component
                 ->orderBy('nama')
                 ->get();
             $kategoriByParent = $kategoriAll->groupBy(fn ($kategori) => $kategori->parent_id ?? 0);
+
             $kategoriList = collect();
-            foreach ($kategoriByParent->get(0, collect()) as $root) {
-                $kategoriList->push($root);
-                foreach ($kategoriByParent->get($root->id, collect()) as $child) {
-                    $kategoriList->push($child);
+            $flattenRecursive = function ($parentId, $depth = 0) use (&$flattenRecursive, $kategoriByParent, &$kategoriList) {
+                $children = $kategoriByParent->get($parentId, collect());
+                foreach ($children as $c) {
+                    $c->tree_depth = $depth;
+                    $kategoriList->push($c);
+                    $flattenRecursive($c->id, $depth + 1);
+                }
+            };
+            $flattenRecursive(0, 0);
+
+            $handledIds = $kategoriList->pluck('id')->all();
+            $orphans = $kategoriAll->whereNotIn('id', $handledIds);
+            foreach ($orphans as $orphan) {
+                $orphan->tree_depth = 0;
+                $kategoriList->push($orphan);
+                $flattenRecursive($orphan->id, 1);
+            }
+
+            // Opsi parent: Hanya kategori dengan kedalaman < 2 (maks 3 tahap: Root=0, Sub=1, Sub-sub=2)
+            // Serta cegah circular dependency jika sedang mengedit
+            $currentEditId = $this->kategoriForm['id'] ? (int) $this->kategoriForm['id'] : null;
+            $excludedIds = [];
+            if ($currentEditId) {
+                $currentKat = $kategoriAll->firstWhere('id', $currentEditId);
+                if ($currentKat) {
+                    $excludedIds = $currentKat->semuaKeturunanIds();
                 }
             }
-            $handledIds = $kategoriList->pluck('id');
-            $kategoriList = $kategoriList->concat($kategoriAll->whereNotIn('id', $handledIds));
-            $kategoriParentOptions = $kategoriAll->whereNull('parent_id');
+
+            $kategoriParentOptions = $kategoriList->filter(function ($kat) use ($excludedIds) {
+                $depth = $kat->tree_depth ?? $kat->depth ?? 0;
+
+                return $depth < 2 && ! in_array($kat->id, $excludedIds, true);
+            });
+
             $kategoriTree = KategoriProduk::getTree();
             $brandList = Brand::withCount('produk')->orderBy('nama')->get();
             $kualitasList = KualitasProduk::with('brand')->withCount('produk')->orderByRaw('brand_id IS NULL ASC')->orderBy('nama')->get();

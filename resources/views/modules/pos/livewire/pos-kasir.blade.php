@@ -2,7 +2,7 @@
     $activeCabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
     $activeCabangName = \App\Modules\Rbac\Models\Cabang::find($activeCabangId)?->nama ?? 'Cabang Utama';
 
-    // Opsi Kategori untuk searchable-select (hirarki natural berurutan tanpa optgroup ganda)
+    // Opsi Kategori untuk searchable-select (hirarki natural 3 tingkat)
     $posKategoriFilterOptions = [];
     foreach ($kategoriList as $parent) {
         $posKategoriFilterOptions[] = [
@@ -20,6 +20,15 @@
                 'level' => 1,
                 'is_child' => true,
             ];
+            foreach ($child->children as $grandchild) {
+                $posKategoriFilterOptions[] = [
+                    'value' => (string) $grandchild->id,
+                    'label' => $grandchild->nama,
+                    'display_label' => $parent->nama . ' → ' . $child->nama . ' → ' . $grandchild->nama,
+                    'level' => 2,
+                    'is_child' => true,
+                ];
+            }
         }
     }
 
@@ -596,18 +605,18 @@
                 </div>
             </div>
 
-            <!-- Filter Preferences Button (Desktop) & Filter Sheet Trigger (Mobile) -->
+            <!-- Filter Preferences Button (Desktop Only - Mobile via Action Strip Pill) -->
             <button
                 type="button"
-                @click="if (window.innerWidth < 640) { mobileFilterOpen = !mobileFilterOpen; } else { desktopFilterDrawerOpen = !desktopFilterDrawerOpen; }"
-                :class="(desktopFilterDrawerOpen || mobileFilterOpen) ? 'bg-up-primary/10 border-up-primary/40 text-up-primary dark:text-up-primary' : ''"
-                class="px-3.5 py-2.5 rounded-xl border border-ink-200/80 dark:border-white/10 text-xs font-semibold text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-white/5 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center gap-1.5 whitespace-nowrap cursor-pointer min-h-[44px]"
+                @click="desktopFilterDrawerOpen = !desktopFilterDrawerOpen"
+                :class="desktopFilterDrawerOpen ? 'bg-up-primary/10 border-up-primary/40 text-up-primary dark:text-up-primary' : ''"
+                class="hidden sm:flex px-3.5 py-2.5 rounded-xl border border-ink-200/80 dark:border-white/10 text-xs font-semibold text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-white/5 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] items-center gap-1.5 whitespace-nowrap cursor-pointer min-h-[44px]"
                 title="Atur filter pencarian produk"
             >
                 <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                 </svg>
-                <span class="hidden sm:inline">Filter</span>
+                <span>Filter</span>
                 @if(collect($visibleFilters)->contains(true))
                     <span class="w-2 h-2 rounded-full bg-up-primary"></span>
                 @endif
@@ -748,6 +757,29 @@
                         <span class="w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
                     @endif
                 </button>
+
+                <!-- Sesi Kas Pill di Mobile (sm:hidden) -->
+                @if($kasAktif)
+                    <button
+                        type="button"
+                        wire:click="bukaMutasiKasModal('keluar')"
+                        class="sm:hidden px-2.5 py-1.5 rounded-xl bg-up-mint/15 text-up-mint border border-up-mint/30 font-bold text-xs flex items-center gap-1.5 shrink-0 whitespace-nowrap min-h-[38px] active:scale-95 cursor-pointer"
+                        title="Kasir Aktif - Klik untuk Mutasi / Tutup Kas"
+                    >
+                        <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
+                        <span>Kas Aktif</span>
+                    </button>
+                @else
+                    <button
+                        type="button"
+                        wire:click="bukaKasModal"
+                        class="sm:hidden px-2.5 py-1.5 rounded-xl bg-up-red/15 text-up-red border border-up-red/30 font-bold text-xs flex items-center gap-1.5 shrink-0 whitespace-nowrap min-h-[38px] active:scale-95 cursor-pointer"
+                        title="Buka Kasir"
+                    >
+                        <span class="w-2 h-2 rounded-full bg-up-red"></span>
+                        <span>Buka Kas</span>
+                    </button>
+                @endif
 
                 @canany(['pos.view', 'pos.view-own', 'pos.create'])
                 <a
@@ -1131,9 +1163,9 @@
     </div>
 
     <!-- MAIN STAGE: TABEL TRANSAKSI KASIR (LELUASA, MODERN & BERSIH) -->
-    <div class="flex-1 min-h-[350px] md:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm md:overflow-hidden">
+    <div class="flex-1 min-h-[200px] md:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm md:overflow-hidden">
         <!-- Mobile Cart Header: Counter & View Toggle (sm:hidden) -->
-        <div class="sm:hidden flex items-center justify-between pb-2.5 mb-2 border-b border-ink-200/70 dark:border-white/10 flex-shrink-0">
+        <div class="sm:hidden flex items-center justify-between pb-2 mb-1.5 border-b border-ink-200/70 dark:border-white/10 flex-shrink-0">
             <div class="flex items-center gap-2">
                 <span class="text-xs font-bold text-ink-900 dark:text-white">Keranjang Belanja</span>
                 <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold text-[10px] tabular-nums border border-up-primary/20">
@@ -1160,10 +1192,10 @@
                     @click="setCartViewMode('list')"
                     :class="cartViewMode === 'list' ? 'bg-white dark:bg-ink-800 text-up-primary shadow-sm font-bold' : 'text-ink-500 hover:text-ink-900 dark:hover:text-white'"
                     class="px-2.5 py-1 rounded-lg text-xs transition flex items-center gap-1 cursor-pointer min-h-[30px]"
-                    title="Tampilan List Kompak"
+                    title="Tampilan Daftar Padat"
                 >
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                     </svg>
                     <span>List</span>
                 </button>
@@ -1171,7 +1203,7 @@
         </div>
 
         <!-- 1. Mobile Cart: Card View Mode -->
-        <div x-show="cartViewMode === 'card'" class="sm:hidden flex-1 overflow-y-auto space-y-2.5 pr-0.5">
+        <div x-show="cartViewMode === 'card'" class="sm:hidden flex-1 min-h-[160px] overflow-y-auto space-y-2.5 pr-0.5">
             @forelse($cart as $key => $item)
                 <div
                     wire:key="cart-mobile-card-{{ $key }}"
@@ -1402,20 +1434,20 @@
                     @include('modules.pos.livewire.partials.sn-control', ['itemKey' => $key, 'item' => $item])
                 </div>
             @empty
-                <div class="py-12 text-center text-ink-400">
-                    <div class="w-14 h-14 rounded-3xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary mx-auto mb-3">
-                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="py-6 sm:py-12 text-center text-ink-400">
+                    <div class="w-12 h-12 rounded-2xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary mx-auto mb-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                         </svg>
                     </div>
-                    <h3 class="text-sm font-bold text-ink-900 dark:text-white">Keranjang Masih Kosong</h3>
-                    <p class="text-xs text-ink-500 mt-1">Scan barcode atau ketik nama barang di atas.</p>
+                    <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white">Keranjang Masih Kosong</h3>
+                    <p class="text-[11px] sm:text-xs text-ink-500 mt-0.5">Scan barcode atau ketik nama barang di atas.</p>
                 </div>
             @endforelse
         </div>
 
         <!-- 2. Mobile Cart: List View Mode (Kompak & Padat untuk Banyak Item) -->
-        <div x-show="cartViewMode === 'list'" class="sm:hidden flex-1 overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 pr-0.5">
+        <div x-show="cartViewMode === 'list'" class="sm:hidden flex-1 min-h-[160px] overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 pr-0.5">
             @forelse($cart as $key => $item)
                 <div
                     wire:key="cart-mobile-list-{{ $key }}"
@@ -1896,8 +1928,8 @@
 
         <!-- BOTTOM CONTROL CENTER: Status Sesi Kas, Ditahan & Action Bayar -->
         <div class="border-t border-ink-200/70 dark:border-white/10 pt-3 mt-2.5 flex-shrink-0 flex items-center justify-between gap-3 flex-wrap pb-20 md:pb-0">
-            <!-- Left Info & Sesi Kas -->
-            <div class="flex items-center gap-2.5 flex-wrap">
+            <!-- Left Info & Sesi Kas (Desktop only inline, Mobile via top action pill) -->
+            <div class="hidden sm:flex items-center gap-2.5 flex-wrap">
                 <!-- Sesi Kas Indicator -->
                 <div class="flex items-center gap-1.5 flex-wrap">
                     @if($kasAktif)
@@ -1998,7 +2030,7 @@
                             class="px-3.5 py-2 rounded-lg bg-transparent hover:bg-rose-500/10 text-slate-500 hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 font-medium text-xs transition border border-slate-200 dark:border-white/10 hover:border-rose-500/30 cursor-pointer active:scale-[0.98] min-h-[42px] flex items-center justify-center gap-1.5"
                         >
                             <span>Batal</span>
-                            <span class="text-[10px] font-mono opacity-60">(ESC)</span>
+                            <span class="hidden sm:inline text-[10px] font-mono opacity-60">(ESC)</span>
                         </button>
 
                         <button
@@ -2007,7 +2039,7 @@
                             class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.06] dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 font-medium text-xs transition border border-slate-200 dark:border-white/10 cursor-pointer active:scale-[0.98] min-h-[42px] flex items-center justify-center gap-1.5"
                         >
                             <span>Tahan</span>
-                            <span class="text-[10px] font-mono opacity-60">(F6)</span>
+                            <span class="hidden sm:inline text-[10px] font-mono opacity-60">(F6)</span>
                         </button>
                     </div>
 
@@ -2015,14 +2047,14 @@
                     <button
                         type="button"
                         wire:click="openPaymentModal"
-                        class="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm transition active:scale-[0.98] cursor-pointer min-h-[42px] flex items-center justify-between sm:justify-center gap-3"
+                        class="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm transition active:scale-[0.98] cursor-pointer min-h-[44px] flex items-center justify-between sm:justify-center gap-3"
                     >
                         <span class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                             <span>BAYAR</span>
-                            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-700/60 text-emerald-100">F4</span>
+                            <span class="hidden sm:inline text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-700/60 text-emerald-100">F4</span>
                         </span>
                         <span class="px-2 py-0.5 rounded bg-black/20 text-white text-xs font-mono font-medium tabular-nums whitespace-nowrap">
                             Rp {{ number_format($totalAkhir, 0, ',', '.') }}

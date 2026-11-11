@@ -107,7 +107,8 @@
                     this.search = '';
                     this.$nextTick(() => {
                         const rect = this.$el.getBoundingClientRect();
-                        this.alignRight = (window.innerWidth - rect.left < 260);
+                        const spaceRight = window.innerWidth - rect.left;
+                        this.alignRight = (spaceRight < 340);
                         this.$refs.searchInput?.focus();
                         this.scrollToSelected();
                     });
@@ -193,6 +194,7 @@
             class="truncate block flex-1"
             :class="selectedItem ? 'text-ink-900 dark:text-white font-semibold' : 'text-ink-400 dark:text-ink-400 font-normal'"
             x-text="displayLabel"
+            :title="displayLabel"
         ></span>
 
         <div class="flex items-center gap-1 shrink-0 text-ink-400">
@@ -234,7 +236,7 @@
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
         x-transition:leave-end="opacity-0 scale-95 -translate-y-1"
-        class="absolute z-50 mt-1 min-w-[240px] w-full max-w-[92vw] sm:max-w-xs rounded-2xl bg-white/95 dark:bg-ink-950/95 backdrop-blur-md border border-ink-200 dark:border-white/10 shadow-2xl p-2 space-y-1.5 font-normal normal-case text-left"
+        class="absolute z-50 mt-1 min-w-full sm:min-w-[280px] w-max max-w-[min(480px,94vw)] rounded-2xl bg-white/95 dark:bg-ink-950/95 backdrop-blur-md border border-ink-200 dark:border-white/10 shadow-2xl p-2 space-y-1.5 font-normal normal-case text-left"
         :class="alignRight ? 'right-0' : 'left-0'"
         style="display: none;"
     >
@@ -268,8 +270,8 @@
                     <!-- Group Header (Optgroup) -->
                     <template x-if="grp.group">
                         <div class="sticky top-0 z-10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400 bg-slate-100/95 dark:bg-ink-900/95 backdrop-blur-sm border-y border-black/5 dark:border-white/5 my-1 flex items-center justify-between">
-                            <span x-text="grp.group"></span>
-                            <span class="text-[9px] font-mono text-ink-400/80" x-text="grp.items.length"></span>
+                            <span class="break-words line-clamp-1" x-text="grp.group"></span>
+                            <span class="text-[9px] font-mono text-ink-400/80 shrink-0 ml-1.5" x-text="grp.items.length"></span>
                         </div>
                     </template>
 
@@ -283,17 +285,26 @@
                                 String(opt.value) === String(selected)
                                     ? 'bg-up-primary/15 text-up-primary dark:text-white font-bold'
                                     : (opt.is_parent ? 'font-semibold text-ink-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 bg-black/[0.02] dark:bg-white/[0.02]' : 'text-ink-700 dark:text-ink-200 hover:bg-black/5 dark:hover:bg-white/10'),
-                                opt.level === 1 ? 'pl-6' : '',
-                                opt.level === 2 ? 'pl-9' : ''
+                                opt.level === 1 ? 'pl-5' : '',
+                                opt.level >= 2 ? 'pl-8' : ''
                             ]"
                         >
-                            <div class="flex items-center gap-1.5 truncate mr-2">
-                                <template x-if="opt.is_child || opt.level > 0">
-                                    <span class="text-ink-400/70 select-none text-[11px]">↳</span>
+                            <div class="flex items-start gap-1.5 flex-1 min-w-0 mr-2 py-0.5">
+                                <template x-if="opt.level === 1">
+                                    <span class="text-ink-400/80 select-none text-[11px] shrink-0 mt-0.5">↳</span>
                                 </template>
-                                <span class="truncate" x-text="opt.label"></span>
+                                <template x-if="opt.level >= 2">
+                                    <span class="text-ink-400/80 select-none text-[11px] shrink-0 mt-0.5">↳↳</span>
+                                </template>
+                                <div class="flex-1 min-w-0">
+                                    <span
+                                        class="break-words line-clamp-2 leading-tight block"
+                                        x-text="opt.label"
+                                        :title="opt.display_label || opt.label"
+                                    ></span>
+                                </div>
                             </div>
-                            <span x-show="String(opt.value) === String(selected)" class="text-up-mint font-bold text-xs shrink-0">✓</span>
+                            <span x-show="String(opt.value) === String(selected)" class="text-up-mint font-bold text-xs shrink-0 self-center">✓</span>
                         </div>
                     </template>
                 </div>

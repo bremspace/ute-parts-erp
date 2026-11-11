@@ -665,13 +665,32 @@
                         $childId = is_array($child) ? ($child['id'] ?? '') : ($child->id ?? (is_scalar($child) ? (string) $child : ''));
                         $childNama = is_array($child) ? ($child['nama'] ?? '') : ($child->nama ?? (is_scalar($child) ? (string) $child : ''));
                         $childCount = is_array($child) ? ($child['count'] ?? null) : ($child->count ?? null);
+                        $grandChildren = is_array($child) ? ($child['children'] ?? []) : ($child->children ?? []);
+                        $hasGrandChildren = !empty($grandChildren) && (is_countable($grandChildren) ? count($grandChildren) : 0) > 0;
+
                         $shopKategoriOptions[] = [
                             'value' => (string) $childId,
                             'label' => $childNama . ($childCount !== null ? ' (' . $childCount . ')' : ''),
                             'display_label' => $catNama . ' → ' . $childNama,
                             'level' => 1,
                             'is_child' => true,
+                            'is_parent' => $hasGrandChildren,
                         ];
+
+                        if ($hasGrandChildren) {
+                            foreach ($grandChildren as $g) {
+                                $gId = is_array($g) ? ($g['id'] ?? '') : ($g->id ?? (is_scalar($g) ? (string) $g : ''));
+                                $gNama = is_array($g) ? ($g['nama'] ?? '') : ($g->nama ?? (is_scalar($g) ? (string) $g : ''));
+                                $gCount = is_array($g) ? ($g['count'] ?? null) : ($g->count ?? null);
+                                $shopKategoriOptions[] = [
+                                    'value' => (string) $gId,
+                                    'label' => $gNama . ($gCount !== null ? ' (' . $gCount . ')' : ''),
+                                    'display_label' => $catNama . ' → ' . $childNama . ' → ' . $gNama,
+                                    'level' => 2,
+                                    'is_child' => true,
+                                ];
+                            }
+                        }
                     }
                 } elseif (!empty($catNama)) {
                     $shopKategoriOptions[] = [

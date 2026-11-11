@@ -644,7 +644,9 @@
 
                 <!-- Shortcuts, Install Button & Status Indicator -->
                 <div class="flex items-center gap-1 sm:gap-2 lg:gap-3 flex-shrink-0">
-                    <x-prism.pwa-install-prompt variant="button" />
+                    <div class="hidden sm:block">
+                        <x-prism.pwa-install-prompt variant="button" />
+                    </div>
 
                     @if(request()->routeIs('pos*'))
                         <div class="hidden lg:flex items-center gap-2 text-xs text-ink-400">
@@ -682,8 +684,8 @@
                         </a>
                     @endcan
 
-                    <!-- [2026] Font Size Switcher (Fluid rem scaling) -->
-                    <div class="relative flex-shrink-0" x-data="fontSizeManager()" @click.outside="open = false">
+                    <!-- [2026] Font Size Switcher (Hidden on mobile to save space) -->
+                    <div class="hidden sm:block relative flex-shrink-0" x-data="fontSizeManager()" @click.outside="open = false">
                         <button type="button" @click="open = !open"
                                 title="Ukuran Font" aria-label="Ukuran Font"
                                 class="p-1.5 sm:p-2 rounded-xl text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-0.5 sm:gap-1 min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px]">
@@ -721,9 +723,9 @@
                         @livewire(\App\Modules\Notifikasi\Livewire\NotificationCenter::class)
                     @endauth
 
-                    <!-- [T-32] Screen Wake Lock Toggle (Kunci Layar Selalu Menyala) — HANYA DI MENU KASIR POS -->
+                    <!-- [T-32] Screen Wake Lock Toggle (Hidden on mobile) -->
                     @if(request()->routeIs('pos*'))
-                        <div x-data="screenWakeLock()" x-init="init()" x-show="isSupported" class="flex-shrink-0" x-cloak>
+                        <div x-data="screenWakeLock()" x-init="init()" x-show="isSupported" class="hidden sm:block flex-shrink-0" x-cloak>
                             <button
                                 type="button"
                                 @click="toggle()"

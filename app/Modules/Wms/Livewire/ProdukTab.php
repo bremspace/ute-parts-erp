@@ -2283,6 +2283,14 @@ class ProdukTab extends Component
                 break;
             case 'kategori':
                 $parentId = $this->quickAddForm['parent_id'] ? (int) $this->quickAddForm['parent_id'] : null;
+                if ($parentId) {
+                    $pKat = KategoriProduk::find($parentId);
+                    if ($pKat && $pKat->depth >= 2) {
+                        $this->dispatch('alert', ['type' => 'error', 'message' => 'Hirarki kategori maksimal 3 tahap.']);
+
+                        return;
+                    }
+                }
                 $existingKat = KategoriProduk::whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($nama)])
                     ->where(function ($q) use ($parentId) {
                         if ($parentId === null) {

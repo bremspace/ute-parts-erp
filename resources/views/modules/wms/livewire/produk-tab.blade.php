@@ -7,7 +7,7 @@
         'rusak' => ['bg' => 'bg-rose-500/15', 'border' => 'border-rose-500/30', 'text' => 'text-rose-400', 'dot' => 'bg-rose-400', 'desc' => 'Rusak / Bahan Kanibal Part Teknisi'],
     ];
 
-    // Opsi Kategori untuk searchable-select (hirarki natural berurutan tanpa optgroup ganda)
+    // Opsi Kategori untuk searchable-select (hirarki natural 3 tingkat)
     $kategoriFilterOptions = [];
     foreach ($kategoriTree as $parent) {
         $kategoriFilterOptions[] = [
@@ -25,6 +25,15 @@
                 'level' => 1,
                 'is_child' => true,
             ];
+            foreach ($child->children as $grandchild) {
+                $kategoriFilterOptions[] = [
+                    'value' => (string) $grandchild->id,
+                    'label' => $grandchild->nama,
+                    'display_label' => $parent->nama . ' → ' . $child->nama . ' → ' . $grandchild->nama,
+                    'level' => 2,
+                    'is_child' => true,
+                ];
+            }
         }
     }
 
@@ -661,7 +670,10 @@
                                                     @foreach($kategoriTree as $kat)
                                                         <option value="{{ $kat->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white font-bold">{{ $kat->nama }}</option>
                                                         @foreach($kat->children as $child)
-                                                            <option value="{{ $child->id }}" class="bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300">└ {{ $child->nama }}</option>
+                                                            <option value="{{ $child->id }}" class="bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
+                                                            @foreach($child->children as $grandchild)
+                                                                <option value="{{ $grandchild->id }}" class="bg-white dark:bg-ink-900 text-ink-600 dark:text-ink-400">&nbsp;&nbsp;&nbsp;&nbsp;↳↳ {{ $grandchild->nama }}</option>
+                                                            @endforeach
                                                         @endforeach
                                                     @endforeach
                                                 </select>
@@ -2408,6 +2420,9 @@
                                     <option value="{{ $parent->id }}" class="bg-ink-900 font-bold text-white">{{ $parent->nama }}</option>
                                     @foreach($parent->children as $child)
                                         <option value="{{ $child->id }}" class="bg-ink-900 text-ink-300">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
+                                        @foreach($child->children as $grandchild)
+                                            <option value="{{ $grandchild->id }}" class="bg-ink-900 text-ink-400">&nbsp;&nbsp;&nbsp;&nbsp;↳↳ {{ $grandchild->nama }}</option>
+                                        @endforeach
                                     @endforeach
                                 @endforeach
                             </select>
@@ -3496,6 +3511,9 @@
                                     <option value="{{ $parent->id }}" class="bg-ink-900 font-bold text-white">{{ $parent->nama }}</option>
                                     @foreach($parent->children as $child)
                                         <option value="{{ $child->id }}" class="bg-ink-900 text-ink-300">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
+                                        @foreach($child->children as $grandchild)
+                                            <option value="{{ $grandchild->id }}" class="bg-ink-900 text-ink-400">&nbsp;&nbsp;&nbsp;&nbsp;↳↳ {{ $grandchild->nama }}</option>
+                                        @endforeach
                                     @endforeach
                                 @endforeach
                             </select>
@@ -4512,10 +4530,13 @@
                             <select wire:model="quickAddForm.parent_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Jadikan Kategori Utama —</option>
                                 @foreach($kategoriTree as $p)
-                                    <option value="{{ $p->id }}" class="bg-ink-900 font-semibold text-white">{{ $p->nama }}</option>
+                                    <option value="{{ $p->id }}" class="bg-ink-900 font-semibold text-white">📁 {{ $p->nama }}</option>
+                                    @foreach($p->children as $c)
+                                        <option value="{{ $c->id }}" class="bg-ink-900 text-ink-300">&nbsp;&nbsp;↳ {{ $c->nama }} (Sub dari {{ $p->nama }})</option>
+                                    @endforeach
                                 @endforeach
                             </select>
-                            <p class="text-[9px] text-ink-500 mt-1">Pilih jika ingin membuat sub-kategori berjenjang</p>
+                            <p class="text-[9px] text-ink-500 mt-1">Pilih kategori induk jika ingin membuat sub-kategori atau sub-subkategori (maks 3 tahap).</p>
                         </div>
                     @endif
 
@@ -4670,6 +4691,9 @@
                                     <option value="{{ $p->id }}" class="font-bold text-white">{{ $p->nama }}</option>
                                     @foreach($p->children as $c)
                                         <option value="{{ $c->id }}" class="text-ink-300">&nbsp;&nbsp;↳ {{ $c->nama }}</option>
+                                        @foreach($c->children as $g)
+                                            <option value="{{ $g->id }}" class="text-ink-400">&nbsp;&nbsp;&nbsp;&nbsp;↳↳ {{ $g->nama }}</option>
+                                        @endforeach
                                     @endforeach
                                 @endforeach
                             </select>

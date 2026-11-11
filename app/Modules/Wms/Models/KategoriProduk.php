@@ -123,15 +123,30 @@ class KategoriProduk extends Model
     }
 
     /**
-     * Ambil nama lengkap berjenjang (e.g. "Sparepart HP > LCD & Touchscreen").
+     * Ambil nama lengkap berjenjang (e.g. "Aksesoris > Tempered Glass > Anti Spy").
      */
     public function getNamaLengkapAttribute(): string
     {
         if ($this->parent) {
-            return "{$this->parent->nama} > {$this->nama}";
+            return "{$this->parent->nama_lengkap} > {$this->nama}";
         }
 
         return $this->nama;
+    }
+
+    /**
+     * Hitung kedalaman hirarki kategori (0 = Utama/Root, 1 = Sub, 2 = Sub-sub).
+     */
+    public function getDepthAttribute(): int
+    {
+        $depth = 0;
+        $curr = $this;
+        while ($curr->parent && $depth < 10) {
+            $depth++;
+            $curr = $curr->parent;
+        }
+
+        return $depth;
     }
 
     /**
@@ -154,7 +169,7 @@ class KategoriProduk extends Model
     }
 
     /**
-     * Dapatkan pohon kategori (tree) lengkap dengan penanganan kategori yatim/flat.
+     * Dapatkan pohon kategori (tree) lengkap secara rekursif hingga multi-tahap (3 tahap/N-tahap).
      */
     public static function getTree(): Collection
     {
@@ -165,19 +180,36 @@ class KategoriProduk extends Model
             ->get();
 
         $byParent = $all->groupBy(fn ($k) => (int) ($k->parent_id ?? 0));
-        $roots = $byParent->get(0, collect());
 
-        foreach ($roots as $root) {
-            $root->setRelation('children', $byParent->get($root->id, collect()));
-        }
+        $buildSubtree = function ($parentId) use (&$buildSubtree, $byParent) {
+            $items = $byParent->get((int) $parentId, collect());
+            foreach ($items as $item) {
+                $item->setRelation('children', $buildSubtree($item->id));
+            }
 
-        // Tangani kategori yatim (orphaned categories)
-        $rootIds = $roots->pluck('id')->all();
-        $handledIds = array_merge($rootIds, $roots->flatMap(fn ($r) => $r->children->pluck('id'))->all());
+            return $items;
+        };
+
+        $roots = $buildSubtree(0);
+
+        // Kumpulkan semua id yang sudah terkelompokkan dalam pohon
+        $collectIds = function ($collection) use (&$collectIds) {
+            $ids = [];
+            foreach ($collection as $item) {
+                $ids[] = $item->id;
+                if ($item->relationLoaded('children') && $item->children->isNotEmpty()) {
+                    $ids = array_merge($ids, $collectIds($item->children));
+                }
+            }
+
+            return $ids;
+        };
+
+        $handledIds = $collectIds($roots);
         $orphans = $all->whereNotIn('id', $handledIds);
 
         foreach ($orphans as $orphan) {
-            $orphan->setRelation('children', collect());
+            $orphan->setRelation('children', $buildSubtree($orphan->id));
             $roots->push($orphan);
         }
 

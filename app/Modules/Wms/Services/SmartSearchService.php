@@ -647,26 +647,32 @@ class SmartSearchService
                 return $count;
             };
 
-            $roots = $grouped->get(0, collect());
-
-            foreach ($roots as $r) {
-                $childrenCollection = $grouped->get($r->id, collect())->map(function ($c) use ($calcSubtreeCount) {
+            $buildBranch = function ($catId) use (&$buildBranch, $grouped, $calcSubtreeCount, $isStrictFilterActive): array {
+                $children = $grouped->get($catId, collect());
+                $branch = [];
+                foreach ($children as $c) {
+                    $cChildren = $buildBranch($c->id);
                     $count = $calcSubtreeCount($c->id);
-
-                    return [
-                        'id' => (string) $c->id,
-                        'nama' => (string) $c->nama,
-                        'slug' => (string) $c->slug,
-                        'count' => $count,
-                    ];
-                });
-
-                if ($isStrictFilterActive) {
-                    $childrenCollection = $childrenCollection->filter(fn ($c) => $c['count'] > 0);
+                    if ($count > 0 || ! $isStrictFilterActive) {
+                        $branch[] = [
+                            'id' => (string) $c->id,
+                            'nama' => (string) $c->nama,
+                            'slug' => (string) $c->slug,
+                            'count' => $count,
+                            'children' => $cChildren,
+                        ];
+                    }
                 }
 
-                $children = $childrenCollection->values()->all();
+                return $branch;
+            };
+
+            $roots = $grouped->get(0, collect());
+            $allCategoryIds = $allCategories->pluck('id')->all();
+
+            foreach ($roots as $r) {
                 $totalCount = $calcSubtreeCount($r->id);
+                $children = $buildBranch($r->id);
 
                 if ($totalCount > 0 || ! $isStrictFilterActive) {
                     $categoriesResult[] = [
@@ -679,12 +685,11 @@ class SmartSearchService
                 }
             }
 
-            // Sertakan juga kategori yatim/flat jika ada
-            $handledRootIds = $roots->pluck('id')->all();
-            $orphans = $allCategories->filter(function ($c) use ($handledRootIds) {
+            // Sertakan juga kategori yatim jika parent_id tidak ada di database
+            $orphans = $allCategories->filter(function ($c) use ($allCategoryIds) {
                 $pId = (int) ($c->parent_id ?? 0);
 
-                return $pId !== 0 && ! in_array($pId, $handledRootIds, true);
+                return $pId !== 0 && ! in_array($pId, $allCategoryIds, true);
             });
             foreach ($orphans as $orphan) {
                 $cnt = $catCounts[$orphan->id] ?? 0;
@@ -694,7 +699,7 @@ class SmartSearchService
                         'nama' => (string) $orphan->nama,
                         'slug' => (string) $orphan->slug,
                         'count' => $cnt,
-                        'children' => [],
+                        'children' => $buildBranch($orphan->id),
                     ];
                 }
             }

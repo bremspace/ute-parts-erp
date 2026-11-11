@@ -2494,10 +2494,14 @@
                                     </label>
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center justify-between gap-2">
-                                            <div class="flex items-center gap-1.5 truncate">
-                                                @if($k->parent_id)
-                                                    <span class="text-ink-500 text-xs">↳</span>
-                                                    <span class="font-bold text-white text-xs truncate">{{ $k->nama }}</span>
+                                            @php $kDepth = $k->tree_depth ?? $k->depth ?? 0; @endphp
+                                            <div class="flex items-center gap-1.5 truncate {{ $kDepth >= 2 ? 'pl-4' : ($kDepth === 1 ? 'pl-2' : '') }}">
+                                                @if($kDepth >= 2)
+                                                    <span class="text-ink-500 text-xs font-mono select-none">↳↳</span>
+                                                    <span class="font-medium text-ink-200 text-xs truncate">{{ $k->nama }}</span>
+                                                @elseif($kDepth === 1)
+                                                    <span class="text-ink-400 text-xs select-none">↳</span>
+                                                    <span class="font-semibold text-white text-xs truncate">{{ $k->nama }}</span>
                                                 @else
                                                     <span class="text-sm">{{ $k->icon ?? '📁' }}</span>
                                                     <span class="font-bold text-white text-xs truncate">{{ $k->nama }}</span>
@@ -2511,8 +2515,10 @@
                                         <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                                             @if($k->is_default || $k->slug === 'umum')
                                                 <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-[10px] text-emerald-400 font-semibold border border-emerald-500/20">Default</span>
-                                            @elseif($k->parent)
-                                                <span class="px-2 py-0.5 rounded bg-white/5 text-[10px] text-ink-300">Sub dari {{ $k->parent->nama }}</span>
+                                            @elseif($kDepth >= 2)
+                                                <span class="px-2 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-400 border border-purple-500/20 font-medium">Sub-sub dari {{ $k->parent?->nama }}</span>
+                                            @elseif($kDepth === 1)
+                                                <span class="px-2 py-0.5 rounded bg-white/5 text-[10px] text-ink-300">Sub dari {{ $k->parent?->nama }}</span>
                                             @else
                                                 <span class="px-2 py-0.5 rounded bg-up-primary/15 text-[10px] text-up-primary font-semibold">Kategori Utama</span>
                                             @endif
@@ -2587,9 +2593,15 @@
                                             </td>
                                             <td class="py-2.5 px-3 font-mono text-ink-400">{{ $k->urutan }}</td>
                                             <td class="py-2.5 px-3">
-                                                @if($k->parent_id)
+                                                @php $kDepth = $k->tree_depth ?? $k->depth ?? 0; @endphp
+                                                @if($kDepth >= 2)
+                                                    <div class="flex items-center gap-1.5 pl-10">
+                                                        <span class="text-ink-500 font-mono text-xs select-none">↳↳</span>
+                                                        <span class="font-normal text-ink-200">{{ $k->nama }}</span>
+                                                    </div>
+                                                @elseif($kDepth === 1)
                                                     <div class="flex items-center gap-1.5 pl-5">
-                                                        <span class="text-ink-500">↳</span>
+                                                        <span class="text-ink-400 select-none">↳</span>
                                                         <span class="font-medium text-white">{{ $k->nama }}</span>
                                                     </div>
                                                 @else
@@ -2601,8 +2613,10 @@
                                             </td>
                                             <td class="py-2.5 px-3 font-mono text-[11px] text-ink-400">{{ $k->slug }}</td>
                                             <td class="py-2.5 px-3">
-                                                @if($k->parent)
-                                                    <span class="px-2 py-0.5 rounded bg-white/5 text-[10px] text-ink-300">Sub dari {{ $k->parent->nama }}</span>
+                                                @if($kDepth >= 2)
+                                                    <span class="px-2 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-400 border border-purple-500/20 font-medium">Sub-sub dari {{ $k->parent?->nama }}</span>
+                                                @elseif($kDepth === 1)
+                                                    <span class="px-2 py-0.5 rounded bg-white/5 text-[10px] text-ink-300">Sub dari {{ $k->parent?->nama }}</span>
                                                 @else
                                                     <span class="px-2 py-0.5 rounded bg-up-primary/15 text-[10px] text-up-primary font-semibold">Kategori Utama</span>
                                                 @endif
@@ -5069,11 +5083,18 @@
                             <option value="" class="bg-ink-900">— Jadikan Kategori Utama (Tanpa Induk) —</option>
                             @foreach($kategoriParentOptions as $p)
                                 @if(!$kategoriForm['id'] || $p->id != $kategoriForm['id'])
-                                    <option value="{{ $p->id }}" class="bg-ink-900 font-bold text-white">{{ $p->nama }}</option>
+                                    @php $pDepth = $p->tree_depth ?? $p->depth ?? 0; @endphp
+                                    <option value="{{ $p->id }}" class="bg-ink-900 {{ $pDepth === 0 ? 'font-bold text-white' : 'text-ink-200' }}">
+                                        @if($pDepth === 1)
+                                            &nbsp;&nbsp;↳ {{ $p->nama }} (Sub dari {{ $p->parent?->nama }})
+                                        @else
+                                            📁 {{ $p->nama }}
+                                        @endif
+                                    </option>
                                 @endif
                             @endforeach
                         </select>
-                        <p class="text-[10px] text-ink-500 mt-1">Pilih kategori induk jika ingin membuat sub-kategori berjenjang.</p>
+                        <p class="text-[10px] text-ink-500 mt-1">Pilih kategori induk untuk membuat Sub Kategori atau Sub-sub Kategori (maksimal 3 tahap).</p>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
