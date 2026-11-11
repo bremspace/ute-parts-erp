@@ -582,7 +582,13 @@
                                                         </select>
                                                     </div>
                                                 @else
-                                                    <!-- Jika Item Tukar Produk: Panel Picker 3 Prioritas -->
+                                                    <!-- Jika Item Tukar Produk: Panel Picker Prioritas & 1-Klik -->
+                                                    @php
+                                                        $rekom = $this->getRekomendasiTukar($itemId);
+                                                        $pSama = $rekom['produk_sama'] ?? null;
+                                                        $stokSama = (int) ($pSama?->stok_tersedia_val ?? 0);
+                                                        $hasTukarItems = ! empty($itemInputs[$itemId]['tukar_items']);
+                                                    @endphp
                                                     <div class="p-3 rounded-2xl bg-up-primary/5 border border-up-primary/20 space-y-3">
                                                         <div class="flex items-center justify-between flex-wrap gap-2">
                                                             <div>
@@ -597,9 +603,44 @@
                                                                 wire:click="bukaPilihTukar({{ $itemId }})"
                                                                 class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[11px] cursor-pointer transition active:scale-95"
                                                             >
-                                                                {{ $activeTukarItemId === $itemId ? '✕ Tutup Pencarian' : '🔍 Pilih Produk Pengganti' }}
+                                                                {{ $activeTukarItemId === $itemId ? '✕ Tutup Pencarian' : '🔍 Cari / Ganti Produk Pengganti' }}
                                                             </button>
                                                         </div>
+
+                                                        <!-- Opsi 1-Klik Unit yang Sama ATAU Alert Jika Stok Unit Sama Habis -->
+                                                        @if($stokSama > 0)
+                                                            @if(! $hasTukarItems)
+                                                                <div class="p-2.5 rounded-xl bg-up-primary/10 border border-up-primary/25 flex items-center justify-between gap-3">
+                                                                    <div class="min-w-0 flex-1">
+                                                                        <div class="text-[10px] font-bold text-up-primary flex items-center gap-1.5 uppercase tracking-wider">
+                                                                            <span>✨ Opsi Unit Sama (1-Klik)</span>
+                                                                            <span class="px-1.5 py-0.2 rounded-full bg-up-primary/20 text-up-primary font-bold">Stok: {{ $stokSama }}</span>
+                                                                        </div>
+                                                                        <div class="font-bold text-white text-xs truncate">{{ $item['produk_nama'] }}</div>
+                                                                        <div class="text-[10px] text-ink-300">
+                                                                            Rp {{ number_format($item['harga_final'], 0, ',', '.') }} · Pengganti langsung unit yang sama
+                                                                        </div>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        wire:click="pilihUnitSama({{ $itemId }})"
+                                                                        class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer shadow-sm active:scale-95 transition whitespace-nowrap"
+                                                                    >
+                                                                        ⚡ Tukar Unit Sama
+                                                                    </button>
+                                                                </div>
+                                                            @endif
+                                                        @else
+                                                            <div class="p-2.5 rounded-xl bg-up-amber/10 border border-up-amber/30 space-y-1">
+                                                                <div class="flex items-center gap-1.5 text-up-amber font-bold text-xs">
+                                                                    <span>⚠️</span>
+                                                                    <span>Stok Unit Sama KOSONG (0 unit)</span>
+                                                                </div>
+                                                                <p class="text-[11px] text-ink-300">
+                                                                    Stok unit <strong class="text-white">{{ $item['produk_nama'] }}</strong> habis di toko ini. Rekomendasi produk sejenis di bawah telah diprioritaskan di daftar teratas.
+                                                                </p>
+                                                            </div>
+                                                        @endif
 
                                                         @error("itemInputs.{$itemId}.tukar_items")
                                                             <div class="p-2.5 rounded-xl bg-up-red/10 border border-up-red/30 text-up-red text-[11px] font-bold flex items-center gap-1.5">
@@ -615,7 +656,12 @@
                                                                     @foreach($itemInputs[$itemId]['tukar_items'] as $tIdx => $tIt)
                                                                         <div class="p-2.5 bg-white/5 flex items-center justify-between gap-2 text-xs">
                                                                             <div class="min-w-0 flex-1">
-                                                                                <div class="font-bold text-white truncate">{{ $tIt['nama'] }}</div>
+                                                                                <div class="font-bold text-white truncate flex items-center gap-1.5">
+                                                                                    <span>{{ $tIt['nama'] }}</span>
+                                                                                    @if(!empty($tIt['is_unit_sama']) || (int)($tIt['produk_id'] ?? 0) === (int)($item['produk_id'] ?? 0))
+                                                                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">Unit Sama</span>
+                                                                                    @endif
+                                                                                </div>
                                                                                 <div class="text-[10px] text-ink-400">
                                                                                     Rp {{ number_format($tIt['harga_satuan'], 0, ',', '.') }} · Stok: {{ $tIt['stok_tersedia'] }}
                                                                                 </div>
@@ -641,20 +687,29 @@
                                                             </div>
                                                         @endif
 
-                                                        <!-- Drawer Rekomendasi Terurut 3 Prioritas -->
+                                                        <!-- Drawer Rekomendasi Terurut (Unit Sama -> Produk Sejenis Kategori/Nama -> Manual) -->
                                                         @if($activeTukarItemId === $itemId)
-                                                            @php $rekomendasi = $this->getRekomendasiTukar($itemId); @endphp
                                                             <div class="p-3 rounded-2xl bg-ink-900 border border-white/15 space-y-3">
+                                                                <!-- Pencarian Manual -->
                                                                 <div class="flex items-center gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        wire:model.live.debounce.300ms="itemInputs.{{ $itemId }}.tukar_search"
-                                                                        placeholder="Cari nama produk atau scan barcode..."
-                                                                        class="flex-1 px-3 py-2 rounded-xl glass-input text-xs text-white"
-                                                                    />
+                                                                    <div class="relative flex-1">
+                                                                        <input
+                                                                            type="text"
+                                                                            wire:model.live.debounce.300ms="itemInputs.{{ $itemId }}.tukar_search"
+                                                                            placeholder="Pencarian manual nama produk atau scan barcode..."
+                                                                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder-ink-400"
+                                                                        />
+                                                                    </div>
+                                                                    @if(!empty($itemInputs[$itemId]['tukar_search']))
+                                                                        <button
+                                                                            type="button"
+                                                                            wire:click="$set('itemInputs.{{ $itemId }}.tukar_search', '')"
+                                                                            class="px-2.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-ink-300 cursor-pointer"
+                                                                        >Reset</button>
+                                                                    @endif
                                                                 </div>
 
-                                                                <!-- Prioritas 1: Produk Sama Persis -->
+                                                                <!-- Prioritas 1: Produk Sama Persis (Jika Ada Stok) -->
                                                                 @if($rekomendasi['prioritas_1']->isNotEmpty())
                                                                     <div class="space-y-1">
                                                                         <span class="text-[10px] font-bold text-up-mint uppercase tracking-wider flex items-center gap-1">
@@ -688,18 +743,23 @@
                                                                     </div>
                                                                 @endif
 
-                                                                <!-- Prioritas 2: Kategori Sejenis / Kompatibel -->
+                                                                <!-- Prioritas 2: Produk Sejenis (Kategori/Subkategori & Kecocokan Nama) di Paling Atas -->
                                                                 @if($rekomendasi['prioritas_2']->isNotEmpty())
                                                                     <div class="space-y-1">
                                                                         <span class="text-[10px] font-bold text-up-primary uppercase tracking-wider flex items-center gap-1">
-                                                                            <span>🔧 Prioritas 2: Kategori Sejenis / Kompatibel</span>
+                                                                            <span>✨ Rekomendasi Produk Sejenis (Kategori & Kecocokan Nama)</span>
                                                                         </span>
-                                                                        <div class="divide-y divide-white/5 rounded-xl border border-white/10 overflow-hidden">
+                                                                        <div class="divide-y divide-white/5 rounded-xl border border-white/10 overflow-hidden max-h-56 overflow-y-auto">
                                                                             @foreach($rekomendasi['prioritas_2'] as $p)
                                                                                 <div class="p-2.5 bg-white/[0.02] flex items-center justify-between gap-2 {{ $p->is_lebih_murah ? 'opacity-50' : '' }}">
                                                                                     <div class="min-w-0 flex-1">
                                                                                         <div class="font-bold text-white text-xs">{{ $p->nama }}</div>
-                                                                                        <div class="text-[10px] text-ink-400">
+                                                                                        <div class="flex items-center flex-wrap gap-1.5 mt-0.5">
+                                                                                            <span class="text-[9px] font-semibold text-up-primary bg-up-primary/15 px-1.5 py-0.2 rounded border border-up-primary/20">
+                                                                                                {{ $p->alasan_cocok }}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <div class="text-[10px] text-ink-400 mt-0.5">
                                                                                             Stok: <strong class="{{ $p->stok_tersedia_val > 0 ? 'text-up-mint' : 'text-up-red' }}">{{ $p->stok_tersedia_val }}</strong> · Rp {{ number_format($p->harga_jual_val, 0, ',', '.') }}
                                                                                             @if($p->selisih_nominal > 0)
                                                                                                 <span class="text-up-amber font-semibold">(+Rp {{ number_format($p->selisih_nominal, 0, ',', '.') }})</span>
@@ -725,11 +785,11 @@
                                                                     </div>
                                                                 @endif
 
-                                                                <!-- Prioritas 3: Global / Lainnya -->
+                                                                <!-- Prioritas 3: Pencarian Manual / Global Lainnya -->
                                                                 @if($rekomendasi['prioritas_3']->isNotEmpty())
                                                                     <div class="space-y-1">
                                                                         <span class="text-[10px] font-bold text-ink-300 uppercase tracking-wider flex items-center gap-1">
-                                                                            <span>🌐 Prioritas 3: Global (Harga Setara / Lebih Tinggi)</span>
+                                                                            <span>🌐 Hasil Pencarian Manual Lainnya</span>
                                                                         </span>
                                                                         <div class="divide-y divide-white/5 rounded-xl border border-white/10 overflow-hidden max-h-48 overflow-y-auto">
                                                                             @foreach($rekomendasi['prioritas_3'] as $p)

@@ -133,6 +133,9 @@ class ReturPenjualanIndex extends Component
     {
         foreach ($this->itemInputs as $k => $item) {
             $this->itemInputs[$k]['tipe_penyelesaian'] = $val;
+            if ($val === 'tukar_produk' && (float) ($this->itemInputs[$k]['jumlah'] ?? 0) > 0) {
+                $this->persiapkanTukarProduk($k);
+            }
         }
     }
 
@@ -348,8 +351,101 @@ class ReturPenjualanIndex extends Component
                 } else {
                     $this->resetErrorBag("itemInputs.{$itemId}.jumlah");
                 }
+
+                // Jika tipe tukar_produk dan jumlah > 0, siapkan tukar produk atau sinkronkan Qty tukar unit sama
+                if (($this->itemInputs[$itemId]['tipe_penyelesaian'] ?? '') === 'tukar_produk' && (float) $this->itemInputs[$itemId]['jumlah'] > 0) {
+                    if (empty($this->itemInputs[$itemId]['tukar_items'])) {
+                        $this->persiapkanTukarProduk($itemId);
+                    } else {
+                        foreach ($this->itemInputs[$itemId]['tukar_items'] as $idx => $tItem) {
+                            if (! empty($tItem['is_unit_sama']) || (int) ($tItem['produk_id'] ?? 0) === (int) ($itemInfo['produk_id'] ?? 0)) {
+                                $newQty = min((int) $this->itemInputs[$itemId]['jumlah'], (int) ($tItem['stok_tersedia'] ?? 1));
+                                $newQty = max(1, $newQty);
+                                $this->itemInputs[$itemId]['tukar_items'][$idx]['jumlah'] = $newQty;
+                                $this->itemInputs[$itemId]['tukar_items'][$idx]['subtotal'] = $newQty * (float) $tItem['harga_satuan'];
+                            }
+                        }
+                    }
+                }
             }
         }
+
+        if (str_ends_with($key, '.tipe_penyelesaian')) {
+            $parts = explode('.', $key);
+            $itemId = (int) $parts[0];
+            if ($value === 'tukar_produk' && (float) ($this->itemInputs[$itemId]['jumlah'] ?? 0) > 0) {
+                $this->persiapkanTukarProduk($itemId);
+            }
+        }
+    }
+
+    /**
+     * Persiapkan produk pengganti: jika stok unit sama tersedia, otomatis masukkan ke list tukar
+     * Jika stok unit sama kosong (0), buka panel pencarian dengan produk sejenis di paling atas.
+     */
+    public function persiapkanTukarProduk(int $itemId, bool $force = false): void
+    {
+        $target = $this->transaksiItemData[$itemId] ?? null;
+        if (! $target) {
+            return;
+        }
+
+        $cabangId = session('cabang_id') ?: ($this->selectedTransaksi?->cabang_id ?: 1);
+        $gudangId = $this->selectedTransaksi?->gudang_id;
+        if (! $gudangId || ! Gudang::where('id', $gudangId)->exists()) {
+            $gudangId = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
+                ?? Gudang::where('cabang_id', $cabangId)->value('id')
+                ?? Gudang::value('id');
+        }
+
+        $targetProdukId = (int) $target['produk_id'];
+        $stokUnitSama = (int) StokItem::where('produk_id', $targetProdukId)
+            ->when($gudangId, fn ($q) => $q->where('gudang_id', $gudangId))
+            ->value('jumlah');
+
+        $currentTukarItems = $this->itemInputs[$itemId]['tukar_items'] ?? [];
+
+        if ($stokUnitSama > 0) {
+            if (empty($currentTukarItems) || $force) {
+                $produk = Produk::find($targetProdukId);
+                if ($produk) {
+                    $hargaPengganti = (float) ($produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
+                    $qtyRetur = max(1, (int) ($this->itemInputs[$itemId]['jumlah'] ?? 1));
+                    $qtyTukar = min($qtyRetur, $stokUnitSama);
+
+                    $this->itemInputs[$itemId]['tukar_items'] = [
+                        [
+                            'produk_id' => $produk->id,
+                            'nama' => $produk->nama,
+                            'stok_tersedia' => $stokUnitSama,
+                            'harga_satuan' => $hargaPengganti,
+                            'jumlah' => $qtyTukar,
+                            'subtotal' => $hargaPengganti * $qtyTukar,
+                            'is_unit_sama' => true,
+                        ],
+                    ];
+                    $this->dispatch('alert', [
+                        'type' => 'success',
+                        'message' => "Unit yang sama [{$produk->nama}] otomatis dipilih sebagai pengganti (Stok: {$stokUnitSama}).",
+                    ]);
+                }
+            }
+        } else {
+            // Stok unit sama habis, otomatis buka panel rekomendasi produk sejenis
+            $this->activeTukarItemId = $itemId;
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Stok untuk unit yang sama [{$target['produk_nama']}] KOSONG di toko ini. Rekomendasi produk sejenis ditampilkan di paling atas.",
+            ]);
+        }
+    }
+
+    /**
+     * Opsi 1-klik untuk memilih produk pengganti unit yang sama
+     */
+    public function pilihUnitSama(int $itemId): void
+    {
+        $this->persiapkanTukarProduk($itemId, true);
     }
 
     public function hapusFotoBukti(int $itemId, int $idx): void
@@ -376,7 +472,13 @@ class ReturPenjualanIndex extends Component
     {
         $target = $this->transaksiItemData[$itemId] ?? null;
         if (! $target) {
-            return ['prioritas_1' => collect(), 'prioritas_2' => collect(), 'prioritas_3' => collect()];
+            return [
+                'prioritas_1' => collect(),
+                'prioritas_2' => collect(),
+                'prioritas_3' => collect(),
+                'produk_sama' => null,
+                'is_stok_sama_kosong' => true,
+            ];
         }
 
         $hargaKonsumen = (float) $target['harga_final'];
@@ -385,6 +487,7 @@ class ReturPenjualanIndex extends Component
         $targetKategoriString = $target['kategori'] ? trim(strtolower($target['kategori'])) : null;
         $targetBrand = $target['brand_kompatibel'] ? trim(strtolower($target['brand_kompatibel'])) : null;
         $targetModel = $target['model_kompatibel'] ? trim(strtolower($target['model_kompatibel'])) : null;
+        $targetNama = strtolower(trim($target['produk_nama'] ?? ''));
 
         $cabangId = session('cabang_id') ?: ($this->selectedTransaksi?->cabang_id ?: 1);
         $gudangId = $this->selectedTransaksi?->gudang_id;
@@ -396,9 +499,69 @@ class ReturPenjualanIndex extends Component
 
         $term = trim($this->itemInputs[$itemId]['tukar_search'] ?? '');
 
+        // 1. Ambil produk yang sama persis secara definitif
+        $pSama = Produk::with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId))])
+            ->find($targetProdukId);
+
+        $p1 = collect();
+        $isStokSamaKosong = true;
+        if ($pSama) {
+            $hargaJual = (float) ($pSama->harga_jual_retail ?? $pSama->harga_jual ?? 0);
+            $stokTersedia = (int) ($pSama->stokItems->first()?->jumlah ?? 0);
+            $isLebihMurah = $hargaJual < ($hargaKonsumen - 0.01);
+            $selisih = round($hargaJual - $hargaKonsumen, 2);
+
+            $pSama->stok_tersedia_val = $stokTersedia;
+            $pSama->harga_jual_val = $hargaJual;
+            $pSama->is_lebih_murah = $isLebihMurah;
+            $pSama->selisih_nominal = $selisih;
+            $pSama->bisa_dipilih = ! $isLebihMurah && $stokTersedia > 0;
+
+            if ($stokTersedia > 0) {
+                $isStokSamaKosong = false;
+            }
+
+            // Jika tidak ada filter term atau term cocok dengan nama/barcode
+            if (empty($term) || str_contains(strtolower($pSama->nama), strtolower($term)) || str_contains((string) $pSama->barcode, $term)) {
+                $p1->push($pSama);
+            }
+        }
+
+        // 2. Kumpulkan ID Kategori Sejenis (hierarki: kategori sama, subkategori turunan, sibling)
+        $kategoriIdsSejenis = [];
+        if ($targetKategoriId) {
+            $kategoriIdsSejenis[] = $targetKategoriId;
+            $katModel = \App\Modules\Wms\Models\KategoriProduk::with('parent.children')->find($targetKategoriId);
+            if ($katModel) {
+                $kategoriIdsSejenis = array_merge($kategoriIdsSejenis, $katModel->semuaKeturunanIds());
+                if ($katModel->parent_id && $katModel->parent) {
+                    $siblingIds = $katModel->parent->children->pluck('id')->all();
+                    $kategoriIdsSejenis = array_merge($kategoriIdsSejenis, $siblingIds);
+                }
+            }
+        }
+        $kategoriIdsSejenis = array_values(array_unique(array_filter($kategoriIdsSejenis)));
+
+        // 3. Tokenisasi kata kunci nama produk target
+        $cleanTargetNama = preg_replace('/[^a-zA-Z0-9\s]/', ' ', $targetNama);
+        $tokens = array_filter(
+            explode(' ', $cleanTargetNama),
+            fn ($w) => strlen($w) >= 3 && ! in_array($w, ['dan', 'atau', 'untuk', 'yang', 'dengan', 'dari', 'pro', 'max', 'plus', 'ori', 'original', 'tipe', 'type'])
+        );
+        $tokens = array_values(array_unique($tokens));
+
+        // 4. Query produk kandidat (stok > 0 diutamakan)
         $query = Produk::where('is_active', true)
+            ->where('id', '!=', $targetProdukId)
             ->with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId))]);
 
+        // Utamakan yang ada stok di gudang ini
+        $query->whereHas('stokItems', function ($q) use ($gudangId) {
+            $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId))
+                ->where('jumlah', '>', 0);
+        });
+
+        // Filter pencarian jika ada manual input
         if (mb_strlen($term) >= 2) {
             $query->where(function ($q) use ($term) {
                 $q->where('nama', 'like', "%{$term}%")
@@ -407,10 +570,9 @@ class ReturPenjualanIndex extends Component
             });
         }
 
-        $allProduks = $query->limit(30)->get();
+        $allProduks = $query->limit(60)->get();
 
-        $p1 = collect(); // Prioritas 1: Produk yang Sama Persis
-        $p2 = collect(); // Prioritas 2: Kategori Sejenis atau Kompatibilitas Sama
+        $p2 = collect(); // Prioritas 2: Produk Sejenis (Kategori/Sub & Kecocokan Nama)
         $p3 = collect(); // Prioritas 3: Global / Lainnya
 
         foreach ($allProduks as $p) {
@@ -425,24 +587,59 @@ class ReturPenjualanIndex extends Component
             $p->selisih_nominal = $selisih;
             $p->bisa_dipilih = ! $isLebihMurah && $stokTersedia > 0;
 
-            if ($p->id === $targetProdukId) {
-                $p1->push($p);
-            } elseif (
-                ($targetKategoriId && (int) $p->kategori_id === $targetKategoriId) ||
-                ($targetKategoriString && trim(strtolower($p->kategori ?? '')) === $targetKategoriString) ||
-                ($targetBrand && trim(strtolower($p->brand_kompatibel ?? '')) === $targetBrand) ||
-                ($targetModel && trim(strtolower($p->model_kompatibel ?? '')) === $targetModel)
-            ) {
+            // Hitung skor kecocokan sejenis
+            $score = 0;
+            $alasan = [];
+
+            if ($p->kategori_id && in_array((int) $p->kategori_id, $kategoriIdsSejenis, true)) {
+                $score += 50;
+                $alasan[] = 'Kategori Sejenis';
+            } elseif ($targetKategoriString && strtolower(trim($p->kategori ?? '')) === $targetKategoriString) {
+                $score += 40;
+                $alasan[] = 'Kategori Sama';
+            }
+
+            if ($targetModel && strtolower(trim($p->model_kompatibel ?? '')) === $targetModel) {
+                $score += 35;
+                $alasan[] = 'Model Kompatibel';
+            }
+            if ($targetBrand && strtolower(trim($p->brand_kompatibel ?? '')) === $targetBrand) {
+                $score += 15;
+                $alasan[] = 'Brand Sama';
+            }
+
+            $namaLower = strtolower($p->nama);
+            $matchedTokens = 0;
+            foreach ($tokens as $token) {
+                if (str_contains($namaLower, $token)) {
+                    $score += 12;
+                    $matchedTokens++;
+                }
+            }
+            if ($matchedTokens > 0) {
+                $alasan[] = 'Nama Cocok ('.$matchedTokens.' kata)';
+            }
+
+            $p->match_score = $score;
+            $p->alasan_cocok = implode(' · ', array_unique($alasan));
+
+            if ($score > 0) {
                 $p2->push($p);
             } else {
                 $p3->push($p);
             }
         }
 
+        // Urutkan prioritas sejenis berdasarkan skor tertinggi & bisa dipilih
+        $p2 = $p2->sortByDesc(fn ($item) => [$item->bisa_dipilih ? 1 : 0, $item->match_score, -$item->selisih_nominal])->values();
+        $p3 = $p3->sortByDesc(fn ($item) => [$item->bisa_dipilih ? 1 : 0, -$item->selisih_nominal])->values();
+
         return [
             'prioritas_1' => $p1,
             'prioritas_2' => $p2,
             'prioritas_3' => $p3,
+            'produk_sama' => $pSama,
+            'is_stok_sama_kosong' => $isStokSamaKosong,
         ];
     }
 
