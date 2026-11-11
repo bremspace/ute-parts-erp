@@ -74,8 +74,8 @@
                 </div>
 
                 <!-- Baris 2: Toolbar Filter & Kontrol Tampilan (Baris Baru) -->
-                <div class="flex flex-wrap items-center justify-between gap-2.5">
-                    <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5 flex-wrap">
+                <div class="flex flex-wrap items-center justify-between gap-2.5 relative z-20">
+                    <div class="flex items-center gap-2 py-0.5 flex-wrap">
                         <!-- Tombol Atur Filter Kustom -->
                         <button type="button"
                                 wire:click="$toggle('showCustomFilterSettings')"

@@ -71,6 +71,7 @@
 <div
     x-data="{
         open: false,
+        alignRight: false,
         search: '',
         options: @js($normalizedOptions),
         selected: $wire.entangle('{{ $model }}').live,
@@ -81,6 +82,8 @@
                 if (value) {
                     this.search = '';
                     this.$nextTick(() => {
+                        const rect = this.$el.getBoundingClientRect();
+                        this.alignRight = (window.innerWidth - rect.left < 260);
                         this.$refs.searchInput?.focus();
                         this.scrollToSelected();
                     });
@@ -137,6 +140,7 @@
         }
     }"
     class="relative w-full {{ $class }}"
+    :class="{ 'z-50': open, 'z-10': !open }"
     @click.outside="open = false"
     @keydown.escape.window="open = false"
 >
@@ -192,7 +196,8 @@
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
         x-transition:leave-end="opacity-0 scale-95 -translate-y-1"
-        class="absolute z-50 left-0 right-0 mt-1 min-w-[200px] max-w-[95vw] rounded-2xl bg-white/95 dark:bg-ink-950/95 backdrop-blur-md border border-ink-200 dark:border-white/10 shadow-2xl p-2 space-y-1.5 font-normal normal-case text-left"
+        class="absolute z-50 mt-1 min-w-[220px] w-full max-w-[92vw] sm:max-w-xs rounded-2xl bg-white/95 dark:bg-ink-950/95 backdrop-blur-md border border-ink-200 dark:border-white/10 shadow-2xl p-2 space-y-1.5 font-normal normal-case text-left"
+        :class="alignRight ? 'right-0' : 'left-0'"
         style="display: none;"
     >
         <!-- Search Input Header -->
