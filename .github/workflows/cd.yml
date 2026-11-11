@@ -1,0 +1,189 @@
+name: CD Pipeline (Zero-Downtime Deployment)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-cd-deployment
+  cancel-in-progress: true
+
+jobs:
+  build-assets:
+    name: Build Frontend Assets (Offload VPS)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Compile Production Assets
+        run: npm run build
+
+      - name: Verify Manifest & Package Assets
+        run: |
+          test -f public/build/manifest.json || (echo "Vite manifest missing!" && exit 1)
+          tar -czf build-assets.tar.gz -C public build
+
+      - name: Upload Asset Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-assets
+          path: build-assets.tar.gz
+          retention-days: 1
+
+  deploy-production:
+    name: Deploy to Bare-Metal VPS
+    needs: build-assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Asset Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: compiled-assets
+          path: .
+
+      - name: Transfer Pre-built Assets to VPS
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.VPS_USERNAME || secrets.SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY || secrets.SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || secrets.SSH_PORT || 22 }}
+          source: 'build-assets.tar.gz'
+          target: '/tmp'
+
+      - name: Execute Zero-Downtime Atomic Deployment over SSH
+        uses: appleboy/ssh-action@master
+        env:
+          HEALTH_CHECK_SECRET: ${{ secrets.HEALTH_CHECK_SECRET }}
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET || 'deploy-bypass-token' }}
+        with:
+          host: ${{ secrets.VPS_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.VPS_USERNAME || secrets.SSH_USER }}
+          key: ${{ secrets.VPS_SSH_KEY || secrets.SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || secrets.SSH_PORT || 22 }}
+          envs: HEALTH_CHECK_SECRET,DEPLOY_SECRET
+          script_stop: true
+          script: |
+            set -e
+            APP_DIR="/var/www/ute-parts-erp"
+            cd "$APP_DIR"
+
+            # 1. Capture Previous State for Automated Rollback
+            PREV_COMMIT=$(git rev-parse HEAD)
+            echo "Current deployment commit base: $PREV_COMMIT"
+
+            rollback() {
+              echo "::error::Deployment sequence failed! Initiating automated rollback to $PREV_COMMIT..."
+              cd "$APP_DIR"
+              php artisan down --render="errors::503" --secret="${DEPLOY_SECRET}" --retry=60 || true
+              git reset --hard "$PREV_COMMIT"
+              COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader || true
+              php artisan optimize:clear || true
+              php artisan config:cache || true
+              php artisan route:cache || true
+              php artisan view:cache || true
+              php artisan event:cache || true
+              chown -R www-data:www-data storage bootstrap/cache public/build || true
+              chmod -R 775 storage bootstrap/cache || true
+              supervisorctl restart uteparts-worker:* 2>/dev/null || php artisan queue:restart || true
+              systemctl reload php8.4-fpm 2>/dev/null || true
+              php artisan up || true
+              echo "::error::Rollback complete. Application restored to stable commit $PREV_COMMIT."
+              exit 1
+            }
+
+            trap 'rollback' ERR
+
+            # 2. Enter Maintenance Mode (prevents serving requests during schema migration)
+            echo "Activating maintenance lock..."
+            php artisan down --render="errors::503" --secret="${DEPLOY_SECRET}" --retry=60
+
+            # 3. Pull Latest Code from main branch
+            echo "Pulling latest changes from origin/main..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # 4. Extract Pre-built Frontend Assets (no VPS build CPU spike)
+            echo "Extracting pre-built frontend assets..."
+            if [ -f /tmp/build-assets.tar.gz ]; then
+              tar -xzf /tmp/build-assets.tar.gz -C "$APP_DIR/public"
+              rm -f /tmp/build-assets.tar.gz
+            else
+              echo "::warning::build-assets.tar.gz not found in /tmp; keeping current assets."
+            fi
+
+            # 5. Production Composer Optimization
+            echo "Installing production PHP dependencies..."
+            COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+
+            # 6. Safe Database Migrations
+            echo "Running database schema migrations..."
+            php artisan migrate --force
+
+            # 7. Optimize Caches
+            echo "Rebuilding and optimizing framework caches..."
+            php artisan optimize:clear
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            php artisan event:cache
+
+            # 8. Enforce File System Permissions
+            echo "Setting file permissions..."
+            chown -R www-data:www-data storage bootstrap/cache public/build
+            chmod -R 775 storage bootstrap/cache
+
+            # 9. Reload Queue Workers & Invalidate PHP OPCache
+            echo "Restarting supervisor queue workers and reloading PHP-FPM..."
+            supervisorctl restart uteparts-worker:* 2>/dev/null || php artisan queue:restart
+            systemctl reload php8.4-fpm 2>/dev/null || true
+
+            # 10. Deactivate Maintenance Mode
+            echo "Bringing application online..."
+            php artisan up
+
+            # 11. Live Infrastructure Health Check Probe
+            echo "Verifying runtime health via /api/health probe..."
+            HEALTH_URL="https://test.uteparts.id/api/health"
+            HEALTH_SECRET="${HEALTH_CHECK_SECRET:-$(grep '^HEALTH_CHECK_SECRET=' .env | cut -d '=' -f2-)}"
+            
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            HEALTHY=0
+
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              HTTP_STATUS=$(curl -s -o /tmp/health_response.json -w "%{http_code}" -H "X-Health-Check-Secret: ${HEALTH_SECRET}" "$HEALTH_URL" || echo "000")
+              if [ "$HTTP_STATUS" -eq 200 ]; then
+                echo "Health check probe PASSED with HTTP 200:"
+                cat /tmp/health_response.json
+                HEALTHY=1
+                break
+              else
+                echo "Health check attempt $((RETRY_COUNT+1))/$MAX_RETRIES returned HTTP $HTTP_STATUS. Retrying in 3s..."
+                sleep 3
+                RETRY_COUNT=$((RETRY_COUNT+1))
+              fi
+            done
+
+            if [ "$HEALTHY" -ne 1 ]; then
+              echo "::error::Health check failed after $MAX_RETRIES attempts! Triggering automated rollback..."
+              cat /tmp/health_response.json 2>/dev/null || true
+              rollback
+            fi
+
+            echo "Enterprise CI/CD Deployment Successfully Completed and Verified Healthy."

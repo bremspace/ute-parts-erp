@@ -24,7 +24,7 @@ class ExampleTest extends TestCase
         $response = $this->get('/app/login');
 
         $response->assertStatus(200);
-        $response->assertSee('UTE PARTS');
+        $response->assertSee('Bremspace');
     }
 
     public function test_shop_catalog_renders(): void

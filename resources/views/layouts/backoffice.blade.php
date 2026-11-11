@@ -26,6 +26,13 @@
             var size = 'md';
             try { size = localStorage.getItem('ute-font-size') || 'md'; } catch (e) {}
             root.dataset.fontSize = size;
+
+            var collapsed = true;
+            try {
+                var stored = localStorage.getItem('ute-sidebar-md-collapsed');
+                if (stored !== null) collapsed = (stored === '1');
+            } catch (e) {}
+            window.__INITIAL_SIDEBAR_COLLAPSED = collapsed;
         })();
     </script>
 
@@ -45,7 +52,7 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/backoffice.js'])
     @livewireStyles
 </head>
 <body class="bg-[#F1F5F9] dark:bg-[#090D16] text-ink-900 dark:text-ink-100 font-sans antialiased h-screen h-[100dvh] flex flex-col overflow-hidden selection:bg-up-primary selection:text-white"
@@ -74,7 +81,7 @@
              :class="{ 'open': sidebarOpen }"></div>
 
         <!-- [2026] Sidebar Desktop Spacer (zero jitter/reflow on hover) -->
-        <div class="hidden md:block sidebar-spacer" :class="{ 'is-collapsed': sidebarCollapsed }"></div>
+        <div class="hidden md:block sidebar-spacer is-collapsed" :class="{ 'is-collapsed': sidebarCollapsed }"></div>
 
         <!-- [T-46 & 2026] Sidebar 3 kondisi:
              < 768px  : drawer slide-in + backdrop (hamburger)
@@ -83,7 +90,7 @@
             class="w-64 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border-r border-ink-200/60 dark:border-white/5 flex flex-col flex-shrink-0
                    fixed inset-y-0 left-0 z-50 transform-gpu shadow-xl md:shadow-none
                    transition-[width,transform] duration-200 ease-out
-                   md:sticky md:top-0 md:h-screen md:max-h-screen md:inset-auto md:z-30 md:translate-x-0 md:transform-none"
+                   md:sticky md:top-0 md:h-screen md:max-h-screen md:inset-auto md:z-30 md:translate-x-0 md:transform-none sidebar-collapsed"
             :class="[isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : '', sidebarCollapsed ? 'sidebar-collapsed' : '']">
             <!-- Brand -->
             <div class="sidebar-brand h-16 flex items-center justify-between px-5 border-b border-ink-200/60 dark:border-white/5">
@@ -908,19 +915,22 @@
             // [T-46] Sidebar: drawer (<768) + collapsible md (768-1023, localStorage) + selalu tampil lg + accordion dropdown
             Alpine.data('sidebarManager', () => ({
                 sidebarOpen: false,
-                sidebarCollapsed: false,
+                sidebarCollapsed: typeof window.__INITIAL_SIDEBAR_COLLAPSED !== 'undefined' ? window.__INITIAL_SIDEBAR_COLLAPSED : (window.innerWidth >= 768),
                 isMobile: window.innerWidth < 768,
                 defaultDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/approvals*', 'app/audit-log*') ? 'approval' : (request()->is('app/pengaturan*', 'app/keamanan*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : '')))))))) }}',
                 activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/approvals*', 'app/audit-log*') ? 'approval' : (request()->is('app/pengaturan*', 'app/keamanan*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : '')))))))) }}',
 
                 init() {
                     this.isMobile = window.innerWidth < 768;
-                    try {
-                        const stored = localStorage.getItem('ute-sidebar-md-collapsed');
-                        // Di mode PC/desktop (>= 768px): default auto-collapse agar icon-rail aktif dengan hover expand
-                        this.sidebarCollapsed = stored !== null ? stored === '1' : true;
-                    } catch (e) {
-                        this.sidebarCollapsed = true;
+                    if (typeof window.__INITIAL_SIDEBAR_COLLAPSED !== 'undefined') {
+                        this.sidebarCollapsed = window.__INITIAL_SIDEBAR_COLLAPSED;
+                    } else {
+                        try {
+                            const stored = localStorage.getItem('ute-sidebar-md-collapsed');
+                            this.sidebarCollapsed = stored !== null ? stored === '1' : true;
+                        } catch (e) {
+                            this.sidebarCollapsed = true;
+                        }
                     }
 
                     try {

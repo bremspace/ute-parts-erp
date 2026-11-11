@@ -5,17 +5,7 @@ import '../css/app.css';
 import './theme.js'; // [T-32] Tema dark/light/auto
 import './font-size.js'; // [2026] Font size switcher
 import './components/format-number.js'; // [T-34] Ribuan separator input nominal
-import './components/thermal-print.js'; // [T-35] Cetak thermal Bluetooth 58/80mm + fallback web print
-import './components/barcode-scanner.js'; // Barcode scanner engine (hardware keyboard wedge + web mobile camera)
 import './components/notification-sound.js'; // [2026] Precision Web Audio notification synthesizer
-import * as fflate from 'fflate'; // Fast client-side ZIP directory inspection & selective extraction
-import './components/bulk-foto-uploader.js'; // [2026] Bulk product photo pre-flight sorter & chunk uploader
-import './components/offline-db.js'; // [T-OFFLINE-02] UtePartsOfflineDB client engine
-import './components/pos-offline-engine.js'; // [T-OFFLINE-07,08,09,10] Alpine.js POS Offline Store & Sync Worker
-import { Html5Qrcode } from 'html5-qrcode';
-
-window.fflate = fflate;
-window.Html5Qrcode = Html5Qrcode;
 
 // PWA Service Worker — SATU-SATUNYA registrasi via VitePWA (generateSW, /build/sw.js).
 // Registrasi manual lama `/sw.js` (404) dihapus; virtual module ini menyuntik

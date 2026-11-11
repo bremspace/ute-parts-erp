@@ -17,9 +17,13 @@ use App\Modules\Reseller\Controllers\ResellerController;
 use App\Modules\Servis\Controllers\ServisController;
 use App\Modules\Wms\Controllers\ProcurementController;
 use App\Modules\Wms\Controllers\ReturnPembelianController;
+use App\Http\Controllers\HealthCheckController;
 use App\Modules\Wms\Controllers\WmsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+// [CI/CD & Ops Probe] Zero-Downtime Health Check Endpoint (Security token protected)
+Route::get('/health', HealthCheckController::class);
 
 // ===== Global API rate limiting (T-28) =====
 // Apply throttle:60,1 to all API routes unless overridden by specific route

@@ -1,0 +1,97 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-and-quality:
+    name: Backend CI & Quality Gates
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:6CUG1sX4WjF5sF2+uYjF2mX+qN2/4g8u7bZzGkM/94s=
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      HEALTH_CHECK_SECRET: ci-testing-health-check-secret-token-32b
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, ctype, curl, dom, fileinfo, intl, json, mbstring, openssl, pcre, pdo, pdo_mysql, tokenizer, xml, zip, sqlite3, pdo_sqlite
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Validate Composer Configuration
+        run: composer validate --strict
+
+      - name: Audit Composer Dependencies
+        run: composer audit --no-interaction || true
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Code Style Check (Laravel Pint)
+        run: vendor/bin/pint --test
+
+      - name: Static Analysis (PHPStan)
+        run: |
+          if [ -f phpstan.neon ]; then
+            php -d memory_limit=1G vendor/bin/phpstan analyse --configuration=phpstan.neon --no-progress
+          fi
+
+      - name: Run Database Migrations (In-Memory SQLite)
+        run: php artisan migrate --force
+
+      - name: Run Test Suite (PHPUnit / Pest)
+        run: php artisan test --parallel
+
+  frontend-build:
+    name: Frontend Compilation & Asset Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci
+
+      - name: Compile Frontend Assets (Vite)
+        run: npm run build
+
+      - name: Verify Asset Manifest
+        run: |
+          test -f public/build/manifest.json || (echo "Error: public/build/manifest.json missing!" && exit 1)

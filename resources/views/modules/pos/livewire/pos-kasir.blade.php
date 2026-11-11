@@ -34,8 +34,6 @@
         window.ACTIVE_CABANG_ID = {{ $activeCabangId }};
         window.ACTIVE_CABANG_NAME = @json($activeCabangName);
     </script>
-    <!-- PWA Install Prompt Banner -->
-    <x-prism.pwa-install-prompt variant="banner" class="flex-shrink-0" />
 
     <!-- Offline Banner & Drawer Trigger (PRD-OFFLINE-01) -->
     <div

@@ -125,4 +125,12 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Health Check Secret Token
+    |--------------------------------------------------------------------------
+    | Used for probing /api/health during CI/CD zero-downtime deployment
+    */
+    'health_check_secret' => env('HEALTH_CHECK_SECRET'),
+
 ];

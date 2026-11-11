@@ -3,16 +3,16 @@
         showCustomizer: false,
         dragKey: null,
         overKey: null,
-        defaultOrder: ['kpi_metrics', 'analisis_penjualan', 'charts_omzet_kategori', 'operational_funnel', 'feed_transaksi_harga', 'role_specific'],
+        defaultOrder: ['kpi_metrics', 'charts_omzet_kategori', 'operational_funnel', 'feed_transaksi_harga', 'analisis_penjualan', 'role_specific'],
         layoutConfig: {
             kpi_metrics: { visible: true, label: '4 Kartu KPI Utama' },
-            analisis_penjualan: { visible: true, label: 'Data & Analisis Penjualan' },
             charts_omzet_kategori: { visible: true, label: 'Tren Omzet 30 Hari & Komposisi Produk' },
             operational_funnel: { visible: true, label: 'Status Servis & Umur Piutang' },
             feed_transaksi_harga: { visible: true, label: 'Perubahan Harga & Transaksi Terkini' },
+            analisis_penjualan: { visible: true, label: 'Data & Analisis Penjualan' },
             role_specific: { visible: true, label: 'Widget Sesuai Role (Kasir/Finance/dsb)' }
         },
-        widgetOrder: ['kpi_metrics', 'analisis_penjualan', 'charts_omzet_kategori', 'operational_funnel', 'feed_transaksi_harga', 'role_specific'],
+        widgetOrder: ['kpi_metrics', 'charts_omzet_kategori', 'operational_funnel', 'feed_transaksi_harga', 'analisis_penjualan', 'role_specific'],
         init() {
             try {
                 const savedOrder = JSON.parse(localStorage.getItem('ute-dash-order'));
@@ -167,6 +167,7 @@
     <div wire:key="widget-kpi-metrics"
          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 transition-all duration-200"
          x-show="layoutConfig?.kpi_metrics?.visible !== false"
+         style="order: 1"
          :style="'order: ' + (widgetOrder.indexOf('kpi_metrics') + 1)"
          data-widget-key="kpi_metrics">
         <!-- 1. Omzet Hari Ini -->
@@ -266,6 +267,7 @@
     <div wire:key="widget-charts-omzet-kategori"
          class="grid grid-cols-1 lg:grid-cols-3 gap-6 transition-all duration-200"
          x-show="layoutConfig?.charts_omzet_kategori?.visible !== false"
+         style="order: 2"
          :style="'order: ' + (widgetOrder.indexOf('charts_omzet_kategori') + 1)"
          data-widget-key="charts_omzet_kategori">
         <!-- Tren Omzet 30 Hari -->
@@ -468,6 +470,7 @@
     <div wire:key="widget-operational-funnel"
          class="grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-200"
          x-show="layoutConfig?.operational_funnel?.visible !== false"
+         style="order: 3"
          :style="'order: ' + (widgetOrder.indexOf('operational_funnel') + 1)"
          data-widget-key="operational_funnel">
         <!-- 1. Pipeline Tahap Servis Aktif (Kanban Funnel) -->
@@ -586,6 +589,7 @@
     <div wire:key="widget-feed-transaksi-harga"
          class="grid grid-cols-1 lg:grid-cols-3 gap-6 transition-all duration-200"
          x-show="layoutConfig?.feed_transaksi_harga?.visible !== false"
+         style="order: 4"
          :style="'order: ' + (widgetOrder.indexOf('feed_transaksi_harga') + 1)"
          data-widget-key="feed_transaksi_harga">
         <!-- Perubahan Harga Terbaru (dari GRN / Supplier) -->
@@ -700,6 +704,7 @@
     <div wire:key="widget-analisis-penjualan"
          class="transition-all duration-200"
          x-show="layoutConfig?.analisis_penjualan?.visible !== false"
+         style="order: 5"
          :style="'order: ' + (widgetOrder.indexOf('analisis_penjualan') + 1)"
          data-widget-key="analisis_penjualan">
         <x-prism.glass-card title="Data & Analisis Penjualan" subtitle="{{ $dataPenjualan['periode_label'] ?? 'Hari Ini' }}">
@@ -1071,6 +1076,7 @@
     <div wire:key="widget-role-specific"
          class="space-y-6 transition-all duration-200"
          x-show="layoutConfig?.role_specific?.visible !== false"
+         style="order: 6"
          :style="'order: ' + (widgetOrder.indexOf('role_specific') + 1)"
          data-widget-key="role_specific">
     @role('kasir')

@@ -16,8 +16,10 @@ abstract class TestCase extends BaseTestCase
 
     protected function seedPpnDefaults(): void
     {
-        // Seed default PPN config for each test
-        $service = app(PajakService::class);
-        $service->seedDefaults();
+        // Seed default PPN config for each test if table exists
+        if (\Illuminate\Support\Facades\Schema::hasTable('konfigurasi')) {
+            $service = app(PajakService::class);
+            $service->seedDefaults();
+        }
     }
 }

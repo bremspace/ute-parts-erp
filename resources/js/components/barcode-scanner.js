@@ -1,4 +1,30 @@
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+let html5QrcodePromise = null;
+export async function getHtml5Qrcode() {
+    if (!html5QrcodePromise) {
+        html5QrcodePromise = import('html5-qrcode');
+    }
+    return html5QrcodePromise;
+}
+
+export async function getScanFormats() {
+    const { Html5QrcodeSupportedFormats } = await getHtml5Qrcode();
+    return [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.DATA_MATRIX,
+        Html5QrcodeSupportedFormats.AZTEC,
+        Html5QrcodeSupportedFormats.PDF_417,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.ITF
+    ].filter(f => f !== undefined);
+}
 
 /**
  * Barcode Scanner Engine
@@ -9,24 +35,6 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
  * 4. Auto Preflight Permission Request saat load pertama kali di HP
  * 5. Audio Synthesizer Beep & Haptic Vibration Feedback
  */
-
-// Web Audio API Synthesizer Beep
-export const STANDARDIZED_SCAN_FORMATS = [
-    Html5QrcodeSupportedFormats.QR_CODE,
-    Html5QrcodeSupportedFormats.DATA_MATRIX,
-    Html5QrcodeSupportedFormats.AZTEC,
-    Html5QrcodeSupportedFormats.PDF_417,
-    Html5QrcodeSupportedFormats.CODE_128,
-    Html5QrcodeSupportedFormats.CODE_39,
-    Html5QrcodeSupportedFormats.CODE_93,
-    Html5QrcodeSupportedFormats.EAN_13,
-    Html5QrcodeSupportedFormats.EAN_8,
-    Html5QrcodeSupportedFormats.UPC_A,
-    Html5QrcodeSupportedFormats.UPC_E,
-    Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
-    Html5QrcodeSupportedFormats.CODABAR,
-    Html5QrcodeSupportedFormats.ITF
-].filter(f => f !== undefined);
 
 export function cleanScannedCode(raw) {
     if (!raw) return '';
@@ -559,6 +567,8 @@ export class CameraScannerModal {
 
             try {
                 if (!this.html5QrCode) {
+                    const { Html5Qrcode } = await getHtml5Qrcode();
+                    const formats = await getScanFormats();
                     let dummyReader = document.getElementById('ute-dummy-qr-reader');
                     if (!dummyReader) {
                         dummyReader = document.createElement('div');
@@ -567,7 +577,7 @@ export class CameraScannerModal {
                         document.body.appendChild(dummyReader);
                     }
                     this.html5QrCode = new Html5Qrcode('ute-dummy-qr-reader', {
-                        formatsToSupport: STANDARDIZED_SCAN_FORMATS,
+                        formatsToSupport: formats,
                         verbose: false
                     });
                 }
@@ -614,8 +624,10 @@ export class CameraScannerModal {
             }
 
             if (!this.html5QrCode) {
+                const { Html5Qrcode } = await getHtml5Qrcode();
+                const formats = await getScanFormats();
                 this.html5QrCode = new Html5Qrcode('ute-camera-reader', {
-                    formatsToSupport: STANDARDIZED_SCAN_FORMATS,
+                    formatsToSupport: formats,
                     verbose: false
                 });
             }
@@ -680,8 +692,10 @@ export class CameraScannerModal {
 
         try {
             if (!this.html5QrCode) {
+                const { Html5Qrcode } = await getHtml5Qrcode();
+                const formats = await getScanFormats();
                 this.html5QrCode = new Html5Qrcode('ute-camera-reader', {
-                    formatsToSupport: STANDARDIZED_SCAN_FORMATS,
+                    formatsToSupport: formats,
                     verbose: false
                 });
             }
