@@ -1,0 +1,383 @@
+/* UTE Parts ERP - 10 Taste Palettes Engine
+   Supporting Dark & Light mode via [data-palette="..."] attribute on <html> */
+
+/* ============================================================
+   1. LINEAR (Obsidian & Indigo Violet)
+   ============================================================ */
+html[data-palette="linear"].dark,
+html[data-palette="linear"] {
+    --up-primary: #5E6AD2;
+    --up-primary-dark: #4C57B8;
+    --up-accent: #D97706;
+    --up-mint: #10B981;
+    --up-bg-root: #08090A;
+    --up-bg-surface: #0F1012;
+    --up-bg-surface-elevated: #18191C;
+    --up-border-subtle: rgba(255, 255, 255, 0.06);
+    --up-border-strong: rgba(255, 255, 255, 0.12);
+    --up-text-main: #F7F8F8;
+    --up-text-muted: #8A8F98;
+    --up-text-faint: #565A61;
+    --up-glass-bg: rgba(15, 16, 18, 0.88);
+    --up-glass-border: rgba(255, 255, 255, 0.08);
+    --up-glass-border-hover: rgba(94, 106, 210, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #5E6AD2 0%, #808AF0 100%);
+}
+html[data-palette="linear"]:not(.dark) {
+    --up-primary: #5E6AD2;
+    --up-primary-dark: #4C57B8;
+    --up-accent: #D97706;
+    --up-mint: #10B981;
+    --up-bg-root: #FAFBFB;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #F2F3F5;
+    --up-border-subtle: #E2E4E8;
+    --up-border-strong: #CBD0D7;
+    --up-text-main: #191A1B;
+    --up-text-muted: #686C73;
+    --up-text-faint: #8F949D;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   2. APPLE DEVELOPER PRO (Space Gray & California Blue)
+   ============================================================ */
+html[data-palette="apple"].dark {
+    --up-primary: #2997FF;
+    --up-primary-dark: #0077ED;
+    --up-accent: #FF9F0A;
+    --up-mint: #30D158;
+    --up-bg-root: #161617;
+    --up-bg-surface: #1E1E20;
+    --up-bg-surface-elevated: #28282B;
+    --up-border-subtle: rgba(255, 255, 255, 0.08);
+    --up-border-strong: rgba(255, 255, 255, 0.15);
+    --up-text-main: #F5F5F7;
+    --up-text-muted: #A1A1A6;
+    --up-text-faint: #6E6E73;
+    --up-glass-bg: rgba(30, 30, 32, 0.88);
+    --up-glass-border: rgba(255, 255, 255, 0.09);
+    --up-glass-border-hover: rgba(41, 151, 255, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #2997FF 0%, #0077ED 100%);
+}
+html[data-palette="apple"]:not(.dark) {
+    --up-primary: #0071E3;
+    --up-primary-dark: #0077ED;
+    --up-accent: #FF9500;
+    --up-mint: #34C759;
+    --up-bg-root: #F5F5F7;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #E8E8ED;
+    --up-border-subtle: #D2D2D7;
+    --up-border-strong: #B0B0B5;
+    --up-text-main: #1D1D1F;
+    --up-text-muted: #6E6E73;
+    --up-text-faint: #86868B;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   3. RAYCAST / GEIST (Charcoal & Electric Cyan)
+   ============================================================ */
+html[data-palette="raycast"].dark {
+    --up-primary: #00E5FF;
+    --up-primary-dark: #00B8D4;
+    --up-accent: #FF6363;
+    --up-mint: #50E3C2;
+    --up-bg-root: #0F0F11;
+    --up-bg-surface: #161619;
+    --up-bg-surface-elevated: #202025;
+    --up-border-subtle: rgba(255, 255, 255, 0.08);
+    --up-border-strong: rgba(255, 255, 255, 0.16);
+    --up-text-main: #EDEDED;
+    --up-text-muted: #999999;
+    --up-text-faint: #666666;
+    --up-glass-bg: rgba(22, 22, 25, 0.9);
+    --up-glass-border: rgba(255, 255, 255, 0.08);
+    --up-glass-border-hover: rgba(0, 229, 255, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #00E5FF 0%, #0091FF 100%);
+}
+html[data-palette="raycast"]:not(.dark) {
+    --up-primary: #0091FF;
+    --up-primary-dark: #0070F3;
+    --up-accent: #EE0000;
+    --up-mint: #0070F3;
+    --up-bg-root: #FAFAFA;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #F2F2F2;
+    --up-border-subtle: #EAEAEA;
+    --up-border-strong: #D4D4D4;
+    --up-text-main: #111111;
+    --up-text-muted: #666666;
+    --up-text-faint: #888888;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   4. STRIPE WORKBENCH (Deep Navy Slate & Modern Indigo Blue)
+   ============================================================ */
+html[data-palette="stripe"].dark {
+    --up-primary: #635BFF;
+    --up-primary-dark: #5046E5;
+    --up-accent: #00D4B2;
+    --up-mint: #00D4B2;
+    --up-bg-root: #0A192F;
+    --up-bg-surface: #112240;
+    --up-bg-surface-elevated: #1B3058;
+    --up-border-subtle: rgba(255, 255, 255, 0.08);
+    --up-border-strong: rgba(255, 255, 255, 0.16);
+    --up-text-main: #E6F1FF;
+    --up-text-muted: #8892B0;
+    --up-text-faint: #495670;
+    --up-glass-bg: rgba(17, 34, 64, 0.88);
+    --up-glass-border: rgba(255, 255, 255, 0.09);
+    --up-glass-border-hover: rgba(99, 91, 255, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #635BFF 0%, #00D4B2 100%);
+}
+html[data-palette="stripe"]:not(.dark) {
+    --up-primary: #635BFF;
+    --up-primary-dark: #5046E5;
+    --up-accent: #00D4B2;
+    --up-mint: #00B67A;
+    --up-bg-root: #F6F9FC;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #EDF2F7;
+    --up-border-subtle: #E3E8EE;
+    --up-border-strong: #CCD4E0;
+    --up-text-main: #0A2540;
+    --up-text-muted: #425466;
+    --up-text-faint: #697386;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   5. SUPABASE FOREST (Neutral Charcoal & Studio Emerald)
+   ============================================================ */
+html[data-palette="supabase"].dark {
+    --up-primary: #3ECF8E;
+    --up-primary-dark: #2EAB72;
+    --up-accent: #FBBF24;
+    --up-mint: #3ECF8E;
+    --up-bg-root: #121212;
+    --up-bg-surface: #1A1A1A;
+    --up-bg-surface-elevated: #242424;
+    --up-border-subtle: rgba(255, 255, 255, 0.08);
+    --up-border-strong: rgba(255, 255, 255, 0.15);
+    --up-text-main: #EDEDED;
+    --up-text-muted: #9E9E9E;
+    --up-text-faint: #6B6B6B;
+    --up-glass-bg: rgba(26, 26, 26, 0.88);
+    --up-glass-border: rgba(255, 255, 255, 0.08);
+    --up-glass-border-hover: rgba(62, 207, 142, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #3ECF8E 0%, #10B981 100%);
+}
+html[data-palette="supabase"]:not(.dark) {
+    --up-primary: #10B981;
+    --up-primary-dark: #059669;
+    --up-accent: #F59E0B;
+    --up-mint: #10B981;
+    --up-bg-root: #F8F9FA;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #F0F1F2;
+    --up-border-subtle: #E6E8EA;
+    --up-border-strong: #D0D3D6;
+    --up-text-main: #171717;
+    --up-text-muted: #666666;
+    --up-text-faint: #8E8E8E;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   6. ARC BROWSER (Espresso Velvet & Warm Coral Sunset)
+   ============================================================ */
+html[data-palette="arc"].dark {
+    --up-primary: #FF6B4A;
+    --up-primary-dark: #E85735;
+    --up-accent: #FFA26B;
+    --up-mint: #34D399;
+    --up-bg-root: #181515;
+    --up-bg-surface: #221D1D;
+    --up-bg-surface-elevated: #2C2626;
+    --up-border-subtle: rgba(255, 255, 255, 0.07);
+    --up-border-strong: rgba(255, 255, 255, 0.14);
+    --up-text-main: #F7F3EE;
+    --up-text-muted: #A89F97;
+    --up-text-faint: #706861;
+    --up-glass-bg: rgba(34, 29, 29, 0.88);
+    --up-glass-border: rgba(255, 255, 255, 0.08);
+    --up-glass-border-hover: rgba(255, 107, 74, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #FF6B4A 0%, #FFA26B 100%);
+}
+html[data-palette="arc"]:not(.dark) {
+    --up-primary: #E5532F;
+    --up-primary-dark: #CC401E;
+    --up-accent: #F97316;
+    --up-mint: #059669;
+    --up-bg-root: #FAF7F5;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #F3EFEA;
+    --up-border-subtle: #E8E2DA;
+    --up-border-strong: #D5CCC1;
+    --up-text-main: #241D1A;
+    --up-text-muted: #736963;
+    --up-text-faint: #9E938B;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   7. NORDIC PETROL & SLATE (Deep Petrol & Soft Teal)
+   ============================================================ */
+html[data-palette="nordic"].dark {
+    --up-primary: #14B8A6;
+    --up-primary-dark: #0D9488;
+    --up-accent: #FB923C;
+    --up-mint: #34D399;
+    --up-bg-root: #0F1416;
+    --up-bg-surface: #151D20;
+    --up-bg-surface-elevated: #1D262A;
+    --up-border-subtle: rgba(255, 255, 255, 0.07);
+    --up-border-strong: rgba(255, 255, 255, 0.13);
+    --up-text-main: #E6ECEE;
+    --up-text-muted: #8E9FA5;
+    --up-text-faint: #5B6D74;
+    --up-glass-bg: rgba(21, 29, 32, 0.88);
+    --up-glass-border: rgba(255, 255, 255, 0.08);
+    --up-glass-border-hover: rgba(20, 184, 166, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #14B8A6 0%, #06B6D4 100%);
+}
+html[data-palette="nordic"]:not(.dark) {
+    --up-primary: #0F766E;
+    --up-primary-dark: #115E59;
+    --up-accent: #C2410C;
+    --up-mint: #059669;
+    --up-bg-root: #F3F6F6;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #EAF0EF;
+    --up-border-subtle: #DDE5E5;
+    --up-border-strong: #C5D2D2;
+    --up-text-main: #131E20;
+    --up-text-muted: #57696E;
+    --up-text-faint: #899B9F;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   8. GITHUB PRIMER (Clean Charcoal & Marine Sapphire)
+   ============================================================ */
+html[data-palette="github"].dark {
+    --up-primary: #2F81F7;
+    --up-primary-dark: #1F6FEB;
+    --up-accent: #D29922;
+    --up-mint: #238636;
+    --up-bg-root: #0D1117;
+    --up-bg-surface: #161B22;
+    --up-bg-surface-elevated: #21262D;
+    --up-border-subtle: rgba(255, 255, 255, 0.08);
+    --up-border-strong: rgba(255, 255, 255, 0.16);
+    --up-text-main: #E6EDF3;
+    --up-text-muted: #848D97;
+    --up-text-faint: #59616B;
+    --up-glass-bg: rgba(22, 27, 34, 0.88);
+    --up-glass-border: rgba(255, 255, 255, 0.09);
+    --up-glass-border-hover: rgba(47, 129, 247, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #2F81F7 0%, #1F6FEB 100%);
+}
+html[data-palette="github"]:not(.dark) {
+    --up-primary: #0969DA;
+    --up-primary-dark: #0854B0;
+    --up-accent: #9A6700;
+    --up-mint: #1A7F37;
+    --up-bg-root: #F6F8FA;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #EFF1F3;
+    --up-border-subtle: #D0D7DE;
+    --up-border-strong: #AFB8C1;
+    --up-text-main: #1F2328;
+    --up-text-muted: #57606A;
+    --up-text-faint: #7D8590;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   9. CYBERPUNK / TEENAGE ENGINEERING (Matte Carbon & Safety Orange)
+   ============================================================ */
+html[data-palette="cyberpunk"].dark {
+    --up-primary: #FF5722;
+    --up-primary-dark: #E64A19;
+    --up-accent: #FACC15;
+    --up-mint: #22C55E;
+    --up-bg-root: #141416;
+    --up-bg-surface: #1A1A1E;
+    --up-bg-surface-elevated: #242429;
+    --up-border-subtle: rgba(255, 255, 255, 0.09);
+    --up-border-strong: rgba(255, 255, 255, 0.18);
+    --up-text-main: #F4F4F6;
+    --up-text-muted: #9A9AA2;
+    --up-text-faint: #64646D;
+    --up-glass-bg: rgba(26, 26, 30, 0.9);
+    --up-glass-border: rgba(255, 255, 255, 0.1);
+    --up-glass-border-hover: rgba(255, 87, 34, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #FF5722 0%, #FF8A65 100%);
+}
+html[data-palette="cyberpunk"]:not(.dark) {
+    --up-primary: #E64A19;
+    --up-primary-dark: #D84315;
+    --up-accent: #CA8A04;
+    --up-mint: #16A34A;
+    --up-bg-root: #F7F7F8;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #EEEEF0;
+    --up-border-subtle: #E2E2E6;
+    --up-border-strong: #C8C8D0;
+    --up-text-main: #17171A;
+    --up-text-muted: #686872;
+    --up-text-faint: #92929D;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   10. LUXURY CHAMPAGNE BRONZE (Warm Obsidian & Champagne Gold)
+   ============================================================ */
+html[data-palette="bronze"].dark {
+    --up-primary: #D4A373;
+    --up-primary-dark: #C59361;
+    --up-accent: #60A5FA;
+    --up-mint: #34D399;
+    --up-bg-root: #141415;
+    --up-bg-surface: #1B1B1E;
+    --up-bg-surface-elevated: #25252A;
+    --up-border-subtle: rgba(255, 255, 255, 0.07);
+    --up-border-strong: rgba(255, 255, 255, 0.14);
+    --up-text-main: #F2F1EE;
+    --up-text-muted: #A09C95;
+    --up-text-faint: #68645E;
+    --up-glass-bg: rgba(27, 27, 30, 0.88);
+    --up-glass-border: rgba(255, 255, 255, 0.08);
+    --up-glass-border-hover: rgba(212, 163, 115, 0.4);
+    --up-gradient-signature: linear-gradient(135deg, #D4A373 0%, #FAEDCD 100%);
+}
+html[data-palette="bronze"]:not(.dark) {
+    --up-primary: #B08968;
+    --up-primary-dark: #9C6644;
+    --up-accent: #3B82F6;
+    --up-mint: #10B981;
+    --up-bg-root: #FAF8F5;
+    --up-bg-surface: #FFFFFF;
+    --up-bg-surface-elevated: #F2EEE9;
+    --up-border-subtle: #E5DFD7;
+    --up-border-strong: #CEC5BA;
+    --up-text-main: #201B17;
+    --up-text-muted: #6B635B;
+    --up-text-faint: #968E85;
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(0, 0, 0, 0.08);
+}

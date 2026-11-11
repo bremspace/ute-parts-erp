@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UTE 10 Design System & Color Palettes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body { font-family: 'Instrument Sans', system-ui, sans-serif; transition: background-color 0.2s ease, color 0.2s ease; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* UNIFIED ICON SYSTEM: 1.75px stroke width across all icons */
+    svg.lucide { stroke-width: 1.75px !important; }
+
+    /* CSS VARIABLES FOR 10 POPULAR MODERN PALETTES */
+
+    /* 0. CURRENT PALETTE (Baseline) */
+    .palette-current.theme-dark {
+      --bg-root: #090D16; --bg-surface: #0F172A; --bg-surface-elevated: #1E293B;
+      --border-subtle: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.16);
+      --text-main: #FFFFFF; --text-muted: #94A3B8; --text-faint: #64748B;
+      --primary: #4F46E5; --primary-hover: #4338CA; --primary-text: #FFFFFF; --primary-tint: rgba(79,70,229,0.15);
+      --accent: #D97706; --accent-tint: rgba(217,119,6,0.15); --success: #10B981;
+    }
+    .palette-current.theme-light {
+      --bg-root: #F1F5F9; --bg-surface: #FFFFFF; --bg-surface-elevated: #F8FAFC;
+      --border-subtle: #E2E8F0; --border-strong: #CBD5E1;
+      --text-main: #0F172A; --text-muted: #64748B; --text-faint: #94A3B8;
+      --primary: #4F46E5; --primary-hover: #4338CA; --primary-text: #FFFFFF; --primary-tint: rgba(79,70,229,0.08);
+      --accent: #D97706; --accent-tint: rgba(217,119,6,0.08); --success: #10B981;
+    }
+
+    /* 1. LINEAR DARK (Obsidian / Indigo Violet) */
+    .palette-linear.theme-dark {
+      --bg-root: #101114; --bg-surface: #17181C; --bg-surface-elevated: #222328;
+      --border-subtle: rgba(255,255,255,0.07); --border-strong: rgba(255,255,255,0.13);
+      --text-main: #EEEEF0; --text-muted: #9DA0A8; --text-faint: #646770;
+      --primary: #5E6AD2; --primary-hover: #4F5BC4; --primary-text: #FFFFFF; --primary-tint: rgba(94,106,210,0.14);
+      --accent: #F59E0B; --accent-tint: rgba(245,158,11,0.14); --success: #38C172;
+    }
+    .palette-linear.theme-light {
+      --bg-root: #F7F8F9; --bg-surface: #FFFFFF; --bg-surface-elevated: #F1F2F4;
+      --border-subtle: #E4E5E8; --border-strong: #D1D3D8;
+      --text-main: #191A1E; --text-muted: #6B707B; --text-faint: #9EA2AB;
+      --primary: #5E6AD2; --primary-hover: #4F5BC4; --primary-text: #FFFFFF; --primary-tint: rgba(94,106,210,0.09);
+      --accent: #D97706; --accent-tint: rgba(217,119,6,0.09); --success: #10B981;
+    }
+
+    /* 2. APPLE DEVELOPER PRO (Space Gray / California Blue) */
+    .palette-apple.theme-dark {
+      --bg-root: #161617; --bg-surface: #1E1E20; --bg-surface-elevated: #28282B;
+      --border-subtle: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.15);
+      --text-main: #F5F5F7; --text-muted: #A1A1A6; --text-faint: #6E6E73;
+      --primary: #2997FF; --primary-hover: #0077ED; --primary-text: #FFFFFF; --primary-tint: rgba(41,151,255,0.14);
+      --accent: #FF9F0A; --accent-tint: rgba(255,159,10,0.14); --success: #30D158;
+    }
+    .palette-apple.theme-light {
+      --bg-root: #F5F5F7; --bg-surface: #FFFFFF; --bg-surface-elevated: #E8E8ED;
+      --border-subtle: #D2D2D7; --border-strong: #B0B0B5;
+      --text-main: #1D1D1F; --text-muted: #6E6E73; --text-faint: #86868B;
+      --primary: #0071E3; --primary-hover: #0077ED; --primary-text: #FFFFFF; --primary-tint: rgba(0,113,227,0.09);
+      --accent: #FF9500; --accent-tint: rgba(255,149,0,0.09); --success: #34C759;
+    }
+
+    /* 3. RAYCAST / GEIST (Monochrome Charcoal / Electric Cyan) */
+    .palette-raycast.theme-dark {
+      --bg-root: #0F0F11; --bg-surface: #161619; --bg-surface-elevated: #202025;
+      --border-subtle: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.16);
+      --text-main: #EDEDED; --text-muted: #999999; --text-faint: #666666;
+      --primary: #00E5FF; --primary-hover: #00B8D4; --primary-text: #051A24; --primary-tint: rgba(0,229,255,0.12);
+      --accent: #FF6363; --accent-tint: rgba(255,99,99,0.12); --success: #50E3C2;
+    }
+    .palette-raycast.theme-light {
+      --bg-root: #FAFAFA; --bg-surface: #FFFFFF; --bg-surface-elevated: #F2F2F2;
+      --border-subtle: #EAEAEA; --border-strong: #D4D4D4;
+      --text-main: #111111; --text-muted: #666666; --text-faint: #888888;
+      --primary: #0091FF; --primary-hover: #0070F3; --primary-text: #FFFFFF; --primary-tint: rgba(0,145,255,0.08);
+      --accent: #E00; --accent-tint: rgba(238,0,0,0.08); --success: #0070F3;
+    }
+
+    /* 4. STRIPE WORKBENCH (Deep Navy Slate / Modern Blue) */
+    .palette-stripe.theme-dark {
+      --bg-root: #0A192F; --bg-surface: #112240; --bg-surface-elevated: #1B3058;
+      --border-subtle: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.16);
+      --text-main: #E6F1FF; --text-muted: #8892B0; --text-faint: #495670;
+      --primary: #635BFF; --primary-hover: #5046E5; --primary-text: #FFFFFF; --primary-tint: rgba(99,91,255,0.14);
+      --accent: #00D4B2; --accent-tint: rgba(0,212,178,0.14); --success: #00D4B2;
+    }
+    .palette-stripe.theme-light {
+      --bg-root: #F6F9FC; --bg-surface: #FFFFFF; --bg-surface-elevated: #EDF2F7;
+      --border-subtle: #E3E8EE; --border-strong: #CCD4E0;
+      --text-main: #0A2540; --text-muted: #425466; --text-faint: #697386;
+      --primary: #635BFF; --primary-hover: #5046E5; --primary-text: #FFFFFF; --primary-tint: rgba(99,91,255,0.08);
+      --accent: #00D4B2; --accent-tint: rgba(0,212,178,0.08); --success: #00B67A;
+    }
+
+    /* 5. SUPABASE FOREST (Neutral Dark Charcoal / Studio Emerald) */
+    .palette-supabase.theme-dark {
+      --bg-root: #121212; --bg-surface: #1A1A1A; --bg-surface-elevated: #242424;
+      --border-subtle: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.15);
+      --text-main: #EDEDED; --text-muted: #9E9E9E; --text-faint: #6B6B6B;
+      --primary: #3ECF8E; --primary-hover: #2EAB72; --primary-text: #052618; --primary-tint: rgba(62,207,142,0.14);
+      --accent: #FBBF24; --accent-tint: rgba(251,191,36,0.14); --success: #3ECF8E;
+    }
+    .palette-supabase.theme-light {
+      --bg-root: #F8F9FA; --bg-surface: #FFFFFF; --bg-surface-elevated: #F0F1F2;
+      --border-subtle: #E6E8EA; --border-strong: #D0D3D6;
+      --text-main: #171717; --text-muted: #666666; --text-faint: #8E8E8E;
+      --primary: #10B981; --primary-hover: #059669; --primary-text: #FFFFFF; --primary-tint: rgba(16,185,129,0.08);
+      --accent: #F59E0B; --accent-tint: rgba(245,158,11,0.08); --success: #10B981;
+    }
+
+    /* 6. ARC / THE BROWSER CO (Espresso Velvet / Warm Coral Sunset) */
+    .palette-arc.theme-dark {
+      --bg-root: #181515; --bg-surface: #221D1D; --bg-surface-elevated: #2C2626;
+      --border-subtle: rgba(255,255,255,0.07); --border-strong: rgba(255,255,255,0.14);
+      --text-main: #F7F3EE; --text-muted: #A89F97; --text-faint: #706861;
+      --primary: #FF6B4A; --primary-hover: #E85735; --primary-text: #FFFFFF; --primary-tint: rgba(255,107,74,0.14);
+      --accent: #FFA26B; --accent-tint: rgba(255,162,107,0.14); --success: #34D399;
+    }
+    .palette-arc.theme-light {
+      --bg-root: #FAF7F5; --bg-surface: #FFFFFF; --bg-surface-elevated: #F3EFEA;
+      --border-subtle: #E8E2DA; --border-strong: #D5CCC1;
+      --text-main: #241D1A; --text-muted: #736963; --text-faint: #9E938B;
+      --primary: #E5532F; --primary-hover: #CC401E; --primary-text: #FFFFFF; --primary-tint: rgba(229,83,47,0.08);
+      --accent: #F97316; --accent-tint: rgba(249,115,22,0.08); --success: #059669;
+    }
+
+    /* 7. NORDIC PETROL & SLATE (Deep Petrol / Soft Teal / Eye-Relaxing) */
+    .palette-nordic.theme-dark {
+      --bg-root: #0F1416; --bg-surface: #151D20; --bg-surface-elevated: #1D262A;
+      --border-subtle: rgba(255,255,255,0.07); --border-strong: rgba(255,255,255,0.13);
+      --text-main: #E6ECEE; --text-muted: #8E9FA5; --text-faint: #5B6D74;
+      --primary: #14B8A6; --primary-hover: #0D9488; --primary-text: #042F2E; --primary-tint: rgba(20,184,166,0.14);
+      --accent: #FB923C; --accent-tint: rgba(251,146,60,0.14); --success: #34D399;
+    }
+    .palette-nordic.theme-light {
+      --bg-root: #F3F6F6; --bg-surface: #FFFFFF; --bg-surface-elevated: #EAF0EF;
+      --border-subtle: #DDE5E5; --border-strong: #C5D2D2;
+      --text-main: #131E20; --text-muted: #57696E; --text-faint: #899B9F;
+      --primary: #0F766E; --primary-hover: #115E59; --primary-text: #FFFFFF; --primary-tint: rgba(15,118,110,0.08);
+      --accent: #C2410C; --accent-tint: rgba(194,65,12,0.08); --success: #059669;
+    }
+
+    /* 8. GITHUB PRIMER (Modern Clean Charcoal / Marine Sapphire) */
+    .palette-github.theme-dark {
+      --bg-root: #0D1117; --bg-surface: #161B22; --bg-surface-elevated: #21262D;
+      --border-subtle: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.16);
+      --text-main: #E6EDF3; --text-muted: #848D97; --text-faint: #59616B;
+      --primary: #2F81F7; --primary-hover: #1F6FEB; --primary-text: #FFFFFF; --primary-tint: rgba(47,129,247,0.14);
+      --accent: #D29922; --accent-tint: rgba(210,153,34,0.14); --success: #238636;
+    }
+    .palette-github.theme-light {
+      --bg-root: #F6F8FA; --bg-surface: #FFFFFF; --bg-surface-elevated: #EFF1F3;
+      --border-subtle: #D0D7DE; --border-strong: #AFB8C1;
+      --text-main: #1F2328; --text-muted: #57606A; --text-faint: #7D8590;
+      --primary: #0969DA; --primary-hover: #0854B0; --primary-text: #FFFFFF; --primary-tint: rgba(9,105,218,0.08);
+      --accent: #9A6700; --accent-tint: rgba(154,103,0,0.08); --success: #1A7F37;
+    }
+
+    /* 9. CYBERPUNK / TEENAGE ENGINEERING (Matte Carbon / Safety Orange) */
+    .palette-cyberpunk.theme-dark {
+      --bg-root: #141416; --bg-surface: #1A1A1E; --bg-surface-elevated: #242429;
+      --border-subtle: rgba(255,255,255,0.09); --border-strong: rgba(255,255,255,0.18);
+      --text-main: #F4F4F6; --text-muted: #9A9AA2; --text-faint: #64646D;
+      --primary: #FF5722; --primary-hover: #E64A19; --primary-text: #FFFFFF; --primary-tint: rgba(255,87,34,0.15);
+      --accent: #FACC15; --accent-tint: rgba(250,204,21,0.15); --success: #22C55E;
+    }
+    .palette-cyberpunk.theme-light {
+      --bg-root: #F7F7F8; --bg-surface: #FFFFFF; --bg-surface-elevated: #EEEEF0;
+      --border-subtle: #E2E2E6; --border-strong: #C8C8D0;
+      --text-main: #17171A; --text-muted: #686872; --text-faint: #92929D;
+      --primary: #E64A19; --primary-hover: #D84315; --primary-text: #FFFFFF; --primary-tint: rgba(230,74,25,0.08);
+      --accent: #CA8A04; --accent-tint: rgba(202,138,4,0.08); --success: #16A34A;
+    }
+
+    /* 10. LUXURY CHAMPAGNE BRONZE (Warm Obsidian / Champagne Gold) */
+    .palette-bronze.theme-dark {
+      --bg-root: #141415; --bg-surface: #1B1B1E; --bg-surface-elevated: #25252A;
+      --border-subtle: rgba(255,255,255,0.07); --border-strong: rgba(255,255,255,0.14);
+      --text-main: #F2F1EE; --text-muted: #A09C95; --text-faint: #68645E;
+      --primary: #D4A373; --primary-hover: #C59361; --primary-text: #1E150B; --primary-tint: rgba(212,163,115,0.14);
+      --accent: #60A5FA; --accent-tint: rgba(96,165,250,0.14); --success: #34D399;
+    }
+    .palette-bronze.theme-light {
+      --bg-root: #F9F9F8; --bg-surface: #FFFFFF; --bg-surface-elevated: #F1F0ED;
+      --border-subtle: #E5E3DE; --border-strong: #CEC9BF;
+      --text-main: #1D1A17; --text-muted: #6D6861; --text-faint: #99938A;
+      --primary: #A2652B; --primary-hover: #8B5420; --primary-text: #FFFFFF; --primary-tint: rgba(162,101,43,0.08);
+      --accent: #2563EB; --accent-tint: rgba(37,99,235,0.08); --success: #059669;
+    }
+
+    /* UNIFIED COMPONENT UTILITIES */
+    .app-root { background-color: var(--bg-root); color: var(--text-main); }
+    .app-surface { background-color: var(--bg-surface); border-color: var(--border-subtle); }
+    .app-surface-elevated { background-color: var(--bg-surface-elevated); border-color: var(--border-strong); }
+    .app-border { border-color: var(--border-subtle); }
+    .app-border-strong { border-color: var(--border-strong); }
+    .app-text-main { color: var(--text-main); }
+    .app-text-muted { color: var(--text-muted); }
+    .app-text-faint { color: var(--text-faint); }
+    .app-primary-text { color: var(--primary); }
+
+    /* UNIFIED BUTTON SYSTEM */
+    .btn-primary {
+      background-color: var(--primary);
+      color: var(--primary-text);
+      font-weight: 600;
+      padding: 0.5rem 0.875rem;
+      border-radius: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+      font-size: 0.75rem;
+      transition: all 0.15s ease;
+    }
+    .btn-primary:hover { background-color: var(--primary-hover); }
+    .btn-primary:active { transform: scale(0.98); }
+
+    .btn-secondary {
+      background-color: var(--primary-tint);
+      color: var(--primary);
+      font-weight: 600;
+      padding: 0.5rem 0.875rem;
+      border-radius: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+      font-size: 0.75rem;
+      transition: all 0.15s ease;
+    }
+    .btn-secondary:hover { filter: brightness(1.1); }
+    .btn-secondary:active { transform: scale(0.98); }
+
+    .btn-ghost {
+      border: 1px solid var(--border-subtle);
+      background-color: transparent;
+      color: var(--text-main);
+      font-weight: 500;
+      padding: 0.5rem 0.875rem;
+      border-radius: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+      font-size: 0.75rem;
+      transition: all 0.15s ease;
+    }
+    .btn-ghost:hover { background-color: var(--bg-surface-elevated); }
+    .btn-ghost:active { transform: scale(0.98); }
+
+    .btn-icon {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 0.625rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+    }
+    .btn-icon:hover { color: var(--text-main); background-color: var(--bg-surface-elevated); }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased min-h-screen flex flex-col"
+      x-data="{
+        palette: 'linear',
+        themeMode: 'dark',
+        palettes: [
+          { id: 'current', name: '0. Saat Ini (Kasar)', tag: 'Kontras Berlebih', color: '#4F46E5' },
+          { id: 'linear', name: '1. Linear Dark', tag: 'SaaS Terpopuler', color: '#5E6AD2' },
+          { id: 'apple', name: '2. Apple Pro', tag: 'Space Gray & Blue', color: '#0071E3' },
+          { id: 'raycast', name: '3. Raycast / Geist', tag: 'High-Tech Cyan', color: '#00E5FF' },
+          { id: 'stripe', name: '4. Stripe Workbench', tag: 'Navy & Hyper-Indigo', color: '#635BFF' },
+          { id: 'supabase', name: '5. Supabase Forest', tag: 'Charcoal & Emerald', color: '#3ECF8E' },
+          { id: 'arc', name: '6. Arc Sunset', tag: 'Warm Espresso & Coral', color: '#FF6B4A' },
+          { id: 'nordic', name: '7. Nordic Petrol', tag: 'Mata Paling Adem', color: '#14B8A6' },
+          { id: 'github', name: '8. GitHub Primer', tag: 'Classic Clean Tech', color: '#2F81F7' },
+          { id: 'cyberpunk', name: '9. Teenage Eng.', tag: 'Carbon & Safety Orange', color: '#FF5722' },
+          { id: 'bronze', name: '10. Champagne Bronze', tag: 'Luxury Hardware', color: '#D4A373' }
+        ]
+      }"
+      :class="`palette-${palette} theme-${themeMode}`">
+
+  <!-- ============================================================== -->
+  <!-- TOP CONTROLS & PALETTE PICKER                                  -->
+  <!-- ============================================================== -->
+  <header class="sticky top-0 z-50 bg-slate-950/95 backdrop-blur border-b border-slate-800 text-white px-4 py-3 shadow-xl">
+    <div class="max-w-7xl mx-auto space-y-2.5">
+      
+      <!-- Top info line -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center space-x-2.5">
+          <div class="bg-gradient-to-tr from-indigo-500 to-sky-400 p-2 rounded-xl">
+            <i data-lucide="layers" class="w-4 h-4 text-white"></i>
+          </div>
+          <div>
+            <div class="font-bold text-xs sm:text-sm flex items-center gap-2">
+              UTE DESIGN SYSTEM: 10 PALET TERPOPULER & TOMBOL / ICON SERAGAM
+            </div>
+            <p class="text-[11px] text-slate-400">Pilih salah satu dari 10 tema untuk melihat keselarasan icon, tombol, dan warna.</p>
+          </div>
+        </div>
+
+        <!-- Mode Toggle -->
+        <div class="flex items-center gap-2">
+          <div class="bg-slate-900 p-1 rounded-xl border border-slate-800 flex items-center text-xs font-semibold">
+            <button @click="themeMode = 'dark'" :class="themeMode === 'dark' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-400 hover:text-white'" class="px-3 py-1 rounded-lg flex items-center gap-1.5">
+              <i data-lucide="moon" class="w-3.5 h-3.5"></i> Dark (Backend)
+            </button>
+            <button @click="themeMode = 'light'" :class="themeMode === 'light' ? 'bg-slate-200 text-slate-900 shadow-xs' : 'text-slate-400 hover:text-white'" class="px-3 py-1 rounded-lg flex items-center gap-1.5">
+              <i data-lucide="sun" class="w-3.5 h-3.5"></i> Light (Konsumen)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 10 Palette Badges -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+        <template x-for="p in palettes" :key="p.id">
+          <button @click="palette = p.id"
+                  class="px-2.5 py-1.5 rounded-xl border transition flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                  :class="palette === p.id ? 'bg-slate-800 border-slate-600 text-white font-bold ring-1 ring-white/20' : 'bg-slate-950 border-slate-800/80 text-slate-400 hover:text-slate-200 hover:border-slate-700'">
+            <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="`background-color: ${p.color}`"></span>
+            <span x-text="p.name"></span>
+            <span class="text-[9px] font-mono opacity-60 ml-0.5" x-text="p.tag"></span>
+          </button>
+        </template>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ============================================================== -->
+  <!-- ACTIVE DESIGN SYSTEM PREVIEW                                   -->
+  <!-- ============================================================== -->
+  <main class="flex-1 app-root p-4 sm:p-6 transition-colors duration-150">
+    <div class="max-w-7xl mx-auto space-y-6">
+
+      <!-- PALETTE SPECIFICATION & TOKEN OVERVIEW -->
+      <div class="app-surface rounded-2xl p-4 sm:p-5 border space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b app-border pb-3">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-xs uppercase tracking-wider app-text-muted">Desain Aktif:</span>
+            <span class="font-bold text-sm font-mono app-primary-text" x-text="palettes.find(x => x.id === palette)?.name"></span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-md font-semibold" style="background-color: var(--primary-tint); color: var(--primary)" x-text="palettes.find(x => x.id === palette)?.tag"></span>
+          </div>
+          <div class="flex items-center gap-2 text-xs font-mono app-text-muted">
+            <span>Standar Icon: <strong>Lucide 1.75px Stroke</strong></span>
+            <span>&bull;</span>
+            <span>Standar Tombol: <strong>Solid / Tint / Ghost / Micro-32px</strong></span>
+          </div>
+        </div>
+
+        <!-- UNIFIED BUTTONS & ICONS SHOWCASE -->
+        <div>
+          <div class="text-[11px] font-mono uppercase tracking-wider app-text-faint mb-2">Sistem Tombol & Icon Seragam (Unified Design Tokens)</div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <button class="btn-primary">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>Tombol Primary (Aksi Utama)</span>
+            </button>
+            <button class="btn-secondary">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Tombol Secondary (Tint)</span>
+            </button>
+            <button class="btn-ghost">
+              <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+              <span>Tombol Outline/Ghost</span>
+            </button>
+            <button class="btn-icon" title="Cari Part">
+              <i data-lucide="search" class="w-4 h-4"></i>
+            </button>
+            <button class="btn-icon" title="Scan Barcode">
+              <i data-lucide="scan" class="w-4 h-4"></i>
+            </button>
+            <button class="btn-icon" title="Kirim WhatsApp">
+              <i data-lucide="message-square" class="w-4 h-4"></i>
+            </button>
+            <button class="btn-icon" title="Download Faktur">
+              <i data-lucide="printer" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- SECTION 1: BACKEND ERP / WORKSHOP / POS PREVIEW                -->
+      <!-- ============================================================== -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold text-xs uppercase tracking-wider app-text-muted flex items-center gap-2">
+            <i data-lucide="cpu" class="w-4 h-4 app-primary-text"></i>
+            1. Backend ERP (Workshop Servis & POS Kasir Toko)
+          </h3>
+          <span class="text-[11px] font-mono app-text-faint">Area Kerja Teknisi & Kasir (Durasi Panjang)</span>
+        </div>
+
+        <div class="grid grid-cols-12 gap-4">
+          <!-- Sidebar -->
+          <div class="col-span-12 md:col-span-3 app-surface rounded-2xl p-3 border space-y-3">
+            <div class="flex items-center gap-2.5 px-2 py-1.5 border-b app-border pb-2.5">
+              <div class="w-7 h-7 rounded-xl flex items-center justify-center font-bold text-xs" style="background-color: var(--primary); color: var(--primary-text)">
+                UP
+              </div>
+              <div>
+                <div class="font-bold text-xs">UTE PARTS ERP</div>
+                <div class="text-[10px] app-text-muted">Workshop & Toko Pusat</div>
+              </div>
+            </div>
+
+            <!-- Unified nav links -->
+            <div class="space-y-1 text-xs">
+              <div class="font-bold px-2.5 py-2 rounded-xl flex items-center justify-between cursor-pointer" style="background-color: var(--primary-tint); color: var(--primary)">
+                <span class="flex items-center gap-2"><i data-lucide="wrench" class="w-4 h-4"></i> Antrean Workshop</span>
+                <span class="text-[10px] font-mono font-bold px-1.5 rounded-full" style="background-color: var(--primary); color: var(--primary-text)">8</span>
+              </div>
+              <div class="app-text-muted hover:app-text-main px-2.5 py-2 rounded-xl flex items-center gap-2 cursor-pointer transition">
+                <i data-lucide="shopping-cart" class="w-4 h-4"></i> POS Kasir Cepat
+              </div>
+              <div class="app-text-muted hover:app-text-main px-2.5 py-2 rounded-xl flex items-center gap-2 cursor-pointer transition">
+                <i data-lucide="boxes" class="w-4 h-4"></i> Stok Sparepart
+              </div>
+              <div class="app-text-muted hover:app-text-main px-2.5 py-2 rounded-xl flex items-center gap-2 cursor-pointer transition">
+                <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Laporan Omset
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Table & Cards -->
+          <div class="col-span-12 md:col-span-9 space-y-3">
+            <!-- 3 Stat Widgets -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="app-surface rounded-2xl p-3.5 border">
+                <div class="text-[11px] app-text-muted font-medium flex items-center justify-between">
+                  <span>Omset Servis Hari Ini</span>
+                  <i data-lucide="trending-up" class="w-3.5 h-3.5 text-emerald-500"></i>
+                </div>
+                <div class="text-xl font-bold font-mono mt-1">Rp 5.250.000</div>
+                <div class="text-[10px] font-mono app-text-muted mt-1">14 unit HP selesai</div>
+              </div>
+              <div class="app-surface rounded-2xl p-3.5 border">
+                <div class="text-[11px] app-text-muted font-medium flex items-center justify-between">
+                  <span>Unit Dalam Pengerjaan</span>
+                  <i data-lucide="clock" class="w-3.5 h-3.5 app-primary-text"></i>
+                </div>
+                <div class="text-xl font-bold font-mono mt-1">6 Unit HP</div>
+                <div class="text-[10px] font-mono text-amber-500 mt-1">2 Menunggu part LCD</div>
+              </div>
+              <div class="app-surface rounded-2xl p-3.5 border">
+                <div class="text-[11px] app-text-muted font-medium flex items-center justify-between">
+                  <span>Stok Kritis / PO</span>
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-500"></i>
+                </div>
+                <div class="text-xl font-bold font-mono text-rose-500 mt-1">4 Tipe</div>
+                <div class="text-[10px] font-mono text-rose-500 mt-1">Baterai IP11, Lem OCA</div>
+              </div>
+            </div>
+
+            <!-- Table with uniform icons & buttons -->
+            <div class="app-surface rounded-2xl border overflow-hidden">
+              <div class="p-3 border-b app-border flex justify-between items-center">
+                <div class="font-bold text-xs flex items-center gap-2">
+                  <i data-lucide="clipboard-list" class="w-4 h-4 app-primary-text"></i>
+                  Antrean Servis Aktif
+                </div>
+                <div class="flex items-center gap-2">
+                  <button class="btn-ghost py-1 px-2.5 text-xs"><i data-lucide="filter" class="w-3.5 h-3.5"></i> Filter</button>
+                  <button class="btn-primary py-1 px-2.5 text-xs"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Tiket Baru</button>
+                </div>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                  <thead class="text-[10px] uppercase font-mono border-b app-border app-text-muted bg-black/5 dark:bg-white/[0.02]">
+                    <tr>
+                      <th class="p-3">ID & Unit</th>
+                      <th class="p-3">Keluhan & Kerusakan</th>
+                      <th class="p-3">Sparepart Digunakan</th>
+                      <th class="p-3 text-right">Biaya</th>
+                      <th class="p-3 text-center">Status</th>
+                      <th class="p-3 text-center">Aksi Cepat</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y app-border font-sans">
+                    <tr class="hover:bg-black/5 dark:hover:bg-white/[0.02] transition">
+                      <td class="p-3 font-mono">
+                        <div class="font-bold">#SRV-089</div>
+                        <div class="text-[11px] app-text-muted">iPhone 13 Pro Max</div>
+                      </td>
+                      <td class="p-3">
+                        <div class="font-medium">Layar Blank Hijau (WSOD)</div>
+                        <div class="text-[10px] app-text-muted">Jumper flex atau ganti LCD</div>
+                      </td>
+                      <td class="p-3">
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded font-bold" style="background-color: var(--primary-tint); color: var(--primary)">LCD OLED Original</span>
+                      </td>
+                      <td class="p-3 text-right font-mono font-bold">Rp 2.450.000</td>
+                      <td class="p-3 text-center">
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-500">Pengerjaan</span>
+                      </td>
+                      <td class="p-3 text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                          <button class="btn-icon w-7 h-7" title="WhatsApp Pelanggan"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i></button>
+                          <button class="btn-secondary py-1 px-2 text-[11px]">Buka &rarr;</button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    <tr class="hover:bg-black/5 dark:hover:bg-white/[0.02] transition">
+                      <td class="p-3 font-mono">
+                        <div class="font-bold">#SRV-088</div>
+                        <div class="text-[11px] app-text-muted">Samsung S22 Ultra</div>
+                      </td>
+                      <td class="p-3">
+                        <div class="font-medium">Baterai Kembung & Backdoor Terangkat</div>
+                        <div class="text-[10px] app-text-muted">Kapasitas tinggal 62%</div>
+                      </td>
+                      <td class="p-3">
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-emerald-500/15 text-emerald-500">Baterai Ori + Seal Lem</span>
+                      </td>
+                      <td class="p-3 text-right font-mono font-bold">Rp 580.000</td>
+                      <td class="p-3 text-center">
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-500">Siap Ambil</span>
+                      </td>
+                      <td class="p-3 text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                          <button class="btn-icon w-7 h-7" title="WhatsApp Pelanggan"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i></button>
+                          <button class="btn-secondary py-1 px-2 text-[11px]">Buka &rarr;</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- SECTION 2: WEB KONSUMEN / MARKETPLACE PREVIEW                  -->
+      <!-- ============================================================== -->
+      <div class="space-y-3 pt-4 border-t app-border">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold text-xs uppercase tracking-wider app-text-muted flex items-center gap-2">
+            <i data-lucide="shopping-bag" class="w-4 h-4 app-primary-text"></i>
+            2. Web Konsumen (Katalog Sparepart & Tracking Servis)
+          </h3>
+          <span class="text-[11px] font-mono app-text-faint">Area Publik / Pelanggan</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <!-- Product Card 1 -->
+          <div class="app-surface rounded-2xl p-4 border space-y-3 flex flex-col justify-between">
+            <div class="space-y-2.5">
+              <div class="aspect-[16/10] rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center relative overflow-hidden">
+                <i data-lucide="smartphone" class="w-8 h-8 app-text-faint"></i>
+                <span class="absolute top-2 left-2 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md" style="background-color: var(--primary); color: var(--primary-text)">Ori Cabutan</span>
+              </div>
+              <div>
+                <div class="text-[10px] font-mono app-text-muted">LCD Assembly &bull; Apple</div>
+                <h4 class="font-bold text-xs leading-snug">LCD iPhone 13 Pro OLED Original (Truetone Aktif)</h4>
+                <div class="flex items-baseline gap-2 mt-1.5">
+                  <span class="text-sm font-bold font-mono app-primary-text">Rp 1.850.000</span>
+                  <span class="text-[10px] line-through app-text-faint font-mono">Rp 2.100.000</span>
+                </div>
+              </div>
+            </div>
+            <div class="pt-2.5 border-t app-border flex items-center gap-2">
+              <button class="btn-primary flex-1"><i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i> Beli Sekarang</button>
+              <button class="btn-icon" title="Wishlist"><i data-lucide="heart" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+
+          <!-- Product Card 2 -->
+          <div class="app-surface rounded-2xl p-4 border space-y-3 flex flex-col justify-between">
+            <div class="space-y-2.5">
+              <div class="aspect-[16/10] rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center relative overflow-hidden">
+                <i data-lucide="battery-charging" class="w-8 h-8 app-text-faint"></i>
+                <span class="absolute top-2 left-2 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-500">Garansi 6 Bln</span>
+              </div>
+              <div>
+                <div class="text-[10px] font-mono app-text-muted">Battery Cell &bull; Apple</div>
+                <h4 class="font-bold text-xs leading-snug">Baterai iPhone 11 (3110 mAh) High Capacity</h4>
+                <div class="flex items-baseline gap-2 mt-1.5">
+                  <span class="text-sm font-bold font-mono app-primary-text">Rp 250.000</span>
+                  <span class="text-[10px] font-mono app-text-muted">(Teknisi: Rp 165K)</span>
+                </div>
+              </div>
+            </div>
+            <div class="pt-2.5 border-t app-border flex items-center gap-2">
+              <button class="btn-primary flex-1"><i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i> Beli Sekarang</button>
+              <button class="btn-icon" title="Wishlist"><i data-lucide="heart" class="w-3.5 h-3.5"></i></button>
+            </div>
+          </div>
+
+          <!-- Tracking Servis Card -->
+          <div class="app-surface rounded-2xl p-4 border space-y-3 flex flex-col justify-between">
+            <div class="space-y-2">
+              <div class="w-8 h-8 rounded-xl flex items-center justify-center" style="background-color: var(--primary-tint); color: var(--primary)">
+                <i data-lucide="search-check" class="w-4 h-4"></i>
+              </div>
+              <h4 class="font-bold text-xs">Cek Status Servis Pelanggan</h4>
+              <p class="text-[11px] app-text-muted leading-relaxed">
+                Ketik nomor nota atau nomor HP untuk memantau progress pengerjaan teknisi secara live.
+              </p>
+              <div class="space-y-1.5 pt-1">
+                <input type="text" placeholder="Contoh: SRV-089 atau 0812..." class="w-full text-xs p-2 rounded-xl border app-border bg-black/5 dark:bg-white/5 outline-none font-mono">
+              </div>
+            </div>
+            <button class="btn-secondary w-full"><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i> Lacak Sekarang</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    lucide.createIcons();
+    document.addEventListener('alpine:initialized', () => {
+      Alpine.effect(() => {
+        const p = Alpine.store('palette');
+        setTimeout(() => lucide.createIcons(), 20);
+      });
+    });
+  </script>
+</body>
+</html>

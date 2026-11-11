@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './prism-tokens.css';
+@import './palettes.css';
 @import './print.css';
 
 /* [T-32] Variant dark berbasis class (.dark) */
@@ -15,12 +16,12 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 
-    --color-up-primary: #4F46E5;
-    --color-up-primary-dark: #3730A3;
-    --color-up-accent: #D97706;
-    --color-up-mint: #10B981;
-    --color-up-amber: #F59E0B;
-    --color-up-red: #EF4444;
+    --color-up-primary: var(--up-primary);
+    --color-up-primary-dark: var(--up-primary-dark);
+    --color-up-accent: var(--up-accent);
+    --color-up-mint: var(--up-mint);
+    --color-up-amber: var(--up-amber);
+    --color-up-red: var(--up-red);
 
     --color-ink-950: #0B0F19;
     --color-ink-900: #0F172A;

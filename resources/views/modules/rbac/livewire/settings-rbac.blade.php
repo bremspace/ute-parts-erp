@@ -39,6 +39,7 @@
             { id: 'database', label: 'Basis Data & Backup Sistem', subModul: 'sistem', tab: 'database', subTab: null, icon: '💾', group: 'Sistem & Keuangan', desc: 'Backup snapshot SQL, optimasi database, riwayat pencadangan data', keywords: 'database basis data backup restore dump sql download arsip cadangan' },
             { id: 'cache', label: 'Clear Cache Server & Optimasi', subModul: 'sistem', tab: 'database', subTab: null, icon: '⚡', group: 'Sistem & Keuangan', desc: 'Bersihkan cache aplikasi, view, route, config, dan OPcache server', keywords: 'cache clear cache server optimasi bersihkan cache flush ram' },
             { id: 'jaringan', label: 'Akses Jaringan & Domain Online', subModul: 'sistem', tab: 'jaringan', subTab: null, icon: '🌐', group: 'Sistem & Keuangan', desc: 'Upgrade server lokal ke mode online internet via Cloudflare Tunnel atau domain sendiri', keywords: 'jaringan network domain online internet cloudflare tunnel lokal lan url ip wifi' },
+            { id: 'tema', label: 'Tema & Palet Desain Tampilan', subModul: 'sistem', tab: 'tema', subTab: null, icon: '🎨', group: 'Sistem & Keuangan', desc: '10 palet warna estetika (Linear, Apple, Raycast, Stripe, Supabase, Arc, Nordic, dll) & mode tampilan', keywords: 'tema theme palet palette warna desain mode gelap terang dark light visual' },
             { id: 'keamanan_2fa', label: 'Keamanan Akun & 2FA (Two-Factor)', subModul: 'sistem', tab: 'keamanan', subTab: null, icon: '🛡️', group: 'Sistem & Keuangan', desc: 'Verifikasi login dua langkah via Google Authenticator, secret key & kode cadangan', keywords: 'keamanan 2fa two factor totp autentikasi login otp google authenticator password' },
             { id: 'keamanan_sesi', label: 'Manajemen Sesi Perangkat & Login', subModul: 'sistem', tab: 'keamanan', subTab: null, icon: '💻', group: 'Sistem & Keuangan', desc: 'Pantau daftar login aktif, alamat IP, browser dan revoke sesi jarak jauh', keywords: 'sesi login perangkat device ip browser revoke logout aktif user' }
         ],
@@ -93,10 +94,10 @@
                     $wire.set('activeTab', 'integrasi');
                 }
             } else if (modul === 'sistem') {
-                const target = @js(isSuperAdminOrOwner()) ? 'database' : 'master';
-                if (!['database', 'master', 'audit', 'keamanan'].includes(currentTab)) {
+                const target = @js(isSuperAdminOrOwner()) ? 'database' : 'tema';
+                if (!['database', 'master', 'audit', 'keamanan', 'jaringan', 'tema'].includes(currentTab)) {
                     $wire.set('activeTab', target);
-                } else if (@js(isSuperAdminOrOwner()) && !['database', 'audit', 'keamanan'].includes(currentTab)) {
+                } else if (@js(isSuperAdminOrOwner()) && !['database', 'audit', 'keamanan', 'jaringan', 'tema'].includes(currentTab)) {
                     $wire.set('activeTab', 'database');
                 }
             }
@@ -109,7 +110,7 @@
             else if (['loyalitas', 'pajak', 'qris'].includes(value)) subModul = 'kebijakan';
             else if (['master', 'printer'].includes(value)) subModul = (value === 'master' && subModul === 'sistem') ? 'sistem' : 'operasional';
             else if (value === 'integrasi') subModul = 'integrasi';
-            else if (['database', 'audit', 'keamanan', 'jaringan'].includes(value)) subModul = 'sistem';
+            else if (['database', 'audit', 'keamanan', 'jaringan', 'tema'].includes(value)) subModul = 'sistem';
 
             const slug = value.replace(/_/g, '-');
             const target = '/pengaturan/' + slug;
@@ -436,6 +437,12 @@
 
                 <!-- Group 6: Sistem & Keuangan -->
                 <div x-show="subModul === 'sistem'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap flex-shrink-0 min-w-max" x-cloak>
+                    <button
+                        wire:click="$set('activeTab', 'tema')"
+                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'tema' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        🎨 Tema &amp; Palet Desain
+                    </button>
                     <button
                         wire:click="$set('activeTab', 'master')"
                         class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'master' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
@@ -4320,6 +4327,188 @@
                 Anda tidak memiliki hak akses melihat audit log aktivitas sistem.
             </div>
         @endcan
+    @endif
+
+    @if($activeTab === 'tema')
+    <div class="space-y-6" x-data="themeManager()">
+        <!-- Header Section -->
+        <div class="glass-panel p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 space-y-1">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl p-2.5 rounded-2xl bg-up-primary/10 text-up-primary border border-up-primary/20">🎨</span>
+                <div>
+                    <h2 class="text-sm sm:text-base font-bold text-ink-900 dark:text-white">Tema Tampilan &amp; Sistem Palet Desain</h2>
+                    <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Pilih gaya visual ERP favoritmu. Perubahan langsung diaplikasikan secara instan dan tersimpan ke akunmu.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode Gelap / Terang / Otomatis -->
+        <div class="glass-panel p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 space-y-4">
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-ink-400">Mode Pencahayaan</h3>
+                <p class="text-xs text-ink-600 dark:text-ink-400 mt-0.5">Pilih tampilan kontras gelap untuk bengkel/ruang kerja redup, atau mode terang untuk kasir siang hari.</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button type="button" @click="setPreference('dark')"
+                        class="p-4 rounded-2xl border text-left flex items-center justify-between transition cursor-pointer"
+                        :class="preference === 'dark' ? 'border-up-primary bg-up-primary/10 text-ink-900 dark:text-white ring-2 ring-up-primary/30' : 'border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-ink-700 dark:text-ink-300'">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">🌙</span>
+                        <div>
+                            <div class="text-xs font-bold">Mode Gelap (Dark)</div>
+                            <div class="text-[11px] text-ink-500 dark:text-ink-400">Kontras tinggi & nyaman di mata</div>
+                        </div>
+                    </div>
+                    <span x-show="preference === 'dark'" class="w-2.5 h-2.5 rounded-full bg-up-primary"></span>
+                </button>
+                <button type="button" @click="setPreference('light')"
+                        class="p-4 rounded-2xl border text-left flex items-center justify-between transition cursor-pointer"
+                        :class="preference === 'light' ? 'border-up-primary bg-up-primary/10 text-ink-900 dark:text-white ring-2 ring-up-primary/30' : 'border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-ink-700 dark:text-ink-300'">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">☀️</span>
+                        <div>
+                            <div class="text-xs font-bold">Mode Terang (Light)</div>
+                            <div class="text-[11px] text-ink-500 dark:text-ink-400">Jelas & bersih untuk siang hari</div>
+                        </div>
+                    </div>
+                    <span x-show="preference === 'light'" class="w-2.5 h-2.5 rounded-full bg-up-primary"></span>
+                </button>
+                <button type="button" @click="setPreference('auto')"
+                        class="p-4 rounded-2xl border text-left flex items-center justify-between transition cursor-pointer"
+                        :class="preference === 'auto' ? 'border-up-primary bg-up-primary/10 text-ink-900 dark:text-white ring-2 ring-up-primary/30' : 'border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-ink-700 dark:text-ink-300'">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">💻</span>
+                        <div>
+                            <div class="text-xs font-bold">Otomatis (Sistem OS)</div>
+                            <div class="text-[11px] text-ink-500 dark:text-ink-400">Ikuti jadwal perangkat Anda</div>
+                        </div>
+                    </div>
+                    <span x-show="preference === 'auto'" class="w-2.5 h-2.5 rounded-full bg-up-primary"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 10 Taste Design Palettes Grid -->
+        <div class="glass-panel p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-ink-400">10 Palet Desain Taste-Skill</h3>
+                    <p class="text-xs text-ink-600 dark:text-ink-400 mt-0.5">Setiap palet mengubah nuansa warna aksen, warna tombol cockpit, background kartu, dan highlight tabular.</p>
+                </div>
+                <div class="text-xs font-bold px-3 py-1 rounded-full bg-up-primary/15 text-up-primary border border-up-primary/25">
+                    Palet Aktif: <span class="capitalize" x-text="palettes.find(p => p.id === palette)?.name || palette"></span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                <template x-for="item in palettes" :key="item.id">
+                    <div class="p-3.5 rounded-2xl border transition-[border-color,background-color,transform] flex flex-col justify-between gap-3 group relative cursor-pointer"
+                         :class="palette === item.id ? 'border-up-primary bg-up-primary/[0.08] ring-2 ring-up-primary/30 shadow-md' : 'border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] hover:border-black/20 dark:hover:border-white/20'"
+                         @click="setPalette(item.id)">
+                        
+                        <!-- Top details -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold text-ink-900 dark:text-white" x-text="item.name"></span>
+                                <span x-show="palette === item.id" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary text-white">Aktif</span>
+                            </div>
+                            <p class="text-[11px] text-ink-500 dark:text-ink-400 line-clamp-1" x-text="item.desc"></p>
+                        </div>
+
+                        <!-- Swatches row -->
+                        <div class="flex items-center gap-1.5 p-2 rounded-xl bg-black/5 dark:bg-black/30 border border-black/5 dark:border-white/5">
+                            <span class="w-5 h-5 rounded-lg border border-white/20 shadow-xs flex-shrink-0" :style="'background: ' + item.primary" title="Primary Accent"></span>
+                            <span class="w-5 h-5 rounded-lg border border-white/20 shadow-xs flex-shrink-0" :style="'background: ' + item.accent" title="Accent Warm"></span>
+                            <span class="w-5 h-5 rounded-lg border border-white/20 shadow-xs flex-shrink-0" :style="'background: ' + item.bgDark" title="Dark Canvas"></span>
+                            <span class="w-5 h-5 rounded-lg border border-black/10 shadow-xs flex-shrink-0" :style="'background: ' + item.bgLight" title="Light Canvas"></span>
+                            <span class="ml-auto text-[10px] font-mono text-ink-400 font-bold" x-text="item.primary"></span>
+                        </div>
+
+                        <!-- Mini cockpit preview strip -->
+                        <div class="pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between">
+                            <span class="text-[10px] font-mono font-bold text-ink-600 dark:text-ink-300">#SRV-042 • 285k</span>
+                            <button type="button" class="text-[11px] font-bold px-2.5 py-1 rounded-lg transition"
+                                    :class="palette === item.id ? 'bg-up-primary text-white shadow-xs' : 'bg-black/5 dark:bg-white/10 text-ink-700 dark:text-ink-300 hover:bg-up-primary hover:text-white'">
+                                <span x-text="palette === item.id ? 'Dipakai' : 'Pilih'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Cockpit Live Interactive Preview Box -->
+        <div class="glass-panel p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="space-y-0.5">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-ink-400">Pratinjau Langsung (Live Cockpit Design Standard)</h3>
+                    <p class="text-xs text-ink-600 dark:text-ink-400">Bagaimana token warna, tombol 3-tier, font monospace tabular, dan badge status tampil pada palet yang dipilih.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-up-primary/10 text-up-primary border border-up-primary/20">
+                        data-palette="<span x-text="palette"></span>"
+                    </span>
+                </div>
+            </div>
+
+            <!-- Preview Card Matrix -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- 1. Tombol 3-Tier Cockpit -->
+                <div class="p-4 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] space-y-3">
+                    <div class="text-xs font-bold text-ink-900 dark:text-white">Sistem Tombol 3-Tier</div>
+                    <div class="flex flex-col gap-2">
+                        <button type="button" class="btn-primary-cockpit w-full py-2 px-3 text-xs justify-center">
+                            <span>Primary Cockpit (F2)</span>
+                        </button>
+                        <button type="button" class="btn-tactile w-full py-2 px-3 text-xs justify-center">
+                            <span>Secondary Tactile (F3)</span>
+                        </button>
+                        <button type="button" class="btn-erp-ghost w-full py-2 px-3 text-xs justify-center">
+                            <span>Ghost Action (Esc)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. Typography & Tabular Numbers -->
+                <div class="p-4 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] space-y-3">
+                    <div class="text-xs font-bold text-ink-900 dark:text-white">Workshop &amp; POS Monospace</div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between text-xs pb-1.5 border-b border-black/5 dark:border-white/5">
+                            <span class="text-ink-500">Nomor Servis:</span>
+                            <span class="font-mono font-bold text-up-primary">#SRV-2026-089</span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs pb-1.5 border-b border-black/5 dark:border-white/5">
+                            <span class="text-ink-500">Total Tagihan POS:</span>
+                            <span class="font-mono font-extrabold text-sm tabular-nums text-ink-900 dark:text-white">Rp 1.450.000</span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-ink-500">Margin Profit:</span>
+                            <span class="font-mono font-bold text-up-mint tabular-nums">+34.8%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Status Badges & High-Visibility Pills -->
+                <div class="p-4 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] space-y-3">
+                    <div class="text-xs font-bold text-ink-900 dark:text-white">Status Badges &amp; WMS</div>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-up-primary/15 text-up-primary border border-up-primary/30">
+                            Proses Servis
+                        </span>
+                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-up-mint/15 text-up-mint border border-up-mint/30">
+                            Selesai & Lunas
+                        </span>
+                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-up-amber/15 text-up-amber border border-up-amber/30">
+                            Menunggu Sparepart
+                        </span>
+                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-up-red/15 text-up-red border border-up-red/30">
+                            Stok Kritis: 1 Pcs
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     @endif
 
     @if($activeTab === 'keamanan')

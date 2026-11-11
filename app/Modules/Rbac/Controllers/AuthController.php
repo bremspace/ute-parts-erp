@@ -71,20 +71,39 @@ class AuthController extends Controller
         return $this->success($data, 'Login berhasil');
     }
 
-    // [API: AUTH-03] Update theme preference (T-32)
+    // [API: AUTH-03] Update theme preference and color palette (T-32 & Taste Palettes)
     public function updateTheme(Request $request)
     {
         $theme = $request->input('theme');
+        $palette = $request->input('palette');
 
-        if (! in_array($theme, ['light', 'dark', 'auto'], true)) {
+        $allowedThemes = ['light', 'dark', 'auto'];
+        $allowedPalettes = [
+            'default', 'linear', 'apple', 'raycast', 'stripe',
+            'supabase', 'arc', 'nordic', 'github', 'cyberpunk', 'bronze'
+        ];
+
+        if ($theme !== null && ! in_array($theme, $allowedThemes, true)) {
             return $this->error('Tema tidak valid', 422);
         }
 
+        if ($palette !== null && ! in_array($palette, $allowedPalettes, true)) {
+            return $this->error('Palet warna tidak valid', 422);
+        }
+
         $user = $request->user();
-        $user->theme_preference = $theme;
+        if ($theme !== null) {
+            $user->theme_preference = $theme;
+        }
+        if ($palette !== null) {
+            $user->color_palette = $palette;
+        }
         $user->save();
 
-        return $this->success(['theme' => $theme], 'Preferensi tema disimpan');
+        return $this->success([
+            'theme' => $user->theme_preference,
+            'palette' => $user->color_palette ?? 'default',
+        ], 'Preferensi tema dan palet disimpan');
     }
 
     // [API: AUTH-02] Select branch

@@ -71,7 +71,7 @@ class SettingsRbac extends Component
 
     public const VALID_TABS = [
         'users', 'role', 'cabang', 'master_produk', 'master-produk', 'export_import', 'export-import',
-        'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan', 'jaringan',
+        'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit', 'keamanan', 'jaringan', 'tema',
     ];
 
     #[Url(as: 'tab')]
@@ -347,7 +347,7 @@ class SettingsRbac extends Component
             'kebijakan' => $this->activeTab = in_array($this->activeTab, ['loyalitas', 'pajak', 'qris'], true) ? $this->activeTab : 'loyalitas',
             'operasional' => $this->activeTab = in_array($this->activeTab, ['master', 'printer'], true) ? $this->activeTab : 'master',
             'integrasi' => $this->activeTab = 'integrasi',
-            'sistem' => $this->activeTab = in_array($this->activeTab, ['database', 'master', 'audit', 'keamanan'], true) ? $this->activeTab : (isSuperAdminOrOwner() ? 'database' : 'master'),
+            'sistem' => $this->activeTab = in_array($this->activeTab, ['database', 'master', 'audit', 'keamanan', 'jaringan', 'tema'], true) ? $this->activeTab : (isSuperAdminOrOwner() ? 'database' : 'tema'),
             default => null,
         };
     }

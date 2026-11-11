@@ -10,6 +10,7 @@
         window.UTE_ZONE = 'backoffice';
         window.UTE_AUTHED = {!! auth()->check() ? 'true' : 'false' !!};
         window.UTE_THEME = {!! json_encode(auth()->user()?->theme_preference) !!};
+        window.UTE_PALETTE = {!! json_encode(auth()->user()?->color_palette ?? 'default') !!};
     </script>
     <script>
         // [T-32] Bootstrap tema & ukuran font — terapkan sebelum cat pertama untuk mencegah FOUC
@@ -22,6 +23,12 @@
             var root = document.documentElement;
             root.dataset.theme = dark ? 'dark' : 'light';
             root.classList.toggle('dark', dark);
+
+            var pal = null;
+            try { pal = localStorage.getItem('ute-palette'); } catch (e) {}
+            if (!pal) pal = window.UTE_PALETTE;
+            if (!pal) pal = 'default';
+            root.dataset.palette = pal;
 
             var size = 'md';
             try { size = localStorage.getItem('ute-font-size') || 'md'; } catch (e) {}
@@ -742,20 +749,68 @@
                         </div>
                     @endif
 
-                    <!-- [T-32] Toggle tema: sun (gelap) / moon (terang) / monitor (auto) -->
-                    <button type="button" x-data="themeManager()" @click="cycleTheme()"
-                            title="Ganti tema" aria-label="Ganti tema"
-                            class="p-1.5 sm:p-2 rounded-xl text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center flex-shrink-0">
-                        <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'dark'" x-cloak>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                        </svg>
-                        <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'light'" x-cloak>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                        </svg>
-                        <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'auto'" x-cloak>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                        </svg>
-                    </button>
+                    <!-- [T-32 & Taste Palettes] Pengatur Tema & Palet Desain -->
+                    <div class="relative flex items-center gap-1 flex-shrink-0" x-data="themeManager()" @click.outside="paletteOpen = false">
+                        <!-- Quick Palette Dropdown Trigger -->
+                        <button type="button" @click="paletteOpen = !paletteOpen"
+                                title="Pilih Palet Tema Desain" aria-label="Pilih Palet Tema Desain"
+                                class="p-1.5 sm:p-2 rounded-xl text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center gap-1.5">
+                            <span class="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-white/20 shadow-xs flex-shrink-0"
+                                  :style="'background: ' + (palettes.find(p => p.id === palette)?.primary || '#4F46E5')"></span>
+                            <svg class="w-3 h-3 text-ink-400 hidden md:inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        <!-- Palette Dropdown Popover -->
+                        <div x-show="paletteOpen" x-cloak
+                             x-transition:enter="transition ease-out duration-120"
+                             x-transition:enter-start="opacity-0 scale-95"
+                             x-transition:enter-end="opacity-100 scale-100"
+                             x-transition:leave="transition ease-out duration-100"
+                             x-transition:leave-start="opacity-100 scale-100"
+                             x-transition:leave-end="opacity-0 scale-95"
+                             class="absolute right-8 top-full mt-2 w-64 origin-top-right py-2 rounded-2xl bg-white dark:bg-[#0F172A] border border-ink-200/80 dark:border-white/10 shadow-2xl z-50 max-h-[85vh] overflow-y-auto">
+                            <div class="px-3 py-1.5 flex items-center justify-between border-b border-ink-100 dark:border-white/5 mb-1">
+                                <span class="text-[11px] font-bold text-ink-500 dark:text-ink-400 uppercase tracking-wider">Palet Tampilan (10 Tema)</span>
+                                <a href="/app/pengaturan?tab=tema" class="text-[10px] text-up-primary hover:underline font-semibold">Semua</a>
+                            </div>
+                            <div class="space-y-0.5 px-1">
+                                <template x-for="item in palettes" :key="item.id">
+                                    <button type="button" @click="setPalette(item.id); paletteOpen = false"
+                                            class="w-full px-2.5 py-1.5 rounded-xl text-left text-xs flex items-center justify-between transition hover:bg-black/5 dark:hover:bg-white/5"
+                                            :class="palette === item.id ? 'bg-up-primary/10 text-up-primary font-bold' : 'text-ink-700 dark:text-ink-300'">
+                                        <div class="flex items-center gap-2.5 min-w-0">
+                                            <span class="w-3.5 h-3.5 rounded-full flex-shrink-0 shadow-xs border border-white/20"
+                                                  :style="'background: ' + item.primary"></span>
+                                            <div class="truncate">
+                                                <div class="truncate" x-text="item.name"></div>
+                                                <div class="text-[10px] text-ink-400 font-normal truncate" x-text="item.desc"></div>
+                                            </div>
+                                        </div>
+                                        <svg x-show="palette === item.id" class="w-4 h-4 text-up-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Toggle mode: sun (gelap) / moon (terang) / monitor (auto) -->
+                        <button type="button" @click="cycleTheme()"
+                                title="Ganti mode terang/gelap" aria-label="Ganti mode terang/gelap"
+                                class="p-1.5 sm:p-2 rounded-xl text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'dark'" x-cloak>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                            </svg>
+                            <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'light'" x-cloak>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                            </svg>
+                            <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'auto'" x-cloak>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </header>
 

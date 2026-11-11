@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>UTE Parts ERP - Responsive Multi-Device Mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    [x-cloak] { display: none !important; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col" 
+      x-data="{ 
+        currentTab: 1, 
+        viewportMode: 'responsive',
+        mobileView1: 'list',
+        kanbanStage: 'all',
+        selectedTicket: {
+          id: '#SRV-202611-042',
+          device: 'Apple iPhone 13 Pro 128GB',
+          color: 'Sierra Blue',
+          customer: 'Budi Santoso',
+          phone: '0812-9988-1234',
+          imei: '356789104829102',
+          complaint: 'Layar blank hijau mendadak setelah jatuh ringan, getar & suara normal.',
+          tech: 'Bima'
+        }
+      }">
+
+  <!-- ============================================================== -->
+  <!-- TOP SYSTEM BAR (RESPONSIVE HEADER)                             -->
+  <!-- ============================================================== -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50">
+    <div class="px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
+      <!-- Logo & Title -->
+      <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+        <div class="bg-blue-600 p-1.5 rounded-lg text-white flex items-center justify-center">
+          <i data-lucide="wrench" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </div>
+        <div>
+          <div class="font-bold text-xs sm:text-sm tracking-wide flex items-center gap-1.5">
+            UTE PARTS <span class="text-[9px] sm:text-[10px] bg-blue-900 text-blue-300 px-1 py-0.2 rounded border border-blue-700">ERP v2</span>
+          </div>
+          <div class="hidden sm:block text-[10px] text-slate-400">Multi-Device Responsive Mockup</div>
+        </div>
+      </div>
+
+      <!-- Direction Tabs (Desktop & Tablet) -->
+      <div class="hidden md:flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+        <button @click="currentTab = 1" :class="currentTab === 1 ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:text-white'" class="px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 transition">
+          <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
+          <span>1. Workshop</span>
+        </button>
+        <button @click="currentTab = 2" :class="currentTab === 2 ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:text-white'" class="px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 transition">
+          <i data-lucide="boxes" class="w-3.5 h-3.5"></i>
+          <span>2. Inventory</span>
+        </button>
+        <button @click="currentTab = 3" :class="currentTab === 3 ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:text-white'" class="px-3 py-1 rounded text-xs font-semibold flex items-center gap-1 transition">
+          <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+          <span>3. Hybrid POS</span>
+        </button>
+      </div>
+
+      <!-- Viewport Device Switcher Simulator (for Desktop testing) -->
+      <div class="hidden lg:flex items-center gap-1 bg-slate-800/80 px-2 py-1 rounded border border-slate-700 text-xs">
+        <span class="text-[10px] text-slate-400 font-mono mr-1">Preview:</span>
+        <button @click="viewportMode = 'responsive'" :class="viewportMode === 'responsive' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2 py-0.5 rounded text-[11px] font-medium">Auto Full</button>
+        <button @click="viewportMode = 'tablet'" :class="viewportMode === 'tablet' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1"><i data-lucide="tablet" class="w-3 h-3"></i> Tablet</button>
+        <button @click="viewportMode = 'mobile'" :class="viewportMode === 'mobile' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'" class="px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1"><i data-lucide="smartphone" class="w-3 h-3"></i> HP</button>
+      </div>
+
+      <!-- User Info -->
+      <div class="flex items-center space-x-2 text-xs">
+        <span class="font-mono text-emerald-400 bg-emerald-950 px-2 py-1 rounded border border-emerald-800 text-[11px] flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          Agus (Roxy)
+        </span>
+      </div>
+    </div>
+
+    <!-- Mobile Direction Switcher (Dropdown / Pill on Mobile) -->
+    <div class="flex md:hidden border-t border-slate-800 bg-slate-900/95 px-2 py-1.5 justify-around text-xs">
+      <button @click="currentTab = 1" :class="currentTab === 1 ? 'text-blue-400 font-bold border-b-2 border-blue-400' : 'text-slate-400'" class="pb-1 px-2 flex items-center gap-1">
+        <i data-lucide="cpu" class="w-3.5 h-3.5"></i> Workshop
+      </button>
+      <button @click="currentTab = 2" :class="currentTab === 2 ? 'text-blue-400 font-bold border-b-2 border-blue-400' : 'text-slate-400'" class="pb-1 px-2 flex items-center gap-1">
+        <i data-lucide="boxes" class="w-3.5 h-3.5"></i> Inventory
+      </button>
+      <button @click="currentTab = 3" :class="currentTab === 3 ? 'text-blue-400 font-bold border-b-2 border-blue-400' : 'text-slate-400'" class="pb-1 px-2 flex items-center gap-1">
+        <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> POS & Kanban
+      </button>
+    </div>
+  </header>
+
+  <!-- Container Wrapper: Supports Auto-Width or Simulated Tablet/Mobile Frame -->
+  <div class="flex-1 w-full flex justify-center p-2 sm:p-4">
+    <div class="w-full transition-all duration-300"
+         :class="{
+           'max-w-[1600px]': viewportMode === 'responsive',
+           'max-w-[768px] border-x border-slate-300 bg-white shadow-xl min-h-[900px]': viewportMode === 'tablet',
+           'max-w-[390px] border border-slate-400 rounded-3xl bg-white shadow-2xl overflow-hidden min-h-[800px]': viewportMode === 'mobile'
+         }">
+
+      <!-- ============================================================== -->
+      <!-- DIRECTION 1: WORKSHOP CONSOLE (RESPONSIVE SPLIT-SCREEN)        -->
+      <!-- ============================================================== -->
+      <section x-show="currentTab === 1" class="space-y-3">
+        <!-- Responsive Info Banner -->
+        <div class="bg-blue-50 border-l-4 border-blue-600 p-2.5 sm:p-3 rounded-r text-xs text-blue-900 flex flex-wrap items-center justify-between gap-2 shadow-sm">
+          <div class="flex items-center gap-2">
+            <i data-lucide="info" class="w-4 h-4 text-blue-600 shrink-0"></i>
+            <span><strong>Arah 1: Workshop Console</strong> — Di HP, antrean tiket dan workspace sparepart otomatis beradaptasi (tap tiket untuk buka detail & pasang part).</span>
+          </div>
+          <!-- Mobile Screen Toggle Button -->
+          <div class="lg:hidden flex bg-blue-200/80 p-0.5 rounded text-[11px] font-semibold w-full sm:w-auto justify-center">
+            <button @click="mobileView1 = 'list'" :class="mobileView1 === 'list' ? 'bg-white text-blue-900 shadow-xs' : 'text-blue-800'" class="px-3 py-1 rounded flex-1 sm:flex-none flex items-center justify-center gap-1">
+              <i data-lucide="list" class="w-3 h-3"></i> Tiket (12)
+            </button>
+            <button @click="mobileView1 = 'detail'" :class="mobileView1 === 'detail' ? 'bg-white text-blue-900 shadow-xs' : 'text-blue-800'" class="px-3 py-1 rounded flex-1 sm:flex-none flex items-center justify-center gap-1">
+              <i data-lucide="wrench" class="w-3 h-3"></i> Detail & Part
+            </button>
+          </div>
+        </div>
+
+        <!-- Workshop Grid: Desktop side-by-side (5:7), Mobile toggleable list/detail -->
+        <div class="grid grid-cols-12 gap-3 sm:gap-4 items-start">
+          
+          <!-- LEFT: Service Queue Panel -->
+          <div class="col-span-12 lg:col-span-5 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col overflow-hidden"
+               :class="{'hidden lg:flex': mobileView1 === 'detail'}">
+            <!-- Header with Quick Scan -->
+            <div class="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i data-lucide="clock" class="w-4 h-4 text-slate-600"></i>
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-700">Antrean Servis</span>
+                <span class="bg-blue-100 text-blue-800 text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold">12 Unit</span>
+              </div>
+              <button class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow-xs">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> <span>Input Unit</span>
+              </button>
+            </div>
+
+            <!-- Search Field with Touch-friendly Target -->
+            <div class="p-2 border-b border-slate-100 bg-white">
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5"></i>
+                <input type="text" placeholder="Cari IMEI, No Tiket, Tipe HP..." class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-2 focus:ring-blue-500 font-mono">
+              </div>
+            </div>
+
+            <!-- Ticket Items List -->
+            <div class="divide-y divide-slate-100 max-h-[520px] overflow-y-auto">
+              <!-- Ticket 1 (Selected) -->
+              <div @click="mobileView1 = 'detail'" class="p-3 bg-blue-50/70 border-l-4 border-blue-600 cursor-pointer hover:bg-blue-100/50 transition">
+                <div class="flex justify-between items-start gap-1">
+                  <div class="font-mono text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                    <i data-lucide="smartphone" class="w-3.5 h-3.5 text-blue-600 shrink-0"></i>
+                    <span class="truncate">iPhone 13 Pro 128GB</span>
+                  </div>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                    Tunggu Part
+                  </span>
+                </div>
+                <div class="text-xs text-slate-700 mt-1 flex justify-between">
+                  <span>Budi Santoso</span>
+                  <span class="text-slate-400 font-mono text-[11px]">0812-9988-1234</span>
+                </div>
+                <div class="text-[11px] text-slate-500 mt-1 line-clamp-1">Keluhan: Layar blank hijau mendadak, getar & suara ada.</div>
+                <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-blue-200/50 text-[10px] text-slate-500 font-mono">
+                  <span>#SRV-042</span>
+                  <span class="text-blue-700 font-semibold lg:hidden flex items-center gap-0.5">Buka Workspace &rarr;</span>
+                  <span class="hidden lg:inline text-slate-500">Teknisi: Bima</span>
+                </div>
+              </div>
+
+              <!-- Ticket 2 -->
+              <div class="p-3 cursor-pointer hover:bg-slate-50 transition">
+                <div class="flex justify-between items-start gap-1">
+                  <div class="font-mono text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="smartphone" class="w-3.5 h-3.5 text-slate-500 shrink-0"></i>
+                    <span class="truncate">Samsung Galaxy S23 Ultra</span>
+                  </div>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
+                    Pengerjaan
+                  </span>
+                </div>
+                <div class="text-xs text-slate-700 mt-1 flex justify-between">
+                  <span>Hendra Wijaya</span>
+                  <span class="text-slate-400 font-mono text-[11px]">0878-1122-3344</span>
+                </div>
+                <div class="text-[11px] text-slate-500 mt-1 line-clamp-1">Ganti baterai boros & backglass retak.</div>
+                <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500 font-mono">
+                  <span>#SRV-041</span>
+                  <span>Teknisi: Agus</span>
+                </div>
+              </div>
+
+              <!-- Ticket 3 -->
+              <div class="p-3 cursor-pointer hover:bg-slate-50 transition">
+                <div class="flex justify-between items-start gap-1">
+                  <div class="font-mono text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="smartphone" class="w-3.5 h-3.5 text-slate-500 shrink-0"></i>
+                    <span class="truncate">Xiaomi Redmi Note 12</span>
+                  </div>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                    Siap Ambil
+                  </span>
+                </div>
+                <div class="text-xs text-slate-700 mt-1 flex justify-between">
+                  <span>Siti Rahma</span>
+                  <span class="text-slate-400 font-mono text-[11px]">0857-4433-2211</span>
+                </div>
+                <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500 font-mono">
+                  <span>#SRV-039</span>
+                  <span class="text-emerald-700 font-bold">Lunas Rp 175.000</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: Ticket Details & Part Allocator -->
+          <div class="col-span-12 lg:col-span-7 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col overflow-hidden"
+               :class="{'hidden lg:flex': mobileView1 === 'list'}">
+            
+            <!-- Mobile Back Button to Ticket List -->
+            <div class="lg:hidden p-2 bg-slate-800 text-white flex items-center justify-between">
+              <button @click="mobileView1 = 'list'" class="text-xs font-semibold flex items-center gap-1.5 text-blue-300">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i> Kembali ke Antrean
+              </button>
+              <span class="text-[11px] font-mono text-slate-300">Tiket #SRV-042</span>
+            </div>
+
+            <!-- Active Unit Header -->
+            <div class="p-3 bg-slate-900 text-white flex flex-wrap justify-between items-center gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-mono font-bold text-xs sm:text-sm text-blue-300">#SRV-202611-042</span>
+                  <span class="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">IMEI: 356789104829102</span>
+                </div>
+                <div class="text-xs text-slate-300 mt-0.5 font-medium">Apple iPhone 13 Pro 128GB (Blue)</div>
+              </div>
+              <div class="flex gap-1.5">
+                <button class="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] px-2.5 py-1 rounded font-semibold flex items-center gap-1">
+                  <i data-lucide="send" class="w-3 h-3"></i> WA
+                </button>
+                <button class="bg-slate-700 hover:bg-slate-600 text-white text-[11px] px-2.5 py-1 rounded font-semibold flex items-center gap-1">
+                  <i data-lucide="printer" class="w-3 h-3"></i> Cetak
+                </button>
+              </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="p-3 sm:p-4 space-y-3.5">
+              <!-- Service Progress Step Pills -->
+              <div class="bg-slate-50 p-2 sm:p-2.5 rounded border border-slate-200">
+                <div class="grid grid-cols-4 gap-1 sm:gap-2 text-center text-[10px] sm:text-xs font-semibold">
+                  <div class="py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center justify-center gap-0.5">
+                    <i data-lucide="check" class="w-3 h-3"></i> Masuk
+                  </div>
+                  <div class="py-1 rounded bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center gap-0.5">
+                    <i data-lucide="loader" class="w-3 h-3 animate-spin"></i> Part
+                  </div>
+                  <div class="py-1 rounded bg-slate-100 text-slate-400">Kerja</div>
+                  <div class="py-1 rounded bg-slate-100 text-slate-400">Selesai</div>
+                </div>
+              </div>
+
+              <!-- Sparepart Allocation Module -->
+              <div class="border border-blue-200 bg-blue-50/40 rounded-lg p-2.5 sm:p-3">
+                <div class="flex justify-between items-center mb-1.5 text-xs">
+                  <span class="font-bold text-blue-900 flex items-center gap-1">
+                    <i data-lucide="package-search" class="w-3.5 h-3.5 text-blue-600"></i> Cari Sparepart Cocok
+                  </span>
+                  <span class="text-[10px] font-mono text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded font-semibold">Ready Stock (8)</span>
+                </div>
+                
+                <div class="flex gap-1.5 mb-2">
+                  <input type="text" value="LCD OLED iPhone 13 Pro" class="flex-1 px-2.5 py-1.5 text-xs bg-white border border-blue-300 rounded font-mono focus:ring-1 focus:ring-blue-600">
+                  <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-semibold">Cari</button>
+                </div>
+
+                <!-- Part Cards (Responsive Stack) -->
+                <div class="space-y-1.5">
+                  <div class="bg-white p-2 sm:p-2.5 rounded border border-slate-200 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-xs">
+                    <div class="min-w-0 flex-1">
+                      <div class="font-bold text-slate-900 truncate">LCD Assembly OLED (Original Cabutan)</div>
+                      <div class="text-[10px] text-slate-500 font-mono flex gap-2 mt-0.5">
+                        <span class="text-blue-600">Rak B1-03</span>
+                        <span class="text-emerald-600 font-semibold">Stok: 3</span>
+                        <span class="font-semibold text-slate-800">Rp 1.850.000</span>
+                      </div>
+                    </div>
+                    <button class="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white text-[11px] px-3 py-1.5 rounded font-bold flex items-center justify-center gap-1 shrink-0">
+                      <i data-lucide="plus" class="w-3 h-3"></i> Pasang
+                    </button>
+                  </div>
+
+                  <div class="bg-white p-2 sm:p-2.5 rounded border border-slate-200 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-xs">
+                    <div class="min-w-0 flex-1">
+                      <div class="font-bold text-slate-900 truncate">LCD Assembly (Incell / GX Grade)</div>
+                      <div class="text-[10px] text-slate-500 font-mono flex gap-2 mt-0.5">
+                        <span class="text-blue-600">Rak B1-04</span>
+                        <span class="text-emerald-600 font-semibold">Stok: 8</span>
+                        <span class="font-semibold text-slate-800">Rp 950.000</span>
+                      </div>
+                    </div>
+                    <button class="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] px-3 py-1.5 rounded font-semibold flex items-center justify-center gap-1 shrink-0">
+                      <i data-lucide="plus" class="w-3 h-3"></i> Pasang
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Billing Summary -->
+              <div>
+                <div class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Rincian Nota Biaya</div>
+                <div class="border border-slate-200 rounded divide-y divide-slate-100 text-xs font-mono bg-white">
+                  <div class="p-2 flex justify-between">
+                    <span class="font-sans">Jasa Pasang & Truetone</span>
+                    <span class="font-semibold">Rp 150.000</span>
+                  </div>
+                  <div class="p-2 flex justify-between">
+                    <span class="font-sans">LCD OLED Orig Cabutan</span>
+                    <span class="font-semibold">Rp 1.850.000</span>
+                  </div>
+                  <div class="p-2.5 bg-slate-50 flex justify-between font-bold text-slate-900 text-sm">
+                    <span class="font-sans">Total Tagihan:</span>
+                    <span class="text-blue-700">Rp 2.000.000</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sticky Bottom Toolbar (Thumb-reachable on phone) -->
+            <div class="p-2.5 sm:p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 sticky bottom-0">
+              <span class="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Garansi 30 Hari
+              </span>
+              <div class="flex gap-1.5">
+                <button class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2.5 py-1.5 rounded font-semibold">Draft</button>
+                <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 sm:px-4 py-1.5 rounded font-bold shadow flex items-center gap-1">
+                  <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Eksekusi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- DIRECTION 2: INVENTORY & COMPATIBILITY MATRIX                  -->
+      <!-- ============================================================== -->
+      <section x-show="currentTab === 2" class="space-y-3">
+        <!-- Banner -->
+        <div class="bg-emerald-50 border-l-4 border-emerald-600 p-2.5 sm:p-3 rounded-r text-xs text-emerald-900 flex flex-wrap items-center justify-between gap-2 shadow-sm">
+          <div class="flex items-center gap-2">
+            <i data-lucide="boxes" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+            <span><strong>Arah 2: Inventory Matrix</strong> — Di desktop tabel rapat (dense), di HP otomatis berganti jadi Touch Card View dengan tier harga lengkap.</span>
+          </div>
+          <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1">
+            <i data-lucide="plus" class="w-3 h-3"></i> Tambah Part
+          </button>
+        </div>
+
+        <!-- Metric KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+          <div class="bg-white p-2.5 sm:p-3 rounded-lg border border-slate-200 shadow-xs">
+            <div class="text-[10px] sm:text-[11px] text-slate-500 uppercase font-semibold">SKU Aktif</div>
+            <div class="text-base sm:text-xl font-bold font-mono text-slate-900">3.842 <span class="text-[10px] text-emerald-600 font-normal">Ready</span></div>
+          </div>
+          <div class="bg-white p-2.5 sm:p-3 rounded-lg border border-slate-200 shadow-xs">
+            <div class="text-[10px] sm:text-[11px] text-slate-500 uppercase font-semibold">Stok Menipis</div>
+            <div class="text-base sm:text-xl font-bold font-mono text-rose-600">24 <span class="text-[10px] text-rose-500 font-normal">Perlu PO</span></div>
+          </div>
+          <div class="bg-white p-2.5 sm:p-3 rounded-lg border border-slate-200 shadow-xs">
+            <div class="text-[10px] sm:text-[11px] text-slate-500 uppercase font-semibold">Nilai Aset (HPP)</div>
+            <div class="text-base sm:text-xl font-bold font-mono text-slate-900">Rp 482Jt</div>
+          </div>
+          <div class="bg-white p-2.5 sm:p-3 rounded-lg border border-slate-200 shadow-xs">
+            <div class="text-[10px] sm:text-[11px] text-slate-500 uppercase font-semibold">Mutasi Hari Ini</div>
+            <div class="text-base sm:text-xl font-bold font-mono text-blue-600">142 Pcs</div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="bg-white p-2 sm:p-3 rounded-lg border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2">
+          <div class="flex-1 min-w-[180px] relative">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5"></i>
+            <input type="text" placeholder="Cari Part, Model HP, IC Code..." class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded font-mono">
+          </div>
+          <div class="flex flex-wrap gap-1.5 text-xs">
+            <select class="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-xs">
+              <option>Semua Brand</option>
+              <option>Apple</option>
+              <option>Samsung</option>
+              <option>Xiaomi</option>
+            </select>
+            <select class="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-xs">
+              <option>Semua Kategori</option>
+              <option>LCD Screen</option>
+              <option>Baterai</option>
+              <option>IC Chipset</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 1. DESKTOP/TABLET TABLE VIEW (Hidden on Mobile) -->
+        <div class="hidden md:block bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-100 text-slate-700 uppercase font-mono text-[10px] border-b border-slate-200">
+                <tr>
+                  <th class="p-2.5">Kode SKU</th>
+                  <th class="p-2.5">Nama Sparepart</th>
+                  <th class="p-2.5">Kompatibilitas HP</th>
+                  <th class="p-2.5 text-right">HPP</th>
+                  <th class="p-2.5 text-right">Harga Teknisi</th>
+                  <th class="p-2.5 text-right">Harga User</th>
+                  <th class="p-2.5 text-center">Stok</th>
+                  <th class="p-2.5 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 font-mono">
+                <!-- Row 1 -->
+                <tr class="hover:bg-slate-50">
+                  <td class="p-2.5 font-bold text-slate-900">BAT-AP-IP11</td>
+                  <td class="p-2.5 font-sans font-medium">Baterai iPhone 11 Original Equipment</td>
+                  <td class="p-2.5 font-sans"><span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border">iPhone 11 (A2111, A2223)</span></td>
+                  <td class="p-2.5 text-right text-slate-500">Rp 120.000</td>
+                  <td class="p-2.5 text-right font-bold text-blue-700">Rp 165.000</td>
+                  <td class="p-2.5 text-right text-slate-800">Rp 250.000</td>
+                  <td class="p-2.5 text-center"><span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">24 Pcs</span></td>
+                  <td class="p-2.5 text-center"><button class="text-blue-600 font-semibold hover:underline">Edit</button></td>
+                </tr>
+                <!-- Row 2 -->
+                <tr class="hover:bg-slate-50 bg-blue-50/20">
+                  <td class="p-2.5 font-bold text-slate-900">IC-PMI-8952</td>
+                  <td class="p-2.5 font-sans font-medium">IC Power PMI8952 Qualcomm</td>
+                  <td class="p-2.5 font-sans">
+                    <span class="bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-[10px]">Redmi Note 4X</span>
+                    <span class="bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-[10px]">Vivo V5</span>
+                    <span class="text-slate-400 text-[10px]">+4 tipe</span>
+                  </td>
+                  <td class="p-2.5 text-right text-slate-500">Rp 18.000</td>
+                  <td class="p-2.5 text-right font-bold text-blue-700">Rp 35.000</td>
+                  <td class="p-2.5 text-right text-slate-800">Rp 75.000</td>
+                  <td class="p-2.5 text-center"><span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">45 Pcs</span></td>
+                  <td class="p-2.5 text-center"><button class="text-blue-600 font-semibold hover:underline">Edit</button></td>
+                </tr>
+                <!-- Row 3 -->
+                <tr class="hover:bg-slate-50 bg-rose-50/30">
+                  <td class="p-2.5 font-bold text-rose-700">LCD-SAM-A54</td>
+                  <td class="p-2.5 font-sans font-medium">LCD Super AMOLED Galaxy A54 5G</td>
+                  <td class="p-2.5 font-sans"><span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border">Samsung A546B</span></td>
+                  <td class="p-2.5 text-right text-slate-500">Rp 680.000</td>
+                  <td class="p-2.5 text-right font-bold text-blue-700">Rp 820.000</td>
+                  <td class="p-2.5 text-right text-slate-800">Rp 1.150.000</td>
+                  <td class="p-2.5 text-center"><span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold">1 Pcs</span></td>
+                  <td class="p-2.5 text-center"><button class="text-orange-600 font-bold hover:underline">PO</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2. MOBILE CARD VIEW (Shown on Mobile screens) -->
+        <div class="block md:hidden space-y-2">
+          <!-- Mobile Item 1 -->
+          <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-xs space-y-2 text-xs">
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">BAT-AP-IP11</span>
+                <div class="font-bold text-slate-800 mt-1">Baterai iPhone 11 (Orig Equipment)</div>
+              </div>
+              <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold text-[11px]">24 Pcs</span>
+            </div>
+            <div class="text-[11px] text-slate-500 bg-slate-50 p-1.5 rounded">
+              Kompatibel: iPhone 11 (A2111, A2223)
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-slate-100 font-mono text-[11px]">
+              <div>Teknisi: <strong class="text-blue-700">Rp 165.000</strong></div>
+              <div>User: <strong>Rp 250.000</strong></div>
+            </div>
+          </div>
+
+          <!-- Mobile Item 2 -->
+          <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-xs space-y-2 text-xs">
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">IC-PMI-8952</span>
+                <div class="font-bold text-slate-800 mt-1">IC Power PMI8952 Qualcomm</div>
+              </div>
+              <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold text-[11px]">45 Pcs</span>
+            </div>
+            <div class="text-[11px] text-slate-500 bg-slate-50 p-1.5 rounded">
+              Kompatibel: Redmi Note 4X, Vivo V5, +4 tipe lain
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-slate-100 font-mono text-[11px]">
+              <div>Teknisi: <strong class="text-blue-700">Rp 35.000</strong></div>
+              <div>User: <strong>Rp 75.000</strong></div>
+            </div>
+          </div>
+
+          <!-- Mobile Item 3 -->
+          <div class="bg-white p-3 rounded-lg border border-rose-300 bg-rose-50/20 shadow-xs space-y-2 text-xs">
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="font-mono font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded text-[11px]">LCD-SAM-A54</span>
+                <div class="font-bold text-slate-800 mt-1">LCD Super AMOLED Galaxy A54</div>
+              </div>
+              <span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-mono font-bold text-[11px]">1 Pcs (Kritis)</span>
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-slate-100 font-mono text-[11px]">
+              <div>Teknisi: <strong class="text-blue-700">Rp 820.000</strong></div>
+              <button class="bg-orange-600 text-white px-2 py-0.5 rounded font-bold text-[10px]">PO Cepat</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- DIRECTION 3: HYBRID POS & KANBAN HUB                           -->
+      <!-- ============================================================== -->
+      <section x-show="currentTab === 3" class="space-y-3">
+        <!-- Banner -->
+        <div class="bg-indigo-50 border-l-4 border-indigo-600 p-2.5 sm:p-3 rounded-r text-xs text-indigo-900 flex flex-wrap items-center justify-between gap-2 shadow-sm">
+          <div class="flex items-center gap-2">
+            <i data-lucide="layout-grid" class="w-4 h-4 text-indigo-600 shrink-0"></i>
+            <span><strong>Arah 3: Hybrid POS & Kanban Hub</strong> — Papan visual servis: di desktop 4 kolom penuh, di HP bisa swipe horizontal atau filter tahap.</span>
+          </div>
+          <!-- Mobile Stage Filter Filter Buttons -->
+          <div class="flex md:hidden bg-indigo-200/60 p-0.5 rounded text-[10px] font-semibold w-full justify-between">
+            <button @click="kanbanStage = 'all'" :class="kanbanStage === 'all' ? 'bg-white text-indigo-900 shadow-xs' : 'text-indigo-800'" class="px-2 py-1 rounded">Semua</button>
+            <button @click="kanbanStage = '1'" :class="kanbanStage === '1' ? 'bg-white text-indigo-900 shadow-xs' : 'text-indigo-800'" class="px-2 py-1 rounded">Masuk</button>
+            <button @click="kanbanStage = '2'" :class="kanbanStage === '2' ? 'bg-white text-indigo-900 shadow-xs' : 'text-indigo-800'" class="px-2 py-1 rounded">Part</button>
+            <button @click="kanbanStage = '3'" :class="kanbanStage === '3' ? 'bg-white text-indigo-900 shadow-xs' : 'text-indigo-800'" class="px-2 py-1 rounded">Kerja</button>
+            <button @click="kanbanStage = '4'" :class="kanbanStage === '4' ? 'bg-white text-indigo-900 shadow-xs' : 'text-indigo-800'" class="px-2 py-1 rounded">Siap</button>
+          </div>
+        </div>
+
+        <!-- Kanban Board: Desktop 4 columns, Mobile responsive columns -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <!-- Col 1: Penerimaan -->
+          <div class="bg-slate-50 rounded-lg border border-slate-200 flex flex-col"
+               x-show="kanbanStage === 'all' || kanbanStage === '1'">
+            <div class="p-2 border-b border-slate-200 bg-white rounded-t-lg flex justify-between items-center">
+              <span class="font-bold text-xs text-slate-700">1. PENERIMAAN</span>
+              <span class="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-bold">3 Unit</span>
+            </div>
+            <div class="p-2 space-y-2">
+              <div class="bg-white p-2.5 rounded border border-slate-200 shadow-xs text-xs">
+                <div class="flex justify-between font-mono text-[10px] text-slate-400">
+                  <span>#SRV-045</span>
+                  <span>10m lalu</span>
+                </div>
+                <div class="font-bold text-slate-800 mt-0.5">Oppo Reno 8 5G</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">Layar pecah sentuh mati.</div>
+                <div class="mt-2 pt-1 border-t border-slate-100 flex justify-between items-center text-[10px]">
+                  <span class="text-slate-400">CS: Melly</span>
+                  <span class="font-bold text-blue-600">Rp 450.000</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 2: Tunggu Part -->
+          <div class="bg-slate-50 rounded-lg border border-amber-200 flex flex-col"
+               x-show="kanbanStage === 'all' || kanbanStage === '2'">
+            <div class="p-2 border-b border-amber-200 bg-amber-50 rounded-t-lg flex justify-between items-center">
+              <span class="font-bold text-xs text-amber-900">2. TUNGGU PART</span>
+              <span class="text-[10px] font-mono bg-amber-200 text-amber-800 px-1.5 py-0.2 rounded font-bold">2 Unit</span>
+            </div>
+            <div class="p-2 space-y-2">
+              <div class="bg-white p-2.5 rounded border border-amber-300 shadow-xs text-xs">
+                <div class="flex justify-between font-mono text-[10px] text-slate-400">
+                  <span>#SRV-042</span>
+                  <span class="text-amber-700 font-semibold">Tunggu Baterai</span>
+                </div>
+                <div class="font-bold text-slate-800 mt-0.5">iPhone 13 Pro Max</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">Baterai kembung angkat LCD.</div>
+                <div class="mt-2 pt-1 border-t border-slate-100 flex justify-between items-center text-[10px]">
+                  <span class="text-slate-400">Agus (Teknisi)</span>
+                  <span class="font-bold text-amber-800">PO Roxy</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 3: Pengerjaan -->
+          <div class="bg-slate-50 rounded-lg border border-blue-200 flex flex-col"
+               x-show="kanbanStage === 'all' || kanbanStage === '3'">
+            <div class="p-2 border-b border-blue-200 bg-blue-50 rounded-t-lg flex justify-between items-center">
+              <span class="font-bold text-xs text-blue-900">3. PENGERJAAN</span>
+              <span class="text-[10px] font-mono bg-blue-200 text-blue-800 px-1.5 py-0.2 rounded font-bold">4 Unit</span>
+            </div>
+            <div class="p-2 space-y-2">
+              <div class="bg-white p-2.5 rounded border border-blue-300 shadow-xs text-xs">
+                <div class="flex justify-between font-mono text-[10px] text-slate-400">
+                  <span>#SRV-040</span>
+                  <span class="text-blue-600 font-semibold">Reballing IC</span>
+                </div>
+                <div class="font-bold text-slate-800 mt-0.5">Redmi Note 10 Pro</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">Short di jalur VDD_MAIN.</div>
+                <div class="mt-2 pt-1 border-t border-slate-100 flex justify-between items-center text-[10px]">
+                  <span class="text-slate-400">Teknisi: Bima</span>
+                  <span class="font-bold text-blue-700">Rp 350.000</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 4: Siap Ambil -->
+          <div class="bg-slate-50 rounded-lg border border-emerald-200 flex flex-col"
+               x-show="kanbanStage === 'all' || kanbanStage === '4'">
+            <div class="p-2 border-b border-emerald-200 bg-emerald-50 rounded-t-lg flex justify-between items-center">
+              <span class="font-bold text-xs text-emerald-900">4. SIAP AMBIL</span>
+              <span class="text-[10px] font-mono bg-emerald-200 text-emerald-800 px-1.5 py-0.2 rounded font-bold">5 Unit</span>
+            </div>
+            <div class="p-2 space-y-2">
+              <div class="bg-white p-2.5 rounded border border-emerald-300 shadow-xs text-xs">
+                <div class="flex justify-between font-mono text-[10px] text-slate-400">
+                  <span>#SRV-038</span>
+                  <span class="text-emerald-600 font-semibold">QC Passed</span>
+                </div>
+                <div class="font-bold text-slate-800 mt-0.5">iPad Air 4 10.9"</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">Ganti port Type-C charging.</div>
+                <div class="mt-2 pt-1 border-t border-slate-100 flex justify-between items-center text-[10px]">
+                  <span class="font-bold text-emerald-700">Lunas Rp 650K</span>
+                  <button class="bg-emerald-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">WA</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+    document.addEventListener('alpine:initialized', () => {
+      Alpine.effect(() => {
+        const tab = Alpine.store('currentTab');
+        const mode = Alpine.store('viewportMode');
+        setTimeout(() => lucide.createIcons(), 50);
+      });
+    });
+  </script>
+</body>
+</html>
