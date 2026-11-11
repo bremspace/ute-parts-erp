@@ -5,6 +5,8 @@ namespace App\Modules\Rbac\Services;
 use App\Models\User;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Rbac\Services\AppUpdateService;
+use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Wms\Models\Brand;
@@ -33,6 +35,7 @@ use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 use Throwable;
+use ZipArchive;
 
 /**
  * Enterprise Database Management Service for Ute Parts.
@@ -44,7 +47,8 @@ class DatabaseManagementService
 
     public function __construct(
         protected NotificationService $notifikasi,
-        protected AuditService $auditService
+        protected AuditService $auditService,
+        protected AppUpdateService $updateService
     ) {}
 
     /**
@@ -96,10 +100,15 @@ class DatabaseManagementService
     public function listBackups(): array
     {
         $dir = $this->getBackupDirectory();
-        $files = File::glob($dir.DIRECTORY_SEPARATOR.'backup-*.sql.gz') ?: [];
+        $files = array_merge(
+            File::glob($dir.DIRECTORY_SEPARATOR.'backup-*.sql.gz') ?: [],
+            File::glob($dir.DIRECTORY_SEPARATOR.'snapshot-*.zip') ?: [],
+            File::glob($dir.DIRECTORY_SEPARATOR.'upload_*') ?: [],
+            File::glob($dir.DIRECTORY_SEPARATOR.'*.sql') ?: []
+        );
 
         $result = [];
-        foreach ($files as $filePath) {
+        foreach (array_unique($files) as $filePath) {
             $name = basename($filePath);
             $size = File::size($filePath);
             $mtime = File::lastModified($filePath);
@@ -107,6 +116,7 @@ class DatabaseManagementService
             $result[] = [
                 'filename' => $name,
                 'path' => $filePath,
+                'is_snapshot' => str_ends_with($name, '.zip'),
                 'size' => $size,
                 'size_formatted' => $this->formatSize($size),
                 'created_at' => Carbon::createFromTimestamp($mtime)->isoFormat('D MMMM Y, HH:mm:ss'),
@@ -124,16 +134,18 @@ class DatabaseManagementService
      * Buat backup database (MySQL/MariaDB atau SQLite).
      *
      * @param  string  $destination  'local' (server), 'download', atau 'cloud'
+     * @param  bool    $fullSnapshot Apakah membundel storage/app/public + manifest APP_KEY
      */
-    public function backup(string $destination = 'local', int $keepDays = 7, ?string $cloudDisk = null): array
+    public function backup(string $destination = 'local', int $keepDays = 7, ?string $cloudDisk = null, bool $fullSnapshot = false): array
     {
         $connName = config('database.default');
         $conn = config("database.connections.{$connName}");
         $driver = $conn['driver'] ?? 'mysql';
 
         $dir = $this->getBackupDirectory();
-        $filename = 'backup-'.now()->format('Y-m-d_His').'.sql.gz';
-        $targetGz = $dir.DIRECTORY_SEPARATOR.$filename;
+        $timestamp = now()->format('Y-m-d_His');
+        $dbGzName = 'backup-'.$timestamp.'.sql.gz';
+        $targetGz = $dir.DIRECTORY_SEPARATOR.$dbGzName;
 
         if (in_array($driver, ['mysql', 'mariadb'], true)) {
             $this->dumpMysql($conn, $targetGz);
@@ -143,16 +155,28 @@ class DatabaseManagementService
             throw new RuntimeException("Driver database '{$driver}' tidak didukung untuk backup.");
         }
 
-        $size = File::exists($targetGz) ? File::size($targetGz) : 0;
+        $finalFile = $targetGz;
+        $finalFilename = $dbGzName;
+
+        if ($fullSnapshot) {
+            $zipName = 'snapshot-'.$timestamp.'.zip';
+            $zipPath = $dir.DIRECTORY_SEPARATOR.$zipName;
+            $this->createFullSnapshotZip($targetGz, $zipPath);
+            @unlink($targetGz);
+            $finalFile = $zipPath;
+            $finalFilename = $zipName;
+        }
+
+        $size = File::exists($finalFile) ? File::size($finalFile) : 0;
         $deletedCount = $this->rotateBackups($dir, $keepDays);
 
         // Upload ke Cloud jika diminta dan disk cloud terkonfigurasi
         $cloudStatus = null;
         if ($destination === 'cloud' && $cloudDisk && config("filesystems.disks.{$cloudDisk}")) {
             try {
-                $cloudStream = fopen($targetGz, 'r');
+                $cloudStream = fopen($finalFile, 'r');
                 if ($cloudStream) {
-                    Storage::disk($cloudDisk)->put('backups/'.$filename, $cloudStream);
+                    Storage::disk($cloudDisk)->put('backups/'.$finalFilename, $cloudStream);
                     fclose($cloudStream);
                     $cloudStatus = "Tersinkronisasi ke {$cloudDisk}";
                 }
@@ -166,7 +190,7 @@ class DatabaseManagementService
                 'Database',
                 'backup',
                 auth()->id() ?? 0,
-                "Backup database dibuat: {$filename} ({$this->formatSize($size)})"
+                ($fullSnapshot ? 'Full snapshot clone' : 'Backup database')." dibuat: {$finalFilename} ({$this->formatSize($size)})"
             );
         } catch (Throwable $e) {
             Log::warning('Gagal mencatat audit log backup: '.$e->getMessage());
@@ -174,8 +198,9 @@ class DatabaseManagementService
 
         return [
             'success' => true,
-            'filename' => $filename,
-            'path' => $targetGz,
+            'filename' => $finalFilename,
+            'path' => $finalFile,
+            'is_snapshot' => $fullSnapshot,
             'size' => $size,
             'size_formatted' => $this->formatSize($size),
             'deleted_old' => $deletedCount,
@@ -184,7 +209,7 @@ class DatabaseManagementService
     }
 
     /**
-     * Restore database dari file .sql.gz lokal server.
+     * Restore database dari file .sql.gz, .sql, atau .zip (Full Snapshot) lokal server.
      */
     public function restore(string $filePath, ?string $targetDatabase = null): array
     {
@@ -208,20 +233,89 @@ class DatabaseManagementService
         $preBackup = null;
         if (! $isCustomTarget) {
             try {
-                $preBackup = $this->backup('local', 30);
+                $preBackup = $this->backup('local', 30, null, false);
             } catch (Throwable $e) {
                 // Lanjut jika pre-backup gagal karena situasi darurat
             }
         }
 
+        $isZip = str_ends_with(strtolower($filePath), '.zip');
+        $extractedSql = null;
+        $tempExtractDir = null;
+        $appKeySynced = false;
+        $mediaRestored = false;
+
+        if ($isZip) {
+            $tempExtractDir = storage_path('app/temp_zip_'.uniqid());
+            File::ensureDirectoryExists($tempExtractDir);
+
+            $zip = new ZipArchive;
+            if ($zip->open($filePath) !== true) {
+                throw new RuntimeException("Gagal membuka arsip snapshot ZIP: {$filePath}");
+            }
+            $zip->extractTo($tempExtractDir);
+            $zip->close();
+
+            // Cek manifest.json
+            $manifestPath = $tempExtractDir.DIRECTORY_SEPARATOR.'manifest.json';
+            if (File::exists($manifestPath)) {
+                $manifest = json_decode(File::get($manifestPath), true) ?: [];
+                if (! empty($manifest['app_key']) && ! $isCustomTarget) {
+                    $currentKey = config('app.key');
+                    if ($currentKey !== $manifest['app_key']) {
+                        $this->updateService->updateEnv(['APP_KEY' => $manifest['app_key']]);
+                        $appKeySynced = true;
+                    }
+                }
+            }
+
+            // Restore media storage/app/public jika ada
+            $mediaTar = $tempExtractDir.DIRECTORY_SEPARATOR.'storage_public.tar.gz';
+            if (File::exists($mediaTar) && ! $isCustomTarget) {
+                $publicStorageDir = storage_path('app/public');
+                File::ensureDirectoryExists($publicStorageDir);
+                
+                // Gunakan tar atau php fallback
+                $tar = (new ExecutableFinder)->find('tar') ?? 'tar';
+                $proc = Process::fromShellCommandline(
+                    escapeshellarg($tar).' -xzf '.escapeshellarg($mediaTar).' -C '.escapeshellarg($publicStorageDir)
+                );
+                $proc->run();
+                if ($proc->isSuccessful()) {
+                    $mediaRestored = true;
+                    Artisan::call('storage:link');
+                }
+            }
+
+            // Temukan database.sql.gz
+            $candidateDb = $tempExtractDir.DIRECTORY_SEPARATOR.'database.sql.gz';
+            if (File::exists($candidateDb)) {
+                $extractedSql = $candidateDb;
+            } else {
+                $found = glob($tempExtractDir.DIRECTORY_SEPARATOR.'*.sql.gz') ?: glob($tempExtractDir.DIRECTORY_SEPARATOR.'*.sql');
+                if (! empty($found)) {
+                    $extractedSql = $found[0];
+                }
+            }
+
+            if (! $extractedSql || ! File::exists($extractedSql)) {
+                File::deleteDirectory($tempExtractDir);
+                throw new RuntimeException("Arsip ZIP tidak berisi berkas database (.sql / .sql.gz).");
+            }
+
+            $effectiveSqlFile = $extractedSql;
+        } else {
+            $effectiveSqlFile = $filePath;
+        }
+
         // 2. Uncompress gzip ke file SQL sementara jika terkompresi
         $tempSql = storage_path('app/temp_restore_'.uniqid().'.sql');
-        $isGz = str_ends_with(strtolower($filePath), '.gz');
+        $isGz = str_ends_with(strtolower($effectiveSqlFile), '.gz');
 
         if ($isGz) {
-            $this->uncompressGzip($filePath, $tempSql);
+            $this->uncompressGzip($effectiveSqlFile, $tempSql);
         } else {
-            File::copy($filePath, $tempSql);
+            File::copy($effectiveSqlFile, $tempSql);
         }
 
         try {
@@ -234,19 +328,33 @@ class DatabaseManagementService
             }
         } finally {
             @unlink($tempSql);
+            if ($tempExtractDir && File::isDirectory($tempExtractDir)) {
+                File::deleteDirectory($tempExtractDir);
+            }
+        }
+
+        $note = 'Database dipulihkan dari: '.basename($filePath).($isCustomTarget ? " (Target DB: {$targetDatabase})" : '');
+        if ($appKeySynced) {
+            $note .= ' [APP_KEY berhasil disinkronkan]';
+        }
+        if ($mediaRestored) {
+            $note .= ' [Media public storage dipulihkan]';
         }
 
         $this->auditService->catat(
             'Database',
             'restore',
             auth()->id() ?? 0,
-            'Database dipulihkan dari: '.basename($filePath).($isCustomTarget ? " (Target DB: {$targetDatabase})" : '')
+            $note
         );
 
         return [
             'success' => true,
             'restored_from' => basename($filePath),
             'target_database' => $conn['database'],
+            'is_snapshot' => $isZip,
+            'app_key_synced' => $appKeySynced,
+            'media_restored' => $mediaRestored,
             'pre_restore_backup' => $preBackup['filename'] ?? null,
         ];
     }
@@ -951,15 +1059,65 @@ class DatabaseManagementService
         $cutoff = now()->subDays($keepDays)->timestamp;
         $deleted = 0;
 
-        foreach (glob($dir.DIRECTORY_SEPARATOR.'backup-*.sql.gz') ?: [] as $file) {
-            if (filemtime($file) < $cutoff) {
-                if (@unlink($file)) {
-                    $deleted++;
+        $patterns = [
+            $dir.DIRECTORY_SEPARATOR.'backup-*.sql.gz',
+            $dir.DIRECTORY_SEPARATOR.'snapshot-*.zip',
+        ];
+
+        foreach ($patterns as $pattern) {
+            foreach (glob($pattern) ?: [] as $file) {
+                if (filemtime($file) < $cutoff) {
+                    if (@unlink($file)) {
+                        $deleted++;
+                    }
                 }
             }
         }
 
         return $deleted;
+    }
+
+    /**
+     * Bungkus file database .sql.gz, folder storage/app/public, dan manifest.json ke dalam single ZIP.
+     */
+    protected function createFullSnapshotZip(string $sqlGzPath, string $targetZip): void
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($targetZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException("Gagal membuat arsip snapshot: {$targetZip}");
+        }
+
+        // 1. Masukkan database dump
+        $zip->addFile($sqlGzPath, 'database.sql.gz');
+
+        // 2. Buat arsip storage/app/public
+        $publicStorageDir = storage_path('app/public');
+        $tarPath = storage_path('app/temp_media_'.uniqid().'.tar.gz');
+        if (File::isDirectory($publicStorageDir)) {
+            $tar = (new ExecutableFinder)->find('tar') ?? 'tar';
+            $proc = Process::fromShellCommandline(
+                escapeshellarg($tar).' -czf '.escapeshellarg($tarPath).' -C '.escapeshellarg($publicStorageDir).' .'
+            );
+            $proc->run();
+            if ($proc->isSuccessful() && File::exists($tarPath)) {
+                $zip->addFile($tarPath, 'storage_public.tar.gz');
+            }
+        }
+
+        // 3. Manifest metadata
+        $manifest = [
+            'app_name' => config('app.name'),
+            'app_key' => config('app.key'),
+            'created_at' => now()->toIso8601String(),
+            'php_version' => PHP_VERSION,
+            'laravel_version' => app()->version(),
+            'database_driver' => config('database.default'),
+            'type' => 'full_clone_snapshot',
+        ];
+        $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        $zip->close();
+        @unlink($tarPath);
     }
 
     protected function formatSize(int $bytes): string

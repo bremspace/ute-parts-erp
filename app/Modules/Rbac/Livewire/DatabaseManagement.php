@@ -53,11 +53,11 @@ class DatabaseManagement extends Component
         $ext = strtolower($this->uploadedBackupFile->getClientOriginalExtension());
         $origName = strtolower($this->uploadedBackupFile->getClientOriginalName());
 
-        if (! in_array($ext, ['gz', 'sql'], true) && ! str_ends_with($origName, '.sql.gz')) {
+        if (! in_array($ext, ['gz', 'sql', 'zip'], true) && ! str_ends_with($origName, '.sql.gz')) {
             $this->reset('uploadedBackupFile');
             $this->dispatch('alert', [
                 'type' => 'error',
-                'message' => 'Format berkas tidak didukung. Harap upload berkas berekstensi .sql.gz atau .sql.',
+                'message' => 'Format berkas tidak didukung. Harap upload berkas berekstensi .zip (snapshot), .sql.gz, atau .sql.',
             ]);
 
             return;
@@ -71,6 +71,8 @@ class DatabaseManagement extends Component
 
     // Filter & State
     public string $backupDestination = 'local'; // 'local', 'download', 'cloud'
+
+    public bool $isFullSnapshot = false; // Snapshot bundle: DB + APP_KEY + Storage Public
 
     public string $cloudDisk = 's3';
 
@@ -420,11 +422,11 @@ class DatabaseManagement extends Component
         $this->authorizeAccess();
 
         try {
-            $res = $dbService->backup($this->backupDestination, $this->keepDays, $this->cloudDisk);
+            $res = $dbService->backup($this->backupDestination, $this->keepDays, $this->cloudDisk, $this->isFullSnapshot);
 
             $this->dispatch('alert', [
                 'type' => 'success',
-                'message' => "Backup database berhasil dibuat: {$res['filename']} ({$res['size_formatted']})",
+                'message' => ($this->isFullSnapshot ? 'Full snapshot clone' : 'Backup database')." berhasil dibuat: {$res['filename']} ({$res['size_formatted']})",
             ]);
 
             if ($this->backupDestination === 'download') {
@@ -504,7 +506,12 @@ class DatabaseManagement extends Component
         $targetPath = null;
         if ($this->uploadedBackupFile) {
             $ext = strtolower($this->uploadedBackupFile->getClientOriginalExtension());
-            $safeName = 'upload_'.time().'.'.($ext === 'gz' ? 'sql.gz' : 'sql');
+            $suffix = match ($ext) {
+                'zip' => 'zip',
+                'gz' => 'sql.gz',
+                default => 'sql',
+            };
+            $safeName = 'upload_'.time().'.'.$suffix;
             $stored = $this->uploadedBackupFile->storeAs('backups', $safeName);
             $targetPath = storage_path('app/'.$stored);
         } elseif ($this->selectedRestoreFile) {
@@ -523,9 +530,17 @@ class DatabaseManagement extends Component
             $this->confirmPassword = '';
             $this->uploadedBackupFile = null;
 
+            $extraMsg = '';
+            if (! empty($res['app_key_synced'])) {
+                $extraMsg .= ' APP_KEY disinkronkan.';
+            }
+            if (! empty($res['media_restored'])) {
+                $extraMsg .= ' Media public storage dipulihkan.';
+            }
+
             $this->dispatch('alert', [
                 'type' => 'success',
-                'message' => "Database berhasil dipulihkan dari '{$res['restored_from']}'. Sistem kembali normal.",
+                'message' => "Database berhasil dipulihkan dari '{$res['restored_from']}'.{$extraMsg} Sistem kembali normal.",
             ]);
         } catch (Throwable $e) {
             $this->dispatch('alert', [

@@ -116,6 +116,17 @@
                     </div>
                 @endif
 
+                <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-white block">Sertakan File Media &amp; APP_KEY (Full Snapshot Clone)</span>
+                        <span class="text-[10px] text-ink-400">Bundel database, folder foto/media (storage/app/public), dan kunci enkripsi APP_KEY ke dalam arsip .zip untuk migrasi server 1:1.</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer ml-3">
+                        <input type="checkbox" wire:model="isFullSnapshot" class="sr-only peer">
+                        <div class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-up-primary"></div>
+                    </label>
+                </div>
+
                 <div class="pt-2 flex justify-end">
                     <button type="button" wire:click="buatBackup" wire:loading.attr="disabled"
                         class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-bold shadow-md transition-[background-color,transform] duration-140 active:scale-[0.97] flex items-center gap-2 min-h-[44px]">
@@ -130,16 +141,16 @@
         </x-prism.glass-card>
 
         <!-- 2. Card Upload Restore dari PC Lokal -->
-        <x-prism.glass-card class="p-5" title="Pulihkan dari Berkas Luar" subtitle="Upload file .sql.gz dari laptop atau PC Anda untuk dipulihkan ke server">
+        <x-prism.glass-card class="p-5" title="Pulihkan dari Berkas Luar" subtitle="Upload file .sql.gz, .sql, atau .zip snapshot clone dari laptop Anda">
             <div class="space-y-3">
                 <div class="p-4 border-2 border-dashed border-white/10 rounded-xl text-center hover:border-up-mint/40 transition-colors">
-                    <input type="file" wire:model="uploadedBackupFile" accept=".gz,.sql" class="hidden" id="upload-backup-input">
+                    <input type="file" wire:model="uploadedBackupFile" accept=".gz,.sql,.zip" class="hidden" id="upload-backup-input">
                     <label for="upload-backup-input" class="cursor-pointer block">
                         <svg class="w-8 h-8 text-ink-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                         </svg>
-                        <span class="text-xs font-bold text-white block">Pilih Berkas Backup (.sql.gz)</span>
-                        <span class="text-[10px] text-ink-400">Maksimum ukuran sesuai batas upload PHP</span>
+                        <span class="text-xs font-bold text-white block">Pilih Berkas Backup (.sql.gz / .zip Snapshot)</span>
+                        <span class="text-[10px] text-ink-400">Berkas .zip snapshot otomatis merestore database, APP_KEY, dan media upload</span>
                     </label>
                 </div>
 

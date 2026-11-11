@@ -10,6 +10,7 @@ use RuntimeException;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 use Throwable;
+use ZipArchive;
 
 /**
  * F1-6 — Backup database harian: mysqldump (kredensial dari config/database.php)
@@ -23,6 +24,7 @@ class UteBackupCommand extends Command
     protected $signature = 'ute:backup
         {--connection= : Koneksi database di config/database.php (default: koneksi aktif)}
         {--keep-days=7 : Hari penyimpanan backup sebelum dirotasi}
+        {--full : Buat full snapshot clone (Database + APP_KEY + storage/app/public)}
         {--cloud= : Disk storage cloud tujuan sinkronisasi (opsional, contoh: s3, gcs)}';
 
     protected $description = 'Backup database MySQL ke gzip di storage/app/backups (rotasi 7 hari) — F1-6';
@@ -43,22 +45,32 @@ class UteBackupCommand extends Command
         $dir = storage_path('app/backups');
         File::ensureDirectoryExists($dir, 0755, true);
 
-        $target = $dir.DIRECTORY_SEPARATOR.'backup-'.now()->format('Y-m-d_His').'.sql.gz';
+        $isFull = (bool) $this->option('full');
+        $timestamp = now()->format('Y-m-d_His');
+        $target = $dir.DIRECTORY_SEPARATOR.'backup-'.$timestamp.'.sql.gz';
+        $finalFile = $target;
 
         try {
             $this->dump($conn, $target);
 
+            if ($isFull) {
+                $zipTarget = $dir.DIRECTORY_SEPARATOR.'snapshot-'.$timestamp.'.zip';
+                $this->createFullSnapshotZip($target, $zipTarget);
+                @unlink($target);
+                $finalFile = $zipTarget;
+            }
+
             $hapus = $this->rotateBackups($dir, max(1, (int) $this->option('keep-days')));
-            $ukuran = is_file($target) ? (int) filesize($target) : 0;
+            $ukuran = is_file($finalFile) ? (int) filesize($finalFile) : 0;
 
             // Sinkronisasi cloud jika opsi --cloud diisi
             $cloudDisk = $this->option('cloud');
             $cloudNote = '';
             if ($cloudDisk) {
                 try {
-                    $cloudStream = fopen($target, 'r');
+                    $cloudStream = fopen($finalFile, 'r');
                     if ($cloudStream) {
-                        Storage::disk($cloudDisk)->put('backups/'.basename($target), $cloudStream);
+                        Storage::disk($cloudDisk)->put('backups/'.basename($finalFile), $cloudStream);
                         fclose($cloudStream);
                         $cloudNote = " (tersinkron ke cloud disk: {$cloudDisk})";
                     }
@@ -73,26 +85,36 @@ class UteBackupCommand extends Command
                 $notifikasi->kirim(
                     'inapp',
                     null,
-                    'Backup Database Berhasil',
+                    $isFull ? 'Full Snapshot Clone Berhasil' : 'Backup Database Berhasil',
                     sprintf(
-                        'Backup database berhasil: %s (%s)%s. Rotasi: %d file lama dihapus.',
-                        basename($target),
+                        '%s berhasil: %s (%s)%s. Rotasi: %d file lama dihapus.',
+                        $isFull ? 'Full snapshot clone' : 'Backup database',
+                        basename($finalFile),
                         $this->formatUkuran($ukuran),
                         $cloudNote,
                         $hapus,
                     ),
-                    ['file' => basename($target), 'ukuran' => $ukuran, 'dihapus' => $hapus, 'cloud' => $cloudDisk],
+                    ['file' => basename($finalFile), 'ukuran' => $ukuran, 'dihapus' => $hapus, 'cloud' => $cloudDisk, 'is_full' => $isFull],
                 );
             } catch (Throwable $e) {
                 report($e);
             }
 
-            $this->info(sprintf('Backup berhasil: %s (%s)', basename($target), $this->formatUkuran($ukuran)));
+            $this->info(sprintf(
+                '%s berhasil: %s (%s)%s',
+                $isFull ? 'Full snapshot' : 'Backup',
+                basename($finalFile),
+                $this->formatUkuran($ukuran),
+                $cloudNote
+            ));
 
             return self::SUCCESS;
         } catch (Throwable $e) {
             // Bersihkan file parsial agar rerun tidak menumpuk sampah.
             @unlink($target);
+            if (isset($zipTarget)) {
+                @unlink($zipTarget);
+            }
 
             return $this->gagal($notifikasi, $e->getMessage());
         }
@@ -207,14 +229,61 @@ class UteBackupCommand extends Command
         $dihapus = 0;
         clearstatcache(true);
 
-        foreach (glob($dir.DIRECTORY_SEPARATOR.'backup-*.sql.gz') ?: [] as $file) {
-            $mtime = @filemtime($file);
-            if ($mtime !== false && $mtime < $cutoff && @unlink($file)) {
-                $dihapus++;
+        $patterns = [
+            $dir.DIRECTORY_SEPARATOR.'backup-*.sql.gz',
+            $dir.DIRECTORY_SEPARATOR.'snapshot-*.zip',
+        ];
+
+        foreach ($patterns as $pattern) {
+            foreach (glob($pattern) ?: [] as $file) {
+                $mtime = @filemtime($file);
+                if ($mtime !== false && $mtime < $cutoff && @unlink($file)) {
+                    $dihapus++;
+                }
             }
         }
 
         return $dihapus;
+    }
+
+    /**
+     * Bungkus file database .sql.gz, folder storage/app/public, dan manifest.json ke dalam single ZIP.
+     */
+    protected function createFullSnapshotZip(string $sqlGzPath, string $targetZip): void
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($targetZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException("Gagal membuat arsip snapshot: {$targetZip}");
+        }
+
+        $zip->addFile($sqlGzPath, 'database.sql.gz');
+
+        $publicStorageDir = storage_path('app/public');
+        $tarPath = storage_path('app/temp_media_'.uniqid().'.tar.gz');
+        if (File::isDirectory($publicStorageDir)) {
+            $tar = (new ExecutableFinder)->find('tar') ?? 'tar';
+            $proc = Process::fromShellCommandline(
+                escapeshellarg($tar).' -czf '.escapeshellarg($tarPath).' -C '.escapeshellarg($publicStorageDir).' .'
+            );
+            $proc->run();
+            if ($proc->isSuccessful() && File::exists($tarPath)) {
+                $zip->addFile($tarPath, 'storage_public.tar.gz');
+            }
+        }
+
+        $manifest = [
+            'app_name' => config('app.name'),
+            'app_key' => config('app.key'),
+            'created_at' => now()->toIso8601String(),
+            'php_version' => PHP_VERSION,
+            'laravel_version' => app()->version(),
+            'database_driver' => config('database.default'),
+            'type' => 'full_clone_snapshot',
+        ];
+        $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        $zip->close();
+        @unlink($tarPath);
     }
 
     /** Gagal: pesan Indonesia ke konsol + notifikasi queue (tidak pernah sinkron). */
