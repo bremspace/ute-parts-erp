@@ -244,6 +244,10 @@
                     🛡️ Sistem akan otomatis membuat snapshot darurat pra-restore sebelum proses penimpaan dilakukan.
                 </div>
 
+                <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+                    ⚠️ <strong>Perhatian:</strong> Proses restore data ukuran besar membutuhkan waktu 1-3 menit. Jangan tutup tab atau refresh halaman browser sampai notifikasi selesai muncul.
+                </div>
+
                 <div>
                     <label class="block text-xs font-semibold text-ink-300 mb-1">Masukkan Kata Sandi Anda untuk Otorisasi:</label>
                     <input type="password" wire:model="confirmPassword" placeholder="Kata sandi akun saat ini"

@@ -117,6 +117,7 @@ class UteBackupCommand extends Command
             '--routines',
             '--triggers',
             '--no-tablespaces',
+            '--max-allowed-packet=128M',
             '--result-file='.$tmp,
         ];
 

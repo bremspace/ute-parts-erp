@@ -214,9 +214,15 @@ class DatabaseManagementService
             }
         }
 
-        // 2. Uncompress gzip ke file SQL sementara
+        // 2. Uncompress gzip ke file SQL sementara jika terkompresi
         $tempSql = storage_path('app/temp_restore_'.uniqid().'.sql');
-        $this->uncompressGzip($filePath, $tempSql);
+        $isGz = str_ends_with(strtolower($filePath), '.gz');
+
+        if ($isGz) {
+            $this->uncompressGzip($filePath, $tempSql);
+        } else {
+            File::copy($filePath, $tempSql);
+        }
 
         try {
             if (in_array($driver, ['mysql', 'mariadb'], true)) {
@@ -802,6 +808,7 @@ class DatabaseManagementService
             '--routines',
             '--triggers',
             '--no-tablespaces',
+            '--max-allowed-packet=128M',
             '--result-file='.$tmpSql,
         ];
 
@@ -865,7 +872,8 @@ class DatabaseManagementService
             '--host='.($conn['host'] ?? '127.0.0.1'),
             '--user='.($conn['username'] ?? ''),
             '--max-allowed-packet=128M',
-            '--init-command=SET foreign_key_checks=0; SET unique_checks=0;',
+            '--net-buffer-length=16384',
+            '--init-command=SET foreign_key_checks=0; SET unique_checks=0; SET autocommit=1;',
         ];
 
         if (! empty($conn['unix_socket'])) {
@@ -886,7 +894,11 @@ class DatabaseManagementService
         $process->run();
 
         if (! $process->isSuccessful()) {
-            throw new RuntimeException('Restore MySQL gagal: '.$process->getErrorOutput());
+            $err = trim($process->getErrorOutput());
+            if ($err === '') {
+                $err = trim($process->getOutput());
+            }
+            throw new RuntimeException('Restore MySQL gagal (exit '.$process->getExitCode().'): '.($err !== '' ? $err : 'unknown error'));
         }
     }
 

@@ -37,6 +37,38 @@ class DatabaseManagement extends Component
 
     public $uploadedBackupFile = null;
 
+    /**
+     * Hook validasi otomatis saat berkas backup diunggah via form.
+     */
+    public function updatedUploadedBackupFile(): void
+    {
+        $this->validate([
+            'uploadedBackupFile' => 'required|file|max:102400', // max 100MB
+        ], [
+            'uploadedBackupFile.required' => 'Pilih berkas backup terlebih dahulu.',
+            'uploadedBackupFile.file' => 'Berkas backup tidak valid.',
+            'uploadedBackupFile.max' => 'Ukuran berkas melebihi batas 100 MB.',
+        ]);
+
+        $ext = strtolower($this->uploadedBackupFile->getClientOriginalExtension());
+        $origName = strtolower($this->uploadedBackupFile->getClientOriginalName());
+
+        if (! in_array($ext, ['gz', 'sql'], true) && ! str_ends_with($origName, '.sql.gz')) {
+            $this->reset('uploadedBackupFile');
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Format berkas tidak didukung. Harap upload berkas berekstensi .sql.gz atau .sql.',
+            ]);
+
+            return;
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Berkas berhasil dipilih: '.$this->uploadedBackupFile->getClientOriginalName().'. Silakan klik "Lanjut Restore".',
+        ]);
+    }
+
     // Filter & State
     public string $backupDestination = 'local'; // 'local', 'download', 'cloud'
 
@@ -471,7 +503,10 @@ class DatabaseManagement extends Component
 
         $targetPath = null;
         if ($this->uploadedBackupFile) {
-            $targetPath = $this->uploadedBackupFile->getRealPath();
+            $ext = strtolower($this->uploadedBackupFile->getClientOriginalExtension());
+            $safeName = 'upload_'.time().'.'.($ext === 'gz' ? 'sql.gz' : 'sql');
+            $stored = $this->uploadedBackupFile->storeAs('backups', $safeName);
+            $targetPath = storage_path('app/'.$stored);
         } elseif ($this->selectedRestoreFile) {
             $targetPath = $dbService->getBackupDirectory().DIRECTORY_SEPARATOR.basename($this->selectedRestoreFile);
         }
