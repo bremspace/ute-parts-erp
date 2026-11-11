@@ -566,3 +566,117 @@ html:not(.dark) ::-webkit-scrollbar-thumb:hover {
         z-index: 40;
     }
 }
+
+/* ==========================================================================
+   WORKSTATION ERP DESIGN TOKENS (Taste & Anti-Fatigue)
+   ========================================================================== */
+
+/* Standardized Lucide Icon Stroke */
+svg.lucide,
+svg.icon-lucide,
+svg[data-lucide],
+.lucide,
+svg[stroke-width] {
+    stroke-width: 1.75px !important;
+}
+
+/* Workstation ERP Clean Hierarchy Buttons */
+.btn-erp-primary {
+    background-color: var(--up-primary, #5E6AD2);
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    transition: all 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.btn-erp-primary:hover {
+    filter: brightness(1.08);
+}
+.btn-erp-primary:active {
+    transform: scale(0.98);
+}
+
+.btn-erp-secondary {
+    background-color: rgba(94, 106, 210, 0.12);
+    color: #5E6AD2;
+    border: 1px solid rgba(94, 106, 210, 0.2);
+    font-weight: 500;
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    transition: all 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.dark .btn-erp-secondary {
+    background-color: rgba(94, 106, 210, 0.15);
+    color: #A5B4FC;
+    border-color: rgba(94, 106, 210, 0.3);
+}
+.btn-erp-secondary:hover {
+    background-color: rgba(94, 106, 210, 0.2);
+}
+
+.btn-erp-ghost {
+    background-color: transparent;
+    color: #475569;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    font-weight: 500;
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    cursor: pointer;
+    transition: all 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.dark .btn-erp-ghost {
+    color: #94A3B8;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+.btn-erp-ghost:hover {
+    background-color: rgba(148, 163, 184, 0.1);
+    color: #1E293B;
+}
+.dark .btn-erp-ghost:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #F8FAFC;
+}
+
+.btn-erp-icon {
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    color: #64748B;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: transparent;
+    transition: all 120ms cubic-bezier(0.23, 1, 0.32, 1);
+    flex-shrink: 0;
+}
+.dark .btn-erp-icon {
+    color: #94A3B8;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+.btn-erp-icon:hover {
+    background-color: rgba(148, 163, 184, 0.12);
+    color: #1E293B;
+}
+.dark .btn-erp-icon:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #FFFFFF;
+}

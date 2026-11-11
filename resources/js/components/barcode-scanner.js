@@ -161,8 +161,10 @@ export class DevicePermissionManager {
             } catch (_) {}
         }
 
-        // Tampilkan Banner Permintaan Izin Otomatis yang Ramah di Bawah Layar
-        this.showPermissionPromptBanner();
+        // Tampilkan Banner Permintaan Izin Otomatis HANYA pada perangkat mobile / touch screen kasir handheld
+        if (window.innerWidth < 768 && window.matchMedia('(pointer: coarse)').matches) {
+            this.showPermissionPromptBanner();
+        }
     }
 
     showPermissionPromptBanner() {

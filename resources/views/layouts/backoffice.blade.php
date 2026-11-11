@@ -758,9 +758,9 @@
             </header>
 
             <!-- Page Content -->
-            <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6 bg-transparent outline-none min-w-0 w-full max-w-full">
+            <main id="main-content" tabindex="-1" class="flex-1 min-h-0 {{ request()->is('app/pos*') ? 'overflow-y-auto md:overflow-hidden p-2 sm:p-2.5 pb-28 md:pb-2 flex flex-col' : 'overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6' }} bg-transparent outline-none min-w-0 w-full max-w-full">
                 {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out, bisa skip per sesi/disimpan) --}}
-                @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*'))
+                @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*') && ! request()->is('app/pos*'))
                     <div x-data="{
                             dismissed: (localStorage.getItem('dismiss_2fa_banner_{{ auth()->id() }}') === '1' || sessionStorage.getItem('dismiss_2fa_banner') === '1'),
                             dismiss() {
