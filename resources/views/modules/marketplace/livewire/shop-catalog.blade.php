@@ -644,7 +644,7 @@
             $allowedFilters = (array) ($webConfig['allowed_filters'] ?? []);
             $filtersEnabled = $allowedFilters['enabled'] ?? true;
 
-            // Opsi Kategori untuk searchable-select
+            // Opsi Kategori untuk searchable-select (hirarki natural berurutan tanpa optgroup ganda)
             $shopKategoriOptions = [];
             foreach ($categories as $cat) {
                 $catId = is_array($cat) ? ($cat['id'] ?? '') : ($cat->id ?? (is_scalar($cat) ? (string) $cat : ''));
@@ -656,8 +656,10 @@
                 if ($hasChildren) {
                     $shopKategoriOptions[] = [
                         'value' => (string) $catId,
-                        'label' => 'Semua ' . $catNama . ($catCount !== null ? ' (' . $catCount . ')' : ''),
-                        'group' => $catNama,
+                        'label' => $catNama . ($catCount !== null ? ' (' . $catCount . ')' : ''),
+                        'display_label' => $catNama,
+                        'level' => 0,
+                        'is_parent' => true,
                     ];
                     foreach ($children as $child) {
                         $childId = is_array($child) ? ($child['id'] ?? '') : ($child->id ?? (is_scalar($child) ? (string) $child : ''));
@@ -665,14 +667,18 @@
                         $childCount = is_array($child) ? ($child['count'] ?? null) : ($child->count ?? null);
                         $shopKategoriOptions[] = [
                             'value' => (string) $childId,
-                            'label' => '↳ ' . $childNama . ($childCount !== null ? ' (' . $childCount . ')' : ''),
-                            'group' => $catNama,
+                            'label' => $childNama . ($childCount !== null ? ' (' . $childCount . ')' : ''),
+                            'display_label' => $catNama . ' → ' . $childNama,
+                            'level' => 1,
+                            'is_child' => true,
                         ];
                     }
                 } elseif (!empty($catNama)) {
                     $shopKategoriOptions[] = [
                         'value' => (string) $catId,
                         'label' => $catNama . ($catCount !== null ? ' (' . $catCount . ')' : ''),
+                        'display_label' => $catNama,
+                        'level' => 0,
                     ];
                 }
             }

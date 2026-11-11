@@ -7,19 +7,23 @@
         'rusak' => ['bg' => 'bg-rose-500/15', 'border' => 'border-rose-500/30', 'text' => 'text-rose-400', 'dot' => 'bg-rose-400', 'desc' => 'Rusak / Bahan Kanibal Part Teknisi'],
     ];
 
-    // Opsi Kategori untuk searchable-select
+    // Opsi Kategori untuk searchable-select (hirarki natural berurutan tanpa optgroup ganda)
     $kategoriFilterOptions = [];
     foreach ($kategoriTree as $parent) {
         $kategoriFilterOptions[] = [
             'value' => (string) $parent->id,
             'label' => $parent->nama,
-            'group' => 'Kategori Utama',
+            'display_label' => $parent->nama,
+            'level' => 0,
+            'is_parent' => true,
         ];
         foreach ($parent->children as $child) {
             $kategoriFilterOptions[] = [
                 'value' => (string) $child->id,
-                'label' => '↳ ' . $child->nama,
-                'group' => $parent->nama,
+                'label' => $child->nama,
+                'display_label' => $parent->nama . ' → ' . $child->nama,
+                'level' => 1,
+                'is_child' => true,
             ];
         }
     }
@@ -30,6 +34,15 @@
         $brandFilterOptions[] = [
             'value' => (string) $b->id,
             'label' => $b->nama,
+        ];
+    }
+
+    // Opsi Supplier untuk searchable-select
+    $supplierFilterOptions = [];
+    foreach ($suppliers as $sup) {
+        $supplierFilterOptions[] = [
+            'value' => (string) $sup->id,
+            'label' => $sup->nama,
         ];
     }
 
@@ -243,16 +256,13 @@
                         @endif
 
                         @if($visibleFilters['supplier'] ?? false)
-                            <div class="relative inline-flex items-center">
-                                <select wire:model.live="filterSupplierId" class="px-3 py-2 {{ $filterSupplierId ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px] cursor-pointer">
-                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Supplier</option>
-                                    @foreach($suppliers as $sup)
-                                        <option value="{{ $sup->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $sup->nama }}</option>
-                                    @endforeach
-                                </select>
-                                @if($filterSupplierId)
-                                    <button type="button" wire:click="$set('filterSupplierId', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Supplier">✕</button>
-                                @endif
+                            <div class="min-w-[170px] sm:w-48">
+                                <x-prism.searchable-select
+                                    model="filterSupplierId"
+                                    :options="$supplierFilterOptions"
+                                    placeholder="Semua Supplier"
+                                    searchPlaceholder="Cari supplier..."
+                                />
                             </div>
                         @endif
 

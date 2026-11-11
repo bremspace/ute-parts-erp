@@ -2,19 +2,23 @@
     $activeCabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
     $activeCabangName = \App\Modules\Rbac\Models\Cabang::find($activeCabangId)?->nama ?? 'Cabang Utama';
 
-    // Opsi Kategori untuk searchable-select
+    // Opsi Kategori untuk searchable-select (hirarki natural berurutan tanpa optgroup ganda)
     $posKategoriFilterOptions = [];
     foreach ($kategoriList as $parent) {
         $posKategoriFilterOptions[] = [
             'value' => (string) $parent->id,
             'label' => $parent->nama,
-            'group' => 'Kategori Utama',
+            'display_label' => $parent->nama,
+            'level' => 0,
+            'is_parent' => true,
         ];
         foreach ($parent->children as $child) {
             $posKategoriFilterOptions[] = [
                 'value' => (string) $child->id,
-                'label' => '↳ ' . $child->nama,
-                'group' => $parent->nama,
+                'label' => $child->nama,
+                'display_label' => $parent->nama . ' → ' . $child->nama,
+                'level' => 1,
+                'is_child' => true,
             ];
         }
     }
@@ -53,7 +57,7 @@
 @endphp
 
 <div
-    class="flex flex-col gap-2.5 sm:gap-3.5 min-w-0 flex-1 min-h-[calc(100dvh-12rem)] md:min-h-0 md:h-[calc(100dvh-6.5rem)] pb-4 md:pb-0"
+    class="flex flex-col gap-2 min-w-0 flex-1 h-full min-h-0 overflow-hidden pb-1"
     x-data="{
         flexSet: {},
         searchOpen: false,
@@ -748,11 +752,11 @@
                 @canany(['pos.view', 'pos.view-own', 'pos.create'])
                 <a
                     href="/app/pos/retur"
-                    class="px-3 py-1.5 rounded-xl border border-up-red/30 bg-up-red/10 hover:bg-up-red/20 text-xs font-bold text-up-red transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
+                    class="btn-erp-ghost text-xs font-medium text-slate-700 dark:text-slate-300 min-h-[36px] hover:text-rose-500 dark:hover:text-rose-400"
                     title="Buka Manajemen Retur Konsumen"
                 >
-                    <svg class="w-4 h-4 text-up-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    <svg class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                     </svg>
                     <span>Retur</span>
                 </a>
@@ -761,11 +765,11 @@
                 <button
                     type="button"
                     wire:click="bukaRiwayatTransaksi"
-                    class="px-3 py-1.5 rounded-xl border border-ink-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 text-xs font-bold text-ink-700 dark:text-ink-200 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
+                    class="btn-erp-ghost text-xs font-medium text-slate-700 dark:text-slate-300 min-h-[36px]"
                     title="Riwayat Transaksi Kasir Hari Ini"
                 >
-                    <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                     <span>Riwayat</span>
                 </button>
@@ -773,26 +777,26 @@
                 <button
                     type="button"
                     wire:click="bukaPesananOnlineModal"
-                    class="px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
+                    class="btn-erp-ghost text-xs font-medium text-slate-700 dark:text-slate-300 min-h-[36px]"
                     title="Pesanan Online Pickup Cabang"
                 >
-                    <svg class="w-4 h-4 text-up-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                     <span>Online</span>
                     @if($jumlahPesananOnline > 0)
-                        <span class="min-w-[18px] h-4.5 px-1 rounded-full bg-up-amber text-ink-950 text-[10px] font-black flex items-center justify-center tabular-nums">{{ $jumlahPesananOnline }}</span>
+                        <span class="min-w-[18px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-mono font-semibold flex items-center justify-center tabular-nums">{{ $jumlahPesananOnline }}</span>
                     @endif
                 </button>
 
                 <button
                     type="button"
                     wire:click="bukaBayarServisModal"
-                    class="px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-xs font-bold text-blue-500 dark:text-blue-400 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
+                    class="btn-erp-ghost text-xs font-medium text-slate-700 dark:text-slate-300 min-h-[36px]"
                     title="Bayar Tiket Servis di Kasir"
                 >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     </svg>
                     <span>Bayar Servis</span>
                 </button>
@@ -801,11 +805,11 @@
                 <button
                     type="button"
                     wire:click="bukaMutasiKasModal('keluar')"
-                    class="px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400 transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
+                    class="btn-erp-ghost text-xs font-medium text-slate-700 dark:text-slate-300 min-h-[36px]"
                     title="Catat Mutasi Kas Masuk / Keluar Laci"
                 >
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>Mutasi Kas</span>
                 </button>
@@ -814,15 +818,15 @@
                 <button
                     type="button"
                     wire:click="bukaDitahanPanel"
-                    class="px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
+                    class="btn-erp-ghost text-xs font-medium text-slate-700 dark:text-slate-300 min-h-[36px]"
                     title="Lihat & Lanjutkan Transaksi yang Ditahan"
                 >
-                    <svg class="w-4 h-4 text-up-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>Ditahan</span>
                     @if($ditahanList->count() > 0)
-                        <span class="min-w-[18px] h-4.5 px-1 rounded-full bg-up-amber text-ink-950 text-[10px] font-black flex items-center justify-center tabular-nums">{{ $ditahanList->count() }}</span>
+                        <span class="min-w-[18px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-mono font-semibold flex items-center justify-center tabular-nums">{{ $ditahanList->count() }}</span>
                     @endif
                 </button>
             </div>
@@ -1127,7 +1131,7 @@
     </div>
 
     <!-- MAIN STAGE: TABEL TRANSAKSI KASIR (LELUASA, MODERN & BERSIH) -->
-    <div class="flex-1 min-h-[300px] sm:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-3 sm:p-4 flex flex-col shadow-sm overflow-hidden">
+    <div class="flex-1 min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm overflow-hidden">
         <!-- Mobile Cart Header: Counter & View Toggle (sm:hidden) -->
         <div class="sm:hidden flex items-center justify-between pb-2.5 mb-2 border-b border-ink-200/70 dark:border-white/10 flex-shrink-0">
             <div class="flex items-center gap-2">
@@ -1565,8 +1569,8 @@
             @endforelse
         </div>
 
-        <!-- 3. Table Area (Desktop sm:block) -->
-        <div class="hidden sm:block flex-1 overflow-x-auto overflow-y-auto pr-0.5">
+        <!-- 3. Table Area (Desktop sm:flex) -->
+        <div class="hidden sm:flex flex-col flex-1 min-h-0 overflow-x-auto overflow-y-auto pr-0.5">
             <table class="w-full text-left text-xs border-collapse">
                 <thead class="sticky top-0 z-10 bg-white dark:bg-[#0F172A] border-b border-ink-200/80 dark:border-white/10">
                     <tr class="text-[11px] font-bold text-ink-500 uppercase tracking-wider">
@@ -1985,25 +1989,25 @@
                 </div>
 
                 <!-- Action Buttons: Batal, Tahan & BAYAR (Responsif Mobile & Desktop) -->
-                <div class="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2">
+                <div class="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <!-- Baris Atas Mobile: Batal & Tahan -->
-                    <div class="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2">
+                    <div class="grid grid-cols-2 sm:flex sm:items-center gap-2">
                         <button
                             type="button"
                             wire:click="clearCart"
-                            class="w-full sm:w-auto px-3 sm:px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-up-red/15 dark:bg-white/5 dark:hover:bg-up-red/20 text-ink-600 hover:text-up-red dark:text-ink-400 dark:hover:text-up-red font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px] flex items-center justify-center gap-1"
+                            class="px-3.5 py-2 rounded-lg bg-transparent hover:bg-rose-500/10 text-slate-500 hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 font-medium text-xs transition border border-slate-200 dark:border-white/10 hover:border-rose-500/30 cursor-pointer active:scale-[0.98] min-h-[42px] flex items-center justify-center gap-1.5"
                         >
                             <span>Batal</span>
-                            <span class="text-[10px] font-mono text-ink-400 dark:text-ink-500">(ESC)</span>
+                            <span class="text-[10px] font-mono opacity-60">(ESC)</span>
                         </button>
 
                         <button
                             type="button"
                             wire:click="tahanTransaksi"
-                            class="w-full sm:w-auto px-3 sm:px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px] flex items-center justify-center gap-1"
+                            class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.06] dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 font-medium text-xs transition border border-slate-200 dark:border-white/10 cursor-pointer active:scale-[0.98] min-h-[42px] flex items-center justify-center gap-1.5"
                         >
                             <span>Tahan</span>
-                            <span class="text-[10px] font-mono text-ink-400 dark:text-ink-500">(F6)</span>
+                            <span class="text-[10px] font-mono opacity-60">(F6)</span>
                         </button>
                     </div>
 
@@ -2011,15 +2015,16 @@
                     <button
                         type="button"
                         wire:click="openPaymentModal"
-                        class="w-full sm:w-auto px-4 sm:px-5 py-2.5 sm:py-2 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-sm shadow-md shadow-up-mint/25 transition active:scale-95 cursor-pointer min-h-[44px] flex items-center justify-between sm:justify-center gap-2"
+                        class="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm transition active:scale-[0.98] cursor-pointer min-h-[42px] flex items-center justify-between sm:justify-center gap-3"
                     >
-                        <span class="flex items-center gap-1.5">
-                            <svg class="w-4 h-4 text-ink-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        <span class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <span>BAYAR (F4)</span>
+                            <span>BAYAR</span>
+                            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-700/60 text-emerald-100">F4</span>
                         </span>
-                        <span class="px-2.5 py-1 rounded-lg bg-ink-950/20 text-ink-950 text-xs font-mono font-black tabular-nums whitespace-nowrap">
+                        <span class="px-2 py-0.5 rounded bg-black/20 text-white text-xs font-mono font-medium tabular-nums whitespace-nowrap">
                             Rp {{ number_format($totalAkhir, 0, ',', '.') }}
                         </span>
                     </button>
@@ -2028,19 +2033,43 @@
         </div>
     </div>
 
-    <!-- MODALS SECTION -->
-    @include('modules.pos.livewire.modals.payment-modal')
-    @include('modules.pos.livewire.modals.diskon-modal')
-    @include('partials.thermal-receipt-modal')
-    @include('modules.pos.livewire.modals.riwayat-transaksi-modal')
-    @include('modules.pos.livewire.modals.pelanggan-baru-modal')
-    @include('modules.pos.livewire.modals.kas-modal')
-    @include('modules.pos.livewire.modals.mutasi-kas-modal')
-    @include('modules.pos.livewire.modals.bayar-servis-modal')
-    @include('modules.pos.livewire.modals.pesanan-online-modal')
-    @include('modules.pos.livewire.modals.transaksi-ditahan-modal')
-    @include('modules.pos.livewire.modals.void-transaksi-modal')
-    @include('partials.riwayat-modal')
+    <!-- MODALS SECTION (Lazy-rendered for extreme Livewire DOM-diffing speed) -->
+    @if(!empty($showPaymentModal))
+        @include('modules.pos.livewire.modals.payment-modal')
+    @endif
+    @if(!empty($showDiskonModal))
+        @include('modules.pos.livewire.modals.diskon-modal')
+    @endif
+    @if(!empty($showReceiptModal))
+        @include('partials.thermal-receipt-modal')
+    @endif
+    @if(!empty($showRiwayatTransaksiModal))
+        @include('modules.pos.livewire.modals.riwayat-transaksi-modal')
+    @endif
+    @if(!empty($showPelangganBaruModal))
+        @include('modules.pos.livewire.modals.pelanggan-baru-modal')
+    @endif
+    @if(!empty($showKasModal))
+        @include('modules.pos.livewire.modals.kas-modal')
+    @endif
+    @if(!empty($showMutasiKasModal))
+        @include('modules.pos.livewire.modals.mutasi-kas-modal')
+    @endif
+    @if(!empty($showBayarServisModal))
+        @include('modules.pos.livewire.modals.bayar-servis-modal')
+    @endif
+    @if(!empty($showPesananOnlineModal))
+        @include('modules.pos.livewire.modals.pesanan-online-modal')
+    @endif
+    @if(!empty($showDitahanPanel))
+        @include('modules.pos.livewire.modals.transaksi-ditahan-modal')
+    @endif
+    @if(!empty($showVoidModal))
+        @include('modules.pos.livewire.modals.void-transaksi-modal')
+    @endif
+    @if(!empty($showRiwayatModal) && !empty($riwayatId))
+        @include('partials.riwayat-modal')
+    @endif
 
     <!-- MOBILE FILTER BOTTOM SHEET (Apple Design & Emil Kowalski) -->
     <div

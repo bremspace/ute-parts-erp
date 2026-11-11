@@ -1,3 +1,24 @@
+@php
+    $gudangOptions = [];
+    foreach ($gudangs as $g) {
+        $gudangOptions[] = [
+            'value' => (string) $g->id,
+            'label' => $g->nama . ' (' . $g->kode . ')',
+        ];
+    }
+
+    $rakOptions = [];
+    foreach ($raks as $rk) {
+        if (!$filterGudangId || $rk->gudang_id == $filterGudangId) {
+            $rakOptions[] = [
+                'value' => (string) $rk->id,
+                'label' => $rk->nama . ' (' . $rk->kode . ')',
+                'group' => $rk->gudang?->nama ?? null,
+            ];
+        }
+    }
+@endphp
+
 <div x-data="{
         stokViewMode: localStorage.getItem('ute-stok-view-mode') || 'table',
         setStokView(mode) {
@@ -18,23 +39,21 @@
                 </div>
 
                 <div class="w-full sm:w-64">
-                    <select wire:model.live="filterGudangId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                        <option value="" class="bg-ink-900">Semua Gudang</option>
-                        @foreach($gudangs as $g)
-                            <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }} ({{ $g->kode }})</option>
-                        @endforeach
-                    </select>
+                    <x-prism.searchable-select
+                        model="filterGudangId"
+                        :options="$gudangOptions"
+                        placeholder="Semua Gudang"
+                        searchPlaceholder="Cari gudang..."
+                    />
                 </div>
 
-                <div class="w-full sm:w-48">
-                    <select wire:model.live="filterRakId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono">
-                        <option value="" class="bg-ink-900">Semua Rak</option>
-                        @foreach($raks as $rk)
-                            @if(!$filterGudangId || $rk->gudang_id == $filterGudangId)
-                                <option value="{{ $rk->id }}" class="bg-ink-900">{{ $rk->nama }} ({{ $rk->kode }})</option>
-                            @endif
-                        @endforeach
-                    </select>
+                <div class="w-full sm:w-56">
+                    <x-prism.searchable-select
+                        model="filterRakId"
+                        :options="$rakOptions"
+                        placeholder="Semua Rak"
+                        searchPlaceholder="Cari rak..."
+                    />
                 </div>
 
                 <!-- [F2-5] Export laporan stok & View Mode Switcher -->

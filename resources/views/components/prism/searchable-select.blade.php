@@ -8,13 +8,10 @@
 ])
 
 @php
-    // Normalisasi opsi ke array [{value, label, group?}] di sisi PHP
+    // Normalisasi opsi ke array [{value, label, display_label?, group?, level?, is_parent?, is_child?}]
     $normalizedOptions = [];
-
-    // Opsi bisa berupa Collection, array objek, array asosiatif, atau flat array
     $rawOptions = is_iterable($options) ? $options : [];
 
-    // Deteksi tipe iterasi
     $isAssociative = false;
     if (is_array($rawOptions)) {
         $keys = array_keys($rawOptions);
@@ -25,44 +22,72 @@
         if (is_object($item)) {
             $val = $item->value ?? $item->id ?? $key;
             $lbl = $item->label ?? $item->nama ?? (string)$val;
+            $dispLbl = $item->display_label ?? $lbl;
             $grp = $item->group ?? null;
+            $lvl = $item->level ?? 0;
+            $isParent = !empty($item->is_parent);
+            $isChild = !empty($item->is_child) || $lvl > 0;
+
             $normalizedOptions[] = [
                 'value' => (string) $val,
                 'label' => (string) $lbl,
+                'display_label' => (string) $dispLbl,
                 'group' => $grp ? (string) $grp : null,
+                'level' => (int) $lvl,
+                'is_parent' => (bool) $isParent,
+                'is_child' => (bool) $isChild,
             ];
         } elseif (is_array($item)) {
             if (isset($item['value']) || isset($item['label']) || isset($item['id']) || isset($item['nama'])) {
                 $val = $item['value'] ?? $item['id'] ?? $key;
                 $lbl = $item['label'] ?? $item['nama'] ?? (string)$val;
+                $dispLbl = $item['display_label'] ?? $lbl;
                 $grp = $item['group'] ?? null;
+                $lvl = $item['level'] ?? 0;
+                $isParent = !empty($item['is_parent']);
+                $isChild = !empty($item['is_child']) || $lvl > 0;
+
                 $normalizedOptions[] = [
                     'value' => (string) $val,
                     'label' => (string) $lbl,
+                    'display_label' => (string) $dispLbl,
                     'group' => $grp ? (string) $grp : null,
+                    'level' => (int) $lvl,
+                    'is_parent' => (bool) $isParent,
+                    'is_child' => (bool) $isChild,
                 ];
             } else {
-                // array [value => label] atau multidimensional optgroup
                 $val = $key;
                 $lbl = (string) $item;
                 $normalizedOptions[] = [
                     'value' => (string) $val,
                     'label' => $lbl,
+                    'display_label' => $lbl,
                     'group' => null,
+                    'level' => 0,
+                    'is_parent' => false,
+                    'is_child' => false,
                 ];
             }
         } elseif ($isAssociative) {
             $normalizedOptions[] = [
                 'value' => (string) $key,
                 'label' => (string) $item,
+                'display_label' => (string) $item,
                 'group' => null,
+                'level' => 0,
+                'is_parent' => false,
+                'is_child' => false,
             ];
         } else {
-            // Flat scalar array: ['iPhone 11', 'iPhone 12'] -> value & label sama
             $normalizedOptions[] = [
                 'value' => (string) $item,
                 'label' => (string) $item,
+                'display_label' => (string) $item,
                 'group' => null,
+                'level' => 0,
+                'is_parent' => false,
+                'is_child' => false,
             ];
         }
     }
@@ -77,7 +102,6 @@
         selected: $wire.entangle('{{ $model }}').live,
         clearable: @js($clearable),
         init() {
-            // Watch changes to close search or reset search when closed
             this.$watch('open', value => {
                 if (value) {
                     this.search = '';
@@ -97,32 +121,46 @@
             return this.options.find(o => String(o.value) === String(this.selected)) || null;
         },
         get displayLabel() {
-            return this.selectedItem ? this.selectedItem.label : '{{ $placeholder }}';
+            if (!this.selectedItem) {
+                return '{{ addslashes($placeholder) }}';
+            }
+            return this.selectedItem.display_label || this.selectedItem.label;
         },
         get filteredOptions() {
-            let list = this.options;
-            if (this.search && this.search.trim() !== '') {
-                const q = this.search.toLowerCase().trim();
-                list = list.filter(o => {
-                    const matchLabel = o.label && o.label.toLowerCase().includes(q);
-                    const matchGroup = o.group && o.group.toLowerCase().includes(q);
-                    return matchLabel || matchGroup;
-                });
+            if (!this.search || this.search.trim() === '') {
+                return this.options;
             }
-            return list.slice(0, 100);
+            const q = this.search.toLowerCase().trim();
+            return this.options.filter(o => {
+                const matchLabel = o.label && o.label.toLowerCase().includes(q);
+                const matchGroup = o.group && o.group.toLowerCase().includes(q);
+                const matchDisplay = o.display_label && o.display_label.toLowerCase().includes(q);
+                return matchLabel || matchGroup || matchDisplay;
+            });
         },
         get groupedFilteredOptions() {
             const hasGroups = this.options.some(o => !!o.group);
             if (!hasGroups) {
-                return { '': this.filteredOptions };
+                return [{ group: null, items: this.filteredOptions }];
             }
-            const groups = {};
-            this.filteredOptions.forEach(opt => {
+
+            const map = new Map();
+            for (const opt of this.filteredOptions) {
                 const grp = opt.group || '';
-                if (!groups[grp]) groups[grp] = [];
-                groups[grp].push(opt);
+                if (!map.has(grp)) {
+                    map.set(grp, []);
+                }
+                map.get(grp).push(opt);
+            }
+
+            const result = [];
+            map.forEach((items, groupName) => {
+                result.push({
+                    group: groupName || null,
+                    items: items
+                });
             });
-            return groups;
+            return result;
         },
         select(val) {
             this.selected = val;
@@ -196,7 +234,7 @@
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
         x-transition:leave-end="opacity-0 scale-95 -translate-y-1"
-        class="absolute z-50 mt-1 min-w-[220px] w-full max-w-[92vw] sm:max-w-xs rounded-2xl bg-white/95 dark:bg-ink-950/95 backdrop-blur-md border border-ink-200 dark:border-white/10 shadow-2xl p-2 space-y-1.5 font-normal normal-case text-left"
+        class="absolute z-50 mt-1 min-w-[240px] w-full max-w-[92vw] sm:max-w-xs rounded-2xl bg-white/95 dark:bg-ink-950/95 backdrop-blur-md border border-ink-200 dark:border-white/10 shadow-2xl p-2 space-y-1.5 font-normal normal-case text-left"
         :class="alignRight ? 'right-0' : 'left-0'"
         style="display: none;"
     >
@@ -224,25 +262,37 @@
         </div>
 
         <!-- Options List -->
-        <div x-ref="listContainer" class="max-h-56 overflow-y-auto space-y-0.5 overscroll-contain pr-0.5">
-            <template x-for="(opts, grp) in groupedFilteredOptions" :key="grp">
+        <div x-ref="listContainer" class="max-h-64 overflow-y-auto space-y-0.5 overscroll-contain pr-0.5">
+            <template x-for="grp in groupedFilteredOptions" :key="grp.group || '__all__'">
                 <div>
-                    <!-- Group Header if group is present -->
-                    <template x-if="grp !== ''">
-                        <div class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500 bg-black/5 dark:bg-white/5 rounded-md my-0.5" x-text="grp"></div>
+                    <!-- Group Header (Optgroup) -->
+                    <template x-if="grp.group">
+                        <div class="sticky top-0 z-10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400 bg-slate-100/95 dark:bg-ink-900/95 backdrop-blur-sm border-y border-black/5 dark:border-white/5 my-1 flex items-center justify-between">
+                            <span x-text="grp.group"></span>
+                            <span class="text-[9px] font-mono text-ink-400/80" x-text="grp.items.length"></span>
+                        </div>
                     </template>
 
                     <!-- Items in group -->
-                    <template x-for="opt in opts" :key="opt.value">
+                    <template x-for="opt in grp.items" :key="opt.value">
                         <div
                             @click="select(opt.value)"
                             :data-selected="String(opt.value) === String(selected)"
                             class="px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs cursor-pointer transition-colors"
-                            :class="String(opt.value) === String(selected)
-                                ? 'bg-up-primary/15 text-up-primary dark:text-white font-bold'
-                                : 'text-ink-700 dark:text-ink-200 hover:bg-black/5 dark:hover:bg-white/10'"
+                            :class="[
+                                String(opt.value) === String(selected)
+                                    ? 'bg-up-primary/15 text-up-primary dark:text-white font-bold'
+                                    : (opt.is_parent ? 'font-semibold text-ink-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 bg-black/[0.02] dark:bg-white/[0.02]' : 'text-ink-700 dark:text-ink-200 hover:bg-black/5 dark:hover:bg-white/10'),
+                                opt.level === 1 ? 'pl-6' : '',
+                                opt.level === 2 ? 'pl-9' : ''
+                            ]"
                         >
-                            <span class="truncate mr-2" x-text="opt.label"></span>
+                            <div class="flex items-center gap-1.5 truncate mr-2">
+                                <template x-if="opt.is_child || opt.level > 0">
+                                    <span class="text-ink-400/70 select-none text-[11px]">↳</span>
+                                </template>
+                                <span class="truncate" x-text="opt.label"></span>
+                            </div>
                             <span x-show="String(opt.value) === String(selected)" class="text-up-mint font-bold text-xs shrink-0">✓</span>
                         </div>
                     </template>
@@ -255,9 +305,10 @@
             </div>
         </div>
 
-        <!-- Pagination / Result Count footer if truncated -->
-        <div x-show="options.length > 100 && filteredOptions.length >= 100" class="pt-1 border-t border-black/5 dark:border-white/5 text-[10px] text-center text-ink-400">
-            Menampilkan 100 opsi teratas. Ketik kata kunci untuk mempersempit.
+        <!-- Result count footer -->
+        <div class="pt-1 border-t border-black/5 dark:border-white/5 text-[10px] text-center text-ink-400 flex items-center justify-between px-1">
+            <span x-text="filteredOptions.length + ' opsi tersedia'"></span>
+            <span x-show="search.length > 0" class="text-up-primary cursor-pointer hover:underline" @click="search = ''">Reset cari</span>
         </div>
     </div>
 </div>
