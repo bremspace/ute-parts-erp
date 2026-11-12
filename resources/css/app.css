@@ -102,6 +102,20 @@ html, body {
     overflow-x: hidden;
 }
 
+/* [T-35] Konsistensi preview (screen) & cetak (print) untuk struk thermal —
+   class alignment harus sama di layar dan saat cetak */
+.thermal-receipt-container .receipt-title {
+    text-align: center;
+}
+
+.thermal-receipt-container .receipt-center {
+    text-align: center;
+}
+
+.thermal-receipt-container .receipt-right {
+    text-align: right;
+}
+
 * {
     min-width: 0;
     box-sizing: border-box;
