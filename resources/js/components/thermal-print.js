@@ -269,6 +269,11 @@ function layoutFaktur80(data) {
     if (data.show_waktu !== false && data.waktu) {
         E.push({ t: 'line', s: `${data.waktu}`, c: 1 });
     }
+    if (data.show_qr_retur !== false && data.no_transaksi) {
+        E.push({ t: 'qrcode', d: data.no_transaksi, size: 5 });
+        E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Klaim Garansi', c: 1 });
+        E.push({ t: 'sep', w: W, c: '-' });
+    }
     E.push({ t: 'sep', w: W, c: '=' });
     E.push({ t: 'line', s: pair('No. Faktur:', data.no_transaksi ?? '-', W) });
     if (data.sumber && !['pos', 'offline'].includes(String(data.sumber).toLowerCase())) {
@@ -364,12 +369,6 @@ function layoutFaktur80(data) {
         E.push({ t: 'sep', w: W, c: '-' });
     }
 
-    if (data.show_qr_retur !== false && data.no_transaksi) {
-        E.push({ t: 'qrcode', d: data.no_transaksi, size: 5 });
-        E.push({ t: 'line', s: data.no_transaksi, c: 1, b: 1 });
-        E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Klaim Garansi', c: 1 });
-        E.push({ t: 'sep', w: W, c: '-' });
-    }
     E.push({ t: 'line', s: data.footer_text || 'Terima Kasih atas Kunjungan Anda!', c: 1 });
     if (data.kebijakan_retur) {
         for (const ln of wrap(String(data.kebijakan_retur), W)) E.push({ t: 'line', s: ln, c: 1 });
