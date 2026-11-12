@@ -819,10 +819,15 @@
                     <option value="">Semua Brand</option>
                     @foreach($brands as $key => $val)
                         @php
+                            if (is_array($val)) {
+                                continue;
+                            }
                             $b = is_numeric($key) ? $val : $key;
-                            $count = is_numeric($key) ? null : $val;
+                            $count = is_numeric($key) ? null : (is_scalar($val) ? $val : null);
                         @endphp
-                        <option value="{{ $b }}">{{ $b }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
+                        @if(is_scalar($b))
+                            <option value="{{ $b }}">{{ $b }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
+                        @endif
                     @endforeach
                 </select>
                 @if(!empty($filterBrand))

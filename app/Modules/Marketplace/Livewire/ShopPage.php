@@ -380,7 +380,7 @@ class ShopPage extends Component
     public function getBrandsProperty(): mixed
     {
         return Cache::remember('shop.brands.list.v1', self::HP_LIST_CACHE_TTL, function () {
-            return Produk::where('is_active', true)->distinct()->orderBy('brand_kompatibel')->pluck('brand_kompatibel')->filter()->values();
+            return Produk::where('is_active', true)->distinct()->orderBy('brand_kompatibel')->pluck('brand_kompatibel')->filter()->values()->all();
         });
     }
 
