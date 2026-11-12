@@ -33,7 +33,13 @@ If Not objFSO.FolderExists(logsDir) Then
 End If
 
 Set objShell = CreateObject("WScript.Shell")
-' Gunakan format cmd.exe /c standar dengan tanda kutip aman
-cmd = "%comspec% /c """ & phpBin & " -S 0.0.0.0:" & port & " -t """ & docRoot & """ >> """ & logFile & """ 2>&1"""
+' Gunakan router script server.php jika tersedia di baseDir agar route Laravel dapat di-rewrite
+Dim routerScript
+routerScript = baseDir & "\server.php"
+If objFSO.FileExists(routerScript) Then
+    cmd = "%comspec% /c """ & phpBin & " -S 0.0.0.0:" & port & " """ & routerScript & """ >> """ & logFile & """ 2>&1"""
+Else
+    cmd = "%comspec% /c """ & phpBin & " -S 0.0.0.0:" & port & " -t """ & docRoot & """ >> """ & logFile & """ 2>&1"""
+End If
 ' 0 = Hidden window, False = Async/non-blocking
 objShell.Run cmd, 0, False

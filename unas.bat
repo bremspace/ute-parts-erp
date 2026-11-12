@@ -3,6 +3,20 @@ setlocal EnableExtensions EnableDelayedExpansion
 title Bremspace ERP - Unas 1-Click Installer
 cd /d "%~dp0"
 
+rem 0. Deteksi dan Minta Elevasi Hak Administrator jika belum elevated
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo ======================================================================
+    echo    Bremspace ERP - Unas 1-Click Installer (Local Windows Edition)
+    echo    Meminta hak akses Administrator untuk memasang dependensi sistem...
+    echo ======================================================================
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs" 2>nul
+    if not errorlevel 1 exit /b 0
+    echo [PERINGATAN] Berjalan dalam mode Standard User (tanpa Administrator).
+    echo ======================================================================
+    echo.
+)
+
 echo ======================================================================
 echo    Bremspace ERP - Unas 1-Click Installer (Local Windows Edition)
 echo    Otomatisasi Penuh: Cek PC, Dependensi, DB, Migrasi, Run
@@ -44,6 +58,7 @@ if %EXIT_CODE% neq 0 (
 ) else (
     echo [SUKSES] Seluruh tahapan instalasi Bremspace ERP untuk Unas selesai!
 )
+
 echo ======================================================================
 echo Tekan tombol apa saja untuk menutup jendela...
 pause >nul
