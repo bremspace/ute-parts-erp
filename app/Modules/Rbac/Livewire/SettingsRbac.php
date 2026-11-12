@@ -1256,6 +1256,7 @@ class SettingsRbac extends Component
     public array $rakForm = ['id' => null, 'gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => '', 'is_active' => true];
 
     // Master Produk & Katalog Sub-Tab & Modals
+    #[Url(as: 'sub')]
     public string $masterProdukSubTab = 'kategori'; // kategori, brand, kualitas, satuan, kondisi, tipe_hp
 
     // Batch Selection untuk Master Atribut Produk & Part
