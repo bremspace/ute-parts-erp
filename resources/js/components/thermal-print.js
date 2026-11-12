@@ -379,10 +379,12 @@ function layoutFaktur80(data) {
         for (const ln of wrap(String(data.catatan_kaki), W)) E.push({ t: 'line', s: ln, c: 1 });
     }
     E.push({ t: 'feed', n: 1 });
-    E.push({ t: 'line', s: pad('( ' + (data.kasir ?? '') + ' )', W / 2) + '  ( Pelanggan )' });
-    E.push({ t: 'line', s: pad('', W / 2) + '  ' });
-    E.push({ t: 'line', s: pad('Kasir', W / 2) + '  ' + 'Pelanggan' });
-    E.push({ t: 'feed', n: 1 });
+    if (data.is_piutang) {
+        E.push({ t: 'line', s: pad('( ' + (data.kasir ?? '') + ' )', W / 2) + '  ( Pelanggan )' });
+        E.push({ t: 'line', s: pad('', W / 2) + '  ' });
+        E.push({ t: 'line', s: pad('Kasir', W / 2) + '  ' + 'Pelanggan' });
+        E.push({ t: 'feed', n: 1 });
+    }
     return E;
 }
 
