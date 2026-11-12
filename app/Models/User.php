@@ -91,6 +91,8 @@ class User extends Authenticatable
         return $this->hasOne(Karyawan::class, 'user_id');
     }
 
+    protected array $memoBisaAksesCabang = [];
+
     /**
      * Cek apakah user memiliki hak akses ke cabang tertentu berdasarkan role dan penugasan.
      * Role HQ (super-admin, finance, marketing, kelola-hr): memiliki akses ke seluruh cabang aktif.
@@ -98,23 +100,27 @@ class User extends Authenticatable
      */
     public function bisaAksesCabang(int $cabangId): bool
     {
+        if (array_key_exists($cabangId, $this->memoBisaAksesCabang)) {
+            return $this->memoBisaAksesCabang[$cabangId];
+        }
+
         $cabangExists = Cabang::where('id', $cabangId)->where('is_active', true)->exists();
         if (! $cabangExists) {
-            return false;
+            return $this->memoBisaAksesCabang[$cabangId] = false;
         }
 
         // Role tingkat manajemen/pusat (HQ) memiliki akses ke seluruh cabang aktif
         if ($this->hasAnyRole(['super-admin', 'owner', 'finance', 'marketing', 'kelola-hr'])) {
-            return true;
+            return $this->memoBisaAksesCabang[$cabangId] = true;
         }
 
         // Jika user operasional belum memiliki penugasan sama sekali (misal fresh test)
         if ($this->cabangs()->doesntExist()) {
-            return true;
+            return $this->memoBisaAksesCabang[$cabangId] = true;
         }
 
         // Role cabang operasional: wajib hanya cabang yang ditugaskan kepada dirinya
-        return $this->cabangs()
+        return $this->memoBisaAksesCabang[$cabangId] = $this->cabangs()
             ->where('cabang.id', $cabangId)
             ->where('cabang.is_active', true)
             ->exists();
