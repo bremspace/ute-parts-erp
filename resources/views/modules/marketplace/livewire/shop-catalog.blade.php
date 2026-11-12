@@ -11,8 +11,8 @@
         }
 
         $formattedModelLabel = !empty($filterHpModel) ? \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($filterHpModel, $filterHpMerk ?: null) : null;
-        $seoTitle = 'Katalog Sparepart & Suku Cadang HP — ' . config('app.name', 'Bremspace');
-        $seoDesc = 'Katalog suku cadang dan sparepart handphone terlengkap: LCD Touchscreen, Baterai, Flexible Board, IC Chipset kualitas OEM & Original bergaransi resmi.';
+        $seoTitle = $webConfig['seo_title'] ?? ('Katalog Sparepart & Suku Cadang HP — ' . config('app.name', 'Bremspace'));
+        $seoDesc = $webConfig['seo_description'] ?? 'Katalog suku cadang dan sparepart handphone terlengkap: LCD Touchscreen, Baterai, Flexible Board, IC Chipset kualitas OEM & Original bergaransi resmi.';
         if (!empty($activeCategoryName) && !empty($formattedModelLabel)) {
             $seoTitle = "Sparepart {$activeCategoryName} {$formattedModelLabel} — " . config('app.name', 'Bremspace');
             $seoDesc = "Jual suku cadang & {$activeCategoryName} untuk {$formattedModelLabel} terlengkap, kualitas teruji dan bergaransi resmi toko.";
@@ -24,6 +24,7 @@
             $seoDesc = "Daftar lengkap {$activeCategoryName} handphone original & OEM bergaransi siap kirim ke seluruh Indonesia.";
         }
     @endphp
+    <title>{{ $seoTitle }}</title>
     <link rel="canonical" href="{{ $canonicalUrl }}" />
     <meta name="description" content="{{ $seoDesc }}">
     <meta name="keywords" content="{{ $formattedModelLabel ? "{$formattedModelLabel}, sparepart {$formattedModelLabel}, " : '' }}{{ $activeCategoryName ? "{$activeCategoryName}, " : '' }}katalog sparepart hp, lcd touchscreen, baterai handphone, flexible hp, ic power, alat servis hp">
@@ -104,6 +105,9 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12"
      x-data="{
         viewMode: localStorage.getItem('ute-shop-view-mode') || 'grid',
+        previewImg: null,
+        openPreview(url) { this.previewImg = url; },
+        closePreview() { this.previewImg = null; },
         setViewMode(mode) {
             this.viewMode = mode;
             try { localStorage.setItem('ute-shop-view-mode', mode); } catch (e) {}
@@ -507,53 +511,6 @@
     @endif
     @endif
 
-    <!-- Breadcrumb & Category/Compatibility Navigation (Shopee & Amazon Architecture) -->
-    <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-xs font-medium text-ink-500 dark:text-ink-400 overflow-x-auto whitespace-nowrap pb-1">
-        <a href="{{ route('shop') }}" class="hover:text-up-primary dark:hover:text-white transition-colors flex items-center gap-1.5 font-semibold">
-            <svg class="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-            <span>Katalog Sparepart</span>
-        </a>
-        @if(!empty($activeCategoryName))
-            <span class="text-ink-300 dark:text-ink-700">/</span>
-            <a href="{{ route('shop', ['kategori' => $filterKategori]) }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-semibold {{ empty($filterHpModel) ? 'text-up-primary' : '' }}">
-                {{ $activeCategoryName }}
-            </a>
-        @endif
-        @if(!empty($filterHpModel))
-            <span class="text-ink-300 dark:text-ink-700">/</span>
-            <span class="text-ink-900 dark:text-white font-bold flex items-center gap-1">
-                <span>{{ !empty($activeCategoryName) ? $activeCategoryName . ' ' : '' }}{{ \App\Modules\Wms\Models\TipeHp::resolveLabelForModel($filterHpModel, $filterHpMerk ?: null) }}</span>
-                <button type="button" wire:click="resetSingleFilter('hpModel')" class="hover:text-up-red text-ink-400 text-[10px] ml-1 cursor-pointer" title="Hapus filter model">✕</button>
-            </span>
-        @endif
-        @if(!empty($search))
-            <span class="text-ink-300 dark:text-ink-700">/</span>
-            <span class="text-ink-900 dark:text-white font-medium">Cari "{{ $search }}"</span>
-        @endif
-    </nav>
-
-    <!-- Quick Category Tabs / Pills (Fully clickable, live filtered, & crawlable) -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
-        <button type="button"
-                wire:click="setFilterKategori('')"
-                class="px-4 py-2 rounded-xl font-bold transition-all duration-140 cursor-pointer shrink-0 flex items-center gap-1.5 {{ empty($filterKategori) ? 'bg-up-primary text-white shadow-sm shadow-up-primary/25' : 'bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300 border border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
-            <span>Semua Part</span>
-        </button>
-        @foreach($categories as $cat)
-            @php
-                $cId = is_array($cat) ? ($cat['id'] ?? '') : ($cat->id ?? (is_scalar($cat) ? (string) $cat : ''));
-                $cNama = is_array($cat) ? ($cat['nama'] ?? '') : ($cat->nama ?? (is_scalar($cat) ? (string) $cat : ''));
-                $isCurrent = ($filterKategori == $cId || $filterKategori === $cNama);
-            @endphp
-            @if(!empty($cNama))
-                <button type="button"
-                        wire:click="setFilterKategori('{{ $cId }}')"
-                        class="px-4 py-2 rounded-xl font-bold transition-all duration-140 cursor-pointer shrink-0 flex items-center gap-1.5 {{ $isCurrent ? 'bg-up-primary text-white shadow-sm shadow-up-primary/25 ring-2 ring-up-primary/20' : 'bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300 border border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
-                    <span>{{ $cNama }}</span>
-                </button>
-            @endif
-        @endforeach
-    </div>
 
     <!-- Active Filter Tags (Quick-Clear Pills) -->
     @php
@@ -1007,10 +964,13 @@
                                 <img src="{{ $thumbImg }}"
                                      alt="{{ $p->nama }}"
                                      loading="lazy"
-                                     class="aspect-square w-full h-full object-cover transition-transform duration-200 ease-out group-hover/img:scale-105"
-                                     onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.classList.remove('hidden');">
+                                     class="aspect-square w-full h-full object-contain transition-transform duration-200 ease-out group-hover/img:scale-105"
+                                     onerror="this.style.display='none'; const ph=this.closest('a')?.querySelector('[data-img-placeholder]'); if(ph) ph.classList.remove('hidden');">
+                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="absolute top-2 right-2 z-20 inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/50 text-white hover:bg-black/70 transition" title="Lihat gambar produk">
+                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                 </button>
                             @endif
-                            <div class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-4 text-center {{ $thumbImg ? 'hidden' : '' }}">
+                            <div data-img-placeholder class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-4 text-center {{ $thumbImg ? 'hidden' : '' }}">
                                 <svg class="w-8 sm:w-10 h-8 sm:h-10 stroke-[1.25]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                                 </svg>
@@ -1082,8 +1042,22 @@
                                         Rp {{ number_format($price['harga_dasar'], 0, ',', '.') }}
                                     </span>
                                 @endif
-                                <div class="text-sm sm:text-base font-bold text-ink-900 dark:text-white tracking-tight tabular-nums truncate">
-                                    Rp {{ number_format($price['harga'], 0, ',', '.') }}
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="text-sm sm:text-base font-bold text-ink-900 dark:text-white tracking-tight tabular-nums truncate">
+                                        Rp {{ number_format($price['harga'], 0, ',', '.') }}
+                                    </div>
+                                    @if($stok > 0)
+                                        <button type="button"
+                                                wire:click="addToCart({{ $p->id }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="addToCart({{ $p->id }})"
+                                                class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-up-primary hover:bg-up-primary/90 text-white transition-colors cursor-pointer"
+                                                title="Tambah ke Keranjang">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                        </button>
+                                    @else
+                                        <span class="text-[10px] font-semibold text-up-red flex-shrink-0">Habis</span>
+                                    @endif
                                 </div>
 
                                 <div class="flex items-center justify-between gap-1 mt-1.5 text-[10px] min-w-0">
@@ -1099,28 +1073,6 @@
                         </div>
                     </div>
 
-                    <!-- Add-to-Cart Action Button -->
-                    <div class="p-3 sm:p-4 pt-0">
-                        @if($stok > 0)
-                            <button type="button"
-                                    wire:click="addToCart({{ $p->id }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="addToCart({{ $p->id }})"
-                                    class="w-full py-2 px-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-[transform,background-color] duration-140 active:scale-95 cursor-pointer"
-                                    title="Tambah ke Keranjang">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                <span>+ Keranjang</span>
-                            </button>
-                        @else
-                            <button type="button"
-                                    disabled
-                                    class="w-full py-2 px-3 rounded-xl bg-ink-100 dark:bg-white/5 text-ink-400 font-semibold text-xs flex items-center justify-center gap-1.5 cursor-not-allowed">
-                                <span>Stok Habis</span>
-                            </button>
-                        @endif
-                    </div>
                 </div>
             @empty
                 <div class="col-span-full py-16 text-center">
@@ -1150,6 +1102,9 @@
                                      onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                             @endif
                             <span class="text-xs font-bold text-ink-400 items-center justify-center w-full h-full" style="{{ $thumbImg ? 'display:none;' : 'display:flex;' }}">PART</span>
+                             @if($thumbImg)
+                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="absolute bottom-1 right-1 z-10 inline-flex items-center px-1.5 py-0.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition text-[9px] font-semibold" title="Lihat gambar produk">Lihat gambar</button>
+                             @endif
                         </a>
                         <div class="min-w-0 flex-1 space-y-1">
                             <div class="flex items-center gap-2 text-[10px] text-ink-500">
@@ -1240,6 +1195,7 @@
                         $customer = auth('customer')->user();
                         $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                         $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
+                        $thumbImg = $p->thumbnail_url ?: $p->gambar;
                     @endphp
                     <div class="px-3.5 py-2.5 flex items-center justify-between gap-3 hover:bg-ink-50 dark:hover:bg-white/[0.03] transition-colors group">
                         <div class="min-w-0 flex items-center gap-3">
@@ -1259,6 +1215,9 @@
                                 Rp {{ number_format($price['harga'], 0, ',', '.') }}
                             </span>
                             @if($stok > 0)
+                             @if($thumbImg)
+                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="text-[10px] font-semibold text-up-primary hover:underline cursor-pointer" title="Lihat gambar produk">Lihat gambar</button>
+                             @endif
                                 <button type="button"
                                         wire:click="addToCart({{ $p->id }})"
                                         wire:loading.attr="disabled"
@@ -1315,4 +1274,9 @@
             {{ $products->links() }}
         </div>
     </section>
+    <!-- Image Preview Modal -->
+    <div x-show="previewImg" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" @click="closePreview()">
+        <img :src="previewImg" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" @click.stop>
+        <button type="button" @click="closePreview()" class="absolute top-4 right-4 text-white text-3xl font-bold hover:text-up-primary">&times;</button>
+    </div>
 </div>

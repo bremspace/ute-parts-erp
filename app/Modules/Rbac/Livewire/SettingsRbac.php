@@ -149,6 +149,7 @@ class SettingsRbac extends Component
     public string $atributActivePreviewTab = 'kategori';
 
     // Konfigurasi Printer Label QR Produk & Struk Kasir
+    #[Url(as: 'psub')]
     public string $printerSubTab = 'struk'; // 'struk' | 'label' | 'wms_doc' | 'hr_slip' | 'laporan' | 'pengiriman'
 
     public array $printerForm = [
@@ -285,10 +286,14 @@ class SettingsRbac extends Component
 
         if (request()->has('sub')) {
             $sub = (string) request('sub');
-            if (in_array($sub, ['kategori', 'brand', 'kualitas', 'satuan', 'kondisi', 'tipe_hp'], true)) {
+            if (in_array($sub, ['kategori', 'brand', 'kualitas', 'satuan', 'kondisi', 'tipe_hp', 'merk_hp'], true)) {
                 $this->masterProdukSubTab = $sub;
-            } elseif (in_array($sub, ['struk', 'label', 'wms_doc', 'hr_slip', 'laporan', 'pengiriman'], true)) {
-                $this->printerSubTab = $sub;
+            }
+        }
+        if (request()->has('psub')) {
+            $psub = (string) request('psub');
+            if (in_array($psub, ['struk', 'label', 'wms_doc', 'hr_slip', 'laporan', 'pengiriman'], true)) {
+                $this->printerSubTab = $psub;
             }
         }
 

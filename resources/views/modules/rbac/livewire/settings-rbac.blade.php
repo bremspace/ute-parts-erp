@@ -1558,7 +1558,7 @@
                                 <!-- Kertas Struk Simulasi -->
                                 <div
                                     class="bg-white text-black p-4 rounded-xl font-mono text-xs shadow-2xl space-y-2 border border-gray-300 transition-all duration-200 select-text"
-                                    style="width: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '280px' : '330px' }};"
+                                    style="width: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '210px' : '302px' }};"
                                 >
                                     <!-- Header Toko -->
                                     <div class="text-center pb-2 border-b border-dashed border-gray-400 space-y-0.5">

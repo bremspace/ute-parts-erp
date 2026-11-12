@@ -32,7 +32,7 @@
     "name": "preload-helper"
   },
   "node_modules/html5-qrcode/esm/index.js": {
-    "file": "assets/esm-LtCRMgh6.js",
+    "file": "assets/esm-BBl9AjGi.js",
     "name": "esm",
     "src": "node_modules/html5-qrcode/esm/index.js",
     "isDynamicEntry": true,
@@ -47,7 +47,7 @@
     "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-CE87C6tS.css",
+    "file": "assets/app-B94jsZxa.css",
     "name": "app",
     "names": [
       "app.css"
@@ -56,7 +56,7 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-DuAPVQuq.js",
+    "file": "assets/app-Bi4Ne63n.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -67,11 +67,11 @@
       "node_modules/workbox-window/build/workbox-window.prod.es5.mjs"
     ],
     "css": [
-      "assets/app-CE87C6tS.css"
+      "assets/app-B94jsZxa.css"
     ]
   },
   "resources/js/backoffice.js": {
-    "file": "assets/backoffice-_hJwnxKQ.js",
+    "file": "assets/backoffice-Bw_eMRTR.js",
     "name": "backoffice",
     "src": "resources/js/backoffice.js",
     "isEntry": true,
