@@ -169,7 +169,17 @@ class ServisService
         if ($pelanggan) {
             $data['pelanggan_id'] = $pelanggan->id;
             $namaPelanggan = $pelanggan->nama;
-            $teleponPelanggan = $pelanggan->telepon ?: $teleponPelanggan;
+            $teleponPelanggan = $teleponPelanggan ?: $pelanggan->telepon;
+        }
+
+        if (! empty($teleponPelanggan)) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $teleponPelanggan);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $teleponPelanggan = $clean;
         }
 
         // [P1-1/T-01] Race-safe: generation LIKE-locked + retry duplicate-key
@@ -298,7 +308,17 @@ class ServisService
         if ($pelanggan) {
             $data['pelanggan_id'] = $pelanggan->id;
             $namaPelanggan = $pelanggan->nama;
-            $teleponPelanggan = $pelanggan->telepon ?: $teleponPelanggan;
+            $teleponPelanggan = $teleponPelanggan ?: $pelanggan->telepon;
+        }
+
+        if (! empty($teleponPelanggan)) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $teleponPelanggan);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $teleponPelanggan = $clean;
         }
 
         // [P1-1/T-01] Race-safe booking: pola sama dengan terimaUnit().

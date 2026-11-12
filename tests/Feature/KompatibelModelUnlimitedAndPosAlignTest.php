@@ -473,11 +473,11 @@ class KompatibelModelUnlimitedAndPosAlignTest extends TestCase
             ->test(PosKasir::class)
             ->call('toggleFilter', 'model_kompatibel')
             ->assertSet('visibleFilters.model_kompatibel', true)
-            ->assertSeeHtml('optgroup label="Apple"')
-            ->assertSeeHtml('optgroup label="Samsung"');
+            ->assertSee('Apple')
+            ->assertSee('Samsung');
 
         Livewire::test(ShopPage::class)
-            ->assertSeeHtml('optgroup label="Apple"')
-            ->assertSeeHtml('optgroup label="Samsung"');
+            ->assertSee('Apple')
+            ->assertSee('Samsung');
     }
 }

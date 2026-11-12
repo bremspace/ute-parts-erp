@@ -33,6 +33,9 @@ class PoTab extends Component
     /** [B-15c] Pengaman jumlah gudang per cabang (normally < 10). */
     public const GUDANG_DROPDOWN_LIMIT = 100;
 
+    /** [B-15c] Batas dropdown produk PO (P2 N+1 audit). */
+    public const PRODUK_DROPDOWN_LIMIT = 300;
+
     // [T-10] PO dan Supplier
     public bool $showPoModal = false;
 
@@ -352,6 +355,15 @@ class PoTab extends Component
             'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'akun_kas_bank' => '110-01', 'jatuh_tempo' => '',
             'items' => [['produk_id' => null, 'produk_nama' => '', 'sku_variant_id' => null, 'satuan' => 'pcs', 'konversi' => 1, 'jumlah_dasar' => 1, 'daftar_satuan' => [], 'harga_beli' => 0, 'jumlah' => 1]],
         ];
+
+        $totalProduk = $this->scopeStokCabangAktif(Produk::query())->count();
+        if ($totalProduk > self::PRODUK_DROPDOWN_LIMIT) {
+            $this->dispatch('alert', [
+                'type' => 'info',
+                'message' => 'Daftar Produk dibatasi hingga '.self::PRODUK_DROPDOWN_LIMIT.' item pertama. Gunakan pencarian untuk produk lainnya.',
+            ]);
+        }
+
         $this->showPoModal = true;
     }
 
@@ -1024,9 +1036,12 @@ class PoTab extends Component
             ->limit(self::GUDANG_DROPDOWN_LIMIT)
             ->get();
 
-        // Produk: tidak perlu lagi load semua produk ke dropdown.
-        // Pencarian produk global via ProductSearchModal.
-        $allProducts = collect();
+        // [B-15c] Produk: scope stok cabang aktif + limit dropdown (bukan 500-2.000 baris).
+        $allProducts = Produk::where('is_active', true)
+            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
+            ->orderBy('nama')
+            ->limit(self::PRODUK_DROPDOWN_LIMIT)
+            ->get(['id', 'nama']);
 
         $procurementData = null;
         $procurementSummary = null;

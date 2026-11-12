@@ -584,9 +584,12 @@ class TransferTab extends Component
             ->limit(self::GUDANG_DROPDOWN_LIMIT)
             ->get();
 
-        // Produk: tidak perlu lagi load semua produk ke dropdown.
-        // Pencarian produk global via ProductSearchModal.
-        $allProducts = collect();
+        // [B-15c] Produk: scope stok cabang aktif + limit dropdown (bukan 500-2.000 baris).
+        $allProducts = Produk::where('is_active', true)
+            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
+            ->orderBy('nama')
+            ->limit(self::PRODUK_DROPDOWN_LIMIT)
+            ->get(['id', 'nama']);
 
         // Transfer Query
         $transfers = StokTransfer::with(['gudangAsal', 'gudangTujuan', 'pengirim', 'penerima', 'items.produk'])

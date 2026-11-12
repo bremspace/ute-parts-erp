@@ -1895,14 +1895,20 @@ class SettingsRbac extends Component
         $referensi = DB::table('tiket_servis')->where('jenis_servis_id', $id)->count()
             + DB::table('tiket_servis_estimasi_item')->where('jenis_servis_id', $id)->count();
 
+        if ($referensi > 0) {
+            $jenis->update(['is_active' => false]);
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Jenis servis '{$jenis->nama}' masih memiliki {$referensi} tiket/estimasi terkait. Status dinonaktifkan (tidak dihapus permanen).",
+            ]);
+
+            return;
+        }
+
         $kode = $jenis->kode;
         $jenis->delete();
 
         $pesan = "Jenis servis '{$kode}' berhasil dihapus.";
-        if ($referensi > 0) {
-            $pesan .= " {$referensi} tiket/estimasi terkait otomatis dialihkan ke jenis servis default SVC-UMUM.";
-        }
-
         $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
@@ -2075,21 +2081,25 @@ class SettingsRbac extends Component
             return;
         }
 
+        $stokCount = DB::table('stok_items')->where('gudang_id', $id)->count();
+        if ($stokCount > 0) {
+            $gudang->update(['is_active' => false]);
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Gudang '{$gudang->nama}' masih memiliki {$stokCount} data stok. Status dinonaktifkan (tidak dihapus permanen).",
+            ]);
+
+            return;
+        }
+
         $kode = $gudang->kode;
         $nama = $gudang->nama;
-        $stokCount = DB::table('stok_items')->where('gudang_id', $id)->count();
-        $totalStok = (int) DB::table('stok_items')->where('gudang_id', $id)->sum('jumlah');
-        $defaultGudang = Gudang::getDefault($gudang->cabang_id);
-
         try {
             DB::transaction(function () use ($gudang) {
                 $gudang->delete();
             });
 
             $pesan = "Gudang '{$nama}' ({$kode}) berhasil dihapus.";
-            if ($stokCount > 0) {
-                $pesan .= " Sebanyak {$stokCount} item produk ({$totalStok} pcs stok) dan data operasional terkait telah dialihkan ke gudang default '{$defaultGudang->nama}'.";
-            }
             $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
         } catch (\Throwable $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal menghapus gudang: '.$e->getMessage()]);
@@ -3347,7 +3357,12 @@ class SettingsRbac extends Component
 
                         continue;
                     }
-                    $brand->delete();
+                    $hasProduk = DB::table('produk')->where('brand_id', $brand->id)->exists();
+                    if ($hasProduk) {
+                        $brand->update(['is_active' => false]);
+                    } else {
+                        $brand->delete();
+                    }
                     $deleted++;
                 }
                 $this->selectedBrandIds = [];

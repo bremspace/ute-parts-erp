@@ -32,6 +32,8 @@ class TipeHp extends Model
 
     public static ?array $cachedResolutionMap = null;
 
+    public static ?array $cachedModelBrandMap = null;
+
     public static function getDefault(): self
     {
         return static::firstOrCreate(
@@ -85,7 +87,9 @@ class TipeHp extends Model
     public static function clearResolutionCache(): void
     {
         static::$cachedResolutionMap = null;
+        static::$cachedModelBrandMap = null;
         Cache::forget('tipe_hp_resolution_map');
+        Cache::forget('tipe_hp_bulk_model_brand_map');
     }
 
     public function produk(): BelongsToMany
@@ -277,7 +281,59 @@ class TipeHp extends Model
             return (string) $entries[0]['merk'];
         }
 
-        return Cache::remember('tipe_hp_brand_for_'.md5($lowerModel), 300, function () use ($cleanModel, $lowerModel) {
+        if (static::$cachedModelBrandMap === null) {
+            static::$cachedModelBrandMap = Cache::remember('tipe_hp_bulk_model_brand_map', 300, function () {
+                $map = [];
+                $rows = Produk::whereNotNull('brand_kompatibel')
+                    ->where('brand_kompatibel', '!=', '')
+                    ->whereNotNull('model_kompatibel')
+                    ->where('model_kompatibel', '!=', '')
+                    ->select('brand_kompatibel', 'model_kompatibel')
+                    ->get();
+
+                foreach ($rows as $row) {
+                    $b = trim((string) $row->brand_kompatibel);
+                    foreach (explode(',', (string) $row->model_kompatibel) as $m) {
+                        $mLow = strtolower(trim($m));
+                        if ($mLow !== '' && ! isset($map[$mLow])) {
+                            $map[$mLow] = $b;
+                        }
+                    }
+                }
+
+                return $map;
+            });
+        }
+
+        if (isset(static::$cachedModelBrandMap[$lowerModel])) {
+            return static::$cachedModelBrandMap[$lowerModel];
+        }
+
+        $knownBrands = [
+            'Apple' => ['iphone', 'ipad', 'ipod', 'watch'],
+            'Samsung' => ['galaxy', 'samsung'],
+            'Xiaomi' => ['redmi', 'mi ', 'poco', 'blackshark'],
+            'Oppo' => ['oppo', 'find', 'reno'],
+            'Vivo' => ['vivo', 'iqoo'],
+            'Realme' => ['realme'],
+            'Infinix' => ['infinix', 'hot ', 'smart ', 'note '],
+            'Tecno' => ['tecno', 'spark', 'camon', 'pova'],
+            'Asus' => ['asus', 'zenfone', 'rog'],
+            'Huawei' => ['huawei', 'mate', 'nova', 'p30', 'p40', 'p50'],
+            'Google' => ['pixel'],
+            'Nokia' => ['nokia'],
+            'Sony' => ['xperia', 'sony'],
+        ];
+
+        foreach ($knownBrands as $bName => $prefixes) {
+            foreach ($prefixes as $pfx) {
+                if (str_contains($lowerModel, $pfx)) {
+                    return $bName;
+                }
+            }
+        }
+
+        return Cache::remember('tipe_hp_brand_for_'.md5($lowerModel), 300, function () use ($cleanModel) {
             $p = Produk::where('model_kompatibel', $cleanModel)
                 ->orWhere('model_kompatibel', 'like', "%{$cleanModel}%")
                 ->whereNotNull('brand_kompatibel')
@@ -286,30 +342,6 @@ class TipeHp extends Model
 
             if ($p && $p->brand_kompatibel) {
                 return trim($p->brand_kompatibel);
-            }
-
-            $knownBrands = [
-                'Apple' => ['iphone', 'ipad', 'ipod', 'watch'],
-                'Samsung' => ['galaxy', 'samsung'],
-                'Xiaomi' => ['redmi', 'mi ', 'poco', 'blackshark'],
-                'Oppo' => ['oppo', 'find', 'reno'],
-                'Vivo' => ['vivo', 'iqoo'],
-                'Realme' => ['realme'],
-                'Infinix' => ['infinix', 'hot ', 'smart ', 'note '],
-                'Tecno' => ['tecno', 'spark', 'camon', 'pova'],
-                'Asus' => ['asus', 'zenfone', 'rog'],
-                'Huawei' => ['huawei', 'mate', 'nova', 'p30', 'p40', 'p50'],
-                'Google' => ['pixel'],
-                'Nokia' => ['nokia'],
-                'Sony' => ['xperia', 'sony'],
-            ];
-
-            foreach ($knownBrands as $bName => $prefixes) {
-                foreach ($prefixes as $prf) {
-                    if (str_starts_with($lowerModel, $prf) || str_contains($lowerModel, $prf)) {
-                        return $bName;
-                    }
-                }
             }
 
             return 'Lainnya';

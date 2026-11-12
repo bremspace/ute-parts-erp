@@ -32,11 +32,18 @@ class BackupCommandTest extends BaseTestCase
             Schema::create('notifikasi_keluar', function (Blueprint $table) {
                 $table->bigIncrements('id');
                 $table->string('tipe');
+                $table->string('kategori')->nullable();
                 $table->string('tujuan')->nullable();
                 $table->string('judul')->nullable();
                 $table->text('konten');
                 $table->json('payload')->nullable();
                 $table->string('status')->default('pending');
+                $table->unsignedBigInteger('kampanye_broadcast_id')->nullable();
+                $table->unsignedBigInteger('user_id')->nullable();
+                $table->unsignedBigInteger('pelanggan_id')->nullable();
+                $table->unsignedBigInteger('cabang_id')->nullable();
+                $table->string('target_role')->nullable();
+                $table->string('action_url')->nullable();
                 $table->text('error')->nullable();
                 $table->timestamps();
             });

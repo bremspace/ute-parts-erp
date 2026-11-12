@@ -17,12 +17,12 @@
         @php
             $galeri = $produk->galeri_foto;
             $fotoUtama = $produk->foto_utama ?: $produk->gambar;
-            $catRel = $produk->kategoriRelasi;
+            $catRel = $produk->relationLoaded('kategoriRelasi') ? $produk->kategoriRelasi : null;
             $catNama = $catRel ? $catRel->nama : (is_array($produk->kategori) ? implode(', ', $produk->kategori) : (string) $produk->kategori);
             $catParam = $catRel?->id ?: $catNama;
             
             // Kompatibilitas model untuk breadcrumb
-            $compatModel = $produk->model_kompatibel ?: ($produk->tipeHps->first()?->model ?? null);
+            $compatModel = $produk->model_kompatibel ?: ($produk->relationLoaded('tipeHps') ? ($produk->tipeHps->first()?->model ?? null) : null);
             if (!$compatModel && preg_match('/(iPhone\s*\d+(\s*(Pro|Plus|Max|Mini))?|Galaxy\s*[A-Z0-9]+|Redmi\s*[A-Z0-9\s]+|Xiaomi\s*[A-Z0-9\s]+)/i', $produk->nama, $matches)) {
                 $compatModel = trim($matches[0]);
             }
@@ -62,7 +62,7 @@
                     'mpn' => $produk->kode ?: 'PRD-' . $produk->id,
                     'brand' => [
                         '@type' => 'Brand',
-                        'name' => $produk->brand?->nama ?: 'Bremspace Genuine',
+                        'name' => ($produk->relationLoaded('brand') ? $produk->brand?->nama : null) ?: 'Bremspace Genuine',
                     ],
                     'offers' => [
                         '@type' => 'Offer',
@@ -230,19 +230,19 @@
                 <div class="space-y-3 min-w-0">
                     <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                         <span class="text-[10px] uppercase tracking-wider font-bold text-up-primary bg-up-primary/10 dark:bg-up-primary/20 px-2.5 py-1 rounded-full max-w-full truncate">
-                            {{ $produk->kategoriRelasi ? $produk->kategoriRelasi->nama_lengkap : (is_array($produk->kategori) ? implode(', ', $produk->kategori) : (string) $produk->kategori) }}
+                            {{ ($produk->relationLoaded('kategoriRelasi') && $produk->kategoriRelasi) ? $produk->kategoriRelasi->nama_lengkap : (is_array($produk->kategori) ? implode(', ', $produk->kategori) : (string) $produk->kategori) }}
                         </span>
                         @if($produk->kondisi)
                             <span class="text-[10px] uppercase tracking-wider font-bold text-ink-600 dark:text-ink-300 bg-ink-100 dark:bg-white/10 px-2.5 py-1 rounded-full flex-shrink-0">
                                 {{ $produk->kondisi }}
                             </span>
                         @endif
-                        @if($produk->brand)
+                        @if($produk->relationLoaded('brand') && $produk->brand)
                             <span class="text-[10px] uppercase tracking-wider font-bold text-ink-700 dark:text-ink-200 bg-ink-50 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 px-2.5 py-1 rounded-full truncate">
                                 {{ $produk->brand->nama }}
                             </span>
                         @endif
-                        @if($produk->kualitas)
+                        @if($produk->relationLoaded('kualitas') && $produk->kualitas)
                             <span class="text-[10px] uppercase tracking-wider font-bold text-up-mint bg-up-mint/10 dark:bg-up-mint/20 px-2.5 py-1 rounded-full flex-shrink-0">
                                 {{ $produk->kualitas->nama }}
                             </span>
@@ -573,7 +573,7 @@
                 @endif
 
                 <!-- Substitutions / Compatible Parts -->
-                @if($produk->produkKompatibel && $produk->produkKompatibel->count() > 0)
+                @if($produk->relationLoaded('produkKompatibel') && $produk->produkKompatibel && $produk->produkKompatibel->count() > 0)
                     <div class="pt-6 border-t border-ink-100/80 dark:border-white/10 space-y-3">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Alternatif Suku Cadang Terkait</h3>
                         <div class="space-y-2">

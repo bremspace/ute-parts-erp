@@ -86,8 +86,15 @@ class StokLog extends Model
      */
     protected static function booted(): void
     {
-        static::updating(function () {
-            throw new \DomainException('Baris log stok bersifat immutable (tidak dapat diubah) demi kepatuhan ISO/audit.');
+        static::updating(function ($model) {
+            $immutableFields = [
+                'gudang_id', 'produk_id', 'sku_variant_id', 'jenis',
+                'referensi_tipe', 'referensi_id',
+                'jumlah_sebelum', 'perubahan', 'jumlah_setelah',
+            ];
+            if ($model->isDirty($immutableFields)) {
+                throw new \DomainException('Baris log stok bersifat immutable (tidak dapat diubah) demi kepatuhan ISO/audit.');
+            }
         });
 
         static::deleting(function () {

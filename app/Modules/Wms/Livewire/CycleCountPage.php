@@ -403,6 +403,7 @@ class CycleCountPage extends Component
     public function getSchedulesProperty()
     {
         return CycleCountSchedule::where('cabang_id', session('cabang_id'))
+            ->with(['rak', 'brand', 'kategoriRelasi'])
             ->orderBy('created_at', 'desc')
             ->get();
     }
@@ -411,7 +412,7 @@ class CycleCountPage extends Component
     {
         $query = CycleCountTask::query()
             ->where('cabang_id', session('cabang_id'))
-            ->with('schedule');
+            ->with(['schedule.rak', 'schedule.brand', 'schedule.kategoriRelasi', 'user', 'pembuat']);
 
         if ($this->filterStatus !== 'semua') {
             $query->where('status', $this->filterStatus);

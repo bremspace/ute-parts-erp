@@ -151,13 +151,17 @@ class BarcodeScannerIntegrationTest extends TestCase
         $variant = $produk->skuVariants()->first();
 
         // Berikan stok di gudang cabang
-        StokItem::create([
-            'produk_id' => $produk->id,
-            'sku_variant_id' => $variant->id,
-            'gudang_id' => $this->gudang->id,
-            'jumlah' => 15,
-            'jumlah_minimum' => 2,
-        ]);
+        StokItem::updateOrCreate(
+            [
+                'produk_id' => $produk->id,
+                'sku_variant_id' => $variant->id,
+                'gudang_id' => $this->gudang->id,
+            ],
+            [
+                'jumlah' => 15,
+                'jumlah_minimum' => 2,
+            ]
+        );
 
         Livewire::test(PosKasir::class)
             ->set('selectedGudangId', $this->gudang->id)
@@ -193,13 +197,17 @@ class BarcodeScannerIntegrationTest extends TestCase
 
         $variant = $produk->skuVariants()->first();
 
-        StokItem::create([
-            'produk_id' => $produk->id,
-            'sku_variant_id' => $variant->id,
-            'gudang_id' => $this->gudang->id,
-            'jumlah' => 25,
-            'jumlah_minimum' => 5,
-        ]);
+        StokItem::updateOrCreate(
+            [
+                'produk_id' => $produk->id,
+                'sku_variant_id' => $variant->id,
+                'gudang_id' => $this->gudang->id,
+            ],
+            [
+                'jumlah' => 25,
+                'jumlah_minimum' => 5,
+            ]
+        );
 
         $exportService = app(ExportLaporanService::class);
         $dataRefl = new \ReflectionMethod($exportService, 'dataStok');

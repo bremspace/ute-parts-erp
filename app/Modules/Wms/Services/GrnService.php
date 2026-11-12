@@ -14,6 +14,7 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\RiwayatPerubahanHarga;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
@@ -721,10 +722,15 @@ class GrnService
      */
     protected function tambahStok(Grn $grn, array $item, int $qty, ?int $actionedBy, string $noPo): void
     {
+        $variantId = $item['sku_variant_id'] ?? null;
+        if (! $variantId) {
+            $variantId = SkuVariant::where('produk_id', $item['produk_id'])->value('id');
+        }
+
         $attributes = [
             'gudang_id' => $grn->gudang_id,
             'produk_id' => $item['produk_id'],
-            'sku_variant_id' => $item['sku_variant_id'] ?? null,
+            'sku_variant_id' => $variantId,
         ];
 
         try {

@@ -324,8 +324,9 @@ class RekonsiliasiAkunting extends Command
         );
 
         // c. Nomor jurnal duplikat dalam satu cabang.
-        // Jika jurnal_header tersedia, periksa keunikan nomor jurnal per cabang dari header.
-        // Bila tanpa header, periksa nomor jurnal yang dipakai oleh multi-referensi berbeda (transaksi bisnis bentrok).
+        // Jika jurnal_header tersedia dan memiliki data duplikat, gunakan header.
+        // Bila tidak, periksa jurnal_akuntansi (multi-entry atau multi-referensi berbeda).
+        $duplikat = collect();
         if (Schema::hasTable('jurnal_header')) {
             $duplikat = DB::table('jurnal_header')
                 ->select('cabang_key as cabang_id', 'no_jurnal')
@@ -334,13 +335,14 @@ class RekonsiliasiAkunting extends Command
                 ->havingRaw('COUNT(*) > 1')
                 ->orderByDesc('jml')
                 ->get();
-        } else {
+        }
+
+        if ($duplikat->isEmpty()) {
             $duplikat = DB::table('jurnal_akuntansi')
                 ->select('cabang_id', 'no_jurnal')
-                ->selectRaw('COUNT(DISTINCT referensi_id) AS jml, MIN(id) AS id_min, MAX(id) AS id_maks')
-                ->whereNotNull('referensi_id')
+                ->selectRaw('COUNT(*) AS jml, MIN(id) AS id_min, MAX(id) AS id_maks')
                 ->groupBy('cabang_id', 'no_jurnal')
-                ->havingRaw('COUNT(DISTINCT referensi_id) > 1')
+                ->havingRaw('(COUNT(CASE WHEN debit > 0 THEN 1 END) > 1 AND COUNT(CASE WHEN kredit > 0 THEN 1 END) > 1) OR COUNT(DISTINCT referensi_id) > 1')
                 ->orderByDesc('jml')
                 ->get();
         }

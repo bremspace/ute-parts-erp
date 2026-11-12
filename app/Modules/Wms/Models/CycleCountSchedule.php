@@ -48,7 +48,7 @@ class CycleCountSchedule extends Model
 
     public function rak(): BelongsTo
     {
-        return $this->belongsTo(Rak::class);
+        return $this->belongsTo(Rak::class, 'target_id');
     }
 
     public function brand(): BelongsTo
@@ -72,13 +72,13 @@ class CycleCountSchedule extends Model
     public function getTargetLabelAttribute(): string
     {
         if ($this->tipe_target === 'rak') {
-            $rak = $this->rak;
+            $rak = $this->relationLoaded('rak') ? $this->rak : ($this->target_id ? Rak::find($this->target_id) : null);
 
             return $rak ? 'Rak '.$rak->kode.' — '.$rak->nama : ($this->target_id ? 'Rak #'.$this->target_id : 'Semua Rak');
         }
 
         if ($this->tipe_target === 'brand') {
-            $brand = $this->brand;
+            $brand = $this->relationLoaded('brand') ? $this->brand : ($this->target_id ? Brand::find($this->target_id) : null);
 
             return 'Brand '.($brand ? $brand->nama : ($this->target_id ? '#'.$this->target_id : 'Semua Brand'));
         }
@@ -87,7 +87,7 @@ class CycleCountSchedule extends Model
             return 'Semua Stok Produk';
         }
 
-        $kat = $this->kategoriRelasi;
+        $kat = $this->relationLoaded('kategoriRelasi') ? $this->kategoriRelasi : ($this->target_id ? KategoriProduk::find($this->target_id) : null);
 
         return 'Kategori '.($kat ? $kat->nama : ($this->target_kategori ?: 'Semua Kategori'));
     }

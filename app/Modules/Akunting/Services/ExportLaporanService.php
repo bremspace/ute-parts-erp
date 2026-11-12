@@ -173,6 +173,13 @@ class ExportLaporanService
 
         $labaBersih = round($totalPendapatan - $totalBeban, 2);
         $rows[] = ['LABA BERSIH', $labaBersih];
+        $rows[] = [];
+
+        $debit = (float) $j->sum('debit');
+        $kredit = (float) $j->sum('kredit');
+        $rows[] = ['TOTAL DEBIT', round($debit, 2)];
+        $rows[] = ['TOTAL KREDIT', round($kredit, 2)];
+        $rows[] = ['LABA BERSIH (k- d)', round($kredit - $debit, 2)];
 
         return $rows;
     }

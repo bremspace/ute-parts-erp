@@ -39,6 +39,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
@@ -122,6 +123,8 @@ class WmsServisNplus1Test extends TestCase
         $this->user->assignRole('super-admin');
         $this->user->cabangs()->attach([$this->cabang->id, $this->cabangLain->id]);
         $this->actingAs($this->user, 'web');
+        app(PermissionRegistrar::class)->getPermissions();
+        $this->user->getAllPermissions();
     }
 
     // ===== Helper query-log (pola B-15a) =====

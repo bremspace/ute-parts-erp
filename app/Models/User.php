@@ -124,9 +124,11 @@ class User extends Authenticatable
     }
 
     /**
-     * Cache request-level memoization untuk daftarCabangAkses.
+     * Cache instance-level memoization untuk daftarCabangAkses.
      */
-    protected static array $memoDaftarCabangAkses = [];
+    protected mixed $memoDaftarCabangAkses = null;
+
+    public static function flushMemo(): void {}
 
     /**
      * Daftar seluruh cabang yang dapat diakses oleh user.
@@ -135,21 +137,20 @@ class User extends Authenticatable
      */
     public function daftarCabangAkses()
     {
-        $cacheKey = $this->id ?? 'guest';
-        if (isset(static::$memoDaftarCabangAkses[$cacheKey])) {
-            return static::$memoDaftarCabangAkses[$cacheKey];
+        if ($this->memoDaftarCabangAkses !== null) {
+            return $this->memoDaftarCabangAkses;
         }
 
         // Role tingkat manajemen/pusat (HQ) dapat memilih dan berpindah ke semua cabang aktif
         if ($this->hasAnyRole(['super-admin', 'owner', 'finance', 'marketing', 'kelola-hr'])) {
-            return static::$memoDaftarCabangAkses[$cacheKey] = Cabang::where('is_active', true)->orderBy('id')->get();
+            return $this->memoDaftarCabangAkses = Cabang::where('is_active', true)->orderBy('id')->get();
         }
 
         if ($this->cabangs()->doesntExist()) {
-            return static::$memoDaftarCabangAkses[$cacheKey] = Cabang::where('is_active', true)->orderBy('id')->get();
+            return $this->memoDaftarCabangAkses = Cabang::where('is_active', true)->orderBy('id')->get();
         }
 
-        return static::$memoDaftarCabangAkses[$cacheKey] = $this->cabangs()
+        return $this->memoDaftarCabangAkses = $this->cabangs()
             ->where('cabang.is_active', true)
             ->distinct()
             ->orderBy('cabang.id')

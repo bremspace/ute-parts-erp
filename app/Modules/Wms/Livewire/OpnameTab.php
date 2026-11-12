@@ -62,18 +62,15 @@ class OpnameTab extends Component
 
     public bool $showDetailModal = false;
 
-    public function mount()
-    {
-        $cabangId = session('cabang_id');
-        if ($cabangId) {
-            $this->filterGudangId = Gudang::where('cabang_id', $cabangId)->value('id');
-        }
-    }
+    public function mount() {}
 
     // Quick action header "+ Mulai Stock Opname" (dari shell WmsDashboard via $dispatch)
     #[On('wms-opname-baru')]
     public function openNewOpnameModal()
     {
+        if (! $this->filterGudangId && ($cabangId = session('cabang_id'))) {
+            $this->filterGudangId = Gudang::where('cabang_id', $cabangId)->value('id');
+        }
         $this->opnameGudangId = $this->filterGudangId;
         $this->opnameRakId = null;
         $this->opnameTipeTarget = 'rak';
@@ -562,7 +559,6 @@ class OpnameTab extends Component
             'gudangs' => $gudangs,
             'opnames' => $opnames,
             'raks' => Rak::with('gudang')->get(),
-            'kategoris' => KategoriProduk::where('is_active', true)->orderBy('nama')->get(),
             'kategoriTree' => KategoriProduk::getTree(),
             'brands' => Brand::where('is_active', true)->orderBy('nama')->get(),
             'selectedOpname' => $selectedOpname,

@@ -689,6 +689,7 @@
 
                                                         <!-- Drawer Rekomendasi Terurut (Unit Sama -> Produk Sejenis Kategori/Nama -> Manual) -->
                                                         @if($activeTukarItemId === $itemId)
+                                                            @php $rekomendasi = $this->getRekomendasiTukar($itemId); @endphp
                                                             <div class="p-3 rounded-2xl bg-ink-900 border border-white/15 space-y-3">
                                                                 <!-- Pencarian Manual -->
                                                                 <div class="flex items-center gap-2">

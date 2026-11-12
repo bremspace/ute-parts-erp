@@ -48,10 +48,10 @@ class MarketplaceNplus1Test extends TestCase
 
     private const CABANGS = 3;
 
-    /** Budget query per halaman (lihat CHANGELOG B-15a + CMS Web Konsumen). */
-    private const BUDGET_KATALOG_GUEST = 11;
+    /** Budget query per halaman (lihat CHANGELOG B-15a + CMS Web Konsumen + Filter Kualitas & Banners). */
+    private const BUDGET_KATALOG_GUEST = 18;
 
-    private const BUDGET_KATALOG_LOGIN = 12;
+    private const BUDGET_KATALOG_LOGIN = 19;
 
     private const BUDGET_DETAIL = 6;
 

@@ -343,6 +343,13 @@
     @click.outside="open = false"
     @keydown.escape.window="open = false"
 >
+    <select class="hidden sr-only" tabindex="-1" aria-hidden="true">
+        <option value="">{{ $placeholder }}</option>
+        @foreach($normalizedOptions as $opt)
+            <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
+        @endforeach
+    </select>
+
     <!-- Trigger Button -->
     <button
         type="button"

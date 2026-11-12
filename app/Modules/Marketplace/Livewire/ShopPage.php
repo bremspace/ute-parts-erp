@@ -7,11 +7,14 @@ use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\SmartSearchService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -296,27 +299,89 @@ class ShopPage extends Component
 
     public function getKualitasListProperty(): array
     {
-        return $this->facetedOptions['kualitasList'] ?? [];
+        return Cache::remember('shop.kualitas.list.v1', self::HP_LIST_CACHE_TTL, function () {
+            return KualitasProduk::where('is_active', true)->orderBy('nama')->get()->all();
+        });
     }
 
-    public function getCategoriesProperty(): array
+    public function getCategoriesProperty(): mixed
     {
-        return $this->facetedOptions['categories'] ?? [];
+        return Cache::remember('shop.categories.tree.v1', self::HP_LIST_CACHE_TTL, function () {
+            $kat = KategoriProduk::where('is_active', true)
+                ->orderBy('urutan')
+                ->orderBy('nama')
+                ->get();
+
+            if ($kat->isNotEmpty()) {
+                $grouped = $kat->groupBy('parent_id');
+                foreach ($kat as $item) {
+                    $item->setRelation('children', $grouped->get($item->id, collect()));
+                }
+                $roots = $grouped->get(null, collect())->merge($grouped->get(0, collect()))->merge($grouped->get('', collect()));
+
+                return $roots;
+            }
+
+            return Produk::where('is_active', true)->distinct()->orderBy('kategori')->pluck('kategori')->filter()->values();
+        });
     }
 
     public function getHpMerkListProperty(): array
     {
-        return $this->facetedOptions['hpMerkList'] ?? [];
+        return Cache::remember(
+            'shop.hp.merk-list.v1',
+            self::HP_LIST_CACHE_TTL,
+            fn (): array => $this->hpListValues('merk')
+        );
     }
 
     public function getHpModelListProperty(): array
     {
-        return $this->facetedOptions['hpModelList'] ?? [];
+        return Cache::remember(
+            'shop.hp.model-list.v1'.($this->filterHpMerk ? ':'.$this->filterHpMerk : ''),
+            self::HP_LIST_CACHE_TTL,
+            function (): array {
+                $query = Produk::where('is_active', true)
+                    ->whereNotNull('kompatibilitas_hp')
+                    ->where('kompatibilitas_hp', '!=', '[]');
+
+                if ($this->filterHpMerk) {
+                    if (DB::connection()->getDriverName() === 'sqlite') {
+                        $query->where('kompatibilitas_hp', 'like', '%"merk":"'.$this->filterHpMerk.'"%');
+                    } else {
+                        $query->whereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['merk' => $this->filterHpMerk])]);
+                    }
+                }
+
+                return $this->hpListValues('model', $query);
+            }
+        );
     }
 
-    public function getBrandsProperty(): array
+    private function hpListValues(string $field, ?Builder $query = null): array
     {
-        return $this->facetedOptions['brands'] ?? [];
+        $rows = ($query ?? Produk::where('is_active', true)
+            ->whereNotNull('kompatibilitas_hp')
+            ->where('kompatibilitas_hp', '!=', '[]'))
+            ->pluck('kompatibilitas_hp');
+
+        return collect($rows)
+            ->flatMap(function ($json) use ($field): Collection {
+                $decoded = is_array($json) ? $json : json_decode((string) $json, true);
+
+                return collect(is_array($decoded) ? $decoded : [])->pluck($field);
+            })
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    public function getBrandsProperty(): mixed
+    {
+        return Cache::remember('shop.brands.list.v1', self::HP_LIST_CACHE_TTL, function () {
+            return Produk::where('is_active', true)->distinct()->orderBy('brand_kompatibel')->pluck('brand_kompatibel')->filter()->values();
+        });
     }
 
     public function getProductsProperty()
@@ -370,15 +435,7 @@ class ShopPage extends Component
 
         return Produk::where('slug', $this->slug)
             ->where('is_active', true)
-            ->with([
-                'hargaTier',
-                'skuVariants' => fn ($q) => $q->where('is_active', true),
-                'kategoriRelasi.parent',
-                'brand',
-                'kualitas',
-                'tipeHps',
-                'produkKompatibel',
-            ])
+            ->with(['hargaTier', 'skuVariants' => fn ($q) => $q->where('is_active', true)])
             ->first();
     }
 
@@ -715,11 +772,50 @@ class ShopPage extends Component
             $metaTitle = "Katalog {$this->activeCategoryName} — ".($webConfig['store_name'] ?? 'Bremspace');
         }
 
+        $hpModelList = $this->hpModelList;
+        /** @var array<int, string> $extraModels */
+        $extraModels = (array) Cache::remember(
+            'shop.hp.extra-models.v1'.($this->filterHpMerk ? ':'.$this->filterHpMerk : ''),
+            self::HP_LIST_CACHE_TTL,
+            fn (): array => TipeHp::whereHas('produk', fn ($q) => $q->where('is_active', true))
+                ->when($this->filterHpMerk, fn ($q) => $q->where('merk', $this->filterHpMerk))
+                ->pluck('model')
+                ->all()
+        );
+        /** @var array<int, string> $extraFromProduk */
+        $extraFromProduk = (array) Cache::remember(
+            'shop.hp.extra-produk-models.v1'.($this->filterHpMerk ? ':'.$this->filterHpMerk : ''),
+            self::HP_LIST_CACHE_TTL,
+            function (): array {
+                $q = Produk::where('is_active', true)
+                    ->whereNotNull('model_kompatibel')
+                    ->where('model_kompatibel', '!=', '');
+                if ($this->filterHpMerk) {
+                    $q->where('brand_kompatibel', $this->filterHpMerk);
+                }
+
+                return $q->pluck('model_kompatibel')
+                    ->flatMap(fn ($m) => preg_split('/[,;\/]+/', (string) $m))
+                    ->map(fn ($m) => trim($m))
+                    ->filter()
+                    ->all();
+            }
+        );
+        $allModels = $this->getHpModelListProperty();
+        foreach (array_merge($extraModels, $extraFromProduk) as $item) {
+            $modelStr = (string) $item;
+            if ($modelStr !== '' && ! in_array($modelStr, $allModels, true)) {
+                $allModels[] = $modelStr;
+            }
+        }
+        sort($allModels);
+        $hpModelList = $allModels;
+
         return view('modules.marketplace.livewire.shop-catalog', [
             'categories' => $this->categories,
             'brands' => $this->brands,
             'hpMerkList' => $this->hpMerkList,
-            'hpModelList' => $this->hpModelList,
+            'hpModelList' => $hpModelList,
             'kualitasList' => $this->kualitasList,
             'products' => $this->products,
             'webConfig' => $webConfig,

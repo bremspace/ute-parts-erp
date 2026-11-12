@@ -1118,8 +1118,8 @@ class DashboardIndex extends Component
                 'piutang_30d' => round($piutang30d, 2),
                 'utang_30d' => round($utang30d, 2),
                 'proyeksi_30d' => $proyeksi30d,
-                'drill_piutang' => route('akunting', ['tab' => 'piutang']),
-                'drill_utang' => route('akunting', ['tab' => 'utang']),
+                'drill_piutang' => route('laporan.drill', ['model' => 'Piutang', 'tab' => 'piutang']),
+                'drill_utang' => route('laporan.drill', ['model' => 'Utang', 'tab' => 'utang']),
             ];
         });
     }
@@ -1212,8 +1212,8 @@ class DashboardIndex extends Component
                 'piutang_30d' => 0,
                 'utang_30d' => 0,
                 'proyeksi_30d' => 0,
-                'drill_piutang' => route('akunting', ['tab' => 'piutang']),
-                'drill_utang' => route('akunting', ['tab' => 'utang']),
+                'drill_piutang' => route('laporan.drill', ['model' => 'Piutang', 'tab' => 'piutang']),
+                'drill_utang' => route('laporan.drill', ['model' => 'Utang', 'tab' => 'utang']),
             ],
             'marketInsight' => [
                 'tier' => collect(),

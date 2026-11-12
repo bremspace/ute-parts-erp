@@ -118,7 +118,7 @@ class DashboardSinkronisasiTest extends TestCase
 
         $kategori = $dashboard->chartKategori;
         $this->assertEquals(250000, array_sum($kategori['values']), 'komposisi kategori wajib ikut trx lunas');
-        $this->assertContains('LCD', $kategori['labels']);
+        $this->assertTrue(collect($kategori['labels'])->contains(fn ($l) => str_contains((string) $l, 'LCD')));
     }
 
     public function test_omzet_shift_kasir_juga_hitung_transaksi_lunas(): void

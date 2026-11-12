@@ -2103,7 +2103,7 @@ class ProdukTab extends Component
                     }
                 }
 
-                $produk->delete();
+                $produk->forceDelete();
             });
 
             if ($this->editProdukId === $produkId) {
@@ -3596,10 +3596,10 @@ class ProdukTab extends Component
                         }
                     }
 
-                    $produk->delete();
+                    $produk->forceDelete();
                 });
                 $countPermanen++;
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 // skip on error
             }
         }

@@ -223,7 +223,11 @@ class Produk extends Model
      */
     public function getSkuAttribute(): ?string
     {
-        return $this->skuVariants->first()?->sku;
+        if ($this->relationLoaded('skuVariants')) {
+            return $this->skuVariants->first()?->sku;
+        }
+
+        return $this->attributes['sku'] ?? $this->attributes['barcode'] ?? null;
     }
 
     /**

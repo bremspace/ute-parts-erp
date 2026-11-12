@@ -746,6 +746,9 @@ class ProdukService
 
         return DB::transaction(function () use ($produkId, $variantId, $gudangId, $qty, $hargaBeli, $keterangan, $userId, $rakId, $postJurnal, $smlSumber, $smlReferensiTipe, $smlReferensiId, $snList) {
             $cabangId = Gudang::find($gudangId)?->cabang_id;
+            if (! $variantId) {
+                $variantId = SkuVariant::where('produk_id', $produkId)->value('id');
+            }
 
             // [F2-3] Validasi SN dulu — Exception di sini → rollback, stok tidak berubah
             if ($snList !== null) {

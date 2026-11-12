@@ -132,20 +132,22 @@ class CustomerAccount extends Component
         }
 
         // Auto-resolve notifikasi menunggu pembayaran untuk pesanan yang sudah lunas/selesai
-        $unreadOrdersNotif = NotifikasiKeluar::forPelanggan($customer->id)
-            ->whereNull('read_at')
-            ->whereNotNull('payload->transaksi_id')
-            ->get();
+        if ($this->activeTab === 'notifikasi') {
+            $unreadOrdersNotif = NotifikasiKeluar::forPelanggan($customer->id)
+                ->whereNull('read_at')
+                ->whereNotNull('payload->transaksi_id')
+                ->get();
 
-        foreach ($unreadOrdersNotif as $notif) {
-            $transaksiId = $notif->payload['transaksi_id'] ?? null;
-            if ($transaksiId) {
-                $transaksi = Transaksi::find($transaksiId);
-                if ($transaksi && in_array($transaksi->status, ['lunas', 'diproses', 'dikirim', 'siap_diambil', 'selesai', 'batal'], true)) {
-                    $judul = strtolower($notif->judul ?? '');
-                    $konten = strtolower($notif->konten ?? '');
-                    if (str_contains($judul, 'pesanan berhasil didaftarkan') || str_contains($konten, 'selesaikan pembayaran')) {
-                        $notif->update(['read_at' => now()]);
+            foreach ($unreadOrdersNotif as $notif) {
+                $transaksiId = $notif->payload['transaksi_id'] ?? null;
+                if ($transaksiId) {
+                    $transaksi = Transaksi::find($transaksiId);
+                    if ($transaksi && in_array($transaksi->status, ['lunas', 'diproses', 'dikirim', 'siap_diambil', 'selesai', 'batal'], true)) {
+                        $judul = strtolower($notif->judul ?? '');
+                        $konten = strtolower($notif->konten ?? '');
+                        if (str_contains($judul, 'pesanan berhasil didaftarkan') || str_contains($konten, 'selesaikan pembayaran')) {
+                            $notif->update(['read_at' => now()]);
+                        }
                     }
                 }
             }
@@ -393,7 +395,7 @@ class CustomerAccount extends Component
             'notifikasi' => $this->notifikasi,
             'komisi' => $this->komisi,
             'downlines' => $this->downlines,
-            'membershipInfo' => $this->membershipInfo,
+            'membershipInfo' => $this->activeTab === 'membership' ? $this->membershipInfo : [],
         ])->layout('layouts.marketplace', ['title' => 'Akun Saya']);
     }
 }

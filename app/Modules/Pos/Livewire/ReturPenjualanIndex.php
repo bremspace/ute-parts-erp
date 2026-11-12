@@ -697,6 +697,10 @@ class ReturPenjualanIndex extends Component
         // Jika targetItemId dispesifikasikan, simpan ke itemInputs target
         if ($targetItemId && isset($this->itemInputs[$targetItemId])) {
             $currentList = $this->itemInputs[$targetItemId]['tukar_items'] ?? [];
+            if (count($currentList) === 1 && ! empty($currentList[0]['is_unit_sama']) && (int) $currentList[0]['produk_id'] !== $produkId) {
+                $currentList = [];
+                $this->itemInputs[$targetItemId]['tukar_items'] = [];
+            }
             foreach ($currentList as $idx => $tItem) {
                 if ($tItem['produk_id'] === $produkId) {
                     if ($currentList[$idx]['jumlah'] + 1 > $stokTersedia) {

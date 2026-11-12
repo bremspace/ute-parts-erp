@@ -9,6 +9,7 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KpiHasil;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\KomisiSkema;
