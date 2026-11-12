@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -261,8 +262,16 @@ class DatabaseManagementService
                 if (! empty($manifest['app_key']) && ! $isCustomTarget) {
                     $currentKey = config('app.key');
                     if ($currentKey !== $manifest['app_key']) {
-                        $this->updateService->updateEnv(['APP_KEY' => $manifest['app_key']]);
-                        $appKeySynced = true;
+                        try {
+                            $synced = $this->updateService->updateEnv(['APP_KEY' => $manifest['app_key']]);
+                            if ($synced) {
+                                $appKeySynced = true;
+                            } else {
+                                Log::warning('Gagal sinkronisasi APP_KEY: .env tidak writable oleh proses web.');
+                            }
+                        } catch (Throwable $e) {
+                            Log::warning('Sinkronisasi APP_KEY dilewati karena error permission: '.$e->getMessage());
+                        }
                     }
                 }
             }
@@ -329,6 +338,14 @@ class DatabaseManagementService
             if ($tempExtractDir && File::isDirectory($tempExtractDir)) {
                 File::deleteDirectory($tempExtractDir);
             }
+        }
+
+        // Segarkan cache schema & optimize pasca restore
+        try {
+            Artisan::call('optimize:clear');
+            Cache::flush();
+        } catch (Throwable $e) {
+            Log::warning('Post-restore cache clear skipped: '.$e->getMessage());
         }
 
         $note = 'Database dipulihkan dari: '.basename($filePath).($isCustomTarget ? " (Target DB: {$targetDatabase})" : '');
@@ -972,6 +989,23 @@ class DatabaseManagementService
     protected function executeRestoreMysql(array $conn, string $sqlPath): void
     {
         $mysql = (new ExecutableFinder)->find('mysql') ?? 'mysql';
+
+        // Full wipe tables sebelum restore untuk memastikan tidak ada residu tabel/data asing
+        try {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            $tables = DB::select('SHOW FULL TABLES WHERE Table_type = "BASE TABLE"');
+            $dbName = $conn['database'] ?? '';
+            $colName = 'Tables_in_'.$dbName;
+            foreach ($tables as $t) {
+                $tableName = $t->$colName ?? array_values((array) $t)[0] ?? null;
+                if ($tableName) {
+                    DB::statement("DROP TABLE IF EXISTS `{$tableName}`");
+                }
+            }
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        } catch (Throwable $e) {
+            Log::warning('Pre-restore table wipe skipped: '.$e->getMessage());
+        }
 
         $args = [
             $mysql,

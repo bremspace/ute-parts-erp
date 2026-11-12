@@ -512,8 +512,10 @@ class DatabaseManagement extends Component
                 default => 'sql',
             };
             $safeName = 'upload_'.time().'.'.$suffix;
-            $stored = $this->uploadedBackupFile->storeAs('backups', $safeName);
-            $targetPath = storage_path('app/'.$stored);
+            // Gunakan path fisik getBackupDirectory agar tersimpan langsung di storage/app/backups
+            $destDir = $dbService->getBackupDirectory();
+            $targetPath = $destDir.DIRECTORY_SEPARATOR.$safeName;
+            copy($this->uploadedBackupFile->getRealPath(), $targetPath);
         } elseif ($this->selectedRestoreFile) {
             $targetPath = $dbService->getBackupDirectory().DIRECTORY_SEPARATOR.basename($this->selectedRestoreFile);
         }

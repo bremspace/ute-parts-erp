@@ -32,7 +32,8 @@ class AppUpdateService
     public function updateEnv(array $values): bool
     {
         $envPath = base_path('.env');
-        if (! File::exists($envPath)) {
+        if (! File::exists($envPath) || ! is_writable($envPath)) {
+            Log::warning("File .env tidak dapat ditulisi (permission denied atau file tidak ada): {$envPath}");
             return false;
         }
 
