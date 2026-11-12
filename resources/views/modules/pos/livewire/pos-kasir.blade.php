@@ -267,7 +267,7 @@
     <div class="relative glass-panel p-3 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2.5">
         <div class="flex items-center gap-2.5 flex-wrap lg:flex-nowrap justify-between">
             <!-- Search & Barcode Input with Full-Width Dropdown (Desktop) / Fullscreen Search Sheet (Mobile) -->
-            <div class="flex-1 min-w-[200px] sm:min-w-[260px] sm:relative" @click.outside="searchOpen = false">
+            <div class="flex-1 min-w-[200px] sm:min-w-[260px]" @click.outside="searchOpen = false">
                 <x-prism.barcode-scan-input
                     placeholder="Scan Barcode / ketik nama barang (F2 / Kamera)..."
                     model="search"

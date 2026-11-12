@@ -833,7 +833,8 @@ class PosKasir extends Component
             return [];
         }
 
-        return StokItem::whereIn('stok_items.produk_id', $products->pluck('id'))
+        return DB::table('stok_items')
+            ->whereIn('stok_items.produk_id', $products->pluck('id'))
             ->where('stok_items.gudang_id', $this->selectedGudangId)
             ->whereNotNull('stok_items.rak_id')
             ->join('rak', 'rak.id', '=', 'stok_items.rak_id')
@@ -843,7 +844,7 @@ class PosKasir extends Component
             ->groupBy('produk_id')
             ->map(function ($items) {
                 return $items->map(function ($item) {
-                    return ! empty($item->rak_kode) ? $item->rak_kode : $item->rak_nama;
+                    return ! empty($item->rak_kode) ? (string) $item->rak_kode : (string) $item->rak_nama;
                 })->filter()->unique()->values()->all();
             })
             ->all();
