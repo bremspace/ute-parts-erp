@@ -481,6 +481,26 @@
                                                         <span>Suplier: {{ $prod->supplier->nama }}</span>
                                                     </span>
                                                 @endif
+                                                @php
+                                                    $namaGudangAktif = $gudangs->firstWhere('id', $selectedGudangId)?->nama;
+                                                    $posisiRak = !empty($rakPerProduk[$prod->id]) ? implode(', ', $rakPerProduk[$prod->id]) : null;
+                                                @endphp
+                                                @if($selectedGudangId && $namaGudangAktif)
+                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded" title="Gudang: {{ $namaGudangAktif }}">
+                                                        <svg class="w-3 h-3 text-sky-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                                                        </svg>
+                                                        <span>Gudang: {{ $namaGudangAktif }}</span>
+                                                    </span>
+                                                @endif
+                                                @if($posisiRak)
+                                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-500/10 border border-violet-500/25 px-1.5 py-0.5 rounded" title="Posisi Rak: {{ $posisiRak }}">
+                                                        <svg class="w-3 h-3 text-violet-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                                        </svg>
+                                                        <span>Rak: {{ $posisiRak }}</span>
+                                                    </span>
+                                                @endif
                                                 <span class="text-[10px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded uppercase">
                                                     Satuan: {{ $satuanDasar }}
                                                 </span>

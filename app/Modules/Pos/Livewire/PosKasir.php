@@ -827,6 +827,28 @@ class PosKasir extends Component
             ->all();
     }
 
+    private function petaRakKatalog(Collection $products): array
+    {
+        if (! $this->selectedGudangId || $products->isEmpty()) {
+            return [];
+        }
+
+        return StokItem::whereIn('stok_items.produk_id', $products->pluck('id'))
+            ->where('stok_items.gudang_id', $this->selectedGudangId)
+            ->whereNotNull('stok_items.rak_id')
+            ->join('rak', 'rak.id', '=', 'stok_items.rak_id')
+            ->select('stok_items.produk_id', 'rak.nama as rak_nama', 'rak.kode as rak_kode')
+            ->distinct()
+            ->get()
+            ->groupBy('produk_id')
+            ->map(function ($items) {
+                return $items->map(function ($item) {
+                    return ! empty($item->rak_kode) ? $item->rak_kode : $item->rak_nama;
+                })->filter()->unique()->values()->all();
+            })
+            ->all();
+    }
+
     public function checkKasSesi(): void
     {
         $svc = app(KasSesiState::class);
@@ -3837,6 +3859,7 @@ class PosKasir extends Component
 
         // [B-02/P0-2] Peta stok katalog — kriteria sama dgn addToCart (satu query)
         $stokPerProduk = $this->petaStokKatalog($products);
+        $rakPerProduk = $this->petaRakKatalog($products);
 
         // Cache master filter data 5 menit untuk kecepatan render Livewire
         $brandKompatibelList = Cache::remember('pos_filter_brand_kompatibel', 300, function () {
@@ -3916,6 +3939,7 @@ class PosKasir extends Component
             'products' => $products,
             'gudangs' => $gudangs,
             'stokPerProduk' => $stokPerProduk,
+            'rakPerProduk' => $rakPerProduk,
             'adaLebihBanyak' => $adaLebihBanyak,
             'batasProduk' => $this->batasProduk,
             'customers' => $customers,
