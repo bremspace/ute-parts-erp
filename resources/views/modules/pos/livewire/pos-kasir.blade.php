@@ -267,7 +267,7 @@
     <div class="relative glass-panel p-3 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2.5">
         <div class="flex items-center gap-2.5 flex-wrap lg:flex-nowrap justify-between">
             <!-- Search & Barcode Input with Full-Width Dropdown (Desktop) / Fullscreen Search Sheet (Mobile) -->
-            <div class="flex-1 min-w-[200px] sm:min-w-[260px]" @click.outside="searchOpen = false">
+            <div class="flex-1 min-w-[200px] sm:min-w-[260px] sm:relative" @click.outside="searchOpen = false">
                 <x-prism.barcode-scan-input
                     placeholder="Scan Barcode / ketik nama barang (F2 / Kamera)..."
                     model="search"
@@ -287,7 +287,7 @@
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                     x-transition:leave-end="opacity-0 translate-y-3 sm:translate-y-2 scale-[0.99] sm:scale-[0.98]"
-                    class="fixed inset-0 z-50 sm:absolute sm:inset-auto sm:left-0 sm:right-0 sm:w-full sm:top-full sm:mt-2 origin-top bg-white/98 dark:bg-[#0B1120]/98 sm:bg-white/95 sm:dark:bg-[#0B1120]/95 backdrop-blur-2xl border-0 sm:border border-ink-200/90 dark:border-white/15 rounded-none sm:rounded-2xl shadow-2xl overflow-hidden max-h-none sm:max-h-[75vh] flex flex-col"
+                    class="fixed inset-0 z-50 sm:absolute sm:inset-auto sm:left-0 sm:right-0 sm:w-full sm:top-full sm:mt-2 origin-top bg-white/98 dark:bg-[#0B1120]/98 sm:bg-white/95 sm:dark:bg-[#0B1120]/95 backdrop-blur-2xl border-0 sm:border border-ink-200/90 dark:border-white/15 rounded-none sm:rounded-2xl shadow-2xl overflow-hidden h-full max-h-screen sm:h-auto sm:max-h-[75vh] flex flex-col"
                     x-cloak
                 >
                     <!-- Dedicated Mobile Search Header (sm:hidden) -->
@@ -418,7 +418,7 @@
                         </button>
                     </div>
 
-                    <div class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1">
+                    <div class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1 min-h-0">
                         @forelse($products as $prod)
                             @php
                                 $stokTotal = $stokPerProduk[$prod->id] ?? (\App\Modules\Pos\Livewire\PosKasir::STOK_TANPA_GUDANG);
