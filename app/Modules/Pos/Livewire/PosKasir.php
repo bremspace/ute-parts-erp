@@ -3795,6 +3795,7 @@ class PosKasir extends Component
                 'hargaTier',
                 'brand',
                 'kualitas',
+                'supplier',
             ]);
 
         $filters = [

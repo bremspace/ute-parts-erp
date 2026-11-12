@@ -264,10 +264,10 @@
     </div>
 
     <!-- TOP CONTROL BAR: Scan/Search, Gudang, Pelanggan, Aksi Cepat & Big Total -->
-    <div class="glass-panel p-3 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2.5">
+    <div class="relative glass-panel p-3 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2.5">
         <div class="flex items-center gap-2.5 flex-wrap lg:flex-nowrap justify-between">
-            <!-- Search & Barcode Input with Floating Dropdown (Desktop) / Fullscreen Search Sheet (Mobile) -->
-            <div class="relative flex-1 min-w-[200px] sm:min-w-[260px]" @click.outside="searchOpen = false">
+            <!-- Search & Barcode Input with Full-Width Dropdown (Desktop) / Fullscreen Search Sheet (Mobile) -->
+            <div class="flex-1 min-w-[200px] sm:min-w-[260px]" @click.outside="searchOpen = false">
                 <x-prism.barcode-scan-input
                     placeholder="Scan Barcode / ketik nama barang (F2 / Kamera)..."
                     model="search"
@@ -278,7 +278,7 @@
                     @input="searchOpen = true"
                 />
 
-                <!-- Fullscreen Overlay on Mobile / Floating Dropdown on Desktop (Apple-Grade Tactile Transition) -->
+                <!-- Fullscreen Overlay on Mobile / Wide Full-Width Panel on Desktop (Apple-Grade Tactile Transition) -->
                 <div
                     x-show="searchOpen"
                     x-transition:enter="transition ease-out duration-200"
@@ -287,7 +287,7 @@
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                     x-transition:leave-end="opacity-0 translate-y-3 sm:translate-y-2 scale-[0.99] sm:scale-[0.98]"
-                    class="fixed inset-0 z-50 sm:absolute sm:inset-auto sm:left-0 sm:right-auto sm:w-[580px] lg:w-[680px] sm:top-full sm:mt-2 origin-top bg-white/98 dark:bg-[#0B1120]/98 sm:bg-white/95 sm:dark:bg-[#0B1120]/95 backdrop-blur-2xl border-0 sm:border border-ink-200/90 dark:border-white/15 rounded-none sm:rounded-2xl shadow-2xl overflow-hidden max-h-none sm:max-h-[70vh] flex flex-col"
+                    class="fixed inset-0 z-50 sm:absolute sm:inset-auto sm:left-0 sm:right-0 sm:w-full sm:top-full sm:mt-2 origin-top bg-white/98 dark:bg-[#0B1120]/98 sm:bg-white/95 sm:dark:bg-[#0B1120]/95 backdrop-blur-2xl border-0 sm:border border-ink-200/90 dark:border-white/15 rounded-none sm:rounded-2xl shadow-2xl overflow-hidden max-h-none sm:max-h-[75vh] flex flex-col"
                     x-cloak
                 >
                     <!-- Dedicated Mobile Search Header (sm:hidden) -->
@@ -461,19 +461,32 @@
 
                                         <!-- Title, SKU, Chips & Apple-grade compatibility badge -->
                                         <div class="min-w-0 flex-1">
-                                            <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                            <div class="flex items-center gap-1.5 flex-wrap mb-1">
                                                 <span class="font-mono text-[10px] sm:text-[11px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
                                                     {{ $prod->sku }}
                                                 </span>
                                                 <span class="text-[10px] uppercase font-semibold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded">
                                                     {{ $prod->kategoriRelasi?->nama ?? $prod->kategori ?? 'Sparepart' }}
                                                 </span>
+                                                @if($prod->brand?->nama ?? $prod->brand)
+                                                    <span class="text-[10px] font-semibold text-ink-600 dark:text-ink-300 bg-ink-100/80 dark:bg-white/10 px-1.5 py-0.5 rounded">
+                                                        {{ $prod->brand?->nama ?? $prod->brand }}
+                                                    </span>
+                                                @endif
+                                                @if($prod->supplier?->nama)
+                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded" title="Suplier: {{ $prod->supplier->nama }}">
+                                                        <svg class="w-3 h-3 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                                        </svg>
+                                                        <span>Suplier: {{ $prod->supplier->nama }}</span>
+                                                    </span>
+                                                @endif
                                                 <span class="text-[10px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded uppercase">
                                                     Satuan: {{ $satuanDasar }}
                                                 </span>
                                             </div>
 
-                                            <h4 class="font-bold text-xs sm:text-sm text-ink-900 dark:text-white leading-snug line-clamp-1">
+                                            <h4 class="font-bold text-xs sm:text-sm md:text-base text-ink-900 dark:text-white leading-snug break-words">
                                                 {{ $prod->nama }}
                                             </h4>
 
@@ -486,7 +499,7 @@
                                                         <svg class="w-3 h-3 text-up-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                                         </svg>
-                                                        <span>{{ $thModels->take(2)->join(', ') }}{{ $thModels->count() > 2 ? ' (+'.($thModels->count() - 2).')' : '' }}</span>
+                                                        <span>Kompatibel: {{ $thModels->take(4)->join(', ') }}{{ $thModels->count() > 4 ? ' (+'.($thModels->count() - 4).')' : '' }}</span>
                                                     </span>
                                                 </div>
                                             @endif
@@ -552,7 +565,7 @@
                                                 type="button"
                                                 disabled
                                                 title="{{ $alasanTidakBisaDipilih }}"
-                                                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-ink-200/50 dark:bg-white/5 text-ink-400 cursor-not-allowed select-none min-h-[38px] sm:min-h-[34px]"
+                                                class="px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold bg-ink-200/50 dark:bg-white/5 text-ink-400 cursor-not-allowed select-none min-h-[42px] sm:min-h-[34px]"
                                             >
                                                 Stok Habis
                                             </button>
@@ -563,7 +576,7 @@
                                                 wire:click="addToCart({{ $prod->id }})"
                                                 @click="searchOpen = false"
                                                 title="Tambah 1 {{ $satuanDasar }}"
-                                                class="px-3 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary hover:bg-up-primary-dark active:bg-indigo-700 text-white cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 shadow-sm shadow-up-primary/20 min-h-[38px] sm:min-h-[34px]"
+                                                class="px-3 sm:px-3 py-2.5 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary hover:bg-up-primary-dark active:bg-indigo-700 text-white cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 shadow-sm shadow-up-primary/20 min-h-[42px] sm:min-h-[34px]"
                                             >
                                                 <span>+ {{ $satuanDasar }}</span>
                                             </button>
@@ -575,7 +588,7 @@
                                                     wire:click="addToCart({{ $prod->id }}, null, '{{ $sk->satuan_kode }}')"
                                                     @click="searchOpen = false"
                                                     title="Tambah 1 {{ strtoupper($sk->satuan_kode) }}"
-                                                    class="px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary/10 hover:bg-up-primary/20 active:bg-up-primary/30 text-up-primary border border-up-primary/30 cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 min-h-[38px] sm:min-h-[34px]"
+                                                    class="px-3 sm:px-3 py-2.5 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary/10 hover:bg-up-primary/20 active:bg-up-primary/30 text-up-primary border border-up-primary/30 cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 min-h-[42px] sm:min-h-[34px]"
                                                 >
                                                     <span>+ {{ strtoupper($sk->satuan_kode) }}</span>
                                                 </button>
@@ -1305,16 +1318,16 @@
                                     </span>
                                 @endif
                             </div>
-                            <h5 class="text-xs font-bold text-ink-900 dark:text-white leading-snug line-clamp-2">
+                            <h5 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white leading-snug break-words">
                                 {{ $item['nama'] }}
                             </h5>
                         </div>
 
-                        <!-- Tombol Hapus Touch Friendly (min 36px) -->
+                        <!-- Tombol Hapus Touch Friendly (min 40px) -->
                         <button
                             type="button"
                             wire:click="removeFromCart('{{ $key }}')"
-                            class="w-9 h-9 rounded-lg text-ink-400 hover:text-up-red hover:bg-up-red/10 flex items-center justify-center transition-colors cursor-pointer active:scale-90 shrink-0 -mr-1 -mt-1"
+                            class="w-10 h-10 rounded-xl text-ink-400 hover:text-up-red hover:bg-up-red/10 flex items-center justify-center transition-colors cursor-pointer active:scale-90 shrink-0 -mr-1 -mt-1"
                             title="Hapus item"
                             aria-label="Hapus item dari keranjang"
                         >
@@ -1435,11 +1448,11 @@
 
                         <!-- Stepper & Subtotal -->
                         <div class="flex items-center gap-2 shrink-0">
-                            <div class="inline-flex items-center bg-ink-100 dark:bg-white/5 rounded-lg p-0.5 border border-ink-200/80 dark:border-white/10">
+                            <div class="inline-flex items-center bg-ink-100 dark:bg-white/5 rounded-xl p-1 border border-ink-200/80 dark:border-white/10">
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', -1)"
-                                    class="w-7 h-7 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    class="w-8 h-8 rounded-lg hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Kurangi"
                                 >-</button>
                                 <input
@@ -1448,13 +1461,13 @@
                                     max="{{ $item['stok_max'] ?? 9999 }}"
                                     value="{{ $item['qty'] }}"
                                     wire:change="setQty('{{ $key }}', $event.target.value)"
-                                    class="w-8 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white bg-transparent border-0 p-0 focus:ring-1 focus:ring-up-primary rounded font-mono"
+                                    class="w-9 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white bg-transparent border-0 p-0 focus:ring-1 focus:ring-up-primary rounded font-mono"
                                     aria-label="Jumlah item"
                                 >
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', 1)"
-                                    class="w-7 h-7 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    class="w-8 h-8 rounded-lg hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Tambah"
                                 >+</button>
                             </div>
