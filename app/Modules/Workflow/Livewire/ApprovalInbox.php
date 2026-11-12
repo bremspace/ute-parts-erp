@@ -123,7 +123,6 @@ class ApprovalInbox extends Component
     {
         $request = ApprovalRequest::findOrFail($requestId);
         $pelanggan = Pelanggan::find($request->entity_id);
-        $defaultTier = TierMembership::where('is_active', true)->orderBy('urutan')->first();
 
         $this->memberApprovalForm = [
             'request_id' => $request->id,
@@ -131,7 +130,7 @@ class ApprovalInbox extends Component
             'nama' => $pelanggan?->nama ?? ($request->payload_json['nama'] ?? '-'),
             'telepon' => $pelanggan?->telepon ?? ($request->payload_json['telepon'] ?? '-'),
             'tipe_konsumen' => $pelanggan?->tipe_konsumen ?: 'retail',
-            'tier_membership_id' => $pelanggan?->tier_membership_id ?: ($defaultTier?->id ?? ''),
+            'tier_membership_id' => $pelanggan?->tier_membership_id ?: '',
             'kode_agen' => $pelanggan?->kode_agen ?? '',
             'referral_kode' => $pelanggan?->referral_kode ?? '',
             'catatan' => '',

@@ -98,11 +98,8 @@ class User extends Authenticatable
      */
     public function bisaAksesCabang(int $cabangId): bool
     {
-        static $cabangExistsCache = [];
-        if (! array_key_exists($cabangId, $cabangExistsCache)) {
-            $cabangExistsCache[$cabangId] = Cabang::where('id', $cabangId)->where('is_active', true)->exists();
-        }
-        if (! $cabangExistsCache[$cabangId]) {
+        $cabangExists = Cabang::where('id', $cabangId)->where('is_active', true)->exists();
+        if (! $cabangExists) {
             return false;
         }
 

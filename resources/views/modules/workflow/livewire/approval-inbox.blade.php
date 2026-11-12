@@ -308,7 +308,7 @@
                         <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                             Tier Membership (Level Diskon & Poin)
                         </label>
-                        <select wire:model="memberApprovalForm.tier_membership_id" 
+                        <select wire:model.live="memberApprovalForm.tier_membership_id" 
                                 class="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 text-xs font-medium">
                             <option value="">Tanpa Tier Khusus / Tier Dasar</option>
                             @foreach($tiers as $t)

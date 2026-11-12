@@ -262,4 +262,66 @@ class MemberApprovalWorkflowTest extends TestCase
         $this->assertTrue((bool) $pelanggan->is_reseller);
         $this->assertNotEmpty($pelanggan->kode_agen);
     }
+
+    public function test_registrasi_member_tier_null_dan_approver_bisa_memilih_gold_atau_tanpa_tier(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        $goldTier = TierMembership::where('kode', 'gold')->first()
+            ?? TierMembership::create([
+                'kode' => 'gold',
+                'nama' => 'Gold',
+                'min_belanja_12bulan' => 2000000,
+                'diskon_persen' => 5.0,
+                'poin_multiplier' => 1.5,
+                'urutan' => 2,
+                'is_active' => true,
+            ]);
+
+        // 1. Registrasi member baru
+        $this->post('/daftar-pelanggan', [
+            'nama' => 'Member Baru Tanpa Default Silver',
+            'telepon' => '089912345678',
+            'password' => 'secret123',
+        ]);
+
+        $pelanggan = Pelanggan::where('telepon', '089912345678')->first();
+        $this->assertNotNull($pelanggan);
+        $this->assertEquals('pending', $pelanggan->status);
+        $this->assertNull($pelanggan->tier_membership_id, 'Member pending registrasi tidak boleh default ke Silver.');
+
+        $req = ApprovalRequest::where('entity_type', 'member')->where('entity_id', $pelanggan->id)->first();
+        $this->assertNotNull($req);
+
+        // 2. Approver memilih Gold
+        Livewire::actingAs($owner)
+            ->test(ApprovalInbox::class)
+            ->call('openApproveMemberModal', $req->id)
+            ->set('memberApprovalForm.tier_membership_id', $goldTier->id)
+            ->call('confirmApproveMember');
+
+        $pelanggan->refresh();
+        $this->assertEquals('aktif', $pelanggan->status);
+        $this->assertEquals($goldTier->id, $pelanggan->tier_membership_id);
+
+        // 3. Test memilih tanpa tier (null)
+        $this->post('/daftar-pelanggan', [
+            'nama' => 'Member Tanpa Tier',
+            'telepon' => '089987654321',
+            'password' => 'secret123',
+        ]);
+        $pelanggan2 = Pelanggan::where('telepon', '089987654321')->first();
+        $req2 = ApprovalRequest::where('entity_type', 'member')->where('entity_id', $pelanggan2->id)->first();
+
+        Livewire::actingAs($owner)
+            ->test(ApprovalInbox::class)
+            ->call('openApproveMemberModal', $req2->id)
+            ->set('memberApprovalForm.tier_membership_id', '')
+            ->call('confirmApproveMember');
+
+        $pelanggan2->refresh();
+        $this->assertEquals('aktif', $pelanggan2->status);
+        $this->assertNull($pelanggan2->tier_membership_id, 'Member disetujui tanpa tier tidak boleh jatuh ke Silver.');
+    }
 }

@@ -12,6 +12,7 @@ use App\Modules\Crm\Services\TierService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ParsesNominal;
 use Database\Seeders\TierMembershipSeeder;
@@ -351,7 +352,30 @@ class CrmDashboard extends Component
 
         try {
             $pelanggan = Pelanggan::findOrFail($this->editPelangganId);
+            $wasPending = $pelanggan->status === 'pending';
             app(PelangganService::class)->update($pelanggan, $this->editPelangganForm);
+
+            // Jika status pelanggan diubah dari pending menjadi aktif, sinkronkan approval request bila ada
+            if ($wasPending && $this->editPelangganForm['status'] === 'aktif') {
+                $approvalReq = ApprovalRequest::where('entity_type', 'member')
+                    ->where('entity_id', $pelanggan->id)
+                    ->where('status', 'pending')
+                    ->first();
+                if ($approvalReq) {
+                    app(ApprovalService::class)->proses(
+                        $approvalReq->id,
+                        'disetujui',
+                        auth()->id(),
+                        'Disetujui via menu CRM',
+                        [
+                            'tipe_konsumen' => $this->editPelangganForm['tipe_konsumen'],
+                            'tier_membership_id' => $this->editPelangganForm['tier_membership_id'],
+                            'kode_agen' => $this->editPelangganForm['kode_agen'] ?? null,
+                            'referral_kode' => $this->editPelangganForm['referral_kode'] ?? null,
+                        ]
+                    );
+                }
+            }
 
             $this->showEditPelangganModal = false;
             $this->editPelangganId = null;

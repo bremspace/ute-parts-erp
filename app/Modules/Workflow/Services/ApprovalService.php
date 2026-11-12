@@ -274,8 +274,8 @@ class ApprovalService
                     }
                     $isReseller = in_array($tipeKonsumen, ['reseller', 'agen'], true);
 
-                    $tierId = ! empty($options['tier_membership_id'])
-                        ? (int) $options['tier_membership_id']
+                    $tierId = array_key_exists('tier_membership_id', $options)
+                        ? (! empty($options['tier_membership_id']) ? (int) $options['tier_membership_id'] : null)
                         : $pelanggan->tier_membership_id;
 
                     $kodeAgen = ! empty($options['kode_agen']) ? strtoupper(trim($options['kode_agen'])) : null;

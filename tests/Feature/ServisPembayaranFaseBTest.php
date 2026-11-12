@@ -217,7 +217,7 @@ class ServisPembayaranFaseBTest extends TestCase
             'nama' => 'Cabang Lain',
             'kode' => 'CBG-LAIN',
             'is_pusat' => false,
-            'is_aktif' => true,
+            'is_active' => true,
         ]);
         session(['cabang_id' => $cabangLain->id]);
 

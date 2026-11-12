@@ -141,6 +141,9 @@
                     <td class="py-3.5 px-4 font-semibold text-white">
                         <div class="flex items-center gap-2 flex-wrap">
                             <span>{{ $c->nama }}</span>
+                            @if($c->status === 'pending')
+                                <span class="text-[9px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 rounded-full">PENDING APPROVAL</span>
+                            @endif
                             @if($c->tipe_konsumen === 'agen' || $c->kode_agen)
                                 <span class="text-[9px] font-bold text-amber-300 bg-amber-400/15 border border-amber-400/35 px-2 py-0.5 rounded-full tracking-wide">AGEN B2B</span>
                             @elseif($c->is_reseller || $c->tipe_konsumen === 'reseller')
@@ -1415,7 +1418,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tier Membership</label>
-                            <select wire:model="editPelangganForm.tier_membership_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model.live="editPelangganForm.tier_membership_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="" class="bg-ink-900">Tanpa Tier (Retail)</option>
                                 @foreach($tiers as $t)
                                     <option value="{{ $t->id }}" class="bg-ink-900">{{ $t->nama }}</option>

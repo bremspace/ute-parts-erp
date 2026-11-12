@@ -120,10 +120,6 @@ class PelangganService
 
         $validated = Validator::make($data, $this->rules(), $this->messages())->validate();
 
-        $tierTerendah = TierMembership::where('is_active', true)
-            ->orderBy('min_belanja_12bulan')
-            ->first();
-
         $isReseller = (bool) ($validated['is_reseller'] ?? false);
         $tipeKonsumen = $validated['tipe_konsumen'] ?? ($isReseller ? 'reseller' : 'retail');
         if ($tipeKonsumen === 'agen' || $tipeKonsumen === 'reseller') {
@@ -144,7 +140,7 @@ class PelangganService
             'password' => $validated['password'] ?? null,
             'alamat' => $validated['alamat'] ?? null,
             'tanggal_lahir' => $validated['tanggal_lahir'] ?? null,
-            'tier_membership_id' => $validated['tier_membership_id'] ?? $tierTerendah?->id,
+            'tier_membership_id' => $validated['tier_membership_id'] ?? null,
             'is_reseller' => $isReseller,
             'tipe_konsumen' => $tipeKonsumen,
             'kode_agen' => $kodeAgen,
