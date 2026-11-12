@@ -390,7 +390,9 @@ Route::post('/login-pelanggan', function (Request $request) {
 Route::get('/daftar-pelanggan', fn () => view('auth.customer-register'))->name('customer.register');
 Route::post('/daftar-pelanggan', function (Request $request) {
     try {
-        $pelanggan = app(PelangganService::class)->create($request->all());
+        $data = $request->all();
+        $data['is_registrasi_mandiri'] = true;
+        $pelanggan = app(PelangganService::class)->create($data);
 
         if ($pelanggan->status === 'pending') {
             return redirect()->route('customer.login')->with('info', 'Pendaftaran berhasil dikirim. Akun member Anda sedang menunggu persetujuan (approval) dari owner sebelum dapat digunakan.');
