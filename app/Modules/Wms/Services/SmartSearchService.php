@@ -160,10 +160,10 @@ class SmartSearchService
         $allKeywords = array_values(array_unique(array_filter($allKeywords, fn ($k) => strlen($k) >= 2)));
 
         // Pre-fetch matching IDs dari master data (in-memory cached array untuk kecepatan instan & serialization-safe)
-        $allBrands = Cache::remember('smart_search_master_brands', self::FACETED_CACHE_TTL, fn () => Brand::select('id', 'nama')->get()->toArray());
-        $allKualitas = Cache::remember('smart_search_master_kualitas', self::FACETED_CACHE_TTL, fn () => KualitasProduk::select('id', 'nama')->get()->toArray());
-        $allKategori = Cache::remember('smart_search_master_kategori', self::FACETED_CACHE_TTL, fn () => KategoriProduk::select('id', 'nama')->get()->toArray());
-        $allSuppliers = Cache::remember('smart_search_master_suppliers', self::FACETED_CACHE_TTL, fn () => Supplier::select('id', 'nama')->get()->toArray());
+        $allBrands = Brand::select('id', 'nama')->get()->toArray();
+        $allKualitas = KualitasProduk::select('id', 'nama')->get()->toArray();
+        $allKategori = KategoriProduk::select('id', 'nama')->get()->toArray();
+        $allSuppliers = Supplier::select('id', 'nama')->get()->toArray();
 
         $matchingBrandIds = ! empty($allKeywords) ? collect($allBrands)->filter(function ($b) use ($allKeywords) {
             foreach ($allKeywords as $kw) {
