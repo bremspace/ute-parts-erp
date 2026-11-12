@@ -51,7 +51,7 @@ class HealthCheckControllerTest extends TestCase
         $secret = 'test-secret-67890';
         Config::set('app.health_check_secret', $secret);
 
-        $response = $this->getJson('/api/health?token=' . $secret);
+        $response = $this->getJson('/api/health?token='.$secret);
 
         $response->assertStatus(200)
             ->assertJson([

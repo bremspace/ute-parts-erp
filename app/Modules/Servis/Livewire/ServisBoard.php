@@ -254,8 +254,11 @@ class ServisBoard extends Component
 
     // Modal Konfirmasi Pembatalan Item Pekerjaan
     public bool $showBatalItemModal = false;
+
     public ?int $batalItemId = null;
+
     public string $batalItemNama = '';
+
     public string $batalItemAlasan = '';
 
     public function mount()

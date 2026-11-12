@@ -79,7 +79,7 @@ class Gudang extends Model
 
             $default = static::getDefault($model->cabang_id);
             if ($default->id === $model->id) {
-                throw new \DomainException("Gudang default tidak dapat dihapus.");
+                throw new \DomainException('Gudang default tidak dapat dihapus.');
             }
 
             // 1. Merger Stok: pindahkan atau gabungkan stok_items ke gudang default

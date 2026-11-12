@@ -79,10 +79,10 @@ class UteRestoreCommand extends Command
             $result = $dbService->restore($targetPath, $targetDb);
             $this->info("Restore berhasil dari berkas: {$result['restored_from']} ke database '{$result['target_database']}'");
             if (! empty($result['app_key_synced'])) {
-                $this->info("✓ Kunci enkripsi APP_KEY di .env berhasil disinkronkan otomatis dari snapshot manifest.");
+                $this->info('✓ Kunci enkripsi APP_KEY di .env berhasil disinkronkan otomatis dari snapshot manifest.');
             }
             if (! empty($result['media_restored'])) {
-                $this->info("✓ Seluruh berkas media storage/app/public berhasil diekstrak & symlink diperbarui.");
+                $this->info('✓ Seluruh berkas media storage/app/public berhasil diekstrak & symlink diperbarui.');
             }
             if (! empty($result['pre_restore_backup'])) {
                 $this->comment("Snapshot darurat pra-restore disimpan di: {$result['pre_restore_backup']}");

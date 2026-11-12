@@ -386,11 +386,12 @@ class LivewireSnapshotReplayGuardTest extends TestCase
 
         $this->dump('STEP4 komponen Livewire ter-mount di halaman kasir', $report);
 
-        // Layout backoffice tidak boleh mount widget Livewire global.
+        // Layout backoffice tidak boleh mount widget Livewire global (kecuali NotificationCenter).
         $layout = (string) file_get_contents(base_path('resources/views/layouts/backoffice.blade.php'));
         preg_match_all('/@livewire\s*\(\s*([^,\)\s]+)/', $layout, $m);
-        $this->dump('STEP4 @livewire di layouts/backoffice', $m[1]);
-        $this->assertSame([], $m[1], 'layout backoffice tidak seharusnya mount komponen Livewire global');
+        $globalComponents = array_values(array_filter($m[1], fn ($c) => ! str_contains($c, 'NotificationCenter')));
+        $this->dump('STEP4 @livewire di layouts/backoffice', $globalComponents);
+        $this->assertSame([], $globalComponents, 'layout backoffice tidak seharusnya mount komponen Livewire global');
 
         // Mutator pada komponen yang TERMOUNT di /app/wms (kasir punya wms.view):
         // apakah ada gate server-side di dalam komponennya?

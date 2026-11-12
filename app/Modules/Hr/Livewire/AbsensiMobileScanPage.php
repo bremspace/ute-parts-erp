@@ -22,15 +22,19 @@ class AbsensiMobileScanPage extends Component
 
     // Auth state
     public bool $isLoggedIn = false;
+
     public ?Karyawan $karyawan = null;
 
     // Login form fields (jika belum login)
     public string $loginIdentifier = '';
+
     public string $password = '';
+
     public bool $rememberMe = true;
 
     // Feedback state
     public ?array $result = null;
+
     public ?string $errorMessage = null;
 
     public function mount(): void
@@ -56,6 +60,7 @@ class AbsensiMobileScanPage extends Component
         $user = Auth::user();
         if (! $user) {
             $this->isLoggedIn = false;
+
             return;
         }
 
@@ -65,11 +70,13 @@ class AbsensiMobileScanPage extends Component
 
         if (! $this->karyawan) {
             $this->errorMessage = 'Akun login Anda ('.$user->email.') belum tertaut dengan data Karyawan. Hubungi HR.';
+
             return;
         }
 
         if (empty($this->token)) {
             $this->errorMessage = 'Token QR absensi tidak ditemukan. Silakan scan QR Code terbaru di mesin absensi toko.';
+
             return;
         }
 
@@ -88,6 +95,7 @@ class AbsensiMobileScanPage extends Component
 
         if ($identifier === '' || $password === '') {
             $this->errorMessage = 'Silakan masukkan Email / NIK dan kata sandi Anda.';
+
             return;
         }
 
@@ -104,6 +112,7 @@ class AbsensiMobileScanPage extends Component
 
         if (! Auth::attempt(['email' => $email, 'password' => $password], $this->rememberMe)) {
             $this->errorMessage = 'Email / NIK atau kata sandi yang Anda masukkan salah.';
+
             return;
         }
 
@@ -111,6 +120,7 @@ class AbsensiMobileScanPage extends Component
         if (! ($user->is_active ?? true)) {
             Auth::logout();
             $this->errorMessage = 'Akun Anda dinonaktifkan. Hubungi HR / Administrator.';
+
             return;
         }
 
@@ -126,11 +136,13 @@ class AbsensiMobileScanPage extends Component
     {
         if (! $this->karyawan) {
             $this->errorMessage = 'Data profil karyawan tidak ditemukan.';
+
             return;
         }
 
         if (empty($this->token)) {
             $this->errorMessage = 'Token QR Code tidak valid atau sudah kedaluwarsa.';
+
             return;
         }
 
@@ -140,6 +152,7 @@ class AbsensiMobileScanPage extends Component
         if (! ($res['success'] ?? false)) {
             $this->errorMessage = $res['message'] ?? 'Gagal memproses absensi.';
             $this->result = null;
+
             return;
         }
 

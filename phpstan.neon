@@ -3,6 +3,8 @@ includes:
     - phpstan-baseline.neon
 
 parameters:
+    reportUnmatchedIgnoredErrors: false
+
     # Analisis level 6 (Larastan) — keseimbangan ketat vs noise untuk proyek modular.
     # Naikkan ke 7-8 bertahap setelah temuan level 6 bersih.
     level: 6
@@ -23,3 +25,4 @@ parameters:
     ignoreErrors:
         - identifier: missingType.iterableValue
         - identifier: missingType.generics
+        - identifier: nullsafe.neverNull

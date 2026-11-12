@@ -71,7 +71,7 @@ jobs:
         run: php artisan migrate --force
 
       - name: Run Test Suite (PHPUnit / Pest)
-        run: php artisan test --parallel
+        run: php artisan test
 
   frontend-build:
     name: Frontend Compilation & Asset Verification

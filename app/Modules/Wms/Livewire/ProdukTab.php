@@ -26,6 +26,7 @@ use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\ProductImageService;
 use App\Modules\Wms\Services\ProdukService;
 use App\Modules\Wms\Services\ScanResolverService;
+use App\Support\WhatsAppHelper;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -1382,7 +1383,7 @@ class ProdukTab extends Component
                                 $q->orWhere('kode_produk', $alias);
                             }
                             $q->orWhere('model', $mod)
-                              ->orWhere('nama', $mod);
+                                ->orWhere('nama', $mod);
                         })->first();
 
                         if (! $matched) {
@@ -1412,9 +1413,9 @@ class ProdukTab extends Component
                             $q->where(function ($sub) use ($primaryBrand, $mod) {
                                 $sub->where('merk', $primaryBrand)->where('model', $mod);
                             })
-                            ->orWhere('kode_produk', $mod)
-                            ->orWhere('model', $mod)
-                            ->orWhere('nama', $mod);
+                                ->orWhere('kode_produk', $mod)
+                                ->orWhere('model', $mod)
+                                ->orWhere('nama', $mod);
                         })->first();
 
                         if (! $matched) {
@@ -3456,7 +3457,7 @@ class ProdukTab extends Component
         }
 
         $text = implode("\n\n", $lines);
-        $waLink = \App\Support\WhatsAppHelper::buatLink($this->waNomorTujuan ?: null, $text);
+        $waLink = WhatsAppHelper::buatLink($this->waNomorTujuan ?: null, $text);
 
         $this->dispatch('salin-teks', teks: $text, message: "{$produks->count()} data produk disalin & membuka WhatsApp...");
         $this->dispatch('buka-tab-baru', url: $waLink);

@@ -9,6 +9,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StokItem;
 use Carbon\Carbon;
@@ -531,7 +532,7 @@ class ReturPenjualanIndex extends Component
         $kategoriIdsSejenis = [];
         if ($targetKategoriId) {
             $kategoriIdsSejenis[] = $targetKategoriId;
-            $katModel = \App\Modules\Wms\Models\KategoriProduk::with('parent.children')->find($targetKategoriId);
+            $katModel = KategoriProduk::with('parent.children')->find($targetKategoriId);
             if ($katModel) {
                 $kategoriIdsSejenis = array_merge($kategoriIdsSejenis, $katModel->semuaKeturunanIds());
                 if ($katModel->parent_id && $katModel->parent) {

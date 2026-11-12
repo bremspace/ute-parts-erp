@@ -43,11 +43,11 @@ class DatabaseManagement extends Component
     public function updatedUploadedBackupFile(): void
     {
         $this->validate([
-            'uploadedBackupFile' => 'required|file|max:102400', // max 100MB
+            'uploadedBackupFile' => 'required|file|max:512000', // max 500MB
         ], [
             'uploadedBackupFile.required' => 'Pilih berkas backup terlebih dahulu.',
             'uploadedBackupFile.file' => 'Berkas backup tidak valid.',
-            'uploadedBackupFile.max' => 'Ukuran berkas melebihi batas 100 MB.',
+            'uploadedBackupFile.max' => 'Ukuran berkas melebihi batas 500 MB.',
         ]);
 
         $ext = strtolower($this->uploadedBackupFile->getClientOriginalExtension());

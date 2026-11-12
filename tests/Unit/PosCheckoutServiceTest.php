@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\PosCheckoutService;
 use App\Modules\Rbac\Models\Cabang;
@@ -100,7 +101,7 @@ class PosCheckoutServiceTest extends TestCase
             'jumlah' => 5,
         ]);
 
-        $pelangganPending = \App\Modules\Crm\Models\Pelanggan::create([
+        $pelangganPending = Pelanggan::create([
             'kode' => 'CUST-PENDING',
             'nama' => 'Budi Pending',
             'telepon' => '0899999999',

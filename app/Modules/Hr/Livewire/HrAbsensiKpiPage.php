@@ -25,9 +25,13 @@ class HrAbsensiKpiPage extends Component
 
     // Mesin Absensi Dynamic Rolling QR Modal
     public bool $showQrModal = false;
+
     public string $qrToken = '';
+
     public string $qrSvg = '';
+
     public int $qrExpiresAt = 0;
+
     public ?array $latestScannedEmployee = null;
 
     // Shift form
@@ -219,6 +223,7 @@ class HrAbsensiKpiPage extends Component
             $this->latestScannedEmployee = $consumed;
             $this->dispatch('kiosk-beep', ['success' => true]);
             $this->generateNextQr();
+
             return;
         }
 

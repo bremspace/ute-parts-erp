@@ -27,7 +27,7 @@ class HealthCheckController extends Controller
 
         $providedSecret = $request->header('X-Health-Check-Secret') ?? $request->query('token');
 
-        if (empty($providedSecret) || !hash_equals((string) $configuredSecret, (string) $providedSecret)) {
+        if (empty($providedSecret) || ! hash_equals((string) $configuredSecret, (string) $providedSecret)) {
             return response()->json([
                 'status' => 'unauthorized',
                 'message' => 'Invalid or missing health check authorization credentials.',
@@ -50,7 +50,7 @@ class HealthCheckController extends Controller
                 'connection' => DB::getDefaultConnection(),
             ];
         } catch (Throwable $e) {
-            $errors[] = 'Database probe failed: ' . $e->getMessage();
+            $errors[] = 'Database probe failed: '.$e->getMessage();
             $checks['database'] = [
                 'status' => 'failed',
                 'error' => $e->getMessage(),
@@ -60,8 +60,8 @@ class HealthCheckController extends Controller
         // 3. Cache Driver Probe (Read/Write/Delete + Latency)
         $cacheStart = microtime(true);
         try {
-            $probeKey = 'health_probe_' . bin2hex(random_bytes(6));
-            $probeVal = 'probe_val_' . time();
+            $probeKey = 'health_probe_'.bin2hex(random_bytes(6));
+            $probeVal = 'probe_val_'.time();
 
             Cache::put($probeKey, $probeVal, 15);
             $retrieved = Cache::get($probeKey);
@@ -78,7 +78,7 @@ class HealthCheckController extends Controller
                 'store' => config('cache.default'),
             ];
         } catch (Throwable $e) {
-            $errors[] = 'Cache probe failed: ' . $e->getMessage();
+            $errors[] = 'Cache probe failed: '.$e->getMessage();
             $checks['cache'] = [
                 'status' => 'failed',
                 'error' => $e->getMessage(),
@@ -106,9 +106,9 @@ class HealthCheckController extends Controller
                 'writable' => $writable,
             ];
 
-            if (!$exists || !$writable) {
+            if (! $exists || ! $writable) {
                 $storageOk = false;
-                $errors[] = "Directory [{$path}] is " . (!$exists ? 'missing' : 'not writable') . '.';
+                $errors[] = "Directory [{$path}] is ".(! $exists ? 'missing' : 'not writable').'.';
             }
         }
 
@@ -126,7 +126,7 @@ class HealthCheckController extends Controller
             'checks' => $checks,
         ];
 
-        if (!$isHealthy) {
+        if (! $isHealthy) {
             $payload['errors'] = $errors;
         }
 

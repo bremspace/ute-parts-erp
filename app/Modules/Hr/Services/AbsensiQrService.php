@@ -12,7 +12,9 @@ use Illuminate\Support\Str;
 class AbsensiQrService
 {
     public const TOKEN_TTL_SECONDS = 30;
+
     public const CACHE_PREFIX = 'absensi_qr_';
+
     public const CONSUMED_PREFIX = 'absensi_qr_consumed_';
 
     public function __construct(
@@ -37,9 +39,9 @@ class AbsensiQrService
             'used' => false,
         ];
 
-        Cache::put(self::CACHE_PREFIX . $token, $meta, now()->addSeconds($ttl + 60));
+        Cache::put(self::CACHE_PREFIX.$token, $meta, now()->addSeconds($ttl + 60));
 
-        $url = url('/absen/scan?t=' . $token);
+        $url = url('/absen/scan?t='.$token);
         $svg = $this->qrService->generateSvg($url, 260, 1);
 
         return [
@@ -57,7 +59,7 @@ class AbsensiQrService
     public function processScan(string $token, string $employeeIdentifier, ?string $clientIp = null): array
     {
         $cleanToken = trim($token);
-        $key = self::CACHE_PREFIX . $cleanToken;
+        $key = self::CACHE_PREFIX.$cleanToken;
         $meta = Cache::get($key);
 
         if (! $meta) {
@@ -69,6 +71,7 @@ class AbsensiQrService
 
         if (($meta['used'] ?? false) || now()->timestamp > ($meta['expires_at'] ?? 0)) {
             Cache::forget($key);
+
             return [
                 'success' => false,
                 'message' => 'QR Code ini sudah pernah digunakan atau kedaluwarsa. Silakan scan QR terbaru.',
@@ -86,7 +89,7 @@ class AbsensiQrService
             Cache::put($key, $meta, 120);
 
             // Simpan status konsumsi untuk di-polling oleh PC Modal
-            Cache::put(self::CONSUMED_PREFIX . $cleanToken, $res, 60);
+            Cache::put(self::CONSUMED_PREFIX.$cleanToken, $res, 60);
         }
 
         return $res;
@@ -97,6 +100,6 @@ class AbsensiQrService
      */
     public function checkConsumed(string $token): ?array
     {
-        return Cache::get(self::CONSUMED_PREFIX . trim($token));
+        return Cache::get(self::CONSUMED_PREFIX.trim($token));
     }
 }

@@ -80,7 +80,7 @@ class AuthController extends Controller
         $allowedThemes = ['light', 'dark', 'auto'];
         $allowedPalettes = [
             'default', 'linear', 'apple', 'raycast', 'stripe',
-            'supabase', 'arc', 'nordic', 'github', 'cyberpunk', 'bronze'
+            'supabase', 'arc', 'nordic', 'github', 'cyberpunk', 'bronze',
         ];
 
         if ($theme !== null && ! in_array($theme, $allowedThemes, true)) {

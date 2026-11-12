@@ -4,6 +4,7 @@ namespace App\Modules\Pos\Controllers;
 
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Pos\Services\ReturnOfflineSyncService;
 use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -128,7 +129,7 @@ class ReturnPenjualanController extends Controller
 
         $userId = auth()->id() ?? (int) $request->input('user_id', 1);
 
-        $syncService = app(\App\Modules\Pos\Services\ReturnOfflineSyncService::class);
+        $syncService = app(ReturnOfflineSyncService::class);
         $result = $syncService->syncReturBatch(
             returns: $request->input('returns'),
             cabangId: $cabangId,

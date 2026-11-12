@@ -5,7 +5,7 @@ namespace App\Modules\Pos\Services;
 use App\Models\User;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Pos\Models\TransaksiItem;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -59,7 +59,7 @@ class ReturnOfflineSyncService
             $alasan = (string) ($returData['alasan'] ?? 'Retur tukar barang offline kasir');
             $items = $returData['items'] ?? [];
             $clientCreatedAt = isset($returData['client_created_at'])
-                ? rescue(fn () => \Carbon\Carbon::parse($returData['client_created_at']), now())
+                ? rescue(fn () => Carbon::parse($returData['client_created_at']), now())
                 : now();
 
             if (empty($uuid)) {
@@ -70,6 +70,7 @@ class ReturnOfflineSyncService
                     'status' => 'failed',
                     'message' => 'retur_uuid wajib diisi',
                 ];
+
                 continue;
             }
 
@@ -81,6 +82,7 @@ class ReturnOfflineSyncService
                     'status' => 'failed',
                     'message' => 'Nomor nota asal dan rincian item wajib disertakan',
                 ];
+
                 continue;
             }
 
@@ -96,6 +98,7 @@ class ReturnOfflineSyncService
                     'status' => 'failed',
                     'message' => 'Kebijakan ISO: Pengembalian dana tunai (refund) tidak diizinkan saat offline. Hanya tukar unit 1-to-1.',
                 ];
+
                 continue;
             }
 

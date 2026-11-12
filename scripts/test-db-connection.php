@@ -1,4 +1,5 @@
 <?php
+
 // scripts/test-db-connection.php
 // Helper CLI untuk menguji koneksi MySQL secara akurat, cepat dan aman
 
@@ -10,7 +11,7 @@ if (function_exists('mysqli_report')) {
 }
 
 $host = $argv[1] ?? '127.0.0.1';
-$port = (int)($argv[2] ?? 3306);
+$port = (int) ($argv[2] ?? 3306);
 $user = $argv[3] ?? 'root';
 $pass = $argv[4] ?? '';
 $dbName = $argv[5] ?? '';
@@ -21,7 +22,7 @@ $pass = trim($pass, "\r\n");
 function testMysql(string $host, string $user, string $pass, int $port): array
 {
     $link = mysqli_init();
-    if (!$link) {
+    if (! $link) {
         return ['ok' => false, 'errno' => 2002, 'error' => 'Gagal inisialisasi driver MySQL'];
     }
     mysqli_options($link, MYSQLI_OPT_CONNECT_TIMEOUT, 3);
@@ -29,10 +30,11 @@ function testMysql(string $host, string $user, string $pass, int $port): array
     if ($ok) {
         return ['ok' => true, 'link' => $link];
     }
+
     return [
         'ok' => false,
         'errno' => mysqli_connect_errno() ?: 2002,
-        'error' => mysqli_connect_error() ?: 'Koneksi gagal'
+        'error' => mysqli_connect_error() ?: 'Koneksi gagal',
     ];
 }
 

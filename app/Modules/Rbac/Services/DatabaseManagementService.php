@@ -5,8 +5,6 @@ namespace App\Modules\Rbac\Services;
 use App\Models\User;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Notifikasi\Services\NotificationService;
-use App\Modules\Rbac\Services\AppUpdateService;
-use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Wms\Models\Brand;
@@ -134,7 +132,7 @@ class DatabaseManagementService
      * Buat backup database (MySQL/MariaDB atau SQLite).
      *
      * @param  string  $destination  'local' (server), 'download', atau 'cloud'
-     * @param  bool    $fullSnapshot Apakah membundel storage/app/public + manifest APP_KEY
+     * @param  bool  $fullSnapshot  Apakah membundel storage/app/public + manifest APP_KEY
      */
     public function backup(string $destination = 'local', int $keepDays = 7, ?string $cloudDisk = null, bool $fullSnapshot = false): array
     {
@@ -274,7 +272,7 @@ class DatabaseManagementService
             if (File::exists($mediaTar) && ! $isCustomTarget) {
                 $publicStorageDir = storage_path('app/public');
                 File::ensureDirectoryExists($publicStorageDir);
-                
+
                 // Gunakan tar atau php fallback
                 $tar = (new ExecutableFinder)->find('tar') ?? 'tar';
                 $proc = Process::fromShellCommandline(
@@ -300,7 +298,7 @@ class DatabaseManagementService
 
             if (! $extractedSql || ! File::exists($extractedSql)) {
                 File::deleteDirectory($tempExtractDir);
-                throw new RuntimeException("Arsip ZIP tidak berisi berkas database (.sql / .sql.gz).");
+                throw new RuntimeException('Arsip ZIP tidak berisi berkas database (.sql / .sql.gz).');
             }
 
             $effectiveSqlFile = $extractedSql;

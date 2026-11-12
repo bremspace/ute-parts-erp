@@ -3,6 +3,7 @@
 namespace App\Modules\Servis\Controllers;
 
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Services\ServisOfflineSyncService;
 use App\Modules\Servis\Services\ServisService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -388,7 +389,7 @@ class ServisController extends Controller
     public function activeOffline(Request $request)
     {
         $cabangId = $this->resolveCabangId($request) ?? (int) $request->input('cabang_id', 1);
-        $syncService = app(\App\Modules\Servis\Services\ServisOfflineSyncService::class);
+        $syncService = app(ServisOfflineSyncService::class);
         $tickets = $syncService->getActiveTicketsForCache($cabangId, (int) $request->input('limit', 200));
 
         return $this->success([
@@ -413,7 +414,7 @@ class ServisController extends Controller
         $cabangId = $this->resolveCabangId($request) ?? (int) $request->input('cabang_id', 1);
         $userId = auth()->id() ?? (int) $request->input('user_id', 1);
 
-        $syncService = app(\App\Modules\Servis\Services\ServisOfflineSyncService::class);
+        $syncService = app(ServisOfflineSyncService::class);
         $result = $syncService->syncPickupBatch(
             pickups: $request->input('pickups'),
             cabangId: $cabangId,

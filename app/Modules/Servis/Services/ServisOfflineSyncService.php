@@ -4,6 +4,7 @@ namespace App\Modules\Servis\Services;
 
 use App\Models\User;
 use App\Modules\Servis\Models\TiketServis;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -101,7 +102,7 @@ class ServisOfflineSyncService
             $tiketId = isset($item['tiket_id']) ? (int) $item['tiket_id'] : null;
             $namaPengambil = (string) ($item['nama_pengambil'] ?? 'Pelanggan Langsung');
             $metodeBayar = (string) ($item['metode_pembayaran'] ?? 'tunai');
-            $clientCreatedAt = isset($item['client_created_at']) ? rescue(fn () => \Carbon\Carbon::parse($item['client_created_at']), now()) : now();
+            $clientCreatedAt = isset($item['client_created_at']) ? rescue(fn () => Carbon::parse($item['client_created_at']), now()) : now();
 
             if (empty($uuid)) {
                 $failedCount++;
@@ -111,6 +112,7 @@ class ServisOfflineSyncService
                     'status' => 'failed',
                     'message' => 'pickup_uuid wajib diisi',
                 ];
+
                 continue;
             }
 

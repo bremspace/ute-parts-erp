@@ -154,10 +154,7 @@ class RekonsiliasiBankService
     {
         $rows = Excel::toArray(new class implements ToArray
         {
-            public function array(array $array): array
-            {
-                return $array;
-            }
+            public function array(array $array): void {}
         }, $filePath)[0] ?? [];
 
         $items = [];

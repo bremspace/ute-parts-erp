@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\HealthCheckController;
 use App\Modules\Akunting\Controllers\AkuntingController;
 use App\Modules\Crm\Controllers\CrmController;
 use App\Modules\Marketplace\Controllers\ImportController;
@@ -17,7 +18,6 @@ use App\Modules\Reseller\Controllers\ResellerController;
 use App\Modules\Servis\Controllers\ServisController;
 use App\Modules\Wms\Controllers\ProcurementController;
 use App\Modules\Wms\Controllers\ReturnPembelianController;
-use App\Http\Controllers\HealthCheckController;
 use App\Modules\Wms\Controllers\WmsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;

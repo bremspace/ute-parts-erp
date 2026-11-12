@@ -141,23 +141,54 @@
         </x-prism.glass-card>
 
         <!-- 2. Card Upload Restore dari PC Lokal -->
-        <x-prism.glass-card class="p-5" title="Pulihkan dari Berkas Luar" subtitle="Upload file .sql.gz, .sql, atau .zip snapshot clone dari laptop Anda">
-            <div class="space-y-3">
-                <div class="p-4 border-2 border-dashed border-white/10 rounded-xl text-center hover:border-up-mint/40 transition-colors">
-                    <input type="file" wire:model="uploadedBackupFile" accept=".gz,.sql,.zip" class="hidden" id="upload-backup-input">
+        <x-prism.glass-card class="p-5" title="Pulihkan dari Berkas Luar" subtitle="Upload file .sql.gz, .sql, atau .zip snapshot clone dari laptop Anda (hingga 500MB)">
+            <div class="space-y-3"
+                 x-data="{ isUploading: false, progress: 0 }"
+                 x-on:livewire-upload-start="isUploading = true; progress = 0"
+                 x-on:livewire-upload-finish="isUploading = false"
+                 x-on:livewire-upload-error="isUploading = false"
+                 x-on:livewire-upload-progress="progress = $event.detail.progress">
+                
+                <div class="p-4 border-2 border-dashed border-white/10 rounded-xl text-center hover:border-up-mint/40 transition-colors relative"
+                     :class="isUploading ? 'opacity-60 pointer-events-none' : ''">
+                    <input type="file" wire:model="uploadedBackupFile" accept=".gz,.sql,.zip" class="hidden" id="upload-backup-input" :disabled="isUploading">
                     <label for="upload-backup-input" class="cursor-pointer block">
                         <svg class="w-8 h-8 text-ink-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                         </svg>
                         <span class="text-xs font-bold text-white block">Pilih Berkas Backup (.sql.gz / .zip Snapshot)</span>
-                        <span class="text-[10px] text-ink-400">Berkas .zip snapshot otomatis merestore database, APP_KEY, dan media upload</span>
+                        <span class="text-[10px] text-ink-400">Mendukung arsip database & snapshot ZIP hingga 500 MB</span>
                     </label>
                 </div>
 
+                <!-- Progress Bar Unggah Berkas Besar -->
+                <div x-show="isUploading" x-cloak class="p-3 rounded-xl bg-surface-2 border border-white/10 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-white font-semibold flex items-center gap-2">
+                            <svg class="animate-spin h-3.5 w-3.5 text-up-mint" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                            </svg>
+                            Mengunggah berkas backup ke server...
+                        </span>
+                        <span class="font-mono text-up-mint font-bold" x-text="progress + '%'"></span>
+                    </div>
+                    <div class="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+                        <div class="bg-gradient-to-r from-up-mint to-emerald-400 h-2 rounded-full transition-all duration-200" :style="'width: ' + progress + '%'"></div>
+                    </div>
+                    <p class="text-[10px] text-ink-400">Harap jangan tutup atau refresh halaman sampai proses unggah selesai.</p>
+                </div>
+
+                @error('uploadedBackupFile')
+                    <div class="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400">
+                        {{ $message }}
+                    </div>
+                @enderror
+
                 @if($uploadedBackupFile)
                     <div class="p-2.5 rounded-lg bg-up-mint/10 border border-up-mint/30 text-xs text-up-mint flex items-center justify-between">
-                        <span class="truncate max-w-[200px]">{{ $uploadedBackupFile->getClientOriginalName() }}</span>
-                        <button type="button" wire:click="openRestoreModal('uploaded')" class="font-bold underline text-white">
+                        <span class="truncate max-w-[200px] font-semibold">{{ $uploadedBackupFile->getClientOriginalName() }}</span>
+                        <button type="button" wire:click="openRestoreModal('uploaded')" class="font-bold underline text-white hover:text-up-mint transition-colors">
                             Lanjut Restore →
                         </button>
                     </div>
