@@ -6,6 +6,7 @@ use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Reseller\Services\KomisiService;
+use App\Scopes\CabangScope;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -239,7 +240,8 @@ class LeadService
         $stages = ['baru', 'kontak', 'kualifikasi', 'negosiasi', 'won', 'lost'];
 
         /** @var Collection<string, \stdClass> $agregat hasil GROUP BY (bukan model) */
-        $agregat = Lead::forCabang($cabangId)
+        $agregat = Lead::withoutGlobalScope(CabangScope::class)
+            ->forCabang($cabangId)
             ->selectRaw('stage, COUNT(*) as jml, COALESCE(SUM(nilai_estimasi), 0) as nilai')
             ->groupBy('stage')
             ->get()

@@ -165,7 +165,7 @@
         <div class="w-full flex items-center justify-between text-xs px-1">
             <div class="flex items-center gap-2">
                 <div class="w-2 h-2 rounded-full" :class="sequence.length > 0 ? 'bg-up-mint animate-pulse' : 'bg-slate-400'"></div>
-                <span class="font-medium text-ink-600 dark:text-ink-300" x-text="sequence.length === 0 ? 'Tarik pola kunci layar (Android)' : 'Pola tersambung: ' + sequence.length + ' titik'"></span>
+                <span class="font-medium text-ink-600 dark:text-ink-300">Geser / swipe pola antar titik (seperti di HP Android):</span>
             </div>
             <button
                 type="button"
@@ -179,8 +179,13 @@
         </div>
 
         <!-- Android Lock Screen Pad Frame -->
-        <div class="relative w-full max-w-[290px] aspect-square rounded-3xl p-3.5 flex items-center justify-center shadow-lg transition-all duration-200 border"
+        <div class="relative w-full max-w-[290px] aspect-square rounded-[2.5rem] rounded-3xl p-3.5 flex items-center justify-center shadow-lg transition-all duration-200 border"
              :class="isDark ? 'bg-[#0B1120] border-slate-800 shadow-[0_12px_36px_rgba(0,0,0,0.6)]' : 'bg-slate-900 border-slate-800 text-white shadow-xl'">
+
+            <!-- Watermark / Brand in Screen -->
+            <div class="absolute top-2 left-0 right-0 text-center pointer-events-none opacity-40">
+                <span class="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-mono">Buka Pola Layar</span>
+            </div>
 
             <!-- Ambient Glow Effect -->
             <div class="absolute inset-0 rounded-3xl bg-gradient-to-br from-indigo-500/10 via-transparent to-purple-500/10 pointer-events-none"></div>
@@ -200,6 +205,9 @@
                     <!-- Android Glowing Line Filter -->
                     <filter id="android-glow" x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="#818CF8" flood-opacity="0.85"/>
+                    </filter>
+                    <filter id="dot-active-glow" x="-40%" y="-40%" width="180%" height="180%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#A78BFA" flood-opacity="1"/>
                     </filter>
                     <radialGradient id="dot-active-grad" cx="50%" cy="50%" r="50%">
                         <stop offset="0%" stop-color="#C7D2FE" />
@@ -276,7 +284,7 @@
 
         <!-- Pattern Sequence Result Footer -->
         <div class="w-full p-2.5 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/10 flex items-center justify-between text-xs">
-            <span class="text-[11px] font-semibold text-ink-500 dark:text-ink-400">Urutan Terdaftar:</span>
+            <span class="text-[11px] font-semibold text-ink-500 dark:text-ink-400">Urutan Titik (1-9):</span>
             <span class="font-mono font-bold text-xs text-up-primary tracking-wide tabular-nums" x-text="urutanString"></span>
         </div>
     </div>

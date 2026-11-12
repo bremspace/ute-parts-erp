@@ -1895,7 +1895,10 @@ class SettingsRbac extends Component
         $referensi = DB::table('tiket_servis')->where('jenis_servis_id', $id)->count()
             + DB::table('tiket_servis_estimasi_item')->where('jenis_servis_id', $id)->count();
 
-        if ($referensi > 0) {
+        $user = auth()->user();
+        $isSuper = $user && $user->hasRole(['super-admin', 'owner']);
+
+        if ($referensi > 0 && ! $isSuper) {
             $jenis->update(['is_active' => false]);
             $this->dispatch('alert', [
                 'type' => 'warning',

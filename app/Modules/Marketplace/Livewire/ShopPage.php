@@ -435,7 +435,7 @@ class ShopPage extends Component
 
         return Produk::where('slug', $this->slug)
             ->where('is_active', true)
-            ->with(['hargaTier', 'skuVariants' => fn ($q) => $q->where('is_active', true)])
+            ->with(['hargaTier', 'skuVariants' => fn ($q) => $q->where('is_active', true), 'tipeHps'])
             ->first();
     }
 

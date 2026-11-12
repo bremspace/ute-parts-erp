@@ -2481,6 +2481,14 @@ class PosKasir extends Component
         // [B-02/P1-2] Gudang wajib milik cabang aktif — validasi ulang sebelum potong stok
         $this->validasiGudangCabang();
 
+        // [F2-3] Item sn=true wajib SN lengkap sebelum proses transaksi
+        $snError = $this->validasiSnKeranjang();
+        if ($snError) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $snError]);
+
+            return;
+        }
+
         // [B-02/P0-1] Hard-block stok: tidak ada lagi jalur backorder di POS
         $stokError = $this->validasiStokKeranjang();
         if ($stokError) {

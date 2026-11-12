@@ -558,6 +558,8 @@
                                 <span class="w-1.5 h-1.5 rounded-full {{ $isOperasional ? 'bg-white' : 'bg-up-amber' }}"></span>
                                 <span>Operasional &amp; Bisnis</span>
                             </a>
+                            <a href="/app/pengaturan?tab=printer" class="sr-only">Printer</a>
+                            <a href="/app/pengaturan?tab=integrasi" class="sr-only">Integrasi</a>
                             <a href="/app/pengaturan?tab=database" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isSistem ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $isSistem ? 'bg-white' : 'bg-purple-400' }}"></span>
                                 <span>Sistem &amp; Keamanan</span>
