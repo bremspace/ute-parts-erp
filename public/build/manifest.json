@@ -1,7 +1,7 @@
 {
-  "_fonts-Cwz6hwoj.css": {
-    "file": "assets/fonts-Cwz6hwoj.css",
-    "src": "_fonts-Cwz6hwoj.css"
+  "_fonts-C9MNnjVw.css": {
+    "file": "assets/fonts-C9MNnjVw.css",
+    "src": "_fonts-C9MNnjVw.css"
   },
   "_instrument-sans-400-normal-D1W7dsQl.woff": {
     "file": "assets/instrument-sans-400-normal-D1W7dsQl.woff",
@@ -34,7 +34,7 @@
     "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-DdSFZLN6.css",
+    "file": "assets/app-BT15ECGT.css",
     "name": "app",
     "names": [
       "app.css"
@@ -43,7 +43,7 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-DO19agSg.js",
+    "file": "assets/app-CuEuehEW.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -51,7 +51,7 @@
       "node_modules/workbox-window/build/workbox-window.prod.es5.mjs"
     ],
     "css": [
-      "assets/app-DdSFZLN6.css"
+      "assets/app-BT15ECGT.css"
     ]
   }
 }
