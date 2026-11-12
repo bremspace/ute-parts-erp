@@ -39,7 +39,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
 
-    <title>{{ $title ?? config('app.name', 'Bremspace') }} — {{ $webConfig['hero_headline'] ?? 'Toko Sparepart & Servis' }}</title>
+    <title>{{ (request()->routeIs('shop.detail') ? ($title ?? config('app.name', 'Bremspace')) : (!empty($webConfig['seo_title'] ?? '') ? $webConfig['seo_title'] : (($title ?? config('app.name', 'Bremspace')) . ' — ' . ($webConfig['hero_headline'] ?? 'Toko Sparepart & Servis')))) }}</title>
 
     <!-- SEO Best Practices & Structured Metadata (Shopee & Amazon Model) -->
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
@@ -73,7 +73,7 @@
             '@type' => 'SearchAction',
             'target' => [
                 '@type' => 'EntryPoint',
-                'urlTemplate' => route('shop') . '?q={search_term_string}',
+                'urlTemplate' => url('/') . '?q={search_term_string}',
             ],
             'query-input' => 'required name=search_term_string',
         ],
@@ -126,7 +126,7 @@
         <div class="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-3">
             <!-- Brand -->
             <div class="flex items-center gap-3 sm:gap-6 min-w-0 flex-shrink">
-                <x-prism.logo size="md" :with-text="true" mode="auto" subtitle="Precision Parts & Repair" :href="route('shop')" text-class="hidden xs:block tracking-tight font-bold" />
+                <x-prism.logo size="md" :with-text="true" mode="auto" subtitle="Precision Parts & Repair" :href="url('/')" text-class="hidden xs:block tracking-tight font-bold" />
                 <div class="hidden lg:flex items-center gap-1 pl-4 border-l border-ink-200/50 dark:border-white/10 text-xs font-medium text-ink-500 dark:text-ink-400">
                     <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-up-mint/10 text-up-mint text-[11px] font-semibold">
                         <span class="w-1.5 h-1.5 rounded-full bg-up-mint animate-pulse"></span> Certified Labs
@@ -139,7 +139,7 @@
             <!-- Nav -->
             <nav class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 <!-- Katalog (desktop only, mobile di bottom dock) -->
-                <a href="{{ route('shop') }}"
+                <a href="{{ url('/') }}"
                    class="hidden md:inline-flex min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->is('shop') || request()->is('shop/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
                     <svg class="w-4 h-4 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -426,7 +426,7 @@
     <div class="md:hidden fixed bottom-3 inset-x-0 w-full flex justify-center px-4 z-50 pointer-events-none"
          style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.25rem);">
         <nav class="pointer-events-auto bg-white/90 dark:bg-ink-950/90 backdrop-blur-2xl border border-ink-200/90 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] rounded-full px-2 py-1 flex items-center justify-between gap-0.5 sm:gap-1 max-w-xs sm:max-w-sm w-full mx-auto">
-            <a href="{{ route('shop') }}"
+            <a href="{{ url('/') }}"
                class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('shop') || request()->is('shop/*') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                 <div class="relative flex items-center justify-center">
                     <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -547,13 +547,13 @@
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div class="space-y-2 max-w-sm">
-                <x-prism.logo size="sm" :with-text="true" mode="auto" subtitle="Pusat Sparepart & Servis HP Terpercaya." :href="route('shop')" />
+                <x-prism.logo size="sm" :with-text="true" mode="auto" subtitle="Pusat Sparepart & Servis HP Terpercaya." :href="url('/')" />
                 <p class="text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
                     Menyediakan komponen layar, baterai, kamera, dan IC terlengkap dengan kalibrasi uji kualitas tinggi untuk teknisi & pengguna.
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium text-ink-600 dark:text-ink-400">
-                <a href="{{ route('shop') }}" class="hover:text-up-primary transition-colors">Katalog Sparepart</a>
+                <a href="{{ url('/') }}" class="hover:text-up-primary transition-colors">Katalog Sparepart</a>
                 <a href="{{ route('panduan.index') }}" class="hover:text-up-primary transition-colors">Panduan Lab</a>
                 <a href="{{ route('servis.booking') }}" class="hover:text-up-primary transition-colors">Booking Servis</a>
                 <a href="{{ url('/tracking') }}" class="hover:text-up-primary transition-colors">Lacak Servis</a>

@@ -69,7 +69,7 @@ class ShopPage extends Component
     // Detail: pilihan varian & qty
     public ?int $selectedVariantId = null;
 
-    #[Url(as: 'tipe', except: '')]
+    #[Url(as: 'tipe', except: null)]
     public ?string $selectedGadgetModel = null;
 
     public int $qty = 1;

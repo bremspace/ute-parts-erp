@@ -43,7 +43,7 @@
                    class="px-6 py-3.5 rounded-2xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs hover:bg-ink-50 transition-[background-color,transform] duration-140 min-h-[44px] flex items-center active:scale-[0.97]">
                     Lihat Status Pesanan
                 </a>
-                <a href="{{ route('shop') }}"
+                <a href="{{ url('/') }}"
                    class="px-6 py-3.5 rounded-2xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs hover:bg-ink-50 transition-[background-color,transform] duration-140 min-h-[44px] flex items-center active:scale-[0.97]">
                     Lanjut Belanja
                 </a>
@@ -303,7 +303,7 @@
                     <p class="text-xs text-ink-500 dark:text-ink-400">Periksa suku cadang sebelum melanjutkan ke proses pengambilan.</p>
                 </div>
                 @if(count($cart) > 0)
-                    <a href="{{ route('shop') }}" class="text-xs font-semibold text-up-primary hover:underline">
+                    <a href="{{ url('/') }}" class="text-xs font-semibold text-up-primary hover:underline">
                         + Tambah Produk Lain
                     </a>
                 @endif
@@ -322,7 +322,7 @@
                             Cari layar LCD, baterai pengganti, atau pesan jasa servis teknisi profesional.
                         </p>
                     </div>
-                    <a href="{{ route('shop') }}"
+                    <a href="{{ url('/') }}"
                        class="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-[background-color,transform] duration-140 min-h-[44px] active:scale-[0.97]">
                         <span>Jelajahi Katalog Sparepart</span>
                     </a>

@@ -8,7 +8,7 @@
             </div>
             <h2 class="text-lg font-bold text-ink-900 dark:text-white">Komponen Tidak Ditemukan</h2>
             <p class="text-xs text-ink-500 dark:text-ink-400">Item ini mungkin telah diarsipkan atau dipindahkan.</p>
-            <a href="{{ route('shop') }}"
+            <a href="{{ url('/') }}"
                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 font-semibold text-xs transition-[background-color,transform] duration-140 active:scale-[0.97]">
                 <span>Kembali ke Katalog</span>
             </a>
@@ -32,7 +32,7 @@
 
         @push('seo')
             <link rel="canonical" href="{{ route('shop.detail', $produk->slug) }}" />
-            <meta name="description" content="{{ \Illuminate\Support\Str::limit(strip_tags($produk->deskripsi ?: "Beli {$produk->nama} berkualitas OEM/Original bergaransi resmi di " . config('app.name', 'Bremspace')), 160) }}">
+            <meta name="description" content="{{ \Illuminate\Support\Str::limit(strip_tags($produk->meta_description ?: ($produk->deskripsi ?: "Beli {$produk->nama} berkualitas OEM/Original bergaransi resmi di " . config('app.name', 'Bremspace'))), 160) }}">
             <meta name="keywords" content="{{ $produk->nama }}, {{ $catNama }}, {{ $compatModel }}, sparepart handphone, suku cadang resmi">
 
             <!-- OpenGraph Protocol -->
@@ -94,7 +94,7 @@
                             '@type' => 'ListItem',
                             'position' => 1,
                             'name' => 'Katalog Sparepart',
-                            'item' => route('shop'),
+                            'item' => url('/'),
                         ],
                     ],
                 ];
@@ -137,32 +137,21 @@
             </script>
         @endpush
 
-        <!-- Breadcrumb navigation (Fully clickable & correctly routed) -->
+
+        <!-- Breadcrumb navigation -->
         <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-xs font-medium text-ink-500 dark:text-ink-400 mb-8 overflow-x-auto whitespace-nowrap pb-1">
-            <a href="{{ route('shop') }}" class="hover:text-up-primary dark:hover:text-white transition-colors flex items-center gap-1.5 font-semibold">
+            <a href="{{ url('/') }}" class="hover:text-up-primary dark:hover:text-white transition-colors flex items-center gap-1.5 font-semibold">
                 <svg class="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                <span>Katalog Sparepart</span>
+                <span>Home</span>
             </a>
-            <span class="text-ink-300 dark:text-ink-700">/</span>
             @if($catNama)
+                <span class="text-ink-300 dark:text-ink-700">/</span>
                 <a href="{{ route('shop.kategori', ['kategori' => $catParam]) }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-medium">
                     {{ $catNama }}
                 </a>
-                <span class="text-ink-300 dark:text-ink-700">/</span>
             @endif
-            @if($compatModel && $compatLabel)
-                @php
-                    $cSlug = \Illuminate\Support\Str::slug($compatModel);
-                    $compatBreadcrumbUrl = $catParam
-                        ? route('shop.kategori.model', ['kategori' => $catParam, 'hpModel' => $cSlug])
-                        : route('shop.tipe', ['hpModel' => $cSlug]);
-                @endphp
-                <a href="{{ $compatBreadcrumbUrl }}" class="hover:text-up-primary dark:hover:text-white transition-colors font-medium">
-                    {{ $compatLabel }}
-                </a>
-                <span class="text-ink-300 dark:text-ink-700">/</span>
-            @endif
-            <span class="text-ink-900 dark:text-white font-semibold truncate max-w-xs">{{ $produk->nama }}</span>
+            <span class="text-ink-300 dark:text-ink-700">/</span>
+            <span class="text-ink-900 dark:text-white font-bold truncate max-w-xs">{{ $produk->nama }}</span>
         </nav>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-start">
@@ -185,7 +174,7 @@
                         <video :src="activeMedia" autoplay loop muted playsinline class="w-full h-full object-cover"></video>
                     </template>
                     <template x-if="activeMedia && !isVideo(activeMedia)">
-                        <img :src="activeMedia" alt="{{ $produk->nama }}" class="w-full h-full object-cover transition-opacity duration-200"
+                        <img :src="activeMedia" alt="{{ $produk->nama }}" class="w-full h-full object-contain transition-opacity duration-200"
                              x-on:error="activeMedia = null">
                     </template>
                     <template x-if="!activeMedia">
@@ -237,11 +226,7 @@
                                 {{ $produk->kondisi }}
                             </span>
                         @endif
-                        @if($produk->brand)
-                            <span class="text-[10px] uppercase tracking-wider font-bold text-ink-700 dark:text-ink-200 bg-ink-50 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 px-2.5 py-1 rounded-full truncate">
-                                {{ $produk->brand->nama }}
-                            </span>
-                        @endif
+
                         @if($produk->kualitas)
                             <span class="text-[10px] uppercase tracking-wider font-bold text-up-mint bg-up-mint/10 dark:bg-up-mint/20 px-2.5 py-1 rounded-full flex-shrink-0">
                                 {{ $produk->kualitas->nama }}
@@ -292,7 +277,7 @@
                              }">
                             <div class="flex items-center justify-between gap-2">
                                 <div class="flex items-center gap-1.5 flex-wrap">
-                                    <span class="text-[11px] font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Model Kompatibel</span>
+                                    <span class="text-[11px] font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Compatible dengan tipe :</span>
                                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold text-up-mint bg-up-mint/10 dark:bg-up-mint/20 tabular-nums">{{ $totalCompat }} Tipe Cocok</span>
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -359,7 +344,7 @@
                                             @else
                                                 <span class="w-1.5 h-1.5 rounded-full bg-up-mint flex-shrink-0"></span>
                                             @endif
-                                            <span class="truncate max-w-[200px] sm:max-w-none">{{ $thpNama }}</span>
+                                            <a href="{{ $seoUrl }}" wire:navigate class="truncate max-w-[200px] sm:max-w-none hover:underline">{{ $thpNama }}</a>
                                         </button>
                                         <a
                                             href="{{ $seoUrl }}"

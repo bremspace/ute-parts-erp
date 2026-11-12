@@ -30,7 +30,7 @@
                 <kbd class="px-1 py-0.5 rounded bg-black/40 border border-white/10 text-slate-300">Cmd/Ctrl</kbd> + <kbd class="px-1 py-0.5 rounded bg-black/40 border border-white/10 text-slate-300">S</kbd> simpan
             </span>
 
-            <a href="{{ route('shop') }}" target="_blank"
+            <a href="{{ url('/') }}" target="_blank"
                class="inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2.5 rounded-xl text-xs font-medium text-ink-300 bg-white/5 hover:bg-white/10 hover:text-white border border-white/10 transition-[background-color,color,transform] duration-140 active:scale-[0.97] min-h-[44px]">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -885,6 +885,21 @@
                             </label>
                         </div>
                     </div>
+                </div>
+            </div>
+            <div class="pt-4 border-t border-white/10 space-y-3">
+                <h3 class="text-sm font-semibold text-white">SEO (Homepage)</h3>
+                <div>
+                    <label class="block text-xs font-semibold text-ink-300 mb-1">SEO Title</label>
+                    <input type="text" wire:model.live="brandingForm.seo_title" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm" placeholder="Judul SEO homepage">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-ink-300 mb-1">SEO Description</label>
+                    <textarea wire:model.live="brandingForm.seo_description" rows="2" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm" placeholder="Deskripsi SEO homepage"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-ink-300 mb-1">SEO Keywords</label>
+                    <input type="text" wire:model.live="brandingForm.seo_keywords" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm" placeholder="keyword1, keyword2">
                 </div>
             </div>
         </x-prism.glass-card>

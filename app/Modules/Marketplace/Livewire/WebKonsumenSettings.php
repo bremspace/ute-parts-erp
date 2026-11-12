@@ -52,6 +52,11 @@ class WebKonsumenSettings extends Component
         'topbar_url' => '',
         'customer_login_bg_image' => '',
         'customer_login_bg_overlay' => 'scrim_dark', // scrim_dark, scrim_heavy, frosted_glass
+
+        // SEO
+        'seo_title' => '',
+        'seo_description' => '',
+        'seo_keywords' => '',
     ];
 
     public array $heroForm = [
@@ -201,6 +206,10 @@ class WebKonsumenSettings extends Component
         $this->brandingForm['customer_login_bg_image'] = $settings['customer_login_bg_image'] ?? '';
         $this->brandingForm['customer_login_bg_overlay'] = $settings['customer_login_bg_overlay'] ?? 'scrim_dark';
 
+        // SEO
+        $this->brandingForm['seo_title'] = $settings['seo_title'] ?? '';
+        $this->brandingForm['seo_description'] = $settings['seo_description'] ?? '';
+        $this->brandingForm['seo_keywords'] = $settings['seo_keywords'] ?? '';
         // Helper defensive parsing array
         $asArray = function ($val, array $default): array {
             if (is_array($val)) {
@@ -328,6 +337,10 @@ class WebKonsumenSettings extends Component
             'customer_login_bg_image' => $this->brandingForm['customer_login_bg_image'],
             'customer_login_bg_overlay' => $this->brandingForm['customer_login_bg_overlay'],
 
+            // SEO
+            'seo_title' => $this->brandingForm['seo_title'],
+            'seo_description' => $this->brandingForm['seo_description'],
+            'seo_keywords' => $this->brandingForm['seo_keywords'],
             // Hero
             'hero_active' => $this->heroForm['hero_active'],
             'hero_display_mode' => $this->heroForm['hero_display_mode'],
