@@ -70,7 +70,7 @@
 @endphp
 
 <div
-    class="flex flex-col gap-2 min-w-0 flex-1 min-h-full md:h-full md:overflow-hidden pb-2 md:pb-0"
+    class="flex flex-col gap-2 min-w-0 flex-1 min-h-0 md:overflow-y-auto pb-2 md:pb-0"
     x-data="{
         flexSet: {},
         searchOpen: false,
@@ -1249,7 +1249,7 @@
     </div>
 
     <!-- MAIN STAGE: TABEL TRANSAKSI KASIR (LELUASA, MODERN & BERSIH) -->
-    <div class="flex-1 min-h-[200px] md:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm md:overflow-hidden">
+    <div class="flex-1 min-h-[200px] md:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm">
         <!-- Mobile Cart Header: Counter & View Toggle (sm:hidden) -->
         <div class="sm:hidden flex items-center justify-between pb-2 mb-1.5 border-b border-ink-200/70 dark:border-white/10 flex-shrink-0">
             <div class="flex items-center gap-2">
