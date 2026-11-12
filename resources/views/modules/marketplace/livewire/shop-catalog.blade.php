@@ -820,12 +820,17 @@
                     @foreach($brands as $key => $val)
                         @php
                             if (is_array($val)) {
-                                continue;
+                                $b = $val['nama'] ?? $val['name'] ?? null;
+                                $count = null;
+                            } elseif (is_object($val)) {
+                                $b = $val->nama ?? $val->name ?? null;
+                                $count = null;
+                            } else {
+                                $b = is_numeric($key) ? $val : $key;
+                                $count = is_numeric($key) ? null : (is_scalar($val) ? $val : null);
                             }
-                            $b = is_numeric($key) ? $val : $key;
-                            $count = is_numeric($key) ? null : (is_scalar($val) ? $val : null);
                         @endphp
-                        @if(is_scalar($b))
+                        @if(is_scalar($b) && filled($b))
                             <option value="{{ $b }}">{{ $b }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
                         @endif
                     @endforeach

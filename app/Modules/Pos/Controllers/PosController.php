@@ -509,7 +509,7 @@ class PosController extends Controller
         $search = $request->query('search', '');
 
         $query = Pelanggan::with('tierMembership')
-            ->where('is_active', true)
+            ->where('status', 'aktif')
             ->latest();
 
         if (strlen($search) >= 2) {
