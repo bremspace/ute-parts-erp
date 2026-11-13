@@ -459,6 +459,7 @@ class AppUpdateService
             Artisan::call('config:clear');
             Artisan::call('cache:clear');
             Artisan::call('view:clear');
+            Artisan::call('ute:fix-permissions', ['--force' => true]);
             $logs[] = '[4/4] Bersihkan Cache Aplikasi & Konfigurasi: Sukses.';
         } catch (Throwable $e) {
             $logs[] = '[4/4] Bersihkan Cache: '.$e->getMessage();
@@ -491,6 +492,7 @@ class AppUpdateService
             Artisan::call('config:clear');
             Artisan::call('cache:clear');
             Artisan::call('view:clear');
+            Artisan::call('ute:fix-permissions', ['--force' => true]);
             $logs[] = '[2/2] Optimasi & Bersihkan Cache Server: Sukses.';
         } catch (Throwable $e) {
             $logs[] = '[2/2] Bersihkan Cache: '.$e->getMessage();

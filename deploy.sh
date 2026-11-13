@@ -63,6 +63,9 @@ rollback() {
         composer install --no-interaction --prefer-dist --no-dev --quiet >>"$LOG" 2>&1
     fi
     chown -R "$WEB_USER":"$WEB_USER" storage bootstrap/cache public/build 2>>"$LOG" || true
+    find storage/framework/views -type f -exec chmod 664 {} + 2>/dev/null || true
+    find storage/framework/cache -type f -exec chmod 664 {} + 2>/dev/null || true
+    find bootstrap/cache -type f -exec chmod 664 {} + 2>/dev/null || true
     set -e
     log "ROLLBACK SELESAI -> $OLD_REV. Site tetap live."
     exit 1
@@ -117,6 +120,9 @@ log "config/route/view cache..."
 # --- 6. Permission (user dideteksi otomatis di atas) ---
 log "chown $WEB_USER..."
 chown -R "$WEB_USER":"$WEB_USER" storage bootstrap/cache public/build 2>>"$LOG" || true
+find storage/framework/views -type f -exec chmod 664 {} + 2>/dev/null || true
+find storage/framework/cache -type f -exec chmod 664 {} + 2>/dev/null || true
+find bootstrap/cache -type f -exec chmod 664 {} + 2>/dev/null || true
 chmod -R 775 storage bootstrap/cache 2>>"$LOG" || true
 
 # --- 7. Restart queue worker (biar job baru terpakai) ---

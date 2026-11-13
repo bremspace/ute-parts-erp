@@ -68,6 +68,8 @@ class DatabaseManagementService
             $opcacheReset = (bool) @opcache_reset();
         }
 
+        $this->fixStoragePermissions();
+
         $this->auditService->catat(
             'ServerCache',
             'clear',
@@ -1263,6 +1265,8 @@ class DatabaseManagementService
         $paths = [
             storage_path('framework/views'),
             storage_path('framework/cache'),
+            storage_path('framework/sessions'),
+            storage_path('logs'),
             base_path('bootstrap/cache'),
         ];
 

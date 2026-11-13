@@ -127,6 +127,12 @@ jobs:
               php artisan view:cache || true
               php artisan event:cache || true
 
+              chown -R www-data:www-data storage bootstrap/cache public/build || true
+              chmod -R 775 storage bootstrap/cache || true
+              find storage/framework/views -type f -exec chmod 664 {} + 2>/dev/null || true
+              find storage/framework/cache -type f -exec chmod 664 {} + 2>/dev/null || true
+              find bootstrap/cache -type f -exec chmod 664 {} + 2>/dev/null || true
+
               php artisan queue:restart || true
               supervisorctl restart uteparts-worker:* 2>/dev/null || supervisorctl restart ute-parts-prod-queue:* 2>/dev/null || true
               systemctl reload php8.4-fpm 2>/dev/null || true
@@ -180,10 +186,14 @@ jobs:
             php artisan view:cache
             php artisan event:cache
 
-            # 11. Perbaiki ownership & permissions
+            # 11. Perbaiki ownership & permissions (WAJIB setelah view:cache/config:cache)
             echo "Menetapkan permission www-data..."
             chown -R www-data:www-data storage bootstrap/cache public/build
             chmod -R 775 storage bootstrap/cache
+            # Pastikan file yang baru di-generate saat view:cache juga writable oleh group www-data
+            find storage/framework/views -type f -exec chmod 664 {} +
+            find storage/framework/cache -type f -exec chmod 664 {} +
+            find bootstrap/cache -type f -exec chmod 664 {} +
 
             # 12. Restart background queue worker & reload PHP-FPM
             echo "Me-restart queue workers & PHP-FPM..."
