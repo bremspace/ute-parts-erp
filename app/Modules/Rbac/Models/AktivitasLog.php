@@ -3,6 +3,7 @@
 namespace App\Modules\Rbac\Models;
 
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Enumerable;
 use Spatie\Activitylog\Models\Activity;
@@ -14,6 +15,7 @@ use Spatie\Activitylog\Models\Activity;
  * causerNama: "sistem" bila tidak ada user login (job queue / seed / webhook) —
  * bukan "null" supaya jelas di UI riwayat.
  */
+#[Fillable([])]
 class AktivitasLog extends Activity
 {
     public static bool $allowDelete = false;

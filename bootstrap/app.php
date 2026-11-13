@@ -22,6 +22,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Spatie\Permission\Middleware\PermissionMiddleware;
@@ -97,6 +98,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Apply security headers to all responses
         $middleware->web(append: [SecurityHeaders::class]);
         $middleware->api(append: [SecurityHeaders::class]);
+        $middleware->web(prepend: [HandleCors::class]);
+        $middleware->api(prepend: [HandleCors::class]);
 
         // Force HTTPS in production (T-28)
         $middleware->web(prepend: [ForceHttps::class]);

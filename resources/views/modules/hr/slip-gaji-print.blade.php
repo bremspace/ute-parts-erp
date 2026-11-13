@@ -21,7 +21,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Slip Gaji — {{ $slip->karyawan?->nama ?? 'Karyawan' }} ({{ $slip->periode?->nama ?? $slip->periode ?? '-' }})</title>
-    <style>
+    <style nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
         @page {
             size: {{ $isThermal ? '80mm auto' : ($paperSize . ' ' . $orientation) }};
             margin: {{ $isThermal ? '3mm' : ($marginMm . 'mm') }};

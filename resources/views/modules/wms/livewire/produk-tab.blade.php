@@ -5521,7 +5521,7 @@ Baterai iPhone 11	SKU-BAT-02	150000	Original	20	RAK-A1
         @endforeach
     </datalist>
 
-    <script>
+    <script nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
         window.kameraProdukHandler = function() {
             return {
                 showModalKamera: false,

@@ -14,7 +14,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Purchase Order — {{ $po->no_po }}</title>
-    <style>
+    <style nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
         @page {
             size: {{ $paperSize }} {{ $orientation }};
             margin: {{ $marginMm }}mm;

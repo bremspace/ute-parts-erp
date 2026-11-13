@@ -6,12 +6,12 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- [T-32] Tema: flag zona + status staf untuk themeManager -->
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         window.UTE_ZONE = 'marketplace';
         window.UTE_AUTHED = false;
         window.UTE_THEME = null;
     </script>
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         // [T-32] Bootstrap tema & ukuran font — terapkan sebelum cat pertama untuk mencegah FOUC
         (function () {
             var pref = null;

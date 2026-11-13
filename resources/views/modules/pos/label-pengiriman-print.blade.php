@@ -21,7 +21,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Label Pengiriman — {{ $transaksi->no_transaksi }}</title>
-    <style>
+    <style nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
         @page {
             size: {{ $paperSize === '100x150' ? '100mm 150mm' : ($paperSize === '80x100' ? '80mm 100mm' : ($paperSize === '80mm' ? '80mm auto' : '105mm 148mm')) }};
             margin: {{ $marginMm }}mm;

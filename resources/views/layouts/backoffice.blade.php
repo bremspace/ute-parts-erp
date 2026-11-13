@@ -6,13 +6,13 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- [T-32] Tema: flag zona + status staf untuk themeManager -->
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         window.UTE_ZONE = 'backoffice';
         window.UTE_AUTHED = {!! auth()->check() ? 'true' : 'false' !!};
         window.UTE_THEME = {!! json_encode(auth()->user()?->theme_preference) !!};
         window.UTE_PALETTE = {!! json_encode(auth()->user()?->color_palette ?? 'default') !!};
     </script>
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         // [T-32] Bootstrap tema & ukuran font — terapkan sebelum cat pertama untuk mencegah FOUC
         (function () {
             var pref = null;
@@ -904,7 +904,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         document.addEventListener('alpine:init', () => {
             // [T-46] Sidebar: drawer (<768) + collapsible icon-rail (>=768) + accordion dropdown
             Alpine.data('sidebarManager', () => ({

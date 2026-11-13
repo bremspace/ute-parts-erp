@@ -10,11 +10,11 @@
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
-    <style>
+    <style nonce="{{ request()->attributes->get('csp_nonce') }}">
         body { font-family: 'Instrument Sans', sans-serif; }
         .fixed:has(#ute-perm-allow-btn) { display: none !important; }
     </style>
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         try { localStorage.setItem('ute_camera_perm_dismissed', '1'); } catch(e) {}
     </script>
 </head>

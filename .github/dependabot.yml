@@ -1,0 +1,83 @@
+# Dependabot Configuration
+# Auto-update dependencies for security
+
+version: 2
+updates:
+  # PHP (Composer)
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "composer"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      laravel-core:
+        patterns:
+          - "laravel/*"
+          - "nunomaduro/*"
+        update-types:
+          - "minor"
+          - "patch"
+      symfony:
+        patterns:
+          - "symfony/*"
+        update-types:
+          - "minor"
+          - "patch"
+      livewire:
+        patterns:
+          - "livewire/*"
+        update-types:
+          - "minor"
+          - "patch"
+      spatie:
+        patterns:
+          - "spatie/*"
+        update-types:
+          - "minor"
+          - "patch"
+      testing:
+        patterns:
+          - "phpunit/*"
+          - "mockery/*"
+          - "fakerphp/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # JavaScript (npm) - if package.json exists
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:30"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci(deps)"
+      include: "scope"

@@ -20,7 +20,7 @@
         ];
         $qrService = app(\App\Modules\Wms\Services\QrCodeService::class);
     @endphp
-    <style>
+    <style nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
         * {
             box-sizing: border-box;
             margin: 0;
@@ -315,7 +315,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
         function updateParam(key, value) {
             const url = new URL(window.location.href);
             if (key === 'preset') {

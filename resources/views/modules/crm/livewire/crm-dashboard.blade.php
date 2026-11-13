@@ -1595,7 +1595,7 @@
     {{-- [F1-4] Modal riwayat audit trail per pelanggan --}}
     @include('partials.riwayat-modal')
 
-    <script>
+    <script nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
         document.addEventListener('livewire:initialized', () => {
             Livewire.on('tab-changed', (event) => {
                 if (event.url && window.location.href !== event.url) {
