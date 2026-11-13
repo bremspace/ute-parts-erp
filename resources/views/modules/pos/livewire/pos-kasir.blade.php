@@ -418,7 +418,34 @@
                         </button>
                     </div>
 
-                    <div class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1 min-h-0">
+                    <div class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1 min-h-0"
+                        x-data="{
+                            loading: false,
+                            init() {
+                                this.observer = new IntersectionObserver((entries) => {
+                                    const entry = entries[0];
+                                    if (entry.isIntersecting && !this.loading && @this.$wire.adaLebihBanyak) {
+                                        this.loading = true;
+                                        @this.$wire.call('muatLebihBanyak').then(() => {
+                                            this.loading = false;
+                                        }).catch(() => {
+                                            this.loading = false;
+                                        });
+                                    }
+                                }, { root: this.$el, rootMargin: '100px' });
+                                this.$watch('$wire.adaLebihBanyak', () => {
+                                    if (this.sentinel) this.observer.observe(this.sentinel);
+                                });
+                            }
+                        }"
+                        x-init="
+                            this.sentinel = document.createElement('div');
+                            this.sentinel.className = 'h-8 flex items-center justify-center';
+                            this.sentinel.innerHTML = '<div class=\"text-xs text-ink-400 dark:text-ink-500\">Memuat lebih banyak...</div>';
+                            this.$el.appendChild(this.sentinel);
+                            this.observer.observe(this.sentinel);
+                        "
+                    >
                         @forelse($products as $prod)
                             @php
                                 $stokTotal = $stokPerProduk[$prod->id] ?? (\App\Modules\Pos\Livewire\PosKasir::STOK_TANPA_GUDANG);
@@ -629,14 +656,10 @@
                         @endforelse
 
                         @if($adaLebihBanyak)
+                            <!-- Sentinel is handled by IntersectionObserver above -->
+                        @else
                             <div class="p-2.5 text-center">
-                                <button
-                                    type="button"
-                                    wire:click="muatLebihBanyak"
-                                    class="text-xs font-bold text-up-primary hover:underline cursor-pointer py-1.5 px-3 rounded-xl hover:bg-up-primary/10 active:scale-95 transition"
-                                >
-                                    Muat lebih banyak…
-                                </button>
+                                <span class="text-xs font-medium text-ink-400 dark:text-ink-500">Semua produk termuat</span>
                             </div>
                         @endif
                     </div>

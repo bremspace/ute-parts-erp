@@ -583,9 +583,8 @@ class PosStokSinkronTest extends TestCase
         // Default: 16 (batas lama) + tombol load-more tampil
         $this->assertCount(PosKasir::BATAS_PRODUK_AWAL, $component->viewData('products'));
         $this->assertTrue($component->viewData('adaLebihBanyak'));
-        $component->assertSee('Muat lebih banyak');
 
-        // Load-more → sisa produk ikut termuat (20 + 3 fixture = 23 < 32)
+        // Load-more via method → sisa produk ikut termuat (20 + 3 fixture = 23 < 32)
         $component->call('muatLebihBanyak');
         $this->assertSame(23, $component->viewData('products')->count());
         $this->assertFalse($component->viewData('adaLebihBanyak'));
