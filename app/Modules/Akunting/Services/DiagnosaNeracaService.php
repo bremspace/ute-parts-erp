@@ -8,6 +8,7 @@ use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\StokOpname;
 use Illuminate\Support\Facades\DB;
@@ -338,8 +339,20 @@ class DiagnosaNeracaService
                 ->whereNotExists(function ($q) {
                     $q->select(DB::raw(1))
                         ->from('jurnal_akuntansi')
-                        ->whereIn('jurnal_akuntansi.referensi_tipe', ['purchase_order', PurchaseOrder::class, 'App\\Modules\\Wms\\Models\\PurchaseOrder'])
-                        ->whereColumn('jurnal_akuntansi.referensi_id', 'purchase_order.id');
+                        ->where(function ($w) {
+                            $w->where(function ($direct) {
+                                $direct->whereIn('jurnal_akuntansi.referensi_tipe', ['purchase_order', PurchaseOrder::class, 'App\\Modules\\Wms\\Models\\PurchaseOrder'])
+                                    ->whereColumn('jurnal_akuntansi.referensi_id', 'purchase_order.id');
+                            });
+                            if (Schema::hasTable('grn')) {
+                                $w->orWhere(function ($viaGrn) {
+                                    $viaGrn->whereIn('jurnal_akuntansi.referensi_tipe', ['grn', Grn::class, 'App\\Modules\\Wms\\Models\\Grn'])
+                                        ->whereIn('jurnal_akuntansi.referensi_id', function ($g) {
+                                            $g->select('id')->from('grn')->whereColumn('grn.po_id', 'purchase_order.id');
+                                        });
+                                });
+                            }
+                        });
                 });
 
             if ($cabangId !== null) {
