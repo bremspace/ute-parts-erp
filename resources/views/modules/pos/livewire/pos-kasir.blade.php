@@ -95,7 +95,7 @@
     @keydown.window.f6.prevent="$wire.tahanTransaksi()"
     @keydown.window.escape.prevent="$wire.clearCart()"
 >
-    <script nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         window.CURRENT_USER_ID = {{ auth()->id() ?? 1 }};
         window.CURRENT_USER_NAME = @json(auth()->user()?->name ?? 'Kasir');
         window.ACTIVE_CABANG_ID = {{ $activeCabangId }};

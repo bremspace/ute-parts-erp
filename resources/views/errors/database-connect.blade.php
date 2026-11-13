@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <style nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
+    <style nonce="{{ request()->attributes->get('csp_nonce') }}">
         body { background-color: #090D16; color: #f1f5f9; font-family: 'Instrument Sans', system-ui, sans-serif; }
         .glass-panel { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
         .brand-gradient { background: linear-gradient(135deg, #5B4FE9 0%, #E8873B 100%); }

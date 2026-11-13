@@ -14,7 +14,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Berita Acara Penolakan Barang — {{ $po->no_po }}</title>
-    <style nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
+    <style nonce="{{ request()->attributes->get('csp_nonce') }}">
         @page {
             size: {{ $paperSize }} {{ $orientation }};
             margin: {{ $marginMm }}mm;

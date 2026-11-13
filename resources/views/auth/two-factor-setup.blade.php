@@ -154,7 +154,7 @@
     @endif
 </div>
 
-<script nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     function twoFactorSetup() {
         return {};
     }

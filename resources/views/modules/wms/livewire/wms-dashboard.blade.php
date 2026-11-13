@@ -443,7 +443,7 @@
     <!-- MODAL PENCARIAN PRODUK GLOBAL -->
     @livewire(\App\Modules\Wms\Livewire\ProductSearchModal::class)
 
-    <script nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         document.addEventListener('livewire:initialized', () => {
             Livewire.on('tab-changed', (event) => {
                 if (event.url && window.location.href !== event.url) {

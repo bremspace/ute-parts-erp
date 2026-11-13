@@ -2816,7 +2816,7 @@
         @endif
     @endif
 
-    <script nonce="{{ request()->attributes->get(\'csp_nonce\') }}">
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         document.addEventListener('livewire:initialized', () => {
             Livewire.on('tab-changed', (event) => {
                 if (event.url && window.location.href !== event.url) {
