@@ -64,7 +64,7 @@ jobs:
           path: .
 
       - name: Transfer Pre-built Assets to VPS
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST || secrets.VPS_HOST }}
           username: ${{ secrets.SSH_USER || secrets.VPS_USER || 'root' }}
