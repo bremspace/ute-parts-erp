@@ -15,6 +15,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class TransaksiItem extends Model
 {
+    /**
+     * @property int $transaksi_id
+     * @property int $produk_id
+     * @property int|null $sku_variant_id
+     * @property int $jumlah
+     * @property string $satuan
+     * @property float $konversi
+     * @property float $harga_satuan
+     * @property float $diskon_nominal
+     * @property float $subtotal
+     * @property float $hpp
+     * @property string|null $catatan
+     */
     protected $table = 'transaksi_item';
 
     protected $casts = [
@@ -31,11 +44,17 @@ class TransaksiItem extends Model
         return $this->belongsTo(Transaksi::class);
     }
 
+    /**
+     * @return BelongsTo<Produk, $this>
+     */
     public function produk(): BelongsTo
     {
         return $this->belongsTo(Produk::class);
     }
 
+    /**
+     * @return BelongsTo<SkuVariant, $this>
+     */
     public function skuVariant(): BelongsTo
     {
         return $this->belongsTo(SkuVariant::class);

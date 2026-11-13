@@ -12,6 +12,7 @@ use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PartaiPricingService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Pos\Jobs\PrintThermalJob;
 use App\Modules\Pos\Livewire\Concerns\ManagesHoldTransactions;
 use App\Modules\Pos\Livewire\Concerns\ManagesKasLaci;
 use App\Modules\Pos\Models\Transaksi;
@@ -2749,6 +2750,12 @@ class PosKasir extends Component
                 ];
 
                 $this->completedTransactionId = $transaksi->id;
+
+                // Auto-print struk jika dikonfigurasi
+                $strukConfig = app(KonfigurasiService::class)->getStrukConfig();
+                if (! empty($strukConfig['auto_print'])) {
+                    PrintThermalJob::dispatch($transaksi->id);
+                }
             });
 
             $this->showPaymentModal = false;

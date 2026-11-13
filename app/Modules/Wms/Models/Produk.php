@@ -38,7 +38,42 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class Produk extends Model
 {
+    /**
+     * @property string $nama
+     * @property string|null $slug
+     * @property string|null $barcode
+     * @property string|null $barcode_alt
+     * @property string|null $deskripsi
+     * @property string|null $kategori
+     * @property int|null $kategori_id
+     * @property string|null $brand_kompatibel
+     * @property string|null $model_kompatibel
+     * @property string|null $kondisi
+     * @property string $satuan
+     * @property float $harga_beli
+     * @property string|null $metode_harga_beli
+     * @property float $harga_jual_retail
+     * @property float|null $margin_persen
+     * @property string|null $gambar
+     * @property string|null $foto
+     * @property string|null $meta_title
+     * @property string|null $meta_description
+     * @property string|null $kompatibilitas_hp
+     * @property bool $is_active
+     * @property int|null $brand_id
+     * @property int|null $kualitas_id
+     * @property int|null $supplier_id
+     * @property bool $harga_fleksibel
+     * @property string|null $sn
+     * @property string|null $abc_class
+     * @property int|null $reorder_point
+     * @property int|null $min_stock
+     * @property int|null $max_stock
+     * @property bool $is_ondemand
+     * @property bool $kena_pajak
+     */
     use CatatAktivitas;
+
     use LogsActivity;
     use SoftDeletes;
 

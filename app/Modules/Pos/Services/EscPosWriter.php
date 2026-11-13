@@ -3,13 +3,29 @@
 namespace App\Modules\Pos\Services;
 
 /**
- * Minimal ESC/POS byte builder for 58mm thermal receipts (ADR 0009 fallback path).
+ * Minimal ESC/POS byte builder for 58mm & 80mm thermal receipts (ADR 0009 fallback path).
  * Pure PHP, no DB access, deterministic — output depends only on the input array.
  * Bytes are sent raw to the printer (CUPS `lp -o raw` or Web Bluetooth client).
  */
 class EscPosWriter
 {
-    private const COLUMNS = 32; // 58mm @ default font
+    /** Paper width enum. */
+    public const WIDTH_58MM = 58;
+
+    public const WIDTH_80MM = 80;
+
+    /** Columns per paper width at default font (Font A 12x24 dots). */
+    private const COLUMNS_BY_WIDTH = [
+        self::WIDTH_58MM => 32,  // 58mm / 12 dots = ~48 chars max, use 32 for safe printable area
+        self::WIDTH_80MM => 42,  // 80mm / 12 dots = ~64 chars max, use 42 for safe printable area
+    ];
+
+    /** Font size modes. */
+    public const FONT_NORMAL = 0x00;  // 1x1
+
+    public const FONT_SMALL = 0x01;  // compressed (half width) via GS !
+
+    private int $columns = 32;
 
     private string $buf = '';
 
@@ -27,103 +43,192 @@ class EscPosWriter
     ];
 
     /**
-     * Build full 58mm receipt bytes.
+     * Build full thermal receipt bytes.
      *
      * @param  array  $data  {
-     *                       headerLines: string[], items: [{nama, qty, harga, subtotal}],
+     *                       items: [{nama, qty, harga, subtotal, harga_retail?, satuan?, catatan?}],
      *                       total: float, bayar: float, kembali: float,
-     *                       no_transaksi: string, metode_bayar: string, footerLines: string[],
+     *                       no_transaksi: string, metode_bayar: string,
      *                       tanggal: string, kasir: string, cabang: string,
+     *                       pelanggan?: string, tier?: string, tipe_konsumen?: string,
+     *                       saldo_poin?: int, poin_ditukar?: int,
+     *                       diskon_tier?: float, diskon_partai?: float, diskon_poin?: float,
+     *                       diskon?: float, diskon_persen?: float, diskon_nominal?: float,
+     *                       pajak?: float, ppn_persen?: float, ongkir?: float,
+     *                       subtotal?: float, subtotal_retail?: float,
+     *                       hemat_total?: float, komisi_mitra_nominal?: float,
+     *                       is_piutang?: bool, jatuh_tempo?: string, sisa_piutang?: float,
+     *                       no_tiket?: string, jenis_hp?: string, kurir?: string,
+     *                       is_pickup?: bool, resi?: string, sumber?: string,
+     *                       garansi?: string, footer_text?: string, kebijakan_retur?: string,
+     *                       catatan_kaki?: string, nama_toko?: string, slogan?: string,
+     *                       alamat?: string, telepon?: string, website_medsos?: string,
+     *                       show_cabang?: bool, show_kasir?: bool, show_pelanggan?: bool,
+     *                       show_waktu?: bool, show_subtotal_breakdown?: bool,
+     *                       show_qr_retur?: bool, qr_caption?: string,
+     *                       paper_width?: int (58|80), font_size?: string ('normal'|'small'),
      *                       }
      */
     public function receipt(array $data): string
     {
-        $this->buf = "\x1b\x40"; // init
+        $paperWidth = $data['paper_width'] ?? self::WIDTH_58MM;
+        $this->columns = self::COLUMNS_BY_WIDTH[$paperWidth] ?? 32;
 
-        // Header — baris pertama double-size bold, sisanya bold
-        if ($header = $data['headerLines'] ?? []) {
-            $this->align(1)->bold(true)->size(1);
-            $this->text($header[0]);
-            $this->size(0);
-            foreach (array_slice($header, 1) as $line) {
-                $this->text($line);
-            }
-            $this->bold(false);
+        $fontSize = ($data['font_size'] ?? 'normal') === 'small' ? self::FONT_SMALL : self::FONT_NORMAL;
+        $this->init($fontSize);
+
+        // ========== HEADER ==========
+        $namaToko = $data['nama_toko'] ?? 'BREMSPACE';
+        $slogan = $data['slogan'] ?? 'Pusat Sparepart & Servis Gadget';
+
+        $this->align(1)->bold(true)->size(1)->text($namaToko)->size(0);
+        if ($slogan) {
+            $this->text($slogan);
         }
 
-        $this->align(0)->rule();
-        if (! empty($data['is_piutang'])) {
-            $this->bold(true)->text('*** PIUTANG / BELUM LUNAS ***')->bold(false);
+        if (! empty($data['alamat'])) {
+            $this->text($data['alamat']);
         }
-        $this->text('No    : '.$data['no_transaksi']);
-        if (! empty($data['no_tiket'])) {
-            $this->text('Tiket : '.$data['no_tiket']);
+        if (! empty($data['telepon'])) {
+            $this->text('Telp/WA: '.$data['telepon']);
         }
-        if (! empty($data['jenis_hp'])) {
-            $this->text('Unit  : '.$data['jenis_hp']);
+        if (! empty($data['website_medsos'])) {
+            $this->text($data['website_medsos']);
         }
-        $this->text('Tgl   : '.$data['tanggal']);
-        $this->text('Kasir : '.$data['kasir']);
-        $this->text('Cabang: '.$data['cabang']);
-        if (! empty($data['pelanggan']) && $data['pelanggan'] !== 'Umum') {
-            $this->text('Plg   : '.$data['pelanggan']);
-            if (! empty($data['tier']) && $data['tier'] !== 'Retail' && $data['tier'] !== 'Umum') {
-                $lbl = in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Mitra : ' : 'Tier  : ';
-                $this->text($lbl.$data['tier']);
-            }
+
+        if (($data['show_cabang'] ?? true) && ! empty($data['cabang'])) {
+            $this->text($data['cabang']);
         }
+
+        if (! empty($data['is_offline'])) {
+            $this->bold(true)->text('*** STRUK OFFLINE (BUKTI SEMENTARA) ***')->bold(false);
+        }
+
+        if (($data['show_waktu'] ?? true) && ! empty($data['waktu'])) {
+            $this->text($data['waktu']);
+        }
+
         $this->rule();
 
-        foreach ($data['items'] as $item) {
-            foreach ($this->wrap($item['nama']) as $namaLine) {
-                $this->text($namaLine);
+        // ========== TRANSACTION INFO ==========
+        $this->text($this->pad('No. TRX:', $data['no_transaksi'] ?? '-'));
+
+        if (! empty($data['sumber']) && ! in_array(strtolower($data['sumber']), ['pos', 'offline'])) {
+            $this->text($this->pad('Pesanan:', strtoupper($data['sumber'])));
+        }
+
+        if (! empty($data['kurir'])) {
+            $kurirLbl = ! empty($data['is_pickup']) ? 'Metode Ambil:' : 'Kurir:';
+            $resiTeks = (! empty($data['resi']) && $data['resi'] !== '-') ? ' ('.$data['resi'].')' : '';
+            $this->text($this->pad($kurirLbl, $data['kurir'].$resiTeks));
+        }
+
+        if (! empty($data['no_tiket'])) {
+            $this->bold(true)->text($this->pad('No. Tiket:', $data['no_tiket']))->bold(false);
+        }
+
+        if (! empty($data['jenis_hp'])) {
+            $this->text($this->pad('Unit HP:', $data['jenis_hp']));
+        }
+
+        if (($data['show_kasir'] ?? true) && ! empty($data['kasir'])) {
+            $this->text($this->pad('Kasir:', $data['kasir']));
+        }
+
+        if (($data['show_pelanggan'] ?? true)) {
+            $pelanggan = $data['pelanggan'] ?? 'Umum';
+            $this->text($this->pad('Pelanggan:', $pelanggan));
+
+            if (! empty($data['tier']) && $data['tier'] !== 'Retail' && $data['tier'] !== 'Umum') {
+                $lbl = in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Tipe Mitra:' : 'Tier Member:';
+                $this->bold(true)->text($this->pad($lbl, $data['tier']))->bold(false);
             }
+
+            if (! empty($data['saldo_poin']) && (int) $data['saldo_poin'] > 0) {
+                $this->text($this->pad('Saldo Poin:', number_format((int) $data['saldo_poin']).' Poin'));
+            }
+        }
+
+        $this->rule();
+
+        // ========== ITEMS ==========
+        foreach ($data['items'] ?? [] as $item) {
+            $nama = $item['nama'] ?? 'Item';
+            foreach ($this->wrap($nama) as $namaLine) {
+                $this->bold(true)->text($namaLine)->bold(false);
+            }
+
+            $qtySatuan = ($item['qty'] ?? 0).($item['satuan'] ? ' '.$item['satuan'] : '');
+            $harga = $this->money($item['harga'] ?? 0);
+            $subtotal = $this->money($item['subtotal'] ?? 0);
+
+            // Line: "  1x  Rp 50.000          Rp 50.000"
+            $this->text($this->pad("  {$qtySatuan} x {$harga}", $subtotal));
+
+            // Strikethrough retail price if discounted (paper-efficient: show on same line if space allows)
+            $hargaRetail = (float) ($item['harga_retail'] ?? 0);
+            $hargaJual = (float) ($item['harga'] ?? 0);
+            if ($hargaRetail > $hargaJual) {
+                // Format: "Normal: Rp 75.000 → Rp 50.000" (arrow for strikethrough effect)
+                $normal = $this->money($hargaRetail);
+                $this->text("   Normal: {$normal} → {$harga}");
+            }
+
             if (! empty($item['catatan'])) {
                 foreach ($this->wrap('  * '.$item['catatan']) as $catatanLine) {
                     $this->text($catatanLine);
                 }
             }
-            $this->text($this->pad(
-                "{$item['qty']} x ".$this->money($item['harga']),
-                $this->money($item['subtotal'])
-            ));
-            if (! empty($item['harga_retail']) && (float) $item['harga_retail'] > (float) $item['harga']) {
-                $this->text('  (Normal: '.$this->money($item['harga_retail']).')');
-            }
         }
 
         $this->rule();
-        if (! empty($data['subtotal_retail']) && ! empty($data['diskon_tier']) && (float) $data['diskon_tier'] > 0) {
-            $this->text($this->pad('Subtotal Retail', $this->money($data['subtotal_retail'])));
-            $tierLabel = ! empty($data['tier']) && $data['tier'] !== 'Retail'
-                ? "Potongan {$data['tier']}"
-                : (in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Potongan Mitra' : 'Potongan Tier');
-            $this->text($this->pad($tierLabel, '-'.$this->money($data['diskon_tier'])));
-            $this->text($this->pad('Subtotal', $this->money($data['subtotal'] ?? $data['total'])));
+
+        // ========== SUBTOTAL BREAKDOWN ==========
+        $showBreakdown = $data['show_subtotal_breakdown'] ?? true;
+
+        if ($showBreakdown && ! empty($data['diskon_tier']) && (float) $data['diskon_tier'] > 0) {
+            $subRetail = $data['subtotal_retail'] ?? ((float) ($data['subtotal'] ?? 0) + (float) $data['diskon_tier']);
+            $this->text($this->pad('Subtotal Retail:', $this->money($subRetail)));
+
+            $tierLbl = (! empty($data['tier']) && $data['tier'] !== 'Retail')
+                ? "Potongan {$data['tier']}:"
+                : (in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Potongan Mitra:' : 'Potongan Tier:');
+            $this->text($this->pad($tierLbl, '-'.$this->money($data['diskon_tier'])));
+            $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
         } else {
-            $this->text($this->pad('Subtotal', $this->money($data['subtotal'] ?? $data['total'])));
+            $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
         }
 
         if (! empty($data['diskon_partai']) && (float) $data['diskon_partai'] > 0) {
-            $this->text($this->pad('Diskon Partai', '-'.$this->money($data['diskon_partai'])));
+            $this->text($this->pad('Diskon Partai:', '-'.$this->money($data['diskon_partai'])));
         }
 
         if (! empty($data['diskon_poin']) && (float) $data['diskon_poin'] > 0) {
             $pts = $data['poin_ditukar'] ?? 0;
-            $this->text($this->pad("Tukar Poin ({$pts}p)", '-'.$this->money($data['diskon_poin'])));
+            $this->text($this->pad("Tukar Poin ({$pts}pts):", '-'.$this->money($data['diskon_poin'])));
         }
 
         if (! empty($data['diskon']) && (float) $data['diskon'] > 0) {
-            $lbl = ! empty($data['diskon_persen']) && (float) $data['diskon_persen'] > 0 ? "Diskon ({$data['diskon_persen']}%)" : 'Diskon Kasir';
+            $lbl = (! empty($data['diskon_persen']) && (float) $data['diskon_persen'] > 0)
+                ? "Diskon Kasir ({$data['diskon_persen']}%):"
+                : 'Diskon Kasir:';
             $this->text($this->pad($lbl, '-'.$this->money($data['diskon'])));
         }
 
         if (! empty($data['pajak']) && (float) $data['pajak'] > 0) {
-            $ppnLabel = ! empty($data['ppn_persen']) ? "PPN ({$data['ppn_persen']}%)" : 'PPN';
-            $this->text($this->pad($ppnLabel, '+'.$this->money($data['pajak'])));
+            $ppnLbl = ! empty($data['ppn_persen']) ? "PPN ({$data['ppn_persen']}%):" : 'PPN:';
+            $this->text($this->pad($ppnLbl, '+'.$this->money($data['pajak'])));
         }
 
-        $this->bold(true)->text($this->pad('TOTAL', $this->money($data['total'])))->bold(false);
+        if (! empty($data['ongkir']) && (float) $data['ongkir'] > 0) {
+            $this->text($this->pad('Ongkos Kirim:', '+'.$this->money($data['ongkir'])));
+        }
+
+        $this->rule();
+
+        // ========== TOTAL & PAYMENT ==========
+        $this->bold(true)->size(1)->text($this->pad('TOTAL', $this->money($data['total'])))->size(0)->bold(false);
+
         if (! empty($data['is_piutang'])) {
             $this->text('Status  : BELUM LUNAS (PIUTANG)');
             if (! empty($data['jatuh_tempo'])) {
@@ -132,12 +237,12 @@ class EscPosWriter
             $this->text('Sisa Tag: '.$this->money($data['sisa_piutang'] ?? $data['total']));
         } else {
             $this->text('Bayar   : '.$this->money($data['bayar']));
-            $this->text('Kembali : '.$this->money($data['kembali']));
+            $this->text('Kembali : '.$this->money($data['kembali'] ?? 0));
             $this->text('Metode  : '.$data['metode_bayar']);
         }
 
         if (! empty($data['hemat_total']) && (float) $data['hemat_total'] > 0) {
-            $this->bold(true)->text($this->pad('TOTAL HEMAT', $this->money($data['hemat_total'])))->bold(false);
+            $this->bold(true)->text($this->pad('TOTAL HEMAT:', $this->money($data['hemat_total'])))->bold(false);
         }
 
         if (! empty($data['komisi_mitra_nominal']) && (float) $data['komisi_mitra_nominal'] > 0) {
@@ -150,16 +255,28 @@ class EscPosWriter
 
         $this->rule()->feed(1);
 
-        // QR Code Faktur Retur & Garansi ESC/POS native (Model 2)
-        $this->align(1);
-        $this->qrcode($data['no_transaksi']);
-        $this->text($data['no_transaksi']);
-        $this->text('Scan QR utk Retur/Garansi');
-        $this->feed(1);
+        // ========== QR CODE RETUR & GARANSI ==========
+        if (($data['show_qr_retur'] ?? true) && ! empty($data['no_transaksi'])) {
+            $this->align(1);
+            $this->qrcode($data['no_transaksi'], $data['qr_size'] ?? 4);
+            $this->bold(true)->text($data['no_transaksi'])->bold(false);
+            $this->text($data['qr_caption'] ?? 'Scan QR untuk Retur & Garansi');
+            $this->feed(1);
+        }
 
-        // Footer
-        foreach ($data['footerLines'] ?? [] as $line) {
-            $this->text($line);
+        // ========== FOOTER ==========
+        $this->align(1);
+        $this->text($data['footer_text'] ?? 'Terima Kasih atas Kunjungan Anda!');
+
+        if (! empty($data['kebijakan_retur'])) {
+            foreach ($this->wrap($data['kebijakan_retur']) as $ln) {
+                $this->text($ln);
+            }
+        }
+        if (! empty($data['catatan_kaki'])) {
+            foreach ($this->wrap($data['catatan_kaki']) as $ln) {
+                $this->text($ln);
+            }
         }
 
         if (! empty($data['is_piutang'])) {
@@ -204,9 +321,14 @@ class EscPosWriter
         return $this;
     }
 
-    private function init(): self
+    private function init(int $fontSize = self::FONT_NORMAL): self
     {
-        $this->buf = "\x1b\x40";
+        $this->buf = "\x1b\x40"; // init printer
+
+        // Set font size (compressed for paper saving)
+        if ($fontSize === self::FONT_SMALL) {
+            $this->buf .= "\x1d\x21\x01"; // GS ! 1 = compressed (half width)
+        }
 
         return $this;
     }
@@ -226,7 +348,7 @@ class EscPosWriter
         return $this;
     }
 
-    /** GS ! — 0 normal, 1 double height+width. */
+    /** GS ! — 0 normal, 1 double height+width, 0x10 double height, 0x80 double width. */
     private function size(int $n): self
     {
         $this->buf .= "\x1d\x21".chr($n);
@@ -236,7 +358,7 @@ class EscPosWriter
 
     private function rule(): self
     {
-        return $this->text(str_repeat('-', self::COLUMNS));
+        return $this->text(str_repeat('-', $this->columns));
     }
 
     private function feed(int $n): self
@@ -248,7 +370,7 @@ class EscPosWriter
 
     private function cut(): self
     {
-        $this->buf .= "\x1d\x56\x42\x00";
+        $this->buf .= "\x1d\x56\x42\x00"; // Full cut
 
         return $this;
     }
@@ -260,24 +382,24 @@ class EscPosWriter
         return $this;
     }
 
-    /** Left + right pada satu baris selebar COLUMNS. */
+    /** Left + right pada satu baris selebar $this->columns. */
     private function pad(string $left, string $right): string
     {
         $left = $this->ascii($left);
         $right = $this->ascii($right);
-        $pad = max(1, self::COLUMNS - strlen($left) - strlen($right));
+        $pad = max(1, $this->columns - strlen($left) - strlen($right));
 
         return $left.str_repeat(' ', $pad).$right;
     }
 
     private function wrap(string $text): array
     {
-        return explode("\n", wordwrap($this->ascii($text), self::COLUMNS));
+        return explode("\n", wordwrap($this->ascii($text), $this->columns));
     }
 
     private function money($v): string
     {
-        return 'Rp'.number_format((float) $v, 0, ',', '.');
+        return 'Rp '.number_format((float) $v, 0, ',', '.');
     }
 
     private function ascii(string $text): string

@@ -118,11 +118,11 @@ function layoutStruk58(data) {
     const E = [];
     const W = 32;
     const namaToko = data.nama_toko || window.APP_NAME || 'BREMSPACE';
-    const slogan = data.slogan || 'Pusat Sparepart & Servis HP';
+    const slogan = data.slogan || 'Pusat Sparepart & Servis Gadget';
     E.push({ t: 'line', s: namaToko, c: 1, b: 1, h: 1 });
     if (slogan) E.push({ t: 'line', s: slogan, c: 1 });
     if (data.alamat) E.push({ t: 'line', s: String(data.alamat), c: 1 });
-    if (data.telepon) E.push({ t: 'line', s: 'Telp: ' + String(data.telepon), c: 1 });
+    if (data.telepon) E.push({ t: 'line', s: 'Telp/WA: ' + String(data.telepon), c: 1 });
     if (data.website_medsos) E.push({ t: 'line', s: String(data.website_medsos), c: 1 });
     if (data.show_cabang !== false && data.cabang) {
         E.push({ t: 'line', s: String(data.cabang), c: 1 });
@@ -167,8 +167,9 @@ function layoutStruk58(data) {
         for (const ln of wrap(it.nama ?? '', W - 2)) E.push({ t: 'line', s: ln, b: 1 });
         const qtySatuan = `${it.qty ?? 0}${it.satuan ? ' ' + it.satuan : ''}`;
         E.push({ t: 'line', s: pair(`  ${qtySatuan} x ${rupiah(it.harga)}`, rupiah(it.subtotal), W) });
+        // Paper-efficient: show strikethrough retail price with arrow on same line
         if (Number(it.harga_retail) > Number(it.harga)) {
-            E.push({ t: 'line', s: `   (Normal: ${rupiah(it.harga_retail)})`, c: 0 });
+            E.push({ t: 'line', s: `   Normal: ${rupiah(it.harga_retail)} → ${rupiah(it.harga)}`, c: 0 });
         }
     }
     E.push({ t: 'sep', w: W });
@@ -232,7 +233,7 @@ function layoutStruk58(data) {
     }
 
     if (data.show_qr_retur !== false && data.no_transaksi) {
-        E.push({ t: 'qrcode', d: data.no_transaksi, size: 4 });
+        E.push({ t: 'qrcode', d: data.no_transaksi, size: data.qr_size ?? 4 });
         E.push({ t: 'line', s: data.no_transaksi, c: 1, b: 1 });
         E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Garansi', c: 1 });
         E.push({ t: 'sep', w: W });
@@ -254,7 +255,7 @@ function layoutFaktur80(data) {
     const E = [];
     const W = 42;
     const namaToko = data.nama_toko || window.APP_NAME || 'BREMSPACE';
-    const slogan = data.slogan || 'Pusat Sparepart & Servis HP';
+    const slogan = data.slogan || 'Pusat Sparepart & Servis Gadget';
     E.push({ t: 'line', s: namaToko, c: 1, b: 1, h: 2 });
     if (slogan) E.push({ t: 'line', s: slogan, c: 1 });
     if (data.alamat) E.push({ t: 'line', s: String(data.alamat), c: 1 });
@@ -270,7 +271,7 @@ function layoutFaktur80(data) {
         E.push({ t: 'line', s: `${data.waktu}`, c: 1 });
     }
     if (data.show_qr_retur !== false && data.no_transaksi) {
-        E.push({ t: 'qrcode', d: data.no_transaksi, size: 5 });
+        E.push({ t: 'qrcode', d: data.no_transaksi, size: data.qr_size ?? 5 });
         E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Klaim Garansi', c: 1 });
         E.push({ t: 'sep', w: W, c: '-' });
     }
@@ -300,7 +301,7 @@ function layoutFaktur80(data) {
             E.push({ t: 'line', s: pair(lbl, data.tier, W), b: 1 });
         }
         if (data.saldo_poin && Number(data.saldo_poin) > 0) {
-            E.push({ t: 'line', s: pair('Saldo Poin Reward:', `${Math.round(data.saldo_poin)} Poin`, W) });
+            E.push({ t: 'line', s: pair('Saldo Poin:', `${Math.round(data.saldo_poin)} Poin`, W) });
         }
     }
     E.push({ t: 'sep', w: W });
@@ -308,8 +309,9 @@ function layoutFaktur80(data) {
         for (const ln of wrap(it.nama ?? '', W - 2)) E.push({ t: 'line', s: ln, b: 1 });
         const qtySatuan = `${it.qty ?? 0}${it.satuan ? ' ' + it.satuan : ''}`;
         E.push({ t: 'line', s: pair(`  ${qtySatuan} x ${rupiah(it.harga)}`, rupiah(it.subtotal), W) });
+        // Paper-efficient: show strikethrough retail price with arrow on same line
         if (Number(it.harga_retail) > Number(it.harga)) {
-            E.push({ t: 'line', s: `   (Normal: ${rupiah(it.harga_retail)})`, c: 0 });
+            E.push({ t: 'line', s: `   Normal: ${rupiah(it.harga_retail)} → ${rupiah(it.harga)}`, c: 0 });
         }
     }
     E.push({ t: 'sep', w: W });
@@ -323,52 +325,58 @@ function layoutFaktur80(data) {
     const showBreakdown80 = data.show_subtotal_breakdown !== false;
 
     if (showBreakdown80 && Number(data.diskon_tier) > 0) {
-        const tierLbl = data.tier && data.tier !== 'Retail' ? `POTONGAN ${data.tier.toUpperCase()}` : 'POTONGAN TIER';
-        E.push({ t: 'line', s: pair('SUBTOTAL RETAIL', rupiah(data.subtotal_retail ?? (Number(data.subtotal) + Number(data.diskon_tier))), W) });
+        const tierLbl = data.tier && data.tier !== 'Retail' ? `Potongan ${data.tier}:` : 'Potongan Tier:';
+        E.push({ t: 'line', s: pair('Subtotal Retail:', rupiah(data.subtotal_retail ?? (Number(data.subtotal) + Number(data.diskon_tier))), W) });
         E.push({ t: 'line', s: pair(tierLbl, '-' + rupiah(data.diskon_tier), W) });
-        E.push({ t: 'line', s: pair('SUBTOTAL', rupiah(data.subtotal), W) });
+        E.push({ t: 'line', s: pair('Subtotal:', rupiah(data.subtotal), W) });
     } else {
-        E.push({ t: 'line', s: pair('SUBTOTAL', rupiah(data.subtotal), W) });
+        E.push({ t: 'line', s: pair('Subtotal:', rupiah(data.subtotal), W) });
     }
 
     if (Number(data.diskon_partai) > 0) {
-        E.push({ t: 'line', s: pair('DISKON PARTAI MEMBER', '-' + rupiah(data.diskon_partai), W) });
+        E.push({ t: 'line', s: pair('Diskon Partai:', '-' + rupiah(data.diskon_partai), W) });
     }
 
     if (Number(data.diskon_poin) > 0) {
-        E.push({ t: 'line', s: pair('TUKAR POIN (' + (data.poin_ditukar ?? 0) + ' PTS)', '-' + rupiah(data.diskon_poin), W) });
+        E.push({ t: 'line', s: pair('Tukar Poin (' + (data.poin_ditukar ?? 0) + ' PTS)', '-' + rupiah(data.diskon_poin), W) });
     }
 
     if (Number(data.diskon) > 0) {
-        const lbl = Number(data.diskon_persen) > 0 ? `DISKON KASIR (${data.diskon_persen}%):` : 'DISKON KASIR';
+        const lbl = Number(data.diskon_persen) > 0 ? `Diskon Kasir (${data.diskon_persen}%):` : 'Diskon Kasir:';
         E.push({ t: 'line', s: pair(lbl, '-' + rupiah(data.diskon), W) });
     }
     if (data.pajak != null && Number(data.pajak) > 0) {
-        const ppnLbl = data.ppn_persen ? `PPN (${data.ppn_persen}%)` : 'PPN';
+        const ppnLbl = data.ppn_persen ? `PPN (${data.ppn_persen}%):` : 'PPN:';
         E.push({ t: 'line', s: pair(ppnLbl, '+' + rupiah(data.pajak), W) });
     }
     if (Number(data.ongkir) > 0) {
-        E.push({ t: 'line', s: pair('ONGKOS KIRIM', '+' + rupiah(data.ongkir), W) });
+        E.push({ t: 'line', s: pair('Ongkos Kirim:', '+' + rupiah(data.ongkir), W) });
     }
     E.push({ t: 'line', s: pair('TOTAL', rupiah(data.total), W), b: 1, h: 1 });
-    E.push({ t: 'line', s: pair('BAYAR (' + (data.metode ?? '') + ')', rupiah(data.bayar), W) });
+    E.push({ t: 'line', s: pair('BAYAR (' + (data.metode ?? 'TUNAI') + ')', rupiah(data.bayar), W) });
     E.push({ t: 'line', s: pair('KEMBALI', rupiah(data.kembali ?? 0), W) });
     if (Number(data.hemat_total) > 0) {
-        E.push({ t: 'line', s: pair('TOTAL HEMAT BELANJA', rupiah(data.hemat_total), W), b: 1 });
+        E.push({ t: 'line', s: pair('TOTAL HEMAT:', rupiah(data.hemat_total), W), b: 1 });
     }
     if (Number(data.komisi_mitra_nominal) > 0) {
-        E.push({ t: 'line', s: pair('KOMISI MITRA (MASUK SALDO)', '+' + rupiah(data.komisi_mitra_nominal), W) });
+        E.push({ t: 'line', s: pair('Komisi Mitra:', '+' + rupiah(data.komisi_mitra_nominal) + ' (Saldo)', W) });
     }
     if (data.saldo_poin != null) {
-        E.push({ t: 'line', s: pair('SISA SALDO POIN', String(data.saldo_poin) + ' PTS', W) });
+        E.push({ t: 'line', s: pair('Sisa Poin:', String(data.saldo_poin) + ' PTS', W) });
     }
-    E.push({ t: 'sep', w: W, c: '=' });
+    E.push({ t: 'sep', w: W });
 
     if (data.garansi) {
         E.push({ t: 'line', s: 'Garansi: ' + String(data.garansi), c: 1, b: 1 });
-        E.push({ t: 'sep', w: W, c: '-' });
+        E.push({ t: 'sep', w: W });
     }
 
+    if (data.show_qr_retur !== false && data.no_transaksi) {
+        E.push({ t: 'qrcode', d: data.no_transaksi, size: data.qr_size ?? 5 });
+        E.push({ t: 'line', s: data.no_transaksi, c: 1, b: 1 });
+        E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Garansi', c: 1 });
+        E.push({ t: 'sep', w: W });
+    }
     E.push({ t: 'line', s: data.footer_text || 'Terima Kasih atas Kunjungan Anda!', c: 1 });
     if (data.kebijakan_retur) {
         for (const ln of wrap(String(data.kebijakan_retur), W)) E.push({ t: 'line', s: ln, c: 1 });
@@ -376,25 +384,18 @@ function layoutFaktur80(data) {
     if (data.catatan_kaki) {
         for (const ln of wrap(String(data.catatan_kaki), W)) E.push({ t: 'line', s: ln, c: 1 });
     }
-    if (data.is_piutang) {
-        E.push({ t: 'feed', n: 1 });
-        E.push({ t: 'line', s: pad('( ' + (data.kasir ?? '') + ' )', W / 2) + '  ( Pelanggan )' });
-        E.push({ t: 'line', s: pad('', W / 2) + '  ' });
-        E.push({ t: 'line', s: pad('Kasir', W / 2) + '  ' + 'Pelanggan' });
-        E.push({ t: 'feed', n: 1 });
-    }
+    E.push({ t: 'feed', n: 1 });
     return E;
 }
 
-/* ============================== Renderer: bytes (ESC/POS) ============================== */
+/* ============================== Renderer: ESC/POS (Bluetooth) ============================== */
 
-function entriesToBytes(entries, width) {
+function entriesToBytes(entries, width = 32) {
     const p = new EscPos();
     for (const e of entries) {
-        if (e.t === 'feed') { p.feed(e.n); continue; }
+        if (e.t === 'feed') { for (let i = 0; i < e.n; i++) p.raw(0x0a); continue; }
         if (e.t === 'sep') {
-            const ch = e.c || '-';
-            p.line(ch.repeat(e.w));
+            p.align(e.c ?? 0).text(e.s || String(e.c === '-' ? '-'.repeat(width) : '='.repeat(width)));
             continue;
         }
         if (e.t === 'barcode') {
@@ -442,7 +443,7 @@ function entriesToHtml(entries) {
 }
 
 function escapeHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(s).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
 }
 
 /* ============================== Web Bluetooth (BLE GATT) ============================== */
@@ -703,6 +704,7 @@ async function printThermalReceipt(kind = '58', customData = null, forceNewPairi
                 return;
             }
 
+            // Fallback web print native dialog
             if (e.message === 'BLUETOOTH_UNSUPPORTED') {
                 notify('Browser ini tidak mendukung Web Bluetooth. Gunakan Google Chrome atau Microsoft Edge.', 'error');
                 return;
@@ -716,6 +718,9 @@ async function printThermalReceipt(kind = '58', customData = null, forceNewPairi
         }, 500);
     }
 }
+
+function buildStruk58(data) { return entriesToBytes(layoutStruk58(data), 32); }
+function buildFaktur80(data) { return entriesToBytes(layoutFaktur80(data), 42); }
 
 /* ============================== Alpine Component ============================== */
 
@@ -838,6 +843,3 @@ document.addEventListener('alpine:init', () => {
         window.Alpine.data('thermalPrinter', thermalPrinter);
     }
 });
-
-function buildStruk58(data) { return entriesToBytes(layoutStruk58(data), 32); }
-function buildFaktur80(data) { return entriesToBytes(layoutFaktur80(data), 42); }
