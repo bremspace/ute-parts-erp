@@ -13,6 +13,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ACTIONS_STEP_DEBUG: false
+
 jobs:
   backend-and-quality:
     name: Backend CI & Quality Gates

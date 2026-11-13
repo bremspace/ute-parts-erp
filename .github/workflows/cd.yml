@@ -10,6 +10,9 @@ concurrency:
   group: production-cd-deployment
   cancel-in-progress: true
 
+env:
+  ACTIONS_STEP_DEBUG: false
+
 jobs:
   build-and-package:
     name: Build & Package (Offloaded to Runner)

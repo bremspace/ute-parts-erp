@@ -12,6 +12,9 @@ on:
 permissions:
   contents: write
 
+env:
+  ACTIONS_STEP_DEBUG: false
+
 jobs:
   build-linux-package:
     name: Build Linux Standalone (.tar.gz)

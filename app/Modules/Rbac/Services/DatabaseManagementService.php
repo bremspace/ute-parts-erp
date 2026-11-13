@@ -633,7 +633,7 @@ class DatabaseManagementService
                 try {
                     app(KonfigurasiService::class)->set('app_setup_completed', false, 'Setup awal toko perlu dijalankan');
                 } catch (Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error('Gagal set app_setup_completed di factory_reset: '.$e->getMessage());
+                    Log::error('Gagal set app_setup_completed di factory_reset: '.$e->getMessage());
                 }
 
                 $activeSuper = User::where('email', 'superadmin@bremspace.id')->first()
@@ -841,7 +841,7 @@ class DatabaseManagementService
             }
             $konfig->set('master_produk_kondisi_list', array_values($kondisiList));
         } catch (Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Gagal ensureDefaultMasterAttributes: '.$e->getMessage());
+            Log::warning('Gagal ensureDefaultMasterAttributes: '.$e->getMessage());
         }
     }
 
