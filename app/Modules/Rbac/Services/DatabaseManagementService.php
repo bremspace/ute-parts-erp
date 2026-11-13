@@ -348,6 +348,9 @@ class DatabaseManagementService
             Log::warning('Post-restore cache clear skipped: '.$e->getMessage());
         }
 
+        // Pastikan permission cache/view agar www-data bisa menulis (mencegah 500 utime failed)
+        $this->fixStoragePermissions();
+
         $note = 'Database dipulihkan dari: '.basename($filePath).($isCustomTarget ? " (Target DB: {$targetDatabase})" : '');
         if ($appKeySynced) {
             $note .= ' [APP_KEY berhasil disinkronkan]';
@@ -1248,5 +1251,39 @@ class DatabaseManagementService
             'servers' => array_values($found),
             'count' => count($found),
         ];
+    }
+
+    /**
+     * Perbaiki permission storage/framework agar www-data bisa menulis.
+     * Mencegah error "touch(): Utime failed: Operation not permitted"
+     * ketika CLI (root) regenerasi cache tapi web (www-data) mencoba overwrite.
+     */
+    protected function fixStoragePermissions(): void
+    {
+        $paths = [
+            storage_path('framework/views'),
+            storage_path('framework/cache'),
+            base_path('bootstrap/cache'),
+        ];
+
+        foreach ($paths as $path) {
+            if (is_dir($path)) {
+                // chown ke www-data (hanya kalau jalan sebagai root/sudo)
+                @chown($path, 'www-data');
+                @chgrp($path, 'www-data');
+                // chmod 775 biar group www-data bisa write
+                @chmod($path, 0775);
+                // Rekursif untuk isi directory
+                $iterator = new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
+                    \RecursiveIteratorIterator::SELF_FIRST
+                );
+                foreach ($iterator as $item) {
+                    @chown($item->getPathname(), 'www-data');
+                    @chgrp($item->getPathname(), 'www-data');
+                    @chmod($item->getPathname(), $item->isDir() ? 0775 : 0664);
+                }
+            }
+        }
     }
 }

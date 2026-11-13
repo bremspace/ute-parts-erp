@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\FixStoragePermissionsCommand;
 use App\Console\Commands\SidImportRaw;
 use App\Http\Middleware\EnsureCabangSelected;
 use App\Http\Middleware\EnsureLicenseValid;
@@ -49,6 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
             CekBatasWaktuServisCommand::class,
             DuitkuHealthCommand::class,
             DuitkuRekonCommand::class,
+            FixStoragePermissionsCommand::class,
         ],
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -161,6 +163,10 @@ return Application::configure(basePath: dirname(__DIR__))
             ->name(DepresiasiAsetJob::class)
             ->monthlyOn(1, '01:30')
             ->withoutOverlapping();
+
+        // [PERM-1] Safety net: perbaiki permission storage harian 05:00
+        // Mencegah 500 "touch(): Utime failed" jika CLI (root) regenerasi cache
+        $schedule->command('ute:fix-permissions --force')->dailyAt('05:00');
 
         // Refresh token OAuth marketplace sebelum kedaluwarsa (tiap 2 jam)
         $schedule->call(function () {
