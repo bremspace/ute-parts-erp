@@ -350,6 +350,7 @@ class PosKasir extends Component
         }
 
         $this->loadUserPreferences();
+        $this->validasiGudangCabang();
 
         // [T-09] Deteksi sesi kas terbuka utk user/cabang
         $this->checkKasSesi();
@@ -524,6 +525,20 @@ class PosKasir extends Component
             if (is_array($pref)) {
                 $this->visibleFilters = array_merge($this->visibleFilters, $pref);
             }
+
+            // Load saved warehouse preference
+            $savedGudangId = UserPreference::getPref($userId, 'pos_kasir_selected_gudang_id');
+            if ($savedGudangId && Gudang::where('id', $savedGudangId)->where('cabang_id', session('cabang_id'))->exists()) {
+                $this->selectedGudangId = (int) $savedGudangId;
+            }
+        }
+    }
+
+    public function updatedSelectedGudangId(): void
+    {
+        $userId = auth()->id();
+        if ($userId && $this->selectedGudangId) {
+            UserPreference::setPref($userId, 'pos_kasir_selected_gudang_id', $this->selectedGudangId);
         }
     }
 
