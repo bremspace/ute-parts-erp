@@ -421,22 +421,26 @@ function entriesToBytes(entries, width = 32) {
 function entriesToHtml(entries) {
     const parts = [];
     for (const e of entries) {
-        if (e.t === 'feed') { for (let i = 0; i < e.n; i++) parts.push(''); continue; }
-        if (e.t === 'sep') { parts.push(e.s || ''); continue; }
+        if (e.t === 'feed') { for (let i = 0; i < e.n; i++) parts.push('<div class="feed"></div>'); continue; }
+        if (e.t === 'sep') { 
+            const sepClass = e.s ? '' : (e.c === '-' ? 'border-t border-dashed border-gray-300' : 'border-t border-gray-400');
+            parts.push(`<div class="receipt-sep ${sepClass}">${e.s || ''}</div>`); 
+            continue; 
+        }
         if (e.t === 'barcode') {
-            parts.push('[BARCODE ' + e.d + ']');
+            parts.push('<div class="receipt-center text-center"><div class="barcode-placeholder">[BARCODE ' + e.d + ']</div></div>');
             continue;
         }
         if (e.t === 'qrcode') {
-            parts.push('[QR CODE ' + e.d + ']');
+            parts.push('<div class="receipt-center text-center"><div class="qrcode-placeholder">[QR CODE ' + e.d + ']</div></div>');
             continue;
         }
         const cls = [];
-        if (e.c === 1) cls.push('c');
-        if (e.c === 2) cls.push('r');
-        if (e.b) cls.push('b');
-        if (e.h === 1) cls.push('h2');
-        if (e.h === 2) cls.push('h4');
+        if (e.c === 1) cls.push('receipt-center text-center');
+        if (e.c === 2) cls.push('receipt-right text-right');
+        if (e.b) cls.push('font-bold');
+        if (e.h === 1) cls.push('text-sm');
+        if (e.h === 2) cls.push('text-base');
         parts.push(`<div class="${cls.join(' ')}">${escapeHtml(e.s)}</div>`);
     }
     return parts.join('');
@@ -828,11 +832,19 @@ window.addEventListener('afterprint', () => {
     document.body.removeAttribute('data-modal-print');
 });
 
+/* ============================== Preview Renderer (Parity: Preview = Print) ============================== */
+
+function renderPreviewHtml(data, width) {
+    const entries = width >= 40 ? layoutFaktur80(data) : layoutStruk58(data);
+    return entriesToHtml(entries);
+}
+
 // Global exports
 window.thermalPrinter = thermalPrinter;
 window.printThermalReceipt = printThermalReceipt;
 window.resetBlePrinter = resetBlePrinter;
 window.getPosReceiptData = resolveReceiptData;
+window.renderPreviewHtml = renderPreviewHtml;
 
 // Alpine registration
 if (window.Alpine) {
