@@ -2559,6 +2559,7 @@
             loading: false,
             observer: null,
             init() {
+                // Observe the sentinel element directly (not the container)
                 this.observer = new IntersectionObserver((entries) => {
                     const entry = entries[0];
                     if (entry.isIntersecting && !this.loading && this.$wire.adaLebihBanyak) {
@@ -2569,7 +2570,7 @@
                             this.loading = false;
                         });
                     }
-                }, { root: this.$el, rootMargin: '100px' });
+                }, { root: this.$el.parentElement, rootMargin: '100px' });
 
                 this.$watch('$wire.adaLebihBanyak', (val) => {
                     if (val && this.$refs.sentinel) {
