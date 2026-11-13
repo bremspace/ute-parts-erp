@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout Codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -33,7 +33,7 @@ jobs:
           coverage: none
 
       - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
@@ -50,7 +50,7 @@ jobs:
         run: ./tools/linux/scripts/build-linux-package.sh
 
       - name: Upload Linux Package as Workflow Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: BremspaceERP-Linux-x64
           path: dist/linux/*.tar.gz
@@ -73,7 +73,7 @@ jobs:
 
     steps:
       - name: Checkout Codebase
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -83,7 +83,7 @@ jobs:
           coverage: none
 
       - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
@@ -96,11 +96,11 @@ jobs:
           npm ci --ignore-scripts
           npm run build
 
-      - name: Package macOS Standalone with Bytecode Protection
+      - name: Package macOS Application Bundle (.app & .dmg)
         run: ./tools/macos/scripts/build-macos-package.sh
 
       - name: Upload macOS Package as Workflow Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: BremspaceERP-macOS-Universal
           path: dist/macos/*.tar.gz

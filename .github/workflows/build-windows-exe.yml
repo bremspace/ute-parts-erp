@@ -22,8 +22,8 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Checkout Codebase
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v7
 
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -33,13 +33,13 @@ jobs:
           coverage: none
 
       - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
 
       - name: Setup Go 1.22
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: '1.22'
           cache: false
@@ -91,8 +91,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist\windows" | Out-Null
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" tools\windows\installer.iss
 
-      - name: Upload Installer as Workflow Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload Installer Artifact
+        uses: actions/upload-artifact@v7
         with:
           name: BremspaceERP-Windows-Setup
           path: dist\windows\*.exe
