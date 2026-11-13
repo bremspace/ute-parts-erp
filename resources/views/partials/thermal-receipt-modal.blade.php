@@ -3,8 +3,8 @@
     @php
         $strukConfig = app(\App\Modules\Crm\Services\KonfigurasiService::class)->getStrukConfig();
         $showQrRetur = $strukConfig['show_qr_retur'] ?? true;
-        $qrSize = (int) ($strukConfig['qr_size'] ?? 80);
-        $qrCaption = $strukConfig['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi';
+        $qrSize = (int) ($strukConfig['qr_size'] ?? 4);
+        $qrCaption = $strukConfig['qr_caption'] ?? 'Scan QR untuk Retur & Garansi';
         $defaultPaperSize = str_contains($strukConfig['default_width'] ?? '', '80') ? '80' : '58';
         $autoPrint = !empty($strukConfig['auto_print']);
     @endphp
@@ -23,9 +23,10 @@
             },
             get previewHtml() {
                 if (!this.data) return '';
-                const width = this.paperSize === '80' ? 42 : 32;
-                if (typeof window.renderPreviewHtml === 'function') {
-                    return window.renderPreviewHtml(this.data, width);
+                const paperWidth = this.paperSize === '80' ? 80 : 58;
+                if (typeof window.EscPos === 'function') {
+                    const esc = new window.EscPos(paperWidth);
+                    return esc.buildPreviewHtml(this.data);
                 }
                 return '';
             }
@@ -36,35 +37,35 @@
             }
         "
     >
-        <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-white/10 shadow-2xl relative my-auto max-h-[95vh] flex flex-col"> 
+        <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-white/10 shadow-2xl relative my-auto max-h-[95vh] flex flex-col">
             <!-- Header Modal -->
             <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10 flex-shrink-0">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-up-mint animate-pulse"></span>
-                            <h4 class="text-sm font-bold text-white">Struk Transaksi Selesai</h4>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            @if(!empty($completedTransactionId) && auth()->user()?->can('lihat-audit-log'))
-                                <button
-                                    type="button"
-                                    wire:click="bukaRiwayat('transaksi', {{ $completedTransactionId }})"
-                                    class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer"
-                                >
-                                    Audit
-                                </button>
-                            @endif
-                            <button type="button" wire:click="$set('showReceiptModal', false)" class="text-ink-400 hover:text-white cursor-pointer p-1">✕</button>
-                        </div>
-                    </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-up-mint animate-pulse"></span>
+                    <h4 class="text-sm font-bold text-white">Struk Transaksi Selesai</h4>
+                </div>
+                <div class="flex items-center gap-2">
+                    @if(!empty($completedTransactionId) && auth()->user()?->can('lihat-audit-log'))
+                        <button
+                            type="button"
+                            wire:click="bukaRiwayat('transaksi', {{ $completedTransactionId }})"
+                            class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer"
+                        >
+                            Audit
+                        </button>
+                    @endif
+                    <button type="button" wire:click="$set('showReceiptModal', false)" class="text-ink-400 hover:text-white cursor-pointer p-1">✕</button>
+                </div>
+            </div>
 
-                    <!-- Preview Struk Kertas Thermal (Rendered via JS for exact print parity) -->
-                    <div class="overflow-y-auto pr-1 flex-1">
-                        <div class="thermal-receipt-container thermal-receipt-preview bg-white text-black p-4 rounded-2xl font-mono text-xs shadow-inner space-y-2 select-text transition-all duration-200" 
-                             id="thermalReceipt" 
-                             :style="paperSize === '58' ? 'max-width: 210px; margin: 0 auto;' : 'max-width: 302px; margin: 0 auto;'"
-                             x-html="previewHtml">
-                        </div>
-                    </div>
+            <!-- Preview Struk Kertas Thermal (Rendered via JS EscPos for exact print parity) -->
+            <div class="overflow-y-auto pr-1 flex-1">
+                <div class="thermal-receipt-container thermal-receipt-preview bg-white text-black p-4 rounded-2xl font-mono text-xs shadow-inner space-y-2 select-text transition-all duration-200"
+                     id="thermalReceipt"
+                     :style="paperSize === '58' ? 'max-width: 210px; margin: 0 auto;' : 'max-width: 302px; margin: 0 auto;'"
+                     x-html="previewHtml">
+                </div>
+            </div>
 
             <!-- Tombol Aksi Cetak & Tutup (Sederhana, Bersih & Presisi) -->
             <div class="mt-3 pt-3 border-t border-white/10 space-y-2 flex-shrink-0 no-print">

@@ -1,857 +1,705 @@
-// [T-35] [ADR 0009] Cetak thermal 58mm/80mm via Web Bluetooth (BLE / GATT) murni di browser (PC & Mobile)
-// Bekerja langsung di Google Chrome / Edge (Android, Windows, Mac, Linux).
-// Tanpa aplikasi pihak ketiga (RawBT dll). Mendukung auto-reconnect printer tersimpan.
-
-/* ============================== ESC/POS builder ============================== */
-
-const ESC = 0x1b;
-
-// Transliterasi ASCI-safe: é→e, dst., sisanya → '?'
-const MAP = { ß: 'ss', œ: 'oe', æ: 'ae', '’': "'", '‘': "'", '“': '"', '”': '"', '–': '-', '—': '-', '…': '...', '°': 'o', '·': '.', '\u00a0': ' ' };
-
-function transliterate(s) {
-    return String(s ?? '')
-        .replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"')
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^\x20-\x7E]/g, (c) => MAP[c] ?? '?');
-}
-
+/**
+ * Thermal Receipt Preview & Print — Paper-efficient layout matching UTEParts reference.
+ * EscPos class mirrors PHP EscPosWriter byte-for-byte for 1:1 preview=print parity.
+ * Supports Web Bluetooth (auto-reconnect) and CUPS raw printing via backend.
+ */
 class EscPos {
-    constructor() {
-        this.bytes = [ESC, 0x40]; // init printer
-    }
-    raw(...b) { this.bytes.push(...b); return this; }
-    align(a) { return this.raw(ESC, 0x61, a); } // 0=kiri 1=tengah 2=kanan
-    bold(on) { return this.raw(ESC, 0x45, on ? 1 : 0); }
-    size(n) { return this.raw(0x1d, 0x21, n); } // GS ! n (0=1x, 0x10=2x tinggi, 0x80=2x lebar, 0x90=keduanya)
-    text(s) {
-        for (const ch of transliterate(s)) this.bytes.push(ch.charCodeAt(0) & 0xff);
-        return this;
-    }
-    line(s) { return this.text(s).raw(0x0a); }
-    feed(n) { return this.raw(ESC, 0x64, n); }
-    barcode128(s) {
-        const d = transliterate(String(s));
-        // GS w 2 (lebar modul 2 dots agar muat di printable area 384 dots kertas 58mm)
-        this.raw(0x1d, 0x77, 0x02);
-        // GS h 40 (tinggi barcode 40 dots)
-        this.raw(0x1d, 0x68, 0x28);
-        // GS H 2 (HRI di bawah barcode)
-        this.raw(0x1d, 0x48, 0x02);
-        // Code128 standard ESC/POS: GS k 73 (len+2) {B data...
-        this.raw(0x1d, 0x6b, 0x49, d.length + 2, 0x7b, 0x42);
-        this.text(d);
-        return this;
-    }
-    qrcode(s, size = 4) {
-        const d = transliterate(String(s ?? ''));
-        if (!d) return this;
-        const len = d.length + 3;
-        const pL = len & 0xff;
-        const pH = (len >> 8) & 0xff;
-        // 1. Model 2: GS ( k 4 0 49 65 50 0
-        this.raw(0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
-        // 2. Module size: GS ( k 3 0 49 67 size
-        this.raw(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, Math.min(8, Math.max(2, size)));
-        // 3. Error correction M: GS ( k 3 0 49 69 49
-        this.raw(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31);
-        // 4. Store data: GS ( k pL pH 49 80 48 data
-        this.raw(0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30);
-        this.text(d);
-        // 5. Print: GS ( k 3 0 49 81 48
-        this.raw(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30);
-        return this;
-    }
-    cut() {
-        // Feed 1 baris minimal lalu potong kertas (hemat kertas)
-        return this.feed(1).raw(0x1d, 0x56, 0x42, 0x00);
-    }
-    toBytes() { return new Uint8Array(this.bytes); }
-}
+  constructor(paperWidth = 58) {
+    this.paperWidth = paperWidth; // 58 or 80
+    this.compressed = true; // Always small font for paper saving
+    this.columns = this.compressed
+      ? (paperWidth === 80 ? 64 : 42)
+      : (paperWidth === 80 ? 48 : 32);
+    this.buf = [];
+    this.init();
+  }
 
-/* ============================== Helpers ============================== */
+  /** Initialize printer — ESC @ + GS ! 1 (compressed) */
+  init() {
+    this.buf = [0x1b, 0x40]; // ESC @
+    if (this.compressed) {
+      this.buf.push(0x1d, 0x21, 0x01); // GS ! 1 = half width
+    }
+    return this;
+  }
 
-function wrap(text, width) {
+  // --- Alignment ---
+  alignCenter() { this.buf.push(0x1b, 0x61, 0x01); return this; }
+  alignLeft() { this.buf.push(0x1b, 0x61, 0x00); return this; }
+  alignRight() { this.buf.push(0x1b, 0x61, 0x02); return this; }
+
+  // --- Font styling ---
+  bold(on) { this.buf.push(0x1b, 0x45, on ? 1 : 0); return this; }
+  size(n) { this.buf.push(0x1d, 0x21, n); return this; }
+  sizeDoubleWidth(on) { this.size(on ? 0x80 : 0x00); return this; }
+  sizeDoubleHeight(on) { this.size(on ? 0x10 : 0x00); return this; }
+
+  // --- Content ---
+  text(str) {
+    this.buf.push(...this.ascii(str), 0x0a); // + LF
+    return this;
+  }
+
+  rule() { return this.text('-'.repeat(this.columns)); }
+
+  feed(n) { this.buf.push(...Array(n).fill(0x0a)); return this; }
+
+  cut() { this.buf.push(0x1d, 0x56, 0x42, 0x00); return this; } // GS V B 0
+
+  /** Model 2 QR Code — mirrors PHP EscPosWriter::qrcode() */
+  qrcode(content, size = 4) {
+    const d = this.ascii(content);
+    if (!d) return this;
+    const len = d.length + 3;
+    const pL = len & 0xff;
+    const pH = (len >> 8) & 0xff;
+    const modSize = Math.max(2, Math.min(8, size));
+
+    // 1. Model 2: GS ( k 4 0 49 65 50 0
+    this.buf.push(0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
+    // 2. Module size: GS ( k 3 0 49 67 size
+    this.buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, modSize);
+    // 3. Error correction M: GS ( k 3 0 49 69 49
+    this.buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31);
+    // 4. Store data: GS ( k pL pH 49 80 48 data
+    this.buf.push(0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30, ...d);
+    // 5. Print: GS ( k 3 0 49 81 48
+    this.buf.push(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30);
+    return this;
+  }
+
+  /** ESC B 1 = strikethrough on, ESC B 0 = off */
+  textStrikethrough(str) {
+    this.buf.push(0x1b, 0x42, 0x01);
+    this.buf.push(...this.ascii(str), 0x0a);
+    this.buf.push(0x1b, 0x42, 0x00);
+    return this;
+  }
+
+  // --- Helpers ---
+  ascii(str) {
+    // Transliterate non-ASCII → nearest ASCII for cp437 compatibility
+    return str
+      .replace(/[éèêë]/g, 'e')
+      .replace(/[áàâä]/g, 'a')
+      .replace(/[íìîï]/g, 'i')
+      .replace(/[óòôö]/g, 'o')
+      .replace(/[úùûü]/g, 'u')
+      .replace(/ñ/g, 'n')
+      .replace(/ç/g, 'c')
+      .replace(/[±×÷]/g, m => ({ '±': '+/-', '×': 'x', '÷': '/' })[m])
+      .replace(/[–—]/g, '-')
+      .replace(/[’‘]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/→/g, '->')
+      .replace(/[^\x20-\x7E]/g, '')
+      .split('').map(c => c.charCodeAt(0));
+  }
+
+  money(v) { return 'Rp ' + Number(v).toLocaleString('id-ID'); }
+
+  pad(left, right) {
+    left = this.clean(left);
+    right = this.clean(right);
+    const pad = Math.max(1, this.columns - left.length - right.length);
+    return left + ' '.repeat(pad) + right;
+  }
+
+  clean(str) {
+    return str
+      .replace(/[éèêë]/g, 'e')
+      .replace(/[áàâä]/g, 'a')
+      .replace(/[íìîï]/g, 'i')
+      .replace(/[óòôö]/g, 'o')
+      .replace(/[úùûü]/g, 'u')
+      .replace(/ñ/g, 'n')
+      .replace(/ç/g, 'c')
+      .replace(/[±×÷]/g, m => ({ '±': '+/-', '×': 'x', '÷': '/' })[m])
+      .replace(/[–—]/g, '-')
+      .replace(/[’‘]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/→/g, '->')
+      .replace(/[^\x20-\x7E]/g, '');
+  }
+
+  wrap(text) {
+    const clean = this.clean(text);
     const lines = [];
-    let cur = '';
-    for (const w of String(text ?? '').split(/\s+/)) {
-        if (!w) continue;
-        if ((cur + ' ' + w).trim().length > width) {
-            if (cur) lines.push(cur.trim());
-            if (w.length > width) {
-                let rest = w;
-                while (rest.length > width) { lines.push(rest.slice(0, width)); rest = rest.slice(width); }
-                cur = rest;
-            } else {
-                cur = w;
-            }
-        } else {
-            cur = (cur + ' ' + w).trim();
-        }
+    let line = '';
+    for (const word of clean.split(' ')) {
+      if ((line + word).length > this.columns) {
+        if (line) lines.push(line);
+        line = word;
+      } else {
+        line += (line ? ' ' : '') + word;
+      }
     }
-    if (cur) lines.push(cur.trim());
+    if (line) lines.push(line);
     return lines;
-}
+  }
 
-function rupiah(n) {
-    return 'Rp ' + Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
+  // ============================================================
+  // Full receipt builder — mirrors PHP EscPosWriter::receipt()
+  // ============================================================
+  buildReceipt(data) {
+    const {
+      items = [],
+      total, bayar, kembali,
+      no_transaksi, metode_bayar, tanggal, kasir, cabang,
+      pelanggan, tier, tipe_konsumen, saldo_poin, poin_ditukar,
+      diskon_tier, diskon_partai, diskon_poin, diskon, diskon_persen, diskon_nominal,
+      pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
+      is_piutang, jatuh_tempo, sisa_piutang, komisi_mitra_nominal,
+      no_tiket, jenis_hp, kurir, is_pickup, resi, sumber,
+      garansi,
+      footer_text, kebijakan_retur, catatan_kaki,
+      nama_toko, slogan, alamat, telepon, website_medsos,
+      show_cabang, show_kasir, show_pelanggan, show_waktu,
+      show_qr_retur, qr_caption, qr_size, qr_url,
+      paper_width = 58,
+      font_size = 'small',
+    } = data;
 
-function pad(s, w) { s = String(s); return s.length >= w ? s : s + ' '.repeat(w - s.length); }
-function pair(l, r, w = 32) {
-    l = String(l ?? '');
-    r = String(r ?? '');
-    if (l.length + r.length + 1 > w) {
-        const maxL = w - r.length - 1;
-        if (maxL >= 4) {
-            l = l.slice(0, maxL);
-        } else {
-            return l.slice(0, w) + '\n' + r.padStart(w);
-        }
-    }
-    return l + ' '.repeat(Math.max(1, w - l.length - r.length)) + r;
-}
+    // Re-init with correct paper width
+    this.paperWidth = paper_width;
+    this.compressed = font_size === 'small';
+    this.columns = this.compressed
+      ? (paper_width === 80 ? 64 : 42)
+      : (paper_width === 80 ? 48 : 32);
+    this.init();
 
-/* ============================== Layout 58mm (lebar 32) ============================== */
+    // ======== HEADER ========
+    this.alignCenter();
+    this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'UTEPARTS').sizeDoubleWidth(false).bold(false);
+    if (slogan) this.text(slogan);
+    if (alamat) this.text(alamat);
+    if (telepon) this.text('Telp/WA: ' + telepon);
+    if (website_medsos) this.text(website_medsos);
+    if (show_cabang && cabang) this.text(cabang);
+    if (show_waktu && tanggal) this.text(tanggal);
+    this.rule();
 
-function layoutStruk58(data) {
-    const E = [];
-    const W = 32;
-    const namaToko = data.nama_toko || window.APP_NAME || 'BREMSPACE';
-    const slogan = data.slogan || 'Pusat Sparepart & Servis Gadget';
-    E.push({ t: 'line', s: namaToko, c: 1, b: 1, h: 1 });
-    if (slogan) E.push({ t: 'line', s: slogan, c: 1 });
-    if (data.alamat) E.push({ t: 'line', s: String(data.alamat), c: 1 });
-    if (data.telepon) E.push({ t: 'line', s: 'Telp/WA: ' + String(data.telepon), c: 1 });
-    if (data.website_medsos) E.push({ t: 'line', s: String(data.website_medsos), c: 1 });
-    if (data.show_cabang !== false && data.cabang) {
-        E.push({ t: 'line', s: String(data.cabang), c: 1 });
-    }
-    if (data.is_offline) {
-        E.push({ t: 'line', s: '*** STRUK OFFLINE (BUKTI SEMENTARA) ***', c: 1, b: 1 });
-    }
-    if (data.show_waktu !== false && data.waktu) {
-        E.push({ t: 'line', s: String(data.waktu), c: 1 });
-    }
-    E.push({ t: 'sep', w: W });
-    E.push({ t: 'line', s: pair('No. TRX:', data.no_transaksi ?? '-', W) });
-    if (data.sumber && !['pos', 'offline'].includes(String(data.sumber).toLowerCase())) {
-        E.push({ t: 'line', s: pair('Pesanan:', String(data.sumber).toUpperCase(), W) });
-    }
-    if (data.kurir) {
-        const kurirLbl = data.is_pickup ? 'Metode Ambil:' : 'Kurir:';
-        const resiTeks = data.resi && data.resi !== '-' ? ' (' + data.resi + ')' : '';
-        E.push({ t: 'line', s: pair(kurirLbl, data.kurir + resiTeks, W) });
-    }
-    if (data.no_tiket) {
-        E.push({ t: 'line', s: pair('No. Tiket:', data.no_tiket, W), b: 1 });
-    }
-    if (data.jenis_hp) {
-        E.push({ t: 'line', s: pair('Unit HP:', data.jenis_hp, W) });
-    }
-    if (data.show_kasir !== false) {
-        E.push({ t: 'line', s: pair('Kasir:', data.kasir ?? '-', W) });
-    }
-    if (data.show_pelanggan !== false) {
-        E.push({ t: 'line', s: pair('Pelanggan:', `${data.pelanggan ?? 'Umum'}`, W) });
-        if (data.tier && data.tier !== 'Retail' && data.tier !== 'Umum') {
-            const lbl = ['reseller', 'agen'].includes(data.tipe_konsumen) ? 'Tipe Mitra:' : 'Tier Member:';
-            E.push({ t: 'line', s: pair(lbl, data.tier, W), b: 1 });
-        }
-        if (data.saldo_poin && Number(data.saldo_poin) > 0) {
-            E.push({ t: 'line', s: pair('Saldo Poin:', `${Math.round(data.saldo_poin)} Poin`, W) });
-        }
-    }
-    E.push({ t: 'sep', w: W });
-    for (const it of (data.items ?? [])) {
-        for (const ln of wrap(it.nama ?? '', W - 2)) E.push({ t: 'line', s: ln, b: 1 });
-        const qtySatuan = `${it.qty ?? 0}${it.satuan ? ' ' + it.satuan : ''}`;
-        E.push({ t: 'line', s: pair(`  ${qtySatuan} x ${rupiah(it.harga)}`, rupiah(it.subtotal), W) });
-        // Paper-efficient: show strikethrough retail price with arrow on same line
-        if (Number(it.harga_retail) > Number(it.harga)) {
-            E.push({ t: 'line', s: `   Normal: ${rupiah(it.harga_retail)} → ${rupiah(it.harga)}`, c: 0 });
-        }
-    }
-    E.push({ t: 'sep', w: W });
+    // ======== 2-COL: QR (Left) + URL/Date/Warranty (Right) ========
+    const qrContent = no_transaksi || '-';
+    const qrUrl = qr_url || 'www.uteparts.id';
 
-    if (Number(data.subtotal_jasa) > 0 && Number(data.subtotal_part) > 0) {
-        E.push({ t: 'line', s: pair('Subtotal Jasa:', rupiah(data.subtotal_jasa), W) });
-        E.push({ t: 'line', s: pair('Subtotal Part:', rupiah(data.subtotal_part), W) });
-        E.push({ t: 'sep', w: W });
-    }
+    if (show_qr_retur && no_transaksi !== '-') {
+      this.alignCenter();
+      this.qrcode(qrContent, qr_size || 4);
+      this.bold(true).text(qrContent).bold(false);
+      this.text(qr_caption || 'Scan QR untuk Retur & Garansi');
 
-    const showBreakdown = data.show_subtotal_breakdown !== false;
-
-    if (showBreakdown && Number(data.diskon_tier) > 0) {
-        const tierLbl = data.tier && data.tier !== 'Retail' ? `Potongan ${data.tier}:` : 'Potongan Tier:';
-        E.push({ t: 'line', s: pair('Subtotal Retail:', rupiah(data.subtotal_retail ?? (Number(data.subtotal) + Number(data.diskon_tier))), W) });
-        E.push({ t: 'line', s: pair(tierLbl, '-' + rupiah(data.diskon_tier), W) });
-        E.push({ t: 'line', s: pair('Subtotal:', rupiah(data.subtotal), W) });
+      this.alignLeft();
+      this.text('Web: ' + qrUrl);
+      if (tanggal) this.text('Tgl: ' + tanggal);
+      if (garansi) this.text('Garansi: ' + garansi);
+      this.text('Barang fisik utk tukar tdk rusak');
     } else {
-        E.push({ t: 'line', s: pair('Subtotal:', rupiah(data.subtotal), W) });
+      this.alignLeft();
+      this.text('Web: ' + qrUrl);
+      if (tanggal) this.text('Tgl: ' + tanggal);
+      if (garansi) this.text('Garansi: ' + garansi);
+      this.text('Barang fisik utk tukar tdk rusak');
     }
 
-    if (Number(data.diskon_partai) > 0) {
-        E.push({ t: 'line', s: pair('Diskon Partai:', '-' + rupiah(data.diskon_partai), W) });
+    this.rule();
+
+    // ======== TRANSACTION INFO ========
+    this.alignLeft();
+    this.text(this.pad('TRX', no_transaksi));
+
+    if (sumber && !['pos', 'offline'].includes(s?.toLowerCase())) {
+      this.text(this.pad('Pesanan', sumber.toUpperCase()));
     }
 
-    if (Number(data.diskon_poin) > 0) {
-        E.push({ t: 'line', s: pair('Tukar Poin (' + (data.poin_ditukar ?? 0) + 'pts):', '-' + rupiah(data.diskon_poin), W) });
+    if (no_tiket) {
+      this.bold(true).text(this.pad('Tiket', no_tiket)).bold(false);
     }
 
-    if (Number(data.diskon) > 0) {
-        const lbl = Number(data.diskon_persen) > 0 ? `Diskon Kasir (${data.diskon_persen}%):` : 'Diskon Kasir:';
-        E.push({ t: 'line', s: pair(lbl, '-' + rupiah(data.diskon), W) });
-    }
-    if (data.pajak != null && Number(data.pajak) > 0) {
-        const ppnLbl = data.ppn_persen ? `PPN (${data.ppn_persen}%):` : 'PPN:';
-        E.push({ t: 'line', s: pair(ppnLbl, '+' + rupiah(data.pajak), W) });
-    }
-    if (Number(data.ongkir) > 0) {
-        E.push({ t: 'line', s: pair('Ongkos Kirim:', '+' + rupiah(data.ongkir), W) });
-    }
-    E.push({ t: 'sep', w: W });
-
-    E.push({ t: 'line', s: pair('TOTAL', rupiah(data.total), W), b: 1, h: 1 });
-    E.push({ t: 'line', s: pair('BAYAR (' + (data.metode ?? 'TUNAI') + ')', rupiah(data.bayar), W) });
-    E.push({ t: 'line', s: pair('KEMBALI', rupiah(data.kembali ?? 0), W) });
-
-    if (Number(data.hemat_total) > 0) {
-        E.push({ t: 'line', s: pair('TOTAL HEMAT:', rupiah(data.hemat_total), W), b: 1 });
-    }
-    if (Number(data.komisi_mitra_nominal) > 0) {
-        E.push({ t: 'line', s: pair('Komisi Mitra:', '+' + rupiah(data.komisi_mitra_nominal) + ' (Saldo)', W) });
-    }
-    if (data.saldo_poin != null) {
-        E.push({ t: 'line', s: pair('Sisa Poin:', String(data.saldo_poin) + ' pts', W) });
-    }
-    E.push({ t: 'sep', w: W });
-
-    if (data.garansi) {
-        E.push({ t: 'line', s: 'Garansi: ' + String(data.garansi), c: 1, b: 1 });
-        E.push({ t: 'sep', w: W });
+    if (jenis_hp) {
+      this.text(this.pad('Unit', jenis_hp));
     }
 
-    if (data.show_qr_retur !== false && data.no_transaksi) {
-        E.push({ t: 'qrcode', d: data.no_transaksi, size: data.qr_size ?? 4 });
-        E.push({ t: 'line', s: data.no_transaksi, c: 1, b: 1 });
-        E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Garansi', c: 1 });
-        E.push({ t: 'sep', w: W });
+    if (kurir) {
+      const kurirLbl = is_pickup ? 'Ambil' : 'Kurir';
+      const resiTeks = (resi && resi !== '-') ? ' (' + resi + ')' : '';
+      this.text(this.pad(kurirLbl, kurir + resiTeks));
     }
-    E.push({ t: 'line', s: data.footer_text || 'Terima Kasih atas Kunjungan Anda!', c: 1 });
-    if (data.kebijakan_retur) {
-        for (const ln of wrap(String(data.kebijakan_retur), W)) E.push({ t: 'line', s: ln, c: 1 });
-    }
-    if (data.catatan_kaki) {
-        for (const ln of wrap(String(data.catatan_kaki), W)) E.push({ t: 'line', s: ln, c: 1 });
-    }
-    E.push({ t: 'feed', n: 1 });
-    return E;
-}
 
-/* ============================== Layout 80mm faktur (lebar 42) ============================== */
+    if (show_kasir && kasir) {
+      this.text(this.pad('Kasir', kasir));
+    }
 
-function layoutFaktur80(data) {
-    const E = [];
-    const W = 42;
-    const namaToko = data.nama_toko || window.APP_NAME || 'BREMSPACE';
-    const slogan = data.slogan || 'Pusat Sparepart & Servis Gadget';
-    E.push({ t: 'line', s: namaToko, c: 1, b: 1, h: 2 });
-    if (slogan) E.push({ t: 'line', s: slogan, c: 1 });
-    if (data.alamat) E.push({ t: 'line', s: String(data.alamat), c: 1 });
-    if (data.telepon) E.push({ t: 'line', s: 'Telp/WA: ' + String(data.telepon), c: 1 });
-    if (data.website_medsos) E.push({ t: 'line', s: String(data.website_medsos), c: 1 });
-    if (data.show_cabang !== false && data.cabang) {
-        E.push({ t: 'line', s: String(data.cabang), c: 1 });
+    if (show_pelanggan) {
+      const pel = pelanggan || 'Umum';
+      this.text(this.pad('Pelanggan', pel));
+
+      if (tier && tier !== 'Retail' && tier !== 'Umum') {
+        const lbl = ['reseller', 'agen'].includes(tipe_konsumen) ? 'Mitra' : 'Tier';
+        this.bold(true).text(this.pad(lbl, tier)).bold(false);
+      }
+
+      if (saldo_poin && Number(saldo_poin) > 0) {
+        this.text(this.pad('Poin', Number(saldo_poin).toLocaleString('id-ID') + ' Poin'));
+      }
     }
-    if (data.is_offline) {
-        E.push({ t: 'line', s: '*** STRUK OFFLINE (BUKTI SEMENTARA) ***', c: 1, b: 1 });
-    }
-    if (data.show_waktu !== false && data.waktu) {
-        E.push({ t: 'line', s: `${data.waktu}`, c: 1 });
-    }
-    if (data.show_qr_retur !== false && data.no_transaksi) {
-        E.push({ t: 'qrcode', d: data.no_transaksi, size: data.qr_size ?? 5 });
-        E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Klaim Garansi', c: 1 });
-        E.push({ t: 'sep', w: W, c: '-' });
-    }
-    E.push({ t: 'sep', w: W, c: '=' });
-    E.push({ t: 'line', s: pair('No. Faktur:', data.no_transaksi ?? '-', W) });
-    if (data.sumber && !['pos', 'offline'].includes(String(data.sumber).toLowerCase())) {
-        E.push({ t: 'line', s: pair('Pesanan Online:', String(data.sumber).toUpperCase(), W) });
-    }
-    if (data.kurir) {
-        const kurirLbl = data.is_pickup ? 'Metode Ambil:' : 'Kurir / Resi:';
-        const resiTeks = data.resi && data.resi !== '-' ? ' (' + data.resi + ')' : '';
-        E.push({ t: 'line', s: pair(kurirLbl, data.kurir + resiTeks, W) });
-    }
-    if (data.no_tiket) {
-        E.push({ t: 'line', s: pair('No. Tiket:', data.no_tiket, W), b: 1 });
-    }
-    if (data.jenis_hp) {
-        E.push({ t: 'line', s: pair('Unit HP:', data.jenis_hp, W) });
-    }
-    if (data.show_kasir !== false) {
-        E.push({ t: 'line', s: pair('Kasir:', data.kasir ?? '-', W) });
-    }
-    if (data.show_pelanggan !== false) {
-        E.push({ t: 'line', s: pair('Pelanggan:', data.pelanggan ?? 'Umum', W) });
-        if (data.tier && data.tier !== 'Retail' && data.tier !== 'Umum') {
-            const lbl = ['reseller', 'agen'].includes(data.tipe_konsumen) ? 'Tipe Mitra:' : 'Tier Member:';
-            E.push({ t: 'line', s: pair(lbl, data.tier, W), b: 1 });
+
+    this.rule();
+
+    // ======== ITEMS ========
+    for (const item of items) {
+      const nama = item.nama || 'Item';
+      for (const line of this.wrap(nama)) {
+        this.bold(true).text(line).bold(false);
+      }
+
+      const qtySatuan = item.qty + (item.satuan ? ' ' + item.satuan : '');
+      const harga = this.money(item.harga);
+      const subtotal = this.money(item.subtotal);
+
+      this.text(this.pad(qtySatuan + ' x ' + harga, subtotal));
+
+      // Strikethrough retail price if discounted
+      const hargaRetail = Number(item.harga_retail ?? 0);
+      const hargaJual = Number(item.harga ?? 0);
+      if (hargaRetail > hargaJual) {
+        const normal = this.money(hargaRetail);
+        const disc = this.money(hargaJual);
+        // Use ESC B strikethrough (preview renders via CSS line-through)
+        this.textStrikethrough('Normal: ' + normal + ' -> ' + disc);
+      }
+
+      if (item.catatan) {
+        for (const ln of this.wrap('  * ' + item.catatan)) {
+          this.text(ln);
         }
-        if (data.saldo_poin && Number(data.saldo_poin) > 0) {
-            E.push({ t: 'line', s: pair('Saldo Poin:', `${Math.round(data.saldo_poin)} Poin`, W) });
-        }
-    }
-    E.push({ t: 'sep', w: W });
-    for (const it of (data.items ?? [])) {
-        for (const ln of wrap(it.nama ?? '', W - 2)) E.push({ t: 'line', s: ln, b: 1 });
-        const qtySatuan = `${it.qty ?? 0}${it.satuan ? ' ' + it.satuan : ''}`;
-        E.push({ t: 'line', s: pair(`  ${qtySatuan} x ${rupiah(it.harga)}`, rupiah(it.subtotal), W) });
-        // Paper-efficient: show strikethrough retail price with arrow on same line
-        if (Number(it.harga_retail) > Number(it.harga)) {
-            E.push({ t: 'line', s: `   Normal: ${rupiah(it.harga_retail)} → ${rupiah(it.harga)}`, c: 0 });
-        }
-    }
-    E.push({ t: 'sep', w: W });
-
-    if (Number(data.subtotal_jasa) > 0 && Number(data.subtotal_part) > 0) {
-        E.push({ t: 'line', s: pair('Subtotal Jasa:', rupiah(data.subtotal_jasa), W) });
-        E.push({ t: 'line', s: pair('Subtotal Part:', rupiah(data.subtotal_part), W) });
-        E.push({ t: 'sep', w: W, c: '-' });
+      }
     }
 
-    const showBreakdown80 = data.show_subtotal_breakdown !== false;
+    this.rule();
 
-    if (showBreakdown80 && Number(data.diskon_tier) > 0) {
-        const tierLbl = data.tier && data.tier !== 'Retail' ? `Potongan ${data.tier}:` : 'Potongan Tier:';
-        E.push({ t: 'line', s: pair('Subtotal Retail:', rupiah(data.subtotal_retail ?? (Number(data.subtotal) + Number(data.diskon_tier))), W) });
-        E.push({ t: 'line', s: pair(tierLbl, '-' + rupiah(data.diskon_tier), W) });
-        E.push({ t: 'line', s: pair('Subtotal:', rupiah(data.subtotal), W) });
+    // ======== SUBTOTAL BREAKDOWN ========
+    const showBreakdown = true; // always show for paper-saving layout
+    if (showBreakdown && diskon_tier && Number(diskon_tier) > 0) {
+      const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
+      this.text(this.pad('Subtotal Retail', this.money(subRetail)));
+
+      const tierLbl = (tier && tier !== 'Retail')
+        ? 'Pot ' + tier
+        : (['reseller', 'agen'].includes(tipe_konsumen) ? 'Pot Mitra' : 'Pot Tier');
+      this.text(this.pad(tierLbl, '-' + this.money(diskon_tier)));
+      this.text(this.pad('Subtotal', this.money(subtotal ?? total)));
     } else {
-        E.push({ t: 'line', s: pair('Subtotal:', rupiah(data.subtotal), W) });
+      this.text(this.pad('Subtotal', this.money(subtotal ?? total)));
     }
 
-    if (Number(data.diskon_partai) > 0) {
-        E.push({ t: 'line', s: pair('Diskon Partai:', '-' + rupiah(data.diskon_partai), W) });
+    if (diskon_partai && Number(diskon_partai) > 0) {
+      this.text(this.pad('Diskon Partai', '-' + this.money(diskon_partai)));
+    }
+    if (diskon_poin && Number(diskon_poin) > 0) {
+      this.text(this.pad('Tukar Poin (' + (poin_ditukar || 0) + 'pts)', '-' + this.money(diskon_poin)));
+    }
+    if (diskon && Number(diskon) > 0) {
+      const lbl = (diskon_persen && Number(diskon_persen) > 0)
+        ? 'Diskon (' + diskon_persen + '%)'
+        : 'Diskon Kasir';
+      this.text(this.pad(lbl, '-' + this.money(diskon)));
+    }
+    if (pajak && Number(pajak) > 0) {
+      const ppnLbl = ppn_persen ? 'PPN (' + ppn_persen + '%)' : 'PPN';
+      this.text(this.pad(ppnLbl, '+' + this.money(pajak)));
+    }
+    if (ongkir && Number(ongkir) > 0) {
+      this.text(this.pad('Ongkir', '+' + this.money(ongkir)));
     }
 
-    if (Number(data.diskon_poin) > 0) {
-        E.push({ t: 'line', s: pair('Tukar Poin (' + (data.poin_ditukar ?? 0) + ' PTS)', '-' + rupiah(data.diskon_poin), W) });
-    }
+    this.rule();
 
-    if (Number(data.diskon) > 0) {
-        const lbl = Number(data.diskon_persen) > 0 ? `Diskon Kasir (${data.diskon_persen}%):` : 'Diskon Kasir:';
-        E.push({ t: 'line', s: pair(lbl, '-' + rupiah(data.diskon), W) });
-    }
-    if (data.pajak != null && Number(data.pajak) > 0) {
-        const ppnLbl = data.ppn_persen ? `PPN (${data.ppn_persen}%):` : 'PPN:';
-        E.push({ t: 'line', s: pair(ppnLbl, '+' + rupiah(data.pajak), W) });
-    }
-    if (Number(data.ongkir) > 0) {
-        E.push({ t: 'line', s: pair('Ongkos Kirim:', '+' + rupiah(data.ongkir), W) });
-    }
-    E.push({ t: 'line', s: pair('TOTAL', rupiah(data.total), W), b: 1, h: 1 });
-    E.push({ t: 'line', s: pair('BAYAR (' + (data.metode ?? 'TUNAI') + ')', rupiah(data.bayar), W) });
-    E.push({ t: 'line', s: pair('KEMBALI', rupiah(data.kembali ?? 0), W) });
-    if (Number(data.hemat_total) > 0) {
-        E.push({ t: 'line', s: pair('TOTAL HEMAT:', rupiah(data.hemat_total), W), b: 1 });
-    }
-    if (Number(data.komisi_mitra_nominal) > 0) {
-        E.push({ t: 'line', s: pair('Komisi Mitra:', '+' + rupiah(data.komisi_mitra_nominal) + ' (Saldo)', W) });
-    }
-    if (data.saldo_poin != null) {
-        E.push({ t: 'line', s: pair('Sisa Poin:', String(data.saldo_poin) + ' PTS', W) });
-    }
-    E.push({ t: 'sep', w: W });
+    // ======== TOTAL & PAYMENT ========
+    this.bold(true).sizeDoubleHeight(true).text(this.pad('TOTAL', this.money(total))).sizeDoubleHeight(false).bold(false);
 
-    if (data.garansi) {
-        E.push({ t: 'line', s: 'Garansi: ' + String(data.garansi), c: 1, b: 1 });
-        E.push({ t: 'sep', w: W });
-    }
-
-    if (data.show_qr_retur !== false && data.no_transaksi) {
-        E.push({ t: 'qrcode', d: data.no_transaksi, size: data.qr_size ?? 5 });
-        E.push({ t: 'line', s: data.no_transaksi, c: 1, b: 1 });
-        E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Garansi', c: 1 });
-        E.push({ t: 'sep', w: W });
-    }
-    E.push({ t: 'line', s: data.footer_text || 'Terima Kasih atas Kunjungan Anda!', c: 1 });
-    if (data.kebijakan_retur) {
-        for (const ln of wrap(String(data.kebijakan_retur), W)) E.push({ t: 'line', s: ln, c: 1 });
-    }
-    if (data.catatan_kaki) {
-        for (const ln of wrap(String(data.catatan_kaki), W)) E.push({ t: 'line', s: ln, c: 1 });
-    }
-    E.push({ t: 'feed', n: 1 });
-    return E;
-}
-
-/* ============================== Renderer: ESC/POS (Bluetooth) ============================== */
-
-function entriesToBytes(entries, width = 32) {
-    const p = new EscPos();
-    for (const e of entries) {
-        if (e.t === 'feed') { for (let i = 0; i < e.n; i++) p.raw(0x0a); continue; }
-        if (e.t === 'sep') {
-            p.align(e.c ?? 0).text(e.s || String(e.c === '-' ? '-'.repeat(width) : '='.repeat(width)));
-            continue;
-        }
-        if (e.t === 'barcode') {
-            p.align(1).size(0).barcode128(e.d).feed(2);
-            continue;
-        }
-        if (e.t === 'qrcode') {
-            p.align(1).size(0).qrcode(e.d, e.size || (width >= 40 ? 5 : 4)).feed(1);
-            continue;
-        }
-        // line
-        p.align(e.c ?? 0).size(e.h ? (e.h === 1 ? 0x10 : 0x90) : 0).bold(!!e.b);
-        let s = e.s;
-        if (e.c === 2) s = s.padStart(width);
-        p.line(s);
-    }
-    p.cut();
-    return p.toBytes();
-}
-
-/* ============================== Renderer: HTML (Web Print A4 / PDF) ============================== */
-
-function entriesToHtml(entries) {
-    const parts = [];
-    for (const e of entries) {
-        if (e.t === 'feed') { for (let i = 0; i < e.n; i++) parts.push('<div class="feed"></div>'); continue; }
-        if (e.t === 'sep') { 
-            const sepClass = e.s ? '' : (e.c === '-' ? 'border-t border-dashed border-gray-300' : 'border-t border-gray-400');
-            parts.push(`<div class="receipt-sep ${sepClass}">${e.s || ''}</div>`); 
-            continue; 
-        }
-        if (e.t === 'barcode') {
-            parts.push('<div class="receipt-center text-center"><div class="barcode-placeholder">[BARCODE ' + e.d + ']</div></div>');
-            continue;
-        }
-        if (e.t === 'qrcode') {
-            parts.push('<div class="receipt-center text-center"><div class="qrcode-placeholder">[QR CODE ' + e.d + ']</div></div>');
-            continue;
-        }
-        const cls = [];
-        if (e.c === 1) cls.push('receipt-center text-center');
-        if (e.c === 2) cls.push('receipt-right text-right');
-        if (e.b) cls.push('font-bold');
-        if (e.h === 1) cls.push('text-sm');
-        if (e.h === 2) cls.push('text-base');
-        parts.push(`<div class="${cls.join(' ')}">${escapeHtml(e.s)}</div>`);
-    }
-    return parts.join('');
-}
-
-function escapeHtml(s) {
-    return String(s).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
-}
-
-/* ============================== Web Bluetooth (BLE GATT) ============================== */
-
-// Daftar UUID Service BLE Thermal Printer populer (58mm & 80mm)
-const THERMAL_SERVICES = [
-    '0000ffe0-0000-1000-8000-00805f9b34fb', // Standard HM-10 / CC2540 / POS-58
-    '000018f0-0000-1000-8000-00805f9b34fb', // MPT-II / Rego
-    '0000fff0-0000-1000-8000-00805f9b34fb', // Goojprt / Panda / EP-58
-    '0000ff00-0000-1000-8000-00805f9b34fb', // Xprinter / PT-210
-    '0000fee7-0000-1000-8000-00805f9b34fb', // Tencent / micro-printer
-    '0000ae00-0000-1000-8000-00805f9b34fb',
-    '0000ae30-0000-1000-8000-00805f9b34fb',
-    '0000af30-0000-1000-8000-00805f9b34fb',
-    '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC transparent UART
-    '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART Service (NUS)
-    'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Nordic UART legacy
-];
-
-// Persistent state di memory browser agar bisa print otomatis tanpa popup berulang
-let cachedBleDevice = null;
-let cachedCharacteristic = null;
-
-function notify(message, type = 'info') {
-    if (typeof window.showToast === 'function') {
-        window.showToast(message, type);
+    if (is_piutang) {
+      this.text('Status: BELUM LUNAS (PIUTANG)');
+      if (jatuh_tempo) this.text('Jatuh Tempo: ' + jatuh_tempo);
+      this.text('Sisa Tag: ' + this.money(sisa_piutang ?? total));
     } else {
-        console.log(`[POS Print ${type}]:`, message);
+      this.text('Bayar: ' + this.money(bayar));
+      this.text('Kembali: ' + this.money(kembali ?? 0));
+      this.text('Metode: ' + metode_bayar);
     }
+
+    if (hemat_total && Number(hemat_total) > 0) {
+      this.bold(true).text(this.pad('HEMAT', this.money(hemat_total))).bold(false);
+    }
+
+    if (komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0) {
+      this.text('Komisi: +' + this.money(komisi_mitra_nominal) + ' (Saldo)');
+    }
+
+    if (saldo_poin !== undefined) {
+      this.text('Sisa Poin: ' + Number(saldo_poin).toLocaleString('id-ID') + ' pts');
+    }
+
+    this.rule().feed(1);
+
+    // ======== FOOTER ========
+    this.alignCenter();
+    this.text(footer_text || 'Terima Kasih atas Kunjungan Anda!');
+
+    if (kebijakan_retur) {
+      for (const ln of this.wrap(kebijakan_retur)) {
+        this.text(ln);
+      }
+    }
+    if (catatan_kaki) {
+      for (const ln of this.wrap(catatan_kaki)) {
+        this.text(ln);
+      }
+    }
+
+    if (is_piutang) {
+      this.feed(1);
+      this.text('"Barang diterima & berjanji melunasi sblm jatuh tempo"');
+      this.feed(1);
+      this.text('Penerima,              Kasir,');
+      this.feed(2);
+      this.text('(............)        (............)');
+    }
+
+    this.feed(1).cut();
+
+    return new Uint8Array(this.buf);
+  }
+
+  /** Render HTML preview that visually matches the ESC/POS output 1:1 */
+  renderPreviewHtml(data) {
+    const bytes = this.buildReceipt(data);
+    // We'll build HTML directly mirroring the layout logic above
+    // This is more reliable than trying to render bytes visually
+    return this.buildPreviewHtml(data);
+  }
+
+  /** Build HTML preview matching the exact paper layout */
+  buildPreviewHtml(data) {
+    const {
+      items = [],
+      total, bayar, kembali,
+      no_transaksi, metode_bayar, tanggal, kasir, cabang,
+      pelanggan, tier, tipe_konsumen, saldo_poin, poin_ditukar,
+      diskon_tier, diskon_partai, diskon_poin, diskon, diskon_persen, diskon_nominal,
+      pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
+      is_piutang, jatuh_tempo, sisa_piutang, komisi_mitra_nominal,
+      no_tiket, jenis_hp, kurir, is_pickup, resi, sumber,
+      garansi,
+      footer_text, kebijakan_retur, catatan_kaki,
+      nama_toko, slogan, alamat, telepon, website_medsos,
+      show_cabang, show_kasir, show_pelanggan, show_waktu,
+      show_qr_retur, qr_caption, qr_url,
+      paper_width = 58,
+    } = data;
+
+    const money = (v) => 'Rp ' + Number(v).toLocaleString('id-ID');
+    const esc = (str) => str.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
+
+    const paperClass = paper_width === 80 ? 'paper-80' : 'paper-58';
+    const qrContent = no_transaksi || '-';
+    const qrUrl = qr_url || 'www.uteparts.id';
+
+    let html = `
+<div class="thermal-preview ${paperClass}" style="--paper-width: ${paper_width}mm;">
+  <div class="receipt">
+`;
+
+    // Header
+    html += `
+    <div class="section header centered">
+      <div class="shop-name">${esc(nama_toko || 'UTEPARTS')}</div>
+      ${slogan ? `<div class="slogan">${esc(slogan)}</div>` : ''}
+      ${alamat ? `<div class="addr">${esc(alamat)}</div>` : ''}
+      ${telepon ? `<div class="phone">Telp/WA: ${esc(telepon)}</div>` : ''}
+      ${website_medsos ? `<div class="web">${esc(website_medsos)}</div>` : ''}
+      ${show_cabang && cabang ? `<div class="cabang">${esc(cabang)}</div>` : ''}
+      ${show_waktu && tanggal ? `<div class="time">${esc(tanggal)}</div>` : ''}
+      <hr class="rule">
+    </div>
+`;
+
+    // QR + Right column
+    html += `
+    <div class="section qr-section">
+      ${show_qr_retur && no_transaksi !== '-' ? `
+      <div class="qr-col">
+        <div class="qr-code" data-qr="${esc(qrContent)}"></div>
+        <div class="qr-label bold">${esc(qrContent)}</div>
+        <div class="qr-caption">${esc(qr_caption || 'Scan QR untuk Retur & Garansi')}</div>
+      </div>
+      ` : ''}
+      <div class="info-col">
+        <div>Web: ${esc(qrUrl)}</div>
+        ${tanggal ? `<div>Tgl: ${esc(tanggal)}</div>` : ''}
+        ${garansi ? `<div>Garansi: ${esc(garansi)}</div>` : ''}
+        <div>Barang fisik utk tukar tdk rusak</div>
+      </div>
+      <hr class="rule">
+    </div>
+`;
+
+    // Transaction info
+    html += `
+    <div class="section info-section">
+      <div class="row"><span class="label">TRX</span><span class="value">${esc(no_transaksi)}</span></div>
+      ${sumber && !['pos', 'offline'].includes(sumber.toLowerCase()) ? `<div class="row"><span class="label">Pesanan</span><span class="value">${esc(sumber.toUpperCase())}</span></div>` : ''}
+      ${no_tiket ? `<div class="row"><span class="label">Tiket</span><span class="value bold">${esc(no_tiket)}</span></div>` : ''}
+      ${jenis_hp ? `<div class="row"><span class="label">Unit</span><span class="value">${esc(jenis_hp)}</span></div>` : ''}
+      ${kurir ? `<div class="row"><span class="label">${is_pickup ? 'Ambil' : 'Kurir'}</span><span class="value">${esc(kurir + (resi && resi !== '-' ? ' (' + resi + ')' : ''))}</span></div>` : ''}
+      ${show_kasir && kasir ? `<div class="row"><span class="label">Kasir</span><span class="value">${esc(kasir)}</span></div>` : ''}
+      ${show_pelanggan ? `
+        <div class="row"><span class="label">Pelanggan</span><span class="value">${esc(pelanggan || 'Umum')}</span></div>
+        ${tier && tier !== 'Retail' && tier !== 'Umum' ? `<div class="row"><span class="label">${['reseller', 'agen'].includes(tipe_konsumen) ? 'Mitra' : 'Tier'}</span><span class="value bold">${esc(tier)}</span></div>` : ''}
+        ${saldo_poin && Number(saldo_poin) > 0 ? `<div class="row"><span class="label">Poin</span><span class="value">${Number(saldo_poin).toLocaleString('id-ID')} Poin</span></div>` : ''}
+      ` : ''}
+      <hr class="rule">
+    </div>
+`;
+
+    // Items
+    html += `
+    <div class="section items-section">
+`;
+    for (const item of items) {
+      const nama = item.nama || 'Item';
+      const qtySatuan = item.qty + (item.satuan ? ' ' + item.satuan : '');
+      const harga = money(item.harga);
+      const subtotalItem = money(item.subtotal);
+      const hargaRetail = Number(item.harga_retail ?? 0);
+      const hargaJual = Number(item.harga ?? 0);
+
+      html += `
+      <div class="item">
+        <div class="item-name bold">${esc(nama)}</div>
+        <div class="row"><span class="label">${esc(qtySatuan + ' x ' + harga)}</span><span class="value">${esc(subtotalItem)}</span></div>
+`;
+      if (hargaRetail > hargaJual) {
+        html += `<div class="row strikethrough"><span class="label">Normal: ${money(hargaRetail)}</span><span class="value arrow">${esc('→')}</span><span class="value">${money(hargaJual)}</span></div>`;
+      }
+      if (item.catatan) {
+        html += `<div class="item-note">* ${esc(item.catatan)}</div>`;
+      }
+      html += `</div>`;
+    }
+    html += `      <hr class="rule">
+    </div>
+`;
+
+    // Subtotal breakdown
+    html += `
+    <div class="section totals-section">
+`;
+    if (diskon_tier && Number(diskon_tier) > 0) {
+      const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
+      html += `<div class="row"><span class="label">Subtotal Retail</span><span class="value">${money(subRetail)}</span></div>`;
+      const tierLbl = (tier && tier !== 'Retail')
+        ? 'Pot ' + tier
+        : (['reseller', 'agen'].includes(tipe_konsumen) ? 'Pot Mitra' : 'Pot Tier');
+      html += `<div class="row"><span class="label">${tierLbl}</span><span class="value neg">-${money(diskon_tier)}</span></div>`;
+      html += `<div class="row"><span class="label">Subtotal</span><span class="value">${money(subtotal ?? total)}</span></div>`;
+    } else {
+      html += `<div class="row"><span class="label">Subtotal</span><span class="value">${money(subtotal ?? total)}</span></div>`;
+    }
+    if (diskon_partai && Number(diskon_partai) > 0) {
+      html += `<div class="row"><span class="label">Diskon Partai</span><span class="value neg">-${money(diskon_partai)}</span></div>`;
+    }
+    if (diskon_poin && Number(diskon_poin) > 0) {
+      html += `<div class="row"><span class="label">Tukar Poin (${poin_ditukar || 0}pts)</span><span class="value neg">-${money(diskon_poin)}</span></div>`;
+    }
+    if (diskon && Number(diskon) > 0) {
+      const lbl = (diskon_persen && Number(diskon_persen) > 0)
+        ? 'Diskon (' + diskon_persen + '%)'
+        : 'Diskon Kasir';
+      html += `<div class="row"><span class="label">${esc(lbl)}</span><span class="value neg">-${money(diskon)}</span></div>`;
+    }
+    if (pajak && Number(pajak) > 0) {
+      const ppnLbl = ppn_persen ? 'PPN (' + ppn_persen + '%)' : 'PPN';
+      html += `<div class="row"><span class="label">${esc(ppnLbl)}</span><span class="value pos">+${money(pajak)}</span></div>`;
+    }
+    if (ongkir && Number(ongkir) > 0) {
+      html += `<div class="row"><span class="label">Ongkir</span><span class="value pos">+${money(ongkir)}</span></div>`;
+    }
+    html += `      <hr class="rule">
+    </div>
+`;
+
+    // Total & Payment
+    html += `
+    <div class="section payment-section">
+      <div class="row total-row bold"><span class="label">TOTAL</span><span class="value">${money(total)}</span></div>
+`;
+    if (is_piutang) {
+      html += `
+      <div class="row"><span class="label">Status</span><span class="value piutang">BELUM LUNAS (PIUTANG)</span></div>
+      ${jatuh_tempo ? `<div class="row"><span class="label">Jatuh Tempo</span><span class="value">${esc(jatuh_tempo)}</span></div>` : ''}
+      <div class="row"><span class="label">Sisa Tag</span><span class="value">${money(sisa_piutang ?? total)}</span></div>
+`;
+    } else {
+      html += `
+      <div class="row"><span class="label">Bayar</span><span class="value">${money(bayar)}</span></div>
+      <div class="row"><span class="label">Kembali</span><span class="value">${money(kembali ?? 0)}</span></div>
+      <div class="row"><span class="label">Metode</span><span class="value">${esc(metode_bayar)}</span></div>
+`;
+    }
+    if (hemat_total && Number(hemat_total) > 0) {
+      html += `<div class="row bold"><span class="label">HEMAT</span><span class="value">${money(hemat_total)}</span></div>`;
+    }
+    if (komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0) {
+      html += `<div class="row"><span class="label">Komisi</span><span class="value pos">+${money(komisi_mitra_nominal)} (Saldo)</span></div>`;
+    }
+    if (saldo_poin !== undefined) {
+      html += `<div class="row"><span class="label">Sisa Poin</span><span class="value">${Number(saldo_poin).toLocaleString('id-ID')} pts</span></div>`;
+    }
+    html += `      <hr class="rule">
+    </div>
+`;
+
+    // Footer
+    html += `
+    <div class="section footer centered">
+      <div>${esc(footer_text || 'Terima Kasih atas Kunjungan Anda!')}</div>
+      ${kebijakan_retur ? `<div class="policy">${esc(kebijakan_retur)}</div>` : ''}
+      ${catatan_kaki ? `<div class="note">${esc(catatan_kaki)}</div>` : ''}
+      ${is_piutang ? `
+        <div class="piutang-signature">
+          <p>"Barang diterima & berjanji melunasi sblm jatuh tempo"</p>
+          <div class="sig-row">
+            <div class="sig-col">Penerima,</div>
+            <div class="sig-col">Kasir,</div>
+          </div>
+          <div class="sig-row">
+            <div class="sig-col">(............)</div>
+            <div class="sig-col">(............)</div>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  </div>
+</div>
+`;
+    return html;
+  }
 }
 
-function resolveReceiptData(passedData) {
-    if (passedData && passedData.no_transaksi) return passedData;
-    const el = document.getElementById('pos-receipt-data');
-    if (el && el.textContent) {
-        try {
-            const d = JSON.parse(el.textContent);
-            if (d && d.no_transaksi) return d;
-        } catch (e) {
-            console.error('Failed to parse #pos-receipt-data:', e);
-        }
-    }
-    return null;
-}
+/** Thermal printer manager — Web Bluetooth with auto-reconnect */
+class ThermalPrinter {
+  constructor() {
+    this.device = null;
+    this.characteristic = null;
+    this.reconnectTimer = null;
+    this.isConnecting = false;
+    this.onStatusChange = null;
+    this.onError = null;
 
-// Cari characteristic untuk menulis byte ESC/POS
-async function findWriteCharacteristic(server) {
-    let char = null;
-    let services = [];
+    // Auto-reconnect on page load if previously paired
+    this.loadSavedDevice();
+  }
+
+  /** Load previously paired device from localStorage */
+  async loadSavedDevice() {
+    try {
+      const saved = localStorage.getItem('thermal_printer_device');
+      if (saved) {
+        const { name, id } = JSON.parse(saved);
+        // Request device with filter to re-use pairing
+        this.device = await navigator.bluetooth.requestDevice({
+          filters: [{ name }],
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Common thermal service
+        });
+        this.device.addEventListener('gattserverdisconnected', () => this.scheduleReconnect());
+        this.setStatus('ready');
+      }
+    } catch (e) {
+      // No saved device or user cancelled
+      this.setStatus('unpaired');
+    }
+  }
+
+  /** Connect to printer — saves pairing for auto-reconnect */
+  async connect() {
+    if (this.isConnecting) return;
+    if (this.device?.gatt?.connected) return this.setStatus('connected');
+
+    this.isConnecting = true;
+    this.setStatus('connecting');
 
     try {
-        services = await server.getPrimaryServices();
-    } catch (err) {
-        console.warn('[BLE] getPrimaryServices failed, checking specific UUIDs:', err);
-    }
+      if (!this.device) {
+        this.device = await navigator.bluetooth.requestDevice({
+          filters: [
+            { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
+            { namePrefix: 'POS' },
+            { namePrefix: 'Thermal' },
+            { namePrefix: 'Printer' }
+          ],
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+        });
+        this.device.addEventListener('gattserverdisconnected', () => this.scheduleReconnect());
+      }
 
-    for (const svc of services) {
-        try {
-            const cs = await svc.getCharacteristics();
-            char = cs.find((c) => c.properties.write || c.properties.writeWithoutResponse);
-            if (char) return char;
-        } catch (e) { /* ignore */ }
-    }
+      const server = await this.device.gatt.connect();
+      const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+      this.characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
 
-    // Jika getPrimaryServices kosong, loop spesifik service UUID
-    for (const uuid of THERMAL_SERVICES) {
-        try {
-            const svc = await server.getPrimaryService(uuid);
-            const cs = await svc.getCharacteristics();
-            char = cs.find((c) => c.properties.write || c.properties.writeWithoutResponse);
-            if (char) return char;
-        } catch (err) { /* service tidak ada di printer ini */ }
-    }
+      // Save for auto-reconnect
+      localStorage.setItem('thermal_printer_device', JSON.stringify({
+        name: this.device.name,
+        id: this.device.id
+      }));
 
-    return null;
-}
-
-// Kirim data byte ke printer Bluetooth BLE dengan chunking
-async function writeBytesToCharacteristic(char, bytes) {
-    const CHUNK_SIZE = 64; // Batas aman BLE MTU
-    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-        const chunk = bytes.slice(i, i + CHUNK_SIZE);
-        if (char.properties.write) {
-            await char.writeValue(chunk);
-        } else if (char.properties.writeWithoutResponse) {
-            await char.writeValueWithoutResponse(chunk);
-        }
-        await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-}
-
-// Koneksi BLE Printer (Otomatis pakai cached jika ada, atau minta pairing)
-async function connectBlePrinter(forceNewPairing = false) {
-    if (!('bluetooth' in navigator)) {
-        const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        if (!isSecure) {
-            throw new Error('SECURE_CONTEXT_REQUIRED');
-        }
-        throw new Error('BLUETOOTH_UNSUPPORTED');
-    }
-
-    // Jika sudah ada device tersimpan dan masih tersambung
-    if (!forceNewPairing && cachedBleDevice && cachedCharacteristic && cachedBleDevice.gatt && cachedBleDevice.gatt.connected) {
-        return { device: cachedBleDevice, char: cachedCharacteristic, reused: true };
-    }
-
-    // Coba reconnect ke device yang pernah dipilih jika gatt terputus
-    if (!forceNewPairing && cachedBleDevice && cachedBleDevice.gatt) {
-        try {
-            notify(`Menghubungkan ulang ke ${cachedBleDevice.name || 'Printer Bluetooth'}...`, 'info');
-            const server = await cachedBleDevice.gatt.connect();
-            const char = await findWriteCharacteristic(server);
-            if (char) {
-                cachedCharacteristic = char;
-                return { device: cachedBleDevice, char, reused: true };
-            }
-        } catch (err) {
-            console.warn('[BLE] Reconnect failed, checking permitted devices:', err);
-            cachedBleDevice = null;
-            cachedCharacteristic = null;
-        }
-    }
-
-    // Auto-reconnect Chromium getDevices() jika sudah pernah dipairing sebelumnya tanpa popup
-    if (!forceNewPairing && 'getDevices' in navigator.bluetooth) {
-        try {
-            const devices = await navigator.bluetooth.getDevices();
-            const savedName = localStorage.getItem('ute_ble_printer_name');
-            let matchedDevice = null;
-
-            if (savedName && devices.length > 0) {
-                matchedDevice = devices.find(d => d.name === savedName) || devices[0];
-            } else if (devices.length > 0) {
-                matchedDevice = devices[0];
-            }
-
-            if (matchedDevice) {
-                notify(`Menyambungkan otomatis ke ${matchedDevice.name || 'Printer Bluetooth'}...`, 'info');
-                matchedDevice.addEventListener('gattserverdisconnected', () => {
-                    console.log('[BLE] Printer disconnected:', matchedDevice.name);
-                    cachedCharacteristic = null;
-                });
-                const server = await matchedDevice.gatt.connect();
-                const char = await findWriteCharacteristic(server);
-                if (char) {
-                    cachedBleDevice = matchedDevice;
-                    cachedCharacteristic = char;
-                    localStorage.setItem('ute_ble_printer_name', matchedDevice.name || 'Printer BLE');
-                    return { device: matchedDevice, char, reused: true };
-                }
-            }
-        } catch (err) {
-            console.warn('[BLE] getDevices auto-connect failed:', err);
-        }
-    }
-
-    // Minta user memilih printer BLE via popup native browser
-    notify('Pilih printer Bluetooth Anda pada popup browser...', 'info');
-    const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: THERMAL_SERVICES,
-    });
-
-    device.addEventListener('gattserverdisconnected', () => {
-        console.log('[BLE] Printer disconnected:', device.name);
-        cachedCharacteristic = null;
-    });
-
-    const server = await device.gatt.connect();
-    const char = await findWriteCharacteristic(server);
-
-    if (!char) {
-        throw new Error('Karakteristik cetak tidak ditemukan pada printer Bluetooth ini. Pastikan printer mendukung BLE ESC/POS.');
-    }
-
-    cachedBleDevice = device;
-    cachedCharacteristic = char;
-    localStorage.setItem('ute_ble_printer_name', device.name || 'Printer BLE');
-
-    return { device, char, reused: false };
-}
-
-// Cetak data ke Bluetooth BLE
-async function printViaBluetooth(bytes, forceNewPairing = false) {
-    const { device, char, reused } = await connectBlePrinter(forceNewPairing);
-    await writeBytesToCharacteristic(char, bytes);
-    return device;
-}
-
-// Putus / Reset printer tersimpan
-function resetBlePrinter() {
-    if (cachedBleDevice && cachedBleDevice.gatt && cachedBleDevice.gatt.connected) {
-        try { cachedBleDevice.gatt.disconnect(); } catch (e) { /* ignore */ }
-    }
-    cachedBleDevice = null;
-    cachedCharacteristic = null;
-    localStorage.removeItem('ute_ble_printer_name');
-    notify('Printer Bluetooth berhasil diputus / di-reset.', 'info');
-}
-
-/* ============================== Universal Print Entrypoint ============================== */
-
-let isPrintingLock = false;
-
-async function printThermalReceipt(kind = '58', customData = null, forceNewPairing = false) {
-    if (isPrintingLock) return;
-    isPrintingLock = true;
-
-    try {
-        const data = resolveReceiptData(customData);
-        if (!data) {
-            notify('Data struk tidak ditemukan.', 'warning');
-            return;
-        }
-
-        const bytes = kind === '80' ? buildFaktur80(data) : buildStruk58(data);
-
-        try {
-            const device = await printViaBluetooth(bytes, forceNewPairing);
-            notify(`Struk berhasil dicetak ke ${device.name || 'Printer Bluetooth'}!`, 'success');
-        } catch (e) {
-            console.error('[POS BLE Print Error]:', e);
-
-            if (e && (e.name === 'NotFoundError' || e.name === 'AbortError')) {
-                notify('Pemilihan printer Bluetooth dibatalkan.', 'warning');
-                return;
-            }
-
-            if (e.message === 'SECURE_CONTEXT_REQUIRED') {
-                const modalHtml = `
-                    <div id="ble-https-warning" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-                        <div class="glass-panel p-6 rounded-2xl max-w-md w-full border border-up-amber/40 shadow-2xl">
-                            <h4 class="text-base font-bold text-up-amber flex items-center gap-2 mb-3">
-                                <span>⚠️</span> Web Bluetooth Butuh HTTPS
-                            </h4>
-                            <p class="text-xs text-ink-200 leading-relaxed mb-4">
-                                Browser (Chrome/Edge) <strong>memblokir koneksi Bluetooth langsung</strong> jika aplikasi diakses lewat protokol HTTP biasa (<code class="text-up-amber bg-black/40 px-1 py-0.5 rounded">${window.location.origin}</code>).
-                            </p>
-                            <div class="bg-black/30 p-3 rounded-xl border border-white/10 text-xs text-ink-300 space-y-2 mb-4">
-                                <p class="font-bold text-white">Cara agar Bluetooth BLE bisa langsung aktif:</p>
-                                <p>1. Akses aplikasi via domain <strong>HTTPS</strong> dengan sertifikat SSL.</p>
-                                <p>2. Atau di Chrome: buka <code class="text-up-mint">chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, masukkan URL <code class="text-up-mint">${window.location.origin}</code>, pilih <strong>Enabled</strong>, lalu Relaunch.</p>
-                            </div>
-                            <div class="flex gap-2">
-                                <button onclick="document.getElementById('ble-https-warning')?.remove()" class="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs">
-                                    Tutup
-                                </button>
-                                <button onclick="document.getElementById('ble-https-warning')?.remove(); window.print()" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/80 text-white font-bold text-xs">
-                                    Gunakan Web Print
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                const existing = document.getElementById('ble-https-warning');
-                if (existing) existing.remove();
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
-                return;
-            }
-
-            // Fallback web print native dialog
-            if (e.message === 'BLUETOOTH_UNSUPPORTED') {
-                notify('Browser ini tidak mendukung Web Bluetooth. Gunakan Google Chrome atau Microsoft Edge.', 'error');
-                return;
-            }
-
-            notify(`Gagal mencetak: ${e.message || 'Koneksi Bluetooth gagal'}. Pastikan printer menyala & dekat.`, 'error');
-        }
+      this.setStatus('connected');
+    } catch (e) {
+      this.setStatus('error');
+      this.onError?.(e);
+      throw e;
     } finally {
-        setTimeout(() => {
-            isPrintingLock = false;
-        }, 500);
+      this.isConnecting = false;
     }
-}
+  }
 
-function buildStruk58(data) { return entriesToBytes(layoutStruk58(data), 32); }
-function buildFaktur80(data) { return entriesToBytes(layoutFaktur80(data), 42); }
+  scheduleReconnect() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.setStatus('disconnected');
+    this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+  }
 
-/* ============================== Alpine Component ============================== */
+  /** Print raw ESC/POS bytes */
+  async print(bytes) {
+    if (!this.characteristic) await this.connect();
+    if (!this.characteristic) throw new Error('Printer not connected');
 
-function thermalPrinter(receiptData) {
-    return {
-        data: receiptData || null,
-        isPrinting: false,
-        pairedPrinterName: localStorage.getItem('ute_ble_printer_name') || null,
-        autoDirectPrint: localStorage.getItem('ute_auto_direct_print') === '1',
-
-        init() {
-            if (!this.data) {
-                this.data = resolveReceiptData();
-            }
-            this.syncPrinterName();
-        },
-
-        syncPrinterName() {
-            this.pairedPrinterName = localStorage.getItem('ute_ble_printer_name') || null;
-            return this.pairedPrinterName;
-        },
-
-        toggleAutoDirectPrint() {
-            this.autoDirectPrint = !this.autoDirectPrint;
-            localStorage.setItem('ute_auto_direct_print', this.autoDirectPrint ? '1' : '0');
-        },
-
-        async directPrint(preferredSize = null) {
-            if (this.isPrinting) return;
-            const size = preferredSize || (this.paperSize || localStorage.getItem('ute_pos_paper_size') || '58');
-            this.syncPrinterName();
-
-            // Jika ada printer Bluetooth tersimpan atau browser support Bluetooth
-            if (this.pairedPrinterName || ('bluetooth' in navigator)) {
-                try {
-                    if (size === '80') {
-                        await this.printFaktur80(false);
-                    } else {
-                        await this.printStruk58(false);
-                    }
-                    return;
-                } catch (e) {
-                    console.warn('[DirectPrint] BLE error, fallback web print:', e);
-                }
-            }
-
-            // Fallback web print native dialog
-            if (size === '80') {
-                this.webPrint80();
-            } else {
-                this.webPrint58();
-            }
-        },
-
-        async printStruk58(forceNewPairing = false) {
-            if (this.isPrinting) return;
-            this.isPrinting = true;
-            try {
-                await printThermalReceipt('58', this.data, forceNewPairing);
-                this.pairedPrinterName = localStorage.getItem('ute_ble_printer_name');
-            } finally {
-                this.isPrinting = false;
-            }
-        },
-
-        async printFaktur80(forceNewPairing = false) {
-            if (this.isPrinting) return;
-            this.isPrinting = true;
-            try {
-                await printThermalReceipt('80', this.data, forceNewPairing);
-                this.pairedPrinterName = localStorage.getItem('ute_ble_printer_name');
-            } finally {
-                this.isPrinting = false;
-            }
-        },
-
-        disconnectPrinter() {
-            resetBlePrinter();
-            this.pairedPrinterName = null;
-        },
-
-        webPrint58() {
-            document.body.setAttribute('data-modal-print', '58');
-            window.print();
-        },
-
-        webPrint80() {
-            document.body.setAttribute('data-modal-print', '80');
-            window.print();
-        },
-
-        webPrintA4() {
-            document.body.setAttribute('data-modal-print', 'a4');
-            window.print();
-        },
-
-        webPrint() {
-            this.webPrint80();
-        },
-    };
-}
-
-// Reset data-modal-print setelah print selesai
-window.addEventListener('afterprint', () => {
-    document.body.removeAttribute('data-modal-print');
-});
-
-/* ============================== Preview Renderer (Parity: Preview = Print) ============================== */
-
-function renderPreviewHtml(data, width) {
-    const entries = width >= 40 ? layoutFaktur80(data) : layoutStruk58(data);
-    return entriesToHtml(entries);
-}
-
-// Global exports
-window.thermalPrinter = thermalPrinter;
-window.printThermalReceipt = printThermalReceipt;
-window.resetBlePrinter = resetBlePrinter;
-window.getPosReceiptData = resolveReceiptData;
-window.renderPreviewHtml = renderPreviewHtml;
-
-// Alpine registration
-if (window.Alpine) {
-    window.Alpine.data('thermalPrinter', thermalPrinter);
-}
-document.addEventListener('alpine:init', () => {
-    if (window.Alpine) {
-        window.Alpine.data('thermalPrinter', thermalPrinter);
+    const mtu = 20; // BLE MTU
+    for (let i = 0; i < bytes.length; i += mtu) {
+      const chunk = bytes.slice(i, i + mtu);
+      await this.characteristic.writeValue(chunk);
+      // Small delay to avoid overwhelming printer buffer
+      await new Promise(r => setTimeout(r, 10));
     }
-});
+  }
+
+  setStatus(status) {
+    this.status = status;
+    this.onStatusChange?.(status);
+  }
+
+  getStatus() { return this.status; }
+
+  disconnect() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.device?.gatt?.connected) this.device.gatt.disconnect();
+    this.device = null;
+    this.characteristic = null;
+    localStorage.removeItem('thermal_printer_device');
+    this.setStatus('unpaired');
+  }
+}
+
+// Export for global use
+window.EscPos = EscPos;
+window.ThermalPrinter = ThermalPrinter;

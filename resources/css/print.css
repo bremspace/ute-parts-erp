@@ -5,7 +5,7 @@
  * - Lebar area cetak efektif (TPH / print head): 48mm (384 dots @ 203 DPI).
  * - Margin browser HARUS 0mm (@page { margin: 0 !important; }) agar tidak terpotong atau menyusut.
  * - Padding aman sisi kiri & kanan: 1mm.
- * - Baris teks monospace: 32 karakter per baris (Font A).
+ * - Baris teks monospace: 32 karakter per baris (Font A compressed).
  */
 
 /* Sembunyikan elemen print target di layar monitor biasa */
@@ -13,12 +13,95 @@
     display: none !important;
 }
 
+/* Screen preview styling — matches paper layout 1:1 */
 @media screen {
     .thermal-receipt-preview {
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+        font-family: 'Courier New', Courier, ui-monospace, monospace !important;
+        font-size: 10px;
+        line-height: 1.3;
+        background: #fff;
+        color: #000;
     }
+
+    .thermal-receipt-container.paper-58 {
+        max-width: 210px; /* ~58mm at 96dpi */
+        margin: 0 auto;
+        padding: 4px;
+    }
+
+    .thermal-receipt-container.paper-80 {
+        max-width: 290px; /* ~80mm at 96dpi */
+        margin: 0 auto;
+        padding: 4px;
+    }
+
+    /* QR code placeholder for preview */
+    .qr-code {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 4px;
+        border: 1px solid #ccc;
+        background: #fafafa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 8px;
+        color: #999;
+    }
+
+    .qr-code::before {
+        content: 'QR CODE';
+    }
+
+    .qr-label { text-align: center; font-weight: 700; margin-bottom: 2px; }
+    .qr-caption { text-align: center; font-size: 9px; color: #666; margin-bottom: 4px; }
+    .info-col { font-size: 9px; line-height: 1.4; }
+    .info-col div { margin: 1px 0; }
+
+    /* Sections */
+    .section { margin: 4px 0; }
+    .section.centered { text-align: center; }
+    .rule { border-top: 1px dashed #000; margin: 4px 0; height: 1px; }
+
+    /* Header */
+    .header .shop-name { font-size: 13px; font-weight: 900; letter-spacing: 1px; margin-bottom: 2px; }
+    .header .slogan { font-size: 9px; margin-bottom: 2px; }
+    .header .addr { font-size: 9px; margin-bottom: 1px; }
+    .header .phone { font-size: 9px; margin-bottom: 1px; }
+    .header .web { font-size: 9px; margin-bottom: 2px; }
+    .header .cabang { font-size: 9px; margin-bottom: 1px; }
+    .header .time { font-size: 9px; }
+
+    /* Rows (label + value) */
+    .row { display: flex; justify-content: space-between; align-items: flex-start; margin: 2px 0; width: 100%; }
+    .row .label { flex: 1; white-space: pre-wrap; word-break: break-word; }
+    .row .value { flex: 0 0 auto; margin-left: 8px; text-align: right; white-space: nowrap; }
+    .row.total-row { font-size: 12px; font-weight: 900; margin: 4px 0; }
+    .row.bold .label, .row.bold .value { font-weight: 700; }
+    .row .value.neg { color: #c00; }
+    .row .value.pos { color: #080; }
+    .row .value.piutang { color: #c60; font-weight: 700; }
+    .row .value.bold { font-weight: 700; }
+    .row.strikethrough .label { text-decoration: line-through; color: #666; }
+    .row.strikethrough .value.arrow { color: #666; margin: 0 4px; }
+
+    /* Items */
+    .item { margin: 4px 0; }
+    .item-name { font-weight: 700; margin-bottom: 1px; white-space: pre-wrap; word-break: break-word; }
+    .item-note { font-size: 9px; color: #666; margin-left: 4px; white-space: pre-wrap; word-break: break-word; }
+
+    /* Footer */
+    .footer { margin-top: 4px; }
+    .footer .policy { font-size: 8px; color: #666; line-height: 1.3; }
+    .footer .note { font-size: 8px; color: #666; margin-top: 2px; }
+    .piutang-signature { margin-top: 8px; font-size: 9px; text-align: center; }
+    .piutang-signature p { margin: 2px 0; }
+    .sig-row { display: flex; justify-content: space-between; margin-top: 8px; }
+    .sig-col { width: 48%; text-align: center; }
 }
 
+/* Print styles */
 @page {
     size: 58mm auto;
     margin: 0mm !important;
@@ -79,7 +162,7 @@
         border-radius: 0 !important;
         box-shadow: none !important;
         font-family: 'Courier New', Courier, ui-monospace, monospace !important;
-        font-size: 11px !important;
+        font-size: 10px !important;
         line-height: 1.25 !important;
         box-sizing: border-box !important;
         word-break: break-word !important;
@@ -91,7 +174,7 @@
     body[data-modal-print="80"] .thermal-receipt-container {
         width: 72mm !important;
         max-width: 72mm !important;
-        font-size: 12px !important;
+        font-size: 11px !important;
         page: faktur80;
     }
 
@@ -100,57 +183,59 @@
         width: 100% !important;
         max-width: 180mm !important;
         margin: 0 auto !important;
-        font-size: 13px !important;
+        font-size: 12px !important;
         line-height: 1.4 !important;
         page: notaA4;
     }
 
-    /* Elemen teks & tabel struk di print */
-    .thermal-receipt-container .dashed-divider {
-        border-bottom: 1px dashed #000 !important;
-        margin: 3px 0 !important;
-        padding: 0 !important;
-        height: 1px !important;
+    /* QR code - hidden in print (printed via ESC/POS command) */
+    .qr-col {
+        display: none !important;
     }
 
-    .thermal-receipt-container .double-divider {
-        border-bottom: 2px solid #000 !important;
-        margin: 4px 0 !important;
-        padding: 0 !important;
-        height: 2px !important;
-    }
-
-    .thermal-receipt-container .receipt-row {
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: flex-start !important;
-        margin: 1.5px 0 !important;
+    .info-col {
         width: 100% !important;
     }
 
-    .thermal-receipt-container .receipt-row-title {
-        font-weight: 700 !important;
-        margin-top: 2px !important;
-    }
+    /* Sections */
+    .section { margin: 2mm 0 !important; }
+    .section.centered { text-align: center !important; }
+    .rule { border-top: 1px dashed #000 !important; margin: 2mm 0 !important; height: 1px !important; }
 
-    .thermal-receipt-container .receipt-title {
-        font-size: 13px !important;
-        font-weight: 900 !important;
-        text-align: center !important;
-        letter-spacing: 1px !important;
-    }
+    /* Header */
+    .header .shop-name { font-size: 12px !important; font-weight: 900 !important; letter-spacing: 1px !important; text-align: center !important; margin-bottom: 1mm !important; }
+    .header .slogan { font-size: 8px !important; text-align: center !important; margin-bottom: 1mm !important; }
+    .header .addr { font-size: 8px !important; text-align: center !important; margin-bottom: 0.5mm !important; }
+    .header .phone { font-size: 8px !important; text-align: center !important; margin-bottom: 0.5mm !important; }
+    .header .web { font-size: 8px !important; text-align: center !important; margin-bottom: 1mm !important; }
+    .header .cabang { font-size: 8px !important; text-align: center !important; margin-bottom: 0.5mm !important; }
+    .header .time { font-size: 8px !important; text-align: center !important; }
 
-    .thermal-receipt-container .receipt-center {
-        text-align: center !important;
-    }
+    /* Rows */
+    .row { display: flex !important; justify-content: space-between !important; align-items: flex-start !important; margin: 0.5mm 0 !important; width: 100% !important; }
+    .row .label { flex: 1 !important; white-space: pre-wrap !important; word-break: break-word !important; }
+    .row .value { flex: 0 0 auto !important; margin-left: 2mm !important; text-align: right !important; white-space: nowrap !important; }
+    .row.total-row { font-size: 11px !important; font-weight: 900 !important; margin: 1mm 0 !important; }
+    .row.bold .label, .row.bold .value { font-weight: 700 !important; }
+    .row .value.neg { color: #000 !important; } /* strikethrough via CSS not supported in raw print, text content has -> arrow */
+    .row .value.pos { color: #000 !important; }
+    .row .value.piutang { color: #000 !important; font-weight: 700 !important; }
+    .row.strikethrough .label { text-decoration: line-through !important; }
 
-    .thermal-receipt-container .receipt-right {
-        text-align: right !important;
-    }
+    /* Items */
+    .item { margin: 1mm 0 !important; }
+    .item-name { font-weight: 700 !important; margin-bottom: 0.5mm !important; white-space: pre-wrap !important; word-break: break-word !important; }
+    .item-note { font-size: 8px !important; margin-left: 2mm !important; white-space: pre-wrap !important; word-break: break-word !important; }
 
-    .thermal-receipt-container .receipt-bold {
-        font-weight: 700 !important;
-    }
+    /* Footer */
+    .footer { margin-top: 2mm !important; text-align: center !important; }
+    .footer > div:first-child { font-weight: 700 !important; margin-bottom: 1mm !important; }
+    .footer .policy { font-size: 7px !important; line-height: 1.3 !important; margin-bottom: 1mm !important; }
+    .footer .note { font-size: 7px !important; margin-top: 1mm !important; }
+    .piutang-signature { margin-top: 3mm !important; font-size: 8px !important; text-align: center !important; }
+    .piutang-signature p { margin: 1mm 0 !important; }
+    .sig-row { display: flex !important; justify-content: space-between !important; margin-top: 3mm !important; }
+    .sig-col { width: 48% !important; text-align: center !important; }
 
     /* Sembunyikan tombol / kontrol di dalam container saat print */
     .no-print,

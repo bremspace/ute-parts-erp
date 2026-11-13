@@ -22,6 +22,7 @@ use Symfony\Component\Process\Process;
 /**
  * [T-35] Cetak struk thermal via queue (ADR 0009 fallback).
  * Tidak pernah dieksekusi sinkron di request — selalu via antrian database.
+ * Layout paper-efficient matching UTEParts reference (EscPosWriter receipt()).
  */
 class PrintThermalJob implements ShouldQueue
 {
@@ -56,14 +57,21 @@ class PrintThermalJob implements ShouldQueue
         $items = [];
         foreach ($transaksi->items as $item) {
             /** @var TransaksiItem $item */
+            $hargaDasar = (float) ($item->produk?->harga_jual_retail ?? $item->harga_satuan);
+            $hargaSatuan = (float) $item->harga_satuan;
+            $qty = (int) $item->jumlah;
+            $diskonPerUnit = max(0, $hargaDasar - $hargaSatuan);
+
             $items[] = [
                 'nama' => $this->itemName($item),
-                'qty' => $item->jumlah,
-                'harga' => (float) $item->harga_satuan,
+                'qty' => $qty,
+                'harga' => $hargaSatuan,
                 'subtotal' => (float) $item->subtotal,
-                'harga_retail' => (float) ($item->produk?->harga_jual_retail ?? $item->harga_satuan),
+                'harga_retail' => $hargaDasar,
                 'satuan' => $item->produk?->satuan ?? 'pcs',
                 'catatan' => $item->catatan,
+                'diskon_per_unit' => $diskonPerUnit,
+                'diskon_total' => $diskonPerUnit * $qty,
             ];
         }
 
@@ -81,25 +89,13 @@ class PrintThermalJob implements ShouldQueue
                     'subtotal' => (float) $it['subtotal'],
                     'harga_retail' => (float) (isset($it['harga_retail']) ? $it['harga_retail'] : $it['harga']),
                     'satuan' => 'pcs',
+                    'catatan' => null,
                 ];
             }
         }
 
         // Load struk config untuk header/footer/opsi cetak
         $strukConfig = app(KonfigurasiService::class)->getStrukConfig();
-
-        $headerLines = array_values(array_filter([
-            $strukConfig['nama_toko'] ?? ($transaksi->cabang?->nama ?? config('app.name', 'BREMSPACE')),
-            $strukConfig['slogan'] ?? null,
-            $strukConfig['alamat'] ?? null,
-            ! empty($strukConfig['telepon']) ? 'Telp/WA: '.$strukConfig['telepon'] : null,
-        ]));
-
-        $footerLines = array_values(array_filter([
-            $strukConfig['footer_text'] ?? 'Terima kasih atas kunjungan Anda',
-            $strukConfig['kebijakan_retur'] ?? null,
-            $strukConfig['catatan_kaki'] ?? null,
-        ]));
 
         // Data pelanggan & tier
         /** @var Pelanggan|null $pelanggan */
@@ -115,11 +111,11 @@ class PrintThermalJob implements ShouldQueue
 
         $data = [
             // Header info from struk config
-            'nama_toko' => $strukConfig['nama_toko'] ?? 'BREMSPACE',
-            'slogan' => $strukConfig['slogan'] ?? 'Pusat Sparepart & Servis Gadget',
-            'alamat' => $strukConfig['alamat'] ?? 'Jl. Veteran No. 12',
+            'nama_toko' => $strukConfig['nama_toko'] ?? 'UTEPARTS',
+            'slogan' => $strukConfig['slogan'] ?? 'Sparepart & Aksesoris Gadget',
+            'alamat' => $strukConfig['alamat'] ?? 'Jl. Veteran No. 12, Cibolang Kaler, Sukabumi',
             'telepon' => $strukConfig['telepon'] ?? '0812-3456-7890',
-            'website_medsos' => $strukConfig['website_medsos'] ?? 'www.bremspace.com',
+            'website_medsos' => $strukConfig['website_medsos'] ?? 'www.uteparts.id',
 
             // Display options
             'show_cabang' => $strukConfig['show_cabang'] ?? true,
@@ -130,10 +126,11 @@ class PrintThermalJob implements ShouldQueue
             'show_qr_retur' => $strukConfig['show_qr_retur'] ?? true,
             'qr_caption' => $strukConfig['qr_caption'] ?? 'Scan QR untuk Retur & Garansi',
             'qr_size' => $strukConfig['qr_size'] ?? 4,
+            'qr_url' => $strukConfig['qr_url'] ?? 'www.uteparts.id',
 
-            // Paper & font settings
+            // Paper & font settings (paper-saving: compressed/small)
             'paper_width' => $strukConfig['default_width'] === '80mm' ? EscPosWriter::WIDTH_80MM : EscPosWriter::WIDTH_58MM,
-            'font_size' => $strukConfig['font_size'] ?? 'normal', // 'normal' | 'small'
+            'font_size' => 'small', // Always compressed for paper saving
 
             // Transaction data
             'items' => $items,
@@ -159,9 +156,7 @@ class PrintThermalJob implements ShouldQueue
             'no_tiket' => $transaksi->tiketServis?->no_tiket,
             'jenis_hp' => $transaksi->tiketServis?->jenis_hp,
             'metode_bayar' => $transaksi->metode_bayar,
-            'footerLines' => ! empty($footerLines) ? $footerLines : ['Terima kasih atas kunjungan Anda'],
             'tanggal' => $transaksi->created_at?->format('d/m/Y H:i'),
-            'waktu' => $transaksi->created_at?->format('d/m/Y H:i'),
             'kasir' => $transaksi->kasir?->name ?? (string) $transaksi->kasir_id,
             'cabang' => $transaksi->cabang?->nama ?? (string) $transaksi->cabang_id,
 
@@ -184,16 +179,15 @@ class PrintThermalJob implements ShouldQueue
 
             // Garansi
             'garansi' => $transaksi->garansi_teks ?? '3 Hari Toko (Sesuai T&C Penyerahan)',
-
-            // Footer custom
-            'footer_text' => $strukConfig['footer_text'] ?? 'Terima kasih atas kunjungan Anda!',
+            'footer_text' => $strukConfig['footer_text'] ?? 'Terima Kasih atas Kunjungan Anda!',
             'kebijakan_retur' => $strukConfig['kebijakan_retur'] ?? null,
             'catatan_kaki' => $strukConfig['catatan_kaki'] ?? null,
         ];
 
         $bytes = app(EscPosWriter::class)->receipt($data);
 
-        $printer = env('THERMAL_PRINTER', '');
+        // Get printer name from config (supports CUPS printer name or Bluetooth MAC)
+        $printer = $strukConfig['thermal_printer_name'] ?? env('THERMAL_PRINTER', '');
 
         if ($printer !== '') {
             $this->sendToPrinter($printer, $bytes, $transaksi->no_transaksi);
@@ -227,6 +221,19 @@ class PrintThermalJob implements ShouldQueue
 
     private function sendToPrinter(string $printer, string $bytes, string $noTransaksi): void
     {
+        // Check if it's a Bluetooth MAC address (format: XX:XX:XX:XX:XX:XX)
+        if (preg_match('/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/', $printer)) {
+            // Bluetooth printing would be handled by frontend Web Bluetooth API
+            // Here we just log - actual BT print is triggered from frontend
+            Log::info('Bluetooth printer configured, frontend will handle', [
+                'mac' => $printer,
+                'no_transaksi' => $noTransaksi,
+            ]);
+
+            return;
+        }
+
+        // CUPS raw printing via lp
         $process = new Process(['lp', '-d', $printer, '-o', 'raw']);
         $process->setInput($bytes);
 
