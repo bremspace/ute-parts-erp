@@ -32,7 +32,7 @@
     "name": "preload-helper"
   },
   "node_modules/html5-qrcode/esm/index.js": {
-    "file": "assets/esm-DVCfNHL3.js",
+    "file": "assets/esm-CmiMLnO3.js",
     "name": "esm",
     "src": "node_modules/html5-qrcode/esm/index.js",
     "isDynamicEntry": true,
@@ -71,7 +71,7 @@
     ]
   },
   "resources/js/backoffice.js": {
-    "file": "assets/backoffice-tRmMQHRr.js",
+    "file": "assets/backoffice-mA2Ngl2Y.js",
     "name": "backoffice",
     "src": "resources/js/backoffice.js",
     "isEntry": true,

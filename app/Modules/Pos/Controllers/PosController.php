@@ -18,6 +18,7 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\StockReservationService;
 use App\Traits\ApiResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
@@ -595,5 +596,37 @@ class PosController extends Controller
             ['no_transaksi' => $transaksi->no_transaksi],
             'Struk masuk antrian cetak'
         );
+    }
+
+    /**
+     * Print raw ESC/POS bytes to CUPS printer from frontend
+     */
+    public function printRaw(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'printer' => 'required|string|max:100',
+            'data' => 'required|array',
+            'data.*' => 'integer|min:0|max:255',
+        ]);
+
+        $printer = $validated['printer'];
+        $bytes = $validated['data'];
+
+        // Write to temporary file and send to CUPS
+        $tmpFile = storage_path('app/tmp/print-'.uniqid().'.bin');
+        @mkdir(dirname($tmpFile), 0755, true);
+        file_put_contents($tmpFile, chr(...$bytes));
+
+        $output = [];
+        $exitCode = 0;
+        exec('lp -d '.escapeshellarg($printer).' -o raw '.escapeshellarg($tmpFile).' 2>&1', $output, $exitCode);
+
+        @unlink($tmpFile);
+
+        if ($exitCode !== 0) {
+            return $this->error('CUPS print gagal: '.implode("\n", $output), 500);
+        }
+
+        return $this->success(['job_id' => $output[0] ?? 'unknown'], 'Struk dikirim ke printer');
     }
 }

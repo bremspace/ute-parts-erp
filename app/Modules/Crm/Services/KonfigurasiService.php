@@ -516,6 +516,11 @@ class KonfigurasiService
             'default_width' => '80mm',
             'font_size' => 'normal',
             'auto_print' => false,
+
+            // Thermal Printer Hardware
+            'thermal_printer_name' => '',    // CUPS printer name (e.g., 'POS-58', 'TM-T20')
+            'thermal_bluetooth_mac' => '',   // Bluetooth MAC for Web Bluetooth (e.g., 'AA:BB:CC:DD:EE:FF')
+            'thermal_auto_print' => false,   // Auto-print per transaction (alias of auto_print)
         ];
 
         $cfg = $this->get('struk_config');

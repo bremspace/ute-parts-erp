@@ -703,3 +703,223 @@ class ThermalPrinter {
 // Export for global use
 window.EscPos = EscPos;
 window.ThermalPrinter = ThermalPrinter;
+
+/**
+ * Alpine component for thermal receipt modal.
+ * Returns an object with all methods needed for receipt preview and printing.
+ * Merges with parent component via spread operator: ...thermalPrinter(config)
+ */
+function thermalPrinter(config = {}) {
+  const printer = new ThermalPrinter();
+  let isPrinting = false;
+  let autoDirectPrint = false;
+  let pairedPrinterName = null;
+
+  // Load saved Bluetooth MAC from config
+  const savedBluetoothMac = config.thermal_bluetooth_mac || '';
+  const savedCupsPrinter = config.thermal_printer_name || '';
+  const autoPrintEnabled = config.thermal_auto_print || config.auto_print || false;
+
+  // Try to load previously paired device
+  if (savedBluetoothMac) {
+    pairedPrinterName = `BT: ${savedBluetoothMac}`;
+  } else if (savedCupsPrinter) {
+    pairedPrinterName = `CUPS: ${savedCupsPrinter}`;
+  }
+
+  return {
+    // State
+    data: { ...config },
+    paperSize: '58',
+    isPrinting: false,
+    autoDirectPrint: false,
+    pairedPrinterName: pairedPrinterName,
+    printer: printer,
+
+    // Init
+    init() {
+      this.paperSize = localStorage.getItem('ute_pos_paper_size') || 
+        (this.data.default_width?.includes('80') ? '80' : '58');
+      
+      printer.onStatusChange = (status) => {
+        if (status === 'connected') {
+          this.pairedPrinterName = this.printer.device?.name || `BT: ${savedBluetoothMac}`;
+          this.$nextTick(() => {
+            if (this.autoDirectPrint || autoPrintEnabled) {
+              setTimeout(() => this.directPrint(this.paperSize), 350);
+            }
+          });
+        } else if (status === 'disconnected') {
+          this.pairedPrinterName = savedBluetoothMac ? `BT: ${savedBluetoothMac} (terputus)` : null;
+        } else if (status === 'error') {
+          this.pairedPrinterName = 'Kesalahan sambungan';
+        }
+      };
+
+      // Auto-connect if Bluetooth MAC is configured
+      if (savedBluetoothMac && navigator.bluetooth) {
+        this.connectBluetooth(savedBluetoothMac);
+      }
+    },
+
+    // Bluetooth connection
+    async connectBluetooth(mac) {
+      if (!navigator.bluetooth) {
+        this.showToast('Web Bluetooth tidak didukung browser ini');
+        return;
+      }
+
+      try {
+        // Filter by MAC address prefix (Web Bluetooth doesn't support exact MAC filter directly)
+        // We'll use service filter and then verify the device
+        this.printer.device = await navigator.bluetooth.requestDevice({
+          filters: [
+            { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
+            { namePrefix: 'POS' },
+            { namePrefix: 'Thermal' },
+            { namePrefix: 'Printer' }
+          ],
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+        });
+
+        this.printer.device.addEventListener('gattserverdisconnected', () => this.printer.scheduleReconnect());
+        
+        const server = await this.printer.device.gatt.connect();
+        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        this.printer.characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+        // Save for auto-reconnect
+        localStorage.setItem('thermal_printer_device', JSON.stringify({
+          name: this.printer.device.name,
+          id: this.printer.device.id
+        }));
+
+        this.pairedPrinterName = this.printer.device.name || `BT: ${mac}`;
+        this.printer.setStatus('connected');
+      } catch (e) {
+        console.error('Bluetooth connect failed:', e);
+        this.showToast('Gagal menyambung ke printer Bluetooth: ' + e.message);
+        this.pairedPrinterName = null;
+      }
+    },
+
+    // Print functions
+    async directPrint(paperSize) {
+      if (this.isPrinting) return;
+      this.isPrinting = true;
+
+      try {
+        const paperWidth = paperSize === '80' ? 80 : 58;
+        const esc = new window.EscPos(paperWidth);
+        const bytes = esc.build(this.data);
+
+        // Check if we have CUPS printer configured
+        if (savedCupsPrinter) {
+          await this.printViaCups(savedCupsPrinter, bytes);
+          this.showToast(`Struk dikirim ke printer CUPS: ${savedCupsPrinter}`);
+        } 
+        // Check if we have Bluetooth printer
+        else if (this.printer.characteristic) {
+          await this.printer.print(bytes);
+          this.showToast('Struk dikirim ke printer Bluetooth');
+        }
+        // Fallback: trigger browser print dialog
+        else {
+          this.printViaBrowser(paperSize);
+        }
+      } catch (e) {
+        console.error('Print failed:', e);
+        this.showToast('Gagal mencetak: ' + e.message);
+      } finally {
+        this.isPrinting = false;
+      }
+    },
+
+    async printViaCups(printerName, bytes) {
+      const response = await fetch('/api/pos/print-raw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
+        body: JSON.stringify({
+          printer: printerName,
+          data: Array.from(bytes)
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('CUPS print failed: ' + response.status);
+      }
+    },
+
+    printViaBrowser(paperSize) {
+      const printWindow = window.open('', '_blank');
+      const paperWidth = paperSize === '80' ? 80 : 58;
+      const esc = new window.EscPos(paperWidth);
+      const html = esc.buildPreviewHtml(this.data);
+      
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Struk Thermal</title>
+          <style>
+            @media print {
+              @page { margin: 0; size: ${paperSize}mm auto; }
+              body { margin: 0; padding: 0; }
+              .no-print { display: none !important; }
+            }
+            .thermal-receipt-container { 
+              width: ${paperSize === '80' ? '302px' : '210px'}; 
+              margin: 0 auto; 
+              font-family: monospace; 
+              font-size: 10px; 
+              line-height: 1.3; 
+            }
+          </style>
+        </head>
+        <body>${html}</body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    },
+
+    // Print specific sizes (for buttons)
+    async printStruk58(pairNew = false) {
+      if (pairNew) {
+        await this.connectBluetooth(savedBluetoothMac);
+        return;
+      }
+      await this.directPrint('58');
+    },
+
+    async printFaktur80(pairNew = false) {
+      if (pairNew) {
+        await this.connectBluetooth(savedBluetoothMac);
+        return;
+      }
+      await this.directPrint('80');
+    },
+
+    disconnectPrinter() {
+      this.printer.disconnect();
+      this.pairedPrinterName = null;
+      this.showToast('Printer diputuskan');
+    },
+
+    toggleAutoDirectPrint() {
+      this.autoDirectPrint = !this.autoDirectPrint;
+      localStorage.setItem('ute_pos_auto_direct_print', this.autoDirectPrint);
+    },
+
+    showToast(message) {
+      this.$dispatch('toast', { message, type: 'info' });
+    }
+  };
+}
+
+// Make it globally available
+window.thermalPrinter = thermalPrinter;

@@ -231,6 +231,9 @@ class SettingsRbac extends Component
         'default_width' => '80mm',
         'font_size' => 'normal',
         'auto_print' => false,
+        'thermal_printer_name' => '',     // CUPS printer name
+        'thermal_bluetooth_mac' => '',    // Bluetooth MAC for Web Bluetooth
+        'thermal_auto_print' => false,    // Auto-print per transaction
     ];
 
     public array $integrasiForm = [
@@ -746,6 +749,9 @@ class SettingsRbac extends Component
             'label_show_sku' => (bool) ($labelCfg['show_sku'] ?? true),
             'struk_default_width' => (string) ($strukCfg['default_width'] ?? '80mm'),
             'struk_footer' => (string) ($strukCfg['footer_text'] ?? 'Terima kasih atas kunjungan Anda'),
+            'thermal_printer_name' => (string) ($strukCfg['thermal_printer_name'] ?? ''),
+            'thermal_bluetooth_mac' => (string) ($strukCfg['thermal_bluetooth_mac'] ?? ''),
+            'thermal_auto_print' => (bool) ($strukCfg['thermal_auto_print'] ?? false),
         ];
     }
 
@@ -893,6 +899,9 @@ class SettingsRbac extends Component
             'strukForm.catatan_kaki' => 'nullable|string|max:300',
             'strukForm.default_width' => 'required|in:80mm,58mm,a4',
             'strukForm.qr_size' => 'required|numeric|min:40|max:150',
+            'strukForm.thermal_printer_name' => 'nullable|string|max:100',
+            'strukForm.thermal_bluetooth_mac' => 'nullable|string|max:17|regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
+            'strukForm.thermal_auto_print' => 'boolean',
         ]);
 
         $config = app(KonfigurasiService::class);
@@ -901,6 +910,9 @@ class SettingsRbac extends Component
         // Sinkronkan ke printerForm
         $this->printerForm['struk_default_width'] = $this->strukForm['default_width'];
         $this->printerForm['struk_footer'] = $this->strukForm['footer_text'];
+        $this->printerForm['thermal_printer_name'] = $this->strukForm['thermal_printer_name'];
+        $this->printerForm['thermal_bluetooth_mac'] = $this->strukForm['thermal_bluetooth_mac'];
+        $this->printerForm['thermal_auto_print'] = $this->strukForm['thermal_auto_print'];
 
         app(AuditService::class)->catat(
             'Konfigurasi',

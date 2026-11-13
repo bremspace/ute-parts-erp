@@ -2753,7 +2753,8 @@ class PosKasir extends Component
 
                 // Auto-print struk jika dikonfigurasi
                 $strukConfig = app(KonfigurasiService::class)->getStrukConfig();
-                if (! empty($strukConfig['auto_print'])) {
+                $autoPrint = ! empty($strukConfig['auto_print']) || ! empty($strukConfig['thermal_auto_print']);
+                if ($autoPrint) {
                     PrintThermalJob::dispatch($transaksi->id);
                 }
             });
