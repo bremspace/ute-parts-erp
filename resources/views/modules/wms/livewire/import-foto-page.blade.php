@@ -23,13 +23,17 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-[11px] font-bold text-ink-700 dark:text-ink-300 mb-1.5">Sumber Foto:</label>
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 flex-wrap">
                             <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" wire:model="fotoSourceType" value="files" class="radio radio-primary">
-                                <span class="text-xs font-medium text-ink-700 dark:text-ink-300">File (Multi-select / Folder)</span>
+                                <input type="radio" wire:model.live="fotoSourceType" value="files" class="radio radio-primary">
+                                <span class="text-xs font-medium text-ink-700 dark:text-ink-300">File Foto (Bisa 1 atau Banyak)</span>
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" wire:model="fotoSourceType" value="zip" class="radio radio-primary">
+                                <input type="radio" wire:model.live="fotoSourceType" value="folder" class="radio radio-primary">
+                                <span class="text-xs font-medium text-ink-700 dark:text-ink-300">Folder Sekaligus</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" wire:model.live="fotoSourceType" value="zip" class="radio radio-primary">
                                 <span class="text-xs font-medium text-ink-700 dark:text-ink-300">Arsip .ZIP</span>
                             </label>
                         </div>
@@ -64,25 +68,43 @@
                 </div>
 
                 <div class="relative overflow-hidden p-6 rounded-2xl border-2 border-dashed {{ $fotoUploads || $fotoZip ? 'border-up-mint bg-up-mint/[0.03]' : 'border-black/15 dark:border-white/15 bg-black/5 dark:bg-white/[0.01]' }} hover:border-up-primary transition text-center space-y-2 cursor-pointer group">
-                    <input type="file"
-                           wire:model="fotoSourceType === 'files' ? 'fotoUploads' : 'fotoZip'"
-                           accept="{{ $fotoSourceType === 'files' ? '.jpg,.jpeg,.png,.webp' : '.zip,application/zip' }}"
-                           multiple="{{ $fotoSourceType === 'files' }}"
-                           webkitdirectory="{{ $fotoSourceType === 'files' }}"
-                           directory="{{ $fotoSourceType === 'files' }}"
-                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                    @if($fotoSourceType === 'files')
+                        <input type="file"
+                               wire:model="fotoUploads"
+                               accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,image/*"
+                               multiple
+                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                    @elseif($fotoSourceType === 'folder')
+                        <input type="file"
+                               wire:model="fotoUploads"
+                               accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,image/*"
+                               multiple
+                               webkitdirectory
+                               directory
+                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                    @else
+                        <input type="file"
+                               wire:model="fotoZip"
+                               accept=".zip,application/zip"
+                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                    @endif
 
-                    @if($fotoSourceType === 'files' && $fotoUploads)
+                    @if(in_array($fotoSourceType, ['files', 'folder']) && $fotoUploads)
                         <div class="text-3xl text-up-mint">✓</div>
                         <div class="font-bold text-xs text-ink-900 dark:text-white">{{ count($fotoUploads) }} file dipilih</div>
+                        <p class="text-[11px] text-ink-400">Siap auto-import ke produk berdasarkan nama file.</p>
                     @elseif($fotoSourceType === 'zip' && $fotoZip)
                         <div class="text-3xl text-up-mint">✓</div>
                         <div class="font-bold text-xs text-ink-900 dark:text-white">{{ $fotoZip->getClientOriginalName() }}</div>
                         <div class="text-[11px] text-ink-400">{{ number_format($fotoZip->getSize() / 1024 / 1024, 1) }} MB</div>
                     @elseif($fotoSourceType === 'files')
+                        <div class="text-3xl group-hover:scale-110 transition-transform">🖼️</div>
+                        <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih File Foto (Bebas 1 atau Banyak)</div>
+                        <p class="text-[11px] text-ink-400">Pilih 1 foto atau blok banyak foto sekaligus. Nama file foto otomatis dicocokkan ke SKU produk.</p>
+                    @elseif($fotoSourceType === 'folder')
                         <div class="text-3xl group-hover:scale-110 transition-transform">📂</div>
-                        <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih Folder / File Manager</div>
-                        <p class="text-[11px] text-ink-400">Buka File Manager HP/Laptop. Menjaga 100% nama file asli sesuai SKU.</p>
+                        <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih Seluruh Folder Foto</div>
+                        <p class="text-[11px] text-ink-400">Pilih satu folder berisi kumpulan foto produk dari PC / File Manager.</p>
                     @else
                         <div class="text-3xl group-hover:scale-110 transition-transform">🗜️</div>
                         <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih Berkas Arsip (.ZIP)</div>
@@ -90,16 +112,41 @@
                     @endif
                 </div>
 
-                <button type="button"
-                        wire:click="scanUploadedFoto"
-                        wire:loading.attr="disabled"
-                        class="w-full py-3 px-4 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20 disabled:opacity-50">
-                    <span wire:loading.remove wire:target="scanUploadedFoto">Scan & Cocokkan SKU →</span>
-                    <span wire:loading wire:target="scanUploadedFoto" class="flex items-center gap-2">
-                        <span class="animate-spin">⏳</span>
-                        <span>Menganalisis Nama File...</span>
-                    </span>
-                </button>
+                @error('fotoUploads')
+                    <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/30 text-xs text-up-red font-semibold flex items-start gap-2">
+                        <span>⚠️</span>
+                        <span>{{ $message }}</span>
+                    </div>
+                @enderror
+                @error('fotoZip')
+                    <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/30 text-xs text-up-red font-semibold flex items-start gap-2">
+                        <span>⚠️</span>
+                        <span>{{ $message }}</span>
+                    </div>
+                @enderror
+
+                <div class="flex items-center gap-2">
+                    <button type="button"
+                            wire:click="autoImportFoto"
+                            wire:loading.attr="disabled"
+                            class="flex-1 py-3 px-4 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20 disabled:opacity-50">
+                        <span wire:loading.remove wire:target="autoImportFoto">⚡ Auto Import ke Produk</span>
+                        <span wire:loading wire:target="autoImportFoto" class="flex items-center gap-2">
+                            <span class="animate-spin">⏳</span>
+                            <span>Memproses Auto Import...</span>
+                        </span>
+                    </button>
+                    <button type="button"
+                            wire:click="scanUploadedFoto"
+                            wire:loading.attr="disabled"
+                            class="py-3 px-3 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-700 dark:text-ink-200 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            title="Preview hasil pencocokan SKU sebelum simpan">
+                        <span wire:loading.remove wire:target="scanUploadedFoto">Preview →</span>
+                        <span wire:loading wire:target="scanUploadedFoto" class="flex items-center gap-1">
+                            <span class="animate-spin">⏳</span>
+                        </span>
+                    </button>
+                </div>
             </div>
 
             <!-- Right: Rules & Info -->

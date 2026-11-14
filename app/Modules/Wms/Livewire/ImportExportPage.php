@@ -960,7 +960,37 @@ class ImportExportPage extends Component
 
             $scan = $bulkService->preScanFiles($items, $this->fotoMode);
             $this->fotoScanResult = $scan;
+
+            if (($scan['matched_count'] ?? 0) === 0) {
+                $unmatched = collect($scan['skipped'] ?? [])->pluck('filename')->take(3)->implode(', ');
+                $this->addError('fotoUploads', "Upload gagal: Nama file foto ({$unmatched}) tidak ditemukan di katalog produk. Silakan cek kembali nama file agar sesuai SKU/Barcode produk.");
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => "Upload gagal: Nama file foto ({$unmatched}) tidak ditemukan di katalog produk. Silakan cek nama file Anda.",
+                ]);
+                $this->fotoStep = 'upload';
+
+                return;
+            }
+
+            if (($scan['skipped_count'] ?? 0) > 0) {
+                $unmatched = collect($scan['skipped'] ?? [])->pluck('filename')->take(3)->implode(', ');
+                $this->dispatch('alert', [
+                    'type' => 'warning',
+                    'message' => "{$scan['skipped_count']} file foto ({$unmatched}) tidak cocok dengan SKU produk dan gagal di-import. Cek kembali nama file.",
+                ]);
+            }
+
             $this->fotoStep = 'preview';
+        }
+    }
+
+    public function autoImportFoto(): void
+    {
+        $this->scanUploadedFoto();
+
+        if ($this->fotoStep === 'preview' && ($this->fotoScanResult['matched_count'] ?? 0) > 0) {
+            $this->startFotoProcessing();
         }
     }
 

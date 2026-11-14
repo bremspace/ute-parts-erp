@@ -254,14 +254,52 @@ class BulkFotoProdukFeatureTest extends TestCase
             ->assertFileDownloaded();
     }
 
-    public function test_foto_error_filtering_and_load_more(): void
+    public function test_upload_per_foto_gagal_jika_nama_file_tidak_ditemukan_dan_infokan_cek_nama_file(): void
     {
+        $fileUnknown = UploadedFile::fake()->image('SKU-TIDAK-ADA-12345.jpg', 500, 500);
+
         Livewire::test(ImportFotoPage::class)
             ->set('activeTab', 'foto')
-            ->call('setFotoErrorFilterTab', 'gagal')
-            ->assertSet('fotoErrorFilterTab', 'gagal')
-            ->assertSet('fotoErrorDisplayLimit', 50)
-            ->call('loadMoreFotoErrors')
-            ->assertSet('fotoErrorDisplayLimit', 100);
+            ->set('fotoSourceType', 'files')
+            ->set('fotoUploads', [$fileUnknown])
+            ->call('scanUploadedFoto')
+            ->assertSet('fotoStep', 'upload')
+            ->assertHasErrors(['fotoUploads'])
+            ->assertDispatched('alert', fn ($event, $params) => (($params[0] ?? $params)['type'] ?? '') === 'error' && str_contains(($params[0] ?? $params)['message'] ?? '', 'tidak ditemukan'));
+    }
+
+    public function test_upload_per_foto_auto_import_langsung_update_produk_by_nama_file(): void
+    {
+        $produk = Produk::create([
+            'nama' => 'Fleksibel On Off Samsung A12',
+            'slug' => 'flx-on-off-sam-a12-'.uniqid(),
+            'kategori' => 'Fleksibel',
+            'kondisi' => 'baru',
+            'satuan' => 'pcs',
+            'harga_beli' => 15000,
+            'harga_jual_retail' => 35000,
+            'is_active' => true,
+        ]);
+        SkuVariant::create([
+            'produk_id' => $produk->id,
+            'sku' => 'FLX-SAM-A12',
+            'nama_varian' => 'Standar',
+            'is_active' => true,
+        ]);
+
+        $this->assertNull($produk->fresh()->gambar);
+
+        $fotoPerProduk = UploadedFile::fake()->image('FLX-SAM-A12.jpg', 600, 600);
+
+        Livewire::test(ImportFotoPage::class)
+            ->set('activeTab', 'foto')
+            ->set('fotoSourceType', 'files')
+            ->set('fotoUploads', [$fotoPerProduk])
+            ->call('autoImportFoto')
+            ->assertSet('fotoStep', 'completed');
+
+        $produk->refresh();
+        $this->assertNotNull($produk->gambar);
+        $this->assertStringEndsWith('.webp', $produk->gambar);
     }
 }

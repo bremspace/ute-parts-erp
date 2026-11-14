@@ -184,6 +184,10 @@ class BulkProductImageImportService
 
         $dbVariants = collect();
         $dbBarcodes = collect();
+        $dbVariantKodeLama = collect();
+        $dbProdukBarcodes = collect();
+        $dbProdukKodeLama = collect();
+        $dbProdukNama = collect();
 
         if (! empty($lookupKeys)) {
             // Cari di tabel sku_variants yang berelasi ke produk berdasarkan SKU
@@ -209,6 +213,60 @@ class BulkProductImageImportService
                 })
                 ->get()
                 ->keyBy(fn ($item) => strtolower(trim((string) $item->barcode)));
+
+            // Cari juga berdasarkan kode_lama pada sku_variants
+            $dbVariantKodeLama = SkuVariant::query()
+                ->with(['produk:id,nama,gambar,foto'])
+                ->whereNotNull('kode_lama')
+                ->where(function ($q) use ($lookupKeys) {
+                    foreach (array_chunk($lookupKeys, 200) as $chunk) {
+                        $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                        $q->orWhereRaw("LOWER(TRIM(kode_lama)) IN ({$placeholders})", $chunk);
+                    }
+                })
+                ->get()
+                ->keyBy(fn ($item) => strtolower(trim((string) $item->kode_lama)));
+
+            // Cari di tabel produk berdasarkan barcode
+            $dbProdukBarcodes = Produk::query()
+                ->select(['id', 'nama', 'gambar', 'foto', 'barcode'])
+                ->with(['skuVariants:id,produk_id,sku'])
+                ->whereNotNull('barcode')
+                ->where(function ($q) use ($lookupKeys) {
+                    foreach (array_chunk($lookupKeys, 200) as $chunk) {
+                        $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                        $q->orWhereRaw("LOWER(TRIM(barcode)) IN ({$placeholders})", $chunk);
+                    }
+                })
+                ->get()
+                ->keyBy(fn ($item) => strtolower(trim((string) $item->barcode)));
+
+            // Cari di tabel produk berdasarkan kode_lama
+            $dbProdukKodeLama = Produk::query()
+                ->select(['id', 'nama', 'gambar', 'foto', 'kode_lama'])
+                ->with(['skuVariants:id,produk_id,sku'])
+                ->whereNotNull('kode_lama')
+                ->where(function ($q) use ($lookupKeys) {
+                    foreach (array_chunk($lookupKeys, 200) as $chunk) {
+                        $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                        $q->orWhereRaw("LOWER(TRIM(kode_lama)) IN ({$placeholders})", $chunk);
+                    }
+                })
+                ->get()
+                ->keyBy(fn ($item) => strtolower(trim((string) $item->kode_lama)));
+
+            // Cari di tabel produk berdasarkan nama
+            $dbProdukNama = Produk::query()
+                ->select(['id', 'nama', 'gambar', 'foto'])
+                ->with(['skuVariants:id,produk_id,sku'])
+                ->where(function ($q) use ($lookupKeys) {
+                    foreach (array_chunk($lookupKeys, 200) as $chunk) {
+                        $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                        $q->orWhereRaw("LOWER(TRIM(nama)) IN ({$placeholders})", $chunk);
+                    }
+                })
+                ->get()
+                ->keyBy(fn ($item) => strtolower(trim((string) $item->nama)));
         }
 
         foreach ($files as $idx => $f) {
@@ -233,39 +291,59 @@ class BulkProductImageImportService
             }
 
             $candidates = $fileCandidateMap[$idx] ?? [];
-            $matchedVariant = null;
+            $matchedProduk = null;
             $matchedSku = null;
 
-            // Coba satu per satu kandidat terhadap hasil database (SKU dan Barcode)
+            // Coba satu per satu kandidat terhadap hasil database (SKU, Barcode, Kode Lama, Nama)
             foreach ($candidates as $cand) {
                 $norm = strtolower($cand);
                 if (isset($dbVariants[$norm]) && $dbVariants[$norm]->produk) {
-                    $matchedVariant = $dbVariants[$norm];
-                    $matchedSku = $matchedVariant->sku;
+                    $matchedProduk = $dbVariants[$norm]->produk;
+                    $matchedSku = $dbVariants[$norm]->sku;
                     break;
                 }
                 if (isset($dbBarcodes[$norm]) && $dbBarcodes[$norm]->produk) {
-                    $matchedVariant = $dbBarcodes[$norm];
-                    $matchedSku = $matchedVariant->sku;
+                    $matchedProduk = $dbBarcodes[$norm]->produk;
+                    $matchedSku = $dbBarcodes[$norm]->sku;
+                    break;
+                }
+                if (isset($dbVariantKodeLama[$norm]) && $dbVariantKodeLama[$norm]->produk) {
+                    $matchedProduk = $dbVariantKodeLama[$norm]->produk;
+                    $matchedSku = $dbVariantKodeLama[$norm]->sku;
+                    break;
+                }
+                if (isset($dbProdukBarcodes[$norm])) {
+                    $matchedProduk = $dbProdukBarcodes[$norm];
+                    $matchedSku = $matchedProduk->skuVariants?->first()?->sku ?? $matchedProduk->barcode;
+                    break;
+                }
+                if (isset($dbProdukKodeLama[$norm])) {
+                    $matchedProduk = $dbProdukKodeLama[$norm];
+                    $matchedSku = $matchedProduk->skuVariants?->first()?->sku ?? $matchedProduk->kode_lama;
+                    break;
+                }
+                if (isset($dbProdukNama[$norm])) {
+                    $matchedProduk = $dbProdukNama[$norm];
+                    $matchedSku = $matchedProduk->skuVariants?->first()?->sku ?? $cand;
                     break;
                 }
             }
 
-            if (! $matchedVariant) {
-                $bestGuess = $candidates[1] ?? ($candidates[0] ?? '');
+            if (! $matchedProduk) {
+                $bestGuess = $candidates[1] ?? ($candidates[0] ?? $name);
                 $skipped[] = [
                     'index' => $idx,
                     'filename' => $name,
                     'relative_path' => $rel,
                     'sku' => $bestGuess,
-                    'reason' => 'SKU "'.$bestGuess.'" tidak ditemukan di database produk',
+                    'reason' => 'Nama file "'.$name.'" tidak ditemukan di database produk (cek SKU/Barcode)',
                     'size' => $size,
                 ];
 
                 continue;
             }
 
-            $produk = $matchedVariant->produk;
+            $produk = $matchedProduk;
             $hasExisting = ! empty($produk->gambar) || ! empty($produk->foto);
 
             // Jika mode skip_existing dan produk sudah punya foto, sortir sebagai skipped agar tidak perlu diupload
