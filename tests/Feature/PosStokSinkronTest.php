@@ -580,14 +580,16 @@ class PosStokSinkronTest extends TestCase
 
         $component = $this->buatKomponen();
 
-        // Default: 16 (batas lama) + tombol load-more tampil
+        // Default: 20 (chunk awal) + adaLebihBanyak bernilai true (Livewire public property untuk Alpine lazy load)
         $this->assertCount(PosKasir::BATAS_PRODUK_AWAL, $component->viewData('products'));
         $this->assertTrue($component->viewData('adaLebihBanyak'));
+        $this->assertTrue($component->get('adaLebihBanyak'));
 
-        // Load-more via method → sisa produk ikut termuat (20 + 3 fixture = 23 < 32)
+        // Load-more via method → sisa produk ikut termuat (20 + 3 fixture = 23 < 40)
         $component->call('muatLebihBanyak');
         $this->assertSame(23, $component->viewData('products')->count());
         $this->assertFalse($component->viewData('adaLebihBanyak'));
+        $this->assertFalse($component->get('adaLebihBanyak'));
 
         // Pencarian mereset batas (query tidak menumpuk dari halaman sebelumnya)
         $component->set('search', 'Load More')

@@ -58,8 +58,8 @@ class PosKasir extends Component
     use ParsesNominal;
     use PunyaRiwayatAktivitas;
 
-    /** [B-02/P1-5] Jumlah produk per muat katalog (load-more). */
-    public const BATAS_PRODUK_AWAL = 16;
+    /** [B-02/P1-5] Jumlah produk per muat katalog (lazy load pagination). */
+    public const BATAS_PRODUK_AWAL = 20;
 
     /**
      * [B-02] Stok saat belum ada gudang aktif = 0 (bukan batas longgar).
@@ -118,6 +118,8 @@ class PosKasir extends Component
 
     // [B-02/P1-5] Batas katalog yang dimuat (load-more "Muat lebih banyak")
     public int $batasProduk = self::BATAS_PRODUK_AWAL;
+
+    public bool $adaLebihBanyak = false;
 
     public ?int $selectedCustomerId = null;
 
@@ -3870,7 +3872,7 @@ class PosKasir extends Component
 
         // [B-02/P1-5] Load-more: ambil batas+1 utk tahu masih ada sisanya
         $products = $productsQuery->take($this->batasProduk + 1)->get();
-        $adaLebihBanyak = $products->count() > $this->batasProduk;
+        $this->adaLebihBanyak = $products->count() > $this->batasProduk;
         $products = $products->take($this->batasProduk)->values();
 
         $customers = Pelanggan::with('tierMembership')->whereIn('status', ['aktif', 'approved'])->take(10)->get();
@@ -3964,7 +3966,7 @@ class PosKasir extends Component
             'gudangs' => $gudangs,
             'stokPerProduk' => $stokPerProduk,
             'rakPerProduk' => $rakPerProduk,
-            'adaLebihBanyak' => $adaLebihBanyak,
+            'adaLebihBanyak' => $this->adaLebihBanyak,
             'batasProduk' => $this->batasProduk,
             'customers' => $customers,
             'pelangganCari' => $this->pelangganCari,
