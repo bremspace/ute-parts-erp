@@ -31,32 +31,33 @@
     }
 
     .thermal-receipt-container.paper-80 {
-        max-width: 290px; /* ~80mm at 96dpi */
+        width: 80mm !important;
+        max-width: 290px !important; /* ~80mm at 96dpi */
         margin: 0 auto;
         padding: 4px;
     }
 
-    /* QR code placeholder for preview */
+    /* QR code section for preview */
+    .qr-section {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 4px 0;
+    }
+
     .qr-code {
-        width: 80px;
-        height: 80px;
-        margin: 0 auto 4px;
-        border: 1px solid #ccc;
-        background: #fafafa;
+        width: 68px;
+        height: 68px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 8px;
-        color: #999;
-    }
-
-    .qr-code::before {
-        content: 'QR CODE';
     }
 
     .qr-label { text-align: center; font-weight: 700; margin-bottom: 2px; }
-    .qr-caption { text-align: center; font-size: 9px; color: #666; margin-bottom: 4px; }
-    .info-col { font-size: 9px; line-height: 1.4; }
+    .qr-caption { text-align: left; font-size: 8px; color: #4b5563; margin-top: 2px; }
+    .info-col { font-size: 8.5px; line-height: 1.25; }
     .info-col div { margin: 1px 0; }
 
     /* Sections */
@@ -152,8 +153,8 @@
         position: absolute !important;
         left: 0 !important;
         top: 0 !important;
-        width: 48mm !important;
-        max-width: 48mm !important;
+        width: 58mm !important;     /* 58mm physical paper; 80mm overridden via paper-80 class */
+        max-width: 58mm !important;
         margin: 0 auto !important;
         padding: 0 1mm 1mm 1mm !important;
         background: #fff !important;
@@ -188,13 +189,16 @@
         page: notaA4;
     }
 
-    /* QR code - hidden in print (printed via ESC/POS command) */
+    /* QR code section */
     .qr-col {
-        display: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
     }
 
     .info-col {
-        width: 100% !important;
+        flex: 1 !important;
     }
 
     /* Sections */

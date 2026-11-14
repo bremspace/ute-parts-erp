@@ -6,6 +6,7 @@ import './theme.js'; // [T-32] Tema dark/light/auto
 import './font-size.js'; // [2026] Font size switcher
 import './components/format-number.js'; // [T-34] Ribuan separator input nominal
 import './components/notification-sound.js'; // [2026] Precision Web Audio notification synthesizer
+import './components/thermal-print.js'; // Cetak & preview thermal Bluetooth/Web/CUPS 58/80mm
 
 // PWA Service Worker — SATU-SATUNYA registrasi via VitePWA (generateSW, /build/sw.js).
 // Registrasi manual lama `/sw.js` (404) dihapus; virtual module ini menyuntik

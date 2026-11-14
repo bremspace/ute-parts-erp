@@ -5,11 +5,11 @@
  */
 class EscPos {
   constructor(paperWidth = 58) {
-    this.paperWidth = paperWidth; // 58 or 80
+    this.paperWidth = Number(paperWidth) === 80 ? 80 : 58;
     this.compressed = true; // Always small font for paper saving
     this.columns = this.compressed
-      ? (paperWidth === 80 ? 64 : 42)
-      : (paperWidth === 80 ? 48 : 32);
+      ? (this.paperWidth === 80 ? 64 : 42)
+      : (this.paperWidth === 80 ? 48 : 32);
     this.buf = [];
     this.init();
   }
@@ -47,9 +47,9 @@ class EscPos {
   cut() { this.buf.push(0x1d, 0x56, 0x42, 0x00); return this; } // GS V B 0
 
   /** Model 2 QR Code — mirrors PHP EscPosWriter::qrcode() */
-  qrcode(content, size = 4) {
+  qrcode(content, size = 3) {
     const d = this.ascii(content);
-    if (!d) return this;
+    if (!d || !d.length) return this;
     const len = d.length + 3;
     const pL = len & 0xff;
     const pH = (len >> 8) & 0xff;
@@ -78,8 +78,8 @@ class EscPos {
 
   // --- Helpers ---
   ascii(str) {
-    // Transliterate non-ASCII → nearest ASCII for cp437 compatibility
-    return str
+    if (!str) return [];
+    return String(str)
       .replace(/[éèêë]/g, 'e')
       .replace(/[áàâä]/g, 'a')
       .replace(/[íìîï]/g, 'i')
@@ -96,7 +96,7 @@ class EscPos {
       .split('').map(c => c.charCodeAt(0));
   }
 
-  money(v) { return 'Rp ' + Number(v).toLocaleString('id-ID'); }
+  money(v) { return 'Rp ' + Number(v || 0).toLocaleString('id-ID'); }
 
   pad(left, right) {
     left = this.clean(left);
@@ -106,7 +106,8 @@ class EscPos {
   }
 
   clean(str) {
-    return str
+    if (!str) return '';
+    return String(str)
       .replace(/[éèêë]/g, 'e')
       .replace(/[áàâä]/g, 'a')
       .replace(/[íìîï]/g, 'i')
@@ -144,8 +145,8 @@ class EscPos {
   buildReceipt(data) {
     const {
       items = [],
-      total, bayar, kembali,
-      no_transaksi, metode_bayar, tanggal, kasir, cabang,
+      total = 0, bayar = 0, kembali = 0,
+      no_transaksi = '-', metode_bayar = 'TUNAI', metode = 'TUNAI', tanggal, waktu, kasir, cabang,
       pelanggan, tier, tipe_konsumen, saldo_poin, poin_ditukar,
       diskon_tier, diskon_partai, diskon_poin, diskon, diskon_persen, diskon_nominal,
       pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
@@ -154,97 +155,92 @@ class EscPos {
       garansi,
       footer_text, kebijakan_retur, catatan_kaki,
       nama_toko, slogan, alamat, telepon, website_medsos,
-      show_cabang, show_kasir, show_pelanggan, show_waktu,
-      show_qr_retur, qr_caption, qr_size, qr_url,
+      show_cabang, show_kasir = true, show_pelanggan = true, show_waktu,
+      show_qr_retur = true, qr_caption, qr_size = 3, qr_url,
       paper_width = 58,
       font_size = 'small',
+      strikethrough_mode = 'ascii',
     } = data;
 
     // Re-init with correct paper width
-    this.paperWidth = paper_width;
+    this.paperWidth = Number(paper_width) === 80 ? 80 : 58;
     this.compressed = font_size === 'small';
     this.columns = this.compressed
-      ? (paper_width === 80 ? 64 : 42)
-      : (paper_width === 80 ? 48 : 32);
+      ? (this.paperWidth === 80 ? 64 : 42)
+      : (this.paperWidth === 80 ? 48 : 32);
+    this.buf = [];
     this.init();
 
-    // ======== HEADER ========
+    // ======== HEADER (Centered) ========
     this.alignCenter();
-    this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'UTEPARTS').sizeDoubleWidth(false).bold(false);
-    if (slogan) this.text(slogan);
+    this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'UTEParts').sizeDoubleWidth(false).bold(false);
+    this.text(slogan || 'SPAREPARTS/ACCESORIES/SERVICE');
     if (alamat) this.text(alamat);
     if (telepon) this.text('Telp/WA: ' + telepon);
-    if (website_medsos) this.text(website_medsos);
     if (show_cabang && cabang) this.text(cabang);
-    if (show_waktu && tanggal) this.text(tanggal);
-    this.rule();
 
     // ======== 2-COL: QR (Left) + URL/Date/Warranty (Right) ========
     const qrContent = no_transaksi || '-';
-    const qrUrl = qr_url || 'www.uteparts.id';
+    const qrUrlDomain = qr_url || website_medsos || 'www.uteparts.id';
+    const tglStr = tanggal || waktu || '';
+    const captionStr = qr_caption || 'Scan QR ini untuk retur & klaim garansi';
 
-    if (show_qr_retur && no_transaksi !== '-') {
+    if (show_qr_retur && qrContent !== '-') {
       this.alignCenter();
-      this.qrcode(qrContent, qr_size || 4);
+      this.qrcode(qrContent, qr_size || 3);
       this.bold(true).text(qrContent).bold(false);
-      this.text(qr_caption || 'Scan QR untuk Retur & Garansi');
+      this.text(captionStr);
 
       this.alignLeft();
-      this.text('Web: ' + qrUrl);
-      if (tanggal) this.text('Tgl: ' + tanggal);
+      this.text('Web: ' + qrUrlDomain);
+      if (tglStr) this.text('Tgl: ' + tglStr);
       if (garansi) this.text('Garansi: ' + garansi);
-      this.text('Barang fisik utk tukar tdk rusak');
+      this.text('Scan QR ini untuk retur & klaim garansi');
     } else {
       this.alignLeft();
-      this.text('Web: ' + qrUrl);
-      if (tanggal) this.text('Tgl: ' + tanggal);
+      this.text('Web: ' + qrUrlDomain);
+      if (tglStr) this.text('Tgl: ' + tglStr);
       if (garansi) this.text('Garansi: ' + garansi);
-      this.text('Barang fisik utk tukar tdk rusak');
+      this.text('Scan QR ini untuk retur & klaim garansi');
     }
 
     this.rule();
 
     // ======== TRANSACTION INFO ========
     this.alignLeft();
-    this.text(this.pad('TRX', no_transaksi));
+    this.text(this.pad('No. TRX:', qrContent));
 
-    if (sumber && !['pos', 'offline'].includes(s?.toLowerCase())) {
-      this.text(this.pad('Pesanan', sumber.toUpperCase()));
+    if (sumber && !['pos', 'offline'].includes(sumber.toLowerCase())) {
+      this.text(this.pad('Pesanan:', sumber.toUpperCase()));
     }
 
     if (no_tiket) {
-      this.bold(true).text(this.pad('Tiket', no_tiket)).bold(false);
+      this.bold(true).text(this.pad('No. Tiket:', no_tiket)).bold(false);
     }
 
     if (jenis_hp) {
-      this.text(this.pad('Unit', jenis_hp));
+      this.text(this.pad('Unit:', jenis_hp));
     }
 
     if (kurir) {
-      const kurirLbl = is_pickup ? 'Ambil' : 'Kurir';
+      const kurirLbl = is_pickup ? 'Ambil:' : 'Kurir:';
       const resiTeks = (resi && resi !== '-') ? ' (' + resi + ')' : '';
       this.text(this.pad(kurirLbl, kurir + resiTeks));
     }
 
     if (show_kasir && kasir) {
-      this.text(this.pad('Kasir', kasir));
+      this.text(this.pad('Kasir:', kasir));
     }
 
     if (show_pelanggan) {
       const pel = pelanggan || 'Umum';
-      this.text(this.pad('Pelanggan', pel));
+      this.text(this.pad('Pelanggan:', pel));
 
       if (tier && tier !== 'Retail' && tier !== 'Umum') {
-        const lbl = ['reseller', 'agen'].includes(tipe_konsumen) ? 'Mitra' : 'Tier';
+        const lbl = ['reseller', 'agen'].includes(tipe_konsumen) ? 'Mitra:' : 'Tier:';
         this.bold(true).text(this.pad(lbl, tier)).bold(false);
       }
-
-      if (saldo_poin && Number(saldo_poin) > 0) {
-        this.text(this.pad('Poin', Number(saldo_poin).toLocaleString('id-ID') + ' Poin'));
-      }
     }
-
-    this.rule();
 
     // ======== ITEMS ========
     for (const item of items) {
@@ -253,21 +249,32 @@ class EscPos {
         this.bold(true).text(line).bold(false);
       }
 
-      const qtySatuan = item.qty + (item.satuan ? ' ' + item.satuan : '');
+      const qtySatuan = (item.qty || 1) + (item.satuan ? ' ' + item.satuan : ' PCS');
       const harga = this.money(item.harga);
-      const subtotal = this.money(item.subtotal);
-
-      this.text(this.pad(qtySatuan + ' x ' + harga, subtotal));
-
-      // Strikethrough retail price if discounted
+      const subtotalItem = this.money(item.subtotal);
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
+
+      let leftPrice = '';
       if (hargaRetail > hargaJual) {
         const normal = this.money(hargaRetail);
         const disc = this.money(hargaJual);
-        // Use ESC B strikethrough (preview renders via CSS line-through)
-        this.textStrikethrough('Normal: ' + normal + ' -> ' + disc);
+        if (strikethrough_mode === 'overprint') {
+          const prefix = qtySatuan + ' x ';
+          const padStrike = ' '.repeat(prefix.length) + '-'.repeat(normal.length);
+          this.buf.push(...padStrike.split('').map(c => c.charCodeAt(0)), 0x0d);
+          leftPrice = `${prefix}${normal} ${disc}`;
+        } else if (strikethrough_mode === 'combining') {
+          const striked = normal.split('').map(c => c + '\u0336').join('');
+          leftPrice = `${qtySatuan} x ${striked} ${disc}`;
+        } else {
+          leftPrice = `${qtySatuan} x (${normal}) -> ${disc}`;
+        }
+      } else {
+        leftPrice = `${qtySatuan} x ${harga}`;
       }
+
+      this.text(this.pad(leftPrice, subtotalItem));
 
       if (item.catatan) {
         for (const ln of this.wrap('  * ' + item.catatan)) {
@@ -276,81 +283,73 @@ class EscPos {
       }
     }
 
-    this.rule();
-
-    // ======== SUBTOTAL BREAKDOWN ========
-    const showBreakdown = true; // always show for paper-saving layout
-    if (showBreakdown && diskon_tier && Number(diskon_tier) > 0) {
+    // ======== SUBTOTAL BREAKDOWN & TOTALS (Directly follows items) ========
+    if (diskon_tier && Number(diskon_tier) > 0) {
       const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
-      this.text(this.pad('Subtotal Retail', this.money(subRetail)));
+      this.text(this.pad('Subtotal Retail:', this.money(subRetail)));
 
       const tierLbl = (tier && tier !== 'Retail')
-        ? 'Pot ' + tier
-        : (['reseller', 'agen'].includes(tipe_konsumen) ? 'Pot Mitra' : 'Pot Tier');
+        ? 'Pot ' + tier + ':'
+        : (['reseller', 'agen'].includes(tipe_konsumen) ? 'Pot Mitra:' : 'Pot Tier:');
       this.text(this.pad(tierLbl, '-' + this.money(diskon_tier)));
-      this.text(this.pad('Subtotal', this.money(subtotal ?? total)));
+      this.text(this.pad('Subtotal:', this.money(subtotal ?? total)));
     } else {
-      this.text(this.pad('Subtotal', this.money(subtotal ?? total)));
+      this.text(this.pad('Subtotal:', this.money(subtotal ?? total)));
     }
 
     if (diskon_partai && Number(diskon_partai) > 0) {
-      this.text(this.pad('Diskon Partai', '-' + this.money(diskon_partai)));
+      this.text(this.pad('Diskon Partai:', '-' + this.money(diskon_partai)));
     }
     if (diskon_poin && Number(diskon_poin) > 0) {
-      this.text(this.pad('Tukar Poin (' + (poin_ditukar || 0) + 'pts)', '-' + this.money(diskon_poin)));
+      this.text(this.pad('Tukar Poin (' + (poin_ditukar || 0) + 'pts):', '-' + this.money(diskon_poin)));
     }
     if (diskon && Number(diskon) > 0) {
       const lbl = (diskon_persen && Number(diskon_persen) > 0)
-        ? 'Diskon (' + diskon_persen + '%)'
-        : 'Diskon Kasir';
+        ? 'Diskon (' + diskon_persen + '%):'
+        : 'Diskon Kasir:';
       this.text(this.pad(lbl, '-' + this.money(diskon)));
     }
     if (pajak && Number(pajak) > 0) {
-      const ppnLbl = ppn_persen ? 'PPN (' + ppn_persen + '%)' : 'PPN';
+      const ppnLbl = ppn_persen ? 'PPN (' + ppn_persen + '%):' : 'PPN:';
       this.text(this.pad(ppnLbl, '+' + this.money(pajak)));
     }
     if (ongkir && Number(ongkir) > 0) {
-      this.text(this.pad('Ongkir', '+' + this.money(ongkir)));
+      this.text(this.pad('Ongkir:', '+' + this.money(ongkir)));
+    }
+
+    // Bold total
+    this.bold(true).sizeDoubleHeight(true).text(this.pad('TOTAL:', this.money(total))).sizeDoubleHeight(false).bold(false);
+
+    if (is_piutang) {
+      this.text(this.pad('Status:', 'BELUM LUNAS (PIUTANG)'));
+      if (jatuh_tempo) this.text(this.pad('Jatuh Tempo:', jatuh_tempo));
+      this.text(this.pad('Sisa Tag:', this.money(sisa_piutang ?? total)));
+    } else {
+      const caraBayar = String(metode_bayar || metode || 'TUNAI').toUpperCase();
+      this.text(this.pad(`BAYAR (${caraBayar}):`, this.money(bayar || total)));
+      this.text(this.pad('KEMBALI:', this.money(kembali ?? 0)));
+    }
+
+    if (saldo_poin !== undefined) {
+      this.text(this.pad('Sisa Saldo Poin:', Number(saldo_poin).toLocaleString('id-ID') + ' pts'));
+    }
+
+    if (hemat_total && Number(hemat_total) > 0) {
+      this.bold(true).text(this.pad('HEMAT:', this.money(hemat_total))).bold(false);
+    }
+
+    if (komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0) {
+      this.text(this.pad('Komisi:', '+' + this.money(komisi_mitra_nominal) + ' (Saldo)'));
     }
 
     this.rule();
 
-    // ======== TOTAL & PAYMENT ========
-    this.bold(true).sizeDoubleHeight(true).text(this.pad('TOTAL', this.money(total))).sizeDoubleHeight(false).bold(false);
-
-    if (is_piutang) {
-      this.text('Status: BELUM LUNAS (PIUTANG)');
-      if (jatuh_tempo) this.text('Jatuh Tempo: ' + jatuh_tempo);
-      this.text('Sisa Tag: ' + this.money(sisa_piutang ?? total));
-    } else {
-      this.text('Bayar: ' + this.money(bayar));
-      this.text('Kembali: ' + this.money(kembali ?? 0));
-      this.text('Metode: ' + metode_bayar);
-    }
-
-    if (hemat_total && Number(hemat_total) > 0) {
-      this.bold(true).text(this.pad('HEMAT', this.money(hemat_total))).bold(false);
-    }
-
-    if (komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0) {
-      this.text('Komisi: +' + this.money(komisi_mitra_nominal) + ' (Saldo)');
-    }
-
-    if (saldo_poin !== undefined) {
-      this.text('Sisa Poin: ' + Number(saldo_poin).toLocaleString('id-ID') + ' pts');
-    }
-
-    this.rule().feed(1);
-
-    // ======== FOOTER ========
+    // ======== FOOTER (Centered) ========
     this.alignCenter();
-    this.text(footer_text || 'Terima Kasih atas Kunjungan Anda!');
+    if (garansi) this.text('Garansi: ' + garansi);
+    this.text(footer_text || 'Terima kasih atas kunjungan Anda!');
+    this.text(kebijakan_retur || 'Segel toko wajib utuh & fisik barang tidak cacat.');
 
-    if (kebijakan_retur) {
-      for (const ln of this.wrap(kebijakan_retur)) {
-        this.text(ln);
-      }
-    }
     if (catatan_kaki) {
       for (const ln of this.wrap(catatan_kaki)) {
         this.text(ln);
@@ -371,11 +370,13 @@ class EscPos {
     return new Uint8Array(this.buf);
   }
 
+  /** Alias for buildReceipt */
+  build(data) {
+    return this.buildReceipt(data);
+  }
+
   /** Render HTML preview that visually matches the ESC/POS output 1:1 */
   renderPreviewHtml(data) {
-    const bytes = this.buildReceipt(data);
-    // We'll build HTML directly mirroring the layout logic above
-    // This is more reliable than trying to render bytes visually
     return this.buildPreviewHtml(data);
   }
 
@@ -383,8 +384,8 @@ class EscPos {
   buildPreviewHtml(data) {
     const {
       items = [],
-      total, bayar, kembali,
-      no_transaksi, metode_bayar, tanggal, kasir, cabang,
+      total = 0, bayar = 0, kembali = 0,
+      no_transaksi = '-', metode_bayar = 'TUNAI', metode = 'TUNAI', tanggal, waktu, kasir, cabang,
       pelanggan, tier, tipe_konsumen, saldo_poin, poin_ditukar,
       diskon_tier, diskon_partai, diskon_poin, diskon, diskon_persen, diskon_nominal,
       pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
@@ -393,201 +394,284 @@ class EscPos {
       garansi,
       footer_text, kebijakan_retur, catatan_kaki,
       nama_toko, slogan, alamat, telepon, website_medsos,
-      show_cabang, show_kasir, show_pelanggan, show_waktu,
-      show_qr_retur, qr_caption, qr_url,
+      show_cabang, show_kasir = true, show_pelanggan = true,
+      show_qr_retur = true, qr_caption, qr_url, qr_svg,
       paper_width = 58,
     } = data;
 
-    const money = (v) => 'Rp ' + Number(v).toLocaleString('id-ID');
-    const esc = (str) => str.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
+    const money = (v) => 'Rp ' + Number(v || 0).toLocaleString('id-ID');
+    const esc = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-    const paperClass = paper_width === 80 ? 'paper-80' : 'paper-58';
+    const widthNum = Number(paper_width) === 80 ? 80 : 58;
+    const paperClass = widthNum === 80 ? 'paper-80' : 'paper-58';
     const qrContent = no_transaksi || '-';
-    const qrUrl = qr_url || 'www.uteparts.id';
+    const qrUrlDomain = qr_url || website_medsos || 'www.uteparts.id';
+    const tglStr = tanggal || waktu || '';
+    const caraBayar = String(metode_bayar || metode || 'TUNAI').toUpperCase();
 
-    let html = `
-<div class="thermal-preview ${paperClass}" style="--paper-width: ${paper_width}mm;">
-  <div class="receipt">
-`;
+    // Generate fallback QR svg if none provided
+    const renderedQr = qr_svg || `
+      <svg width="68" height="68" viewBox="0 0 100 100" class="border border-gray-300 rounded p-0.5 bg-white">
+        <rect width="100" height="100" fill="white"/>
+        <rect x="10" y="10" width="25" height="25" fill="black"/>
+        <rect x="15" y="15" width="15" height="15" fill="white"/>
+        <rect x="19" y="19" width="7" height="7" fill="black"/>
+        <rect x="65" y="10" width="25" height="25" fill="black"/>
+        <rect x="70" y="15" width="15" height="15" fill="white"/>
+        <rect x="74" y="19" width="7" height="7" fill="black"/>
+        <rect x="10" y="65" width="25" height="25" fill="black"/>
+        <rect x="15" y="70" width="15" height="15" fill="white"/>
+        <rect x="19" y="74" width="7" height="7" fill="black"/>
+        <rect x="45" y="45" width="10" height="10" fill="black"/>
+        <rect x="40" y="20" width="6" height="15" fill="black"/>
+        <rect x="60" y="45" width="8" height="8" fill="black"/>
+        <rect x="45" y="65" width="12" height="6" fill="black"/>
+        <rect x="65" y="65" width="10" height="15" fill="black"/>
+      </svg>
+    `;
 
-    // Header
-    html += `
-    <div class="section header centered">
-      <div class="shop-name">${esc(nama_toko || 'UTEPARTS')}</div>
-      ${slogan ? `<div class="slogan">${esc(slogan)}</div>` : ''}
-      ${alamat ? `<div class="addr">${esc(alamat)}</div>` : ''}
-      ${telepon ? `<div class="phone">Telp/WA: ${esc(telepon)}</div>` : ''}
-      ${website_medsos ? `<div class="web">${esc(website_medsos)}</div>` : ''}
-      ${show_cabang && cabang ? `<div class="cabang">${esc(cabang)}</div>` : ''}
-      ${show_waktu && tanggal ? `<div class="time">${esc(tanggal)}</div>` : ''}
-      <hr class="rule">
-    </div>
-`;
+    const lblDiskon = (diskon_persen && Number(diskon_persen) > 0)
+      ? 'Diskon (' + diskon_persen + '%)'
+      : 'Diskon Kasir';
+    const ppnLabel = ppn_persen ? 'PPN (' + ppn_persen + '%)' : 'PPN';
 
-    // QR + Right column
-    html += `
-    <div class="section qr-section">
-      ${show_qr_retur && no_transaksi !== '-' ? `
-      <div class="qr-col">
-        <div class="qr-code" data-qr="${esc(qrContent)}"></div>
-        <div class="qr-label bold">${esc(qrContent)}</div>
-        <div class="qr-caption">${esc(qr_caption || 'Scan QR untuk Retur & Garansi')}</div>
+    return `
+<div class="thermal-receipt-doc ${paperClass}" style="width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: ${widthNum === 80 ? '11px' : '10px'}; line-height: 1.25; color: #000; background: #fff;">
+  <!-- HEADER (Centered) -->
+  <div style="text-align: center; width: 100%; padding-bottom: 2px;">
+    <div style="font-size: 14px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; text-align: center;">${esc(nama_toko || 'UTEParts')}</div>
+    <div style="font-size: 9px; font-weight: 600; text-transform: uppercase; margin-top: 2px; text-align: center;">${esc(slogan || 'SPAREPARTS/ACCESORIES/SERVICE')}</div>
+    ${alamat ? `<div style="font-size: 8px; color: #374151; margin-top: 2px; line-height: 1.2; text-align: center;">${esc(alamat)}</div>` : ''}
+    ${telepon ? `<div style="font-size: 8.5px; color: #1f2937; text-align: center;">Telp/WA: ${esc(telepon)}</div>` : ''}
+    ${show_cabang && cabang ? `<div style="font-size: 8.5px; font-weight: 600; text-align: center;">${esc(cabang)}</div>` : ''}
+  </div>
+
+  <!-- 2-COL: QR (Left) + URL/Date/Warranty Note (Right) -->
+  <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; gap: 8px; padding: 4px 0;">
+    ${show_qr_retur && qrContent !== '-' ? `
+      <div style="width: 68px; height: 68px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+        ${renderedQr}
       </div>
-      ` : ''}
-      <div class="info-col">
-        <div>Web: ${esc(qrUrl)}</div>
-        ${tanggal ? `<div>Tgl: ${esc(tanggal)}</div>` : ''}
-        ${garansi ? `<div>Garansi: ${esc(garansi)}</div>` : ''}
-        <div>Barang fisik utk tukar tdk rusak</div>
+    ` : ''}
+    <div style="flex: 1; min-width: 0; text-align: left; font-size: 8.5px; line-height: 1.25;">
+      <div style="font-weight: 600; color: #111827; word-break: break-all;">${esc(qrUrlDomain)}</div>
+      ${tglStr ? `<div style="color: #374151;">${esc(tglStr)}</div>` : ''}
+      <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">${esc(qr_caption || 'Scan QR ini untuk retur & klaim garansi')}</div>
+    </div>
+  </div>
+
+  <div style="border-top: 1px dashed #000; width: 100%; margin: 4px 0;"></div>
+
+  <!-- TRANSACTION INFO (Left-Right) -->
+  <div style="width: 100%; font-size: 9px; line-height: 1.35;">
+    <div style="display: flex; justify-content: space-between; width: 100%;">
+      <span style="color: #4b5563;">No. TRX:</span>
+      <span style="font-weight: 700; color: #111827;">${esc(qrContent)}</span>
+    </div>
+    ${sumber && !['pos', 'offline'].includes(sumber.toLowerCase()) ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Pesanan:</span>
+        <span>${esc(sumber.toUpperCase())}</span>
       </div>
-      <hr class="rule">
-    </div>
-`;
-
-    // Transaction info
-    html += `
-    <div class="section info-section">
-      <div class="row"><span class="label">TRX</span><span class="value">${esc(no_transaksi)}</span></div>
-      ${sumber && !['pos', 'offline'].includes(sumber.toLowerCase()) ? `<div class="row"><span class="label">Pesanan</span><span class="value">${esc(sumber.toUpperCase())}</span></div>` : ''}
-      ${no_tiket ? `<div class="row"><span class="label">Tiket</span><span class="value bold">${esc(no_tiket)}</span></div>` : ''}
-      ${jenis_hp ? `<div class="row"><span class="label">Unit</span><span class="value">${esc(jenis_hp)}</span></div>` : ''}
-      ${kurir ? `<div class="row"><span class="label">${is_pickup ? 'Ambil' : 'Kurir'}</span><span class="value">${esc(kurir + (resi && resi !== '-' ? ' (' + resi + ')' : ''))}</span></div>` : ''}
-      ${show_kasir && kasir ? `<div class="row"><span class="label">Kasir</span><span class="value">${esc(kasir)}</span></div>` : ''}
-      ${show_pelanggan ? `
-        <div class="row"><span class="label">Pelanggan</span><span class="value">${esc(pelanggan || 'Umum')}</span></div>
-        ${tier && tier !== 'Retail' && tier !== 'Umum' ? `<div class="row"><span class="label">${['reseller', 'agen'].includes(tipe_konsumen) ? 'Mitra' : 'Tier'}</span><span class="value bold">${esc(tier)}</span></div>` : ''}
-        ${saldo_poin && Number(saldo_poin) > 0 ? `<div class="row"><span class="label">Poin</span><span class="value">${Number(saldo_poin).toLocaleString('id-ID')} Poin</span></div>` : ''}
+    ` : ''}
+    ${no_tiket ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">No. Tiket:</span>
+        <span style="font-weight: 700;">${esc(no_tiket)}</span>
+      </div>
+    ` : ''}
+    ${jenis_hp ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Unit:</span>
+        <span>${esc(jenis_hp)}</span>
+      </div>
+    ` : ''}
+    ${kurir ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">${is_pickup ? 'Ambil:' : 'Kurir:'}</span>
+        <span>${esc(kurir + (resi && resi !== '-' ? ' (' + resi + ')' : ''))}</span>
+      </div>
+    ` : ''}
+    ${show_kasir && kasir ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Kasir:</span>
+        <span>${esc(kasir)}</span>
+      </div>
+    ` : ''}
+    ${show_pelanggan ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Pelanggan:</span>
+        <span>${esc(pelanggan || 'Umum')}</span>
+      </div>
+      ${tier && tier !== 'Retail' && tier !== 'Umum' ? `
+        <div style="display: flex; justify-content: space-between; width: 100%;">
+          <span style="color: #4b5563;">${['reseller', 'agen'].includes(tipe_konsumen) ? 'Mitra:' : 'Tier:'}</span>
+          <span style="font-weight: 700;">${esc(tier)}</span>
+        </div>
       ` : ''}
-      <hr class="rule">
-    </div>
-`;
+    ` : ''}
+  </div>
 
-    // Items
-    html += `
-    <div class="section items-section">
-`;
-    for (const item of items) {
+  <!-- ITEMS -->
+  <div style="width: 100%; margin: 4px 0;">
+    ${items.map(item => {
       const nama = item.nama || 'Item';
-      const qtySatuan = item.qty + (item.satuan ? ' ' + item.satuan : '');
+      const qtySatuan = (item.qty || 1) + (item.satuan ? ' ' + item.satuan : ' PCS');
       const harga = money(item.harga);
-      const subtotalItem = money(item.subtotal);
+      const subtotalItem = Number(item.subtotal || 0).toLocaleString('id-ID');
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
 
-      html += `
-      <div class="item">
-        <div class="item-name bold">${esc(nama)}</div>
-        <div class="row"><span class="label">${esc(qtySatuan + ' x ' + harga)}</span><span class="value">${esc(subtotalItem)}</span></div>
-`;
-      if (hargaRetail > hargaJual) {
-        html += `<div class="row strikethrough"><span class="label">Normal: ${money(hargaRetail)}</span><span class="value arrow">${esc('→')}</span><span class="value">${money(hargaJual)}</span></div>`;
-      }
-      if (item.catatan) {
-        html += `<div class="item-note">* ${esc(item.catatan)}</div>`;
-      }
-      html += `</div>`;
-    }
-    html += `      <hr class="rule">
-    </div>
-`;
-
-    // Subtotal breakdown
-    html += `
-    <div class="section totals-section">
-`;
-    if (diskon_tier && Number(diskon_tier) > 0) {
-      const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
-      html += `<div class="row"><span class="label">Subtotal Retail</span><span class="value">${money(subRetail)}</span></div>`;
-      const tierLbl = (tier && tier !== 'Retail')
-        ? 'Pot ' + tier
-        : (['reseller', 'agen'].includes(tipe_konsumen) ? 'Pot Mitra' : 'Pot Tier');
-      html += `<div class="row"><span class="label">${tierLbl}</span><span class="value neg">-${money(diskon_tier)}</span></div>`;
-      html += `<div class="row"><span class="label">Subtotal</span><span class="value">${money(subtotal ?? total)}</span></div>`;
-    } else {
-      html += `<div class="row"><span class="label">Subtotal</span><span class="value">${money(subtotal ?? total)}</span></div>`;
-    }
-    if (diskon_partai && Number(diskon_partai) > 0) {
-      html += `<div class="row"><span class="label">Diskon Partai</span><span class="value neg">-${money(diskon_partai)}</span></div>`;
-    }
-    if (diskon_poin && Number(diskon_poin) > 0) {
-      html += `<div class="row"><span class="label">Tukar Poin (${poin_ditukar || 0}pts)</span><span class="value neg">-${money(diskon_poin)}</span></div>`;
-    }
-    if (diskon && Number(diskon) > 0) {
-      const lbl = (diskon_persen && Number(diskon_persen) > 0)
-        ? 'Diskon (' + diskon_persen + '%)'
-        : 'Diskon Kasir';
-      html += `<div class="row"><span class="label">${esc(lbl)}</span><span class="value neg">-${money(diskon)}</span></div>`;
-    }
-    if (pajak && Number(pajak) > 0) {
-      const ppnLbl = ppn_persen ? 'PPN (' + ppn_persen + '%)' : 'PPN';
-      html += `<div class="row"><span class="label">${esc(ppnLbl)}</span><span class="value pos">+${money(pajak)}</span></div>`;
-    }
-    if (ongkir && Number(ongkir) > 0) {
-      html += `<div class="row"><span class="label">Ongkir</span><span class="value pos">+${money(ongkir)}</span></div>`;
-    }
-    html += `      <hr class="rule">
-    </div>
-`;
-
-    // Total & Payment
-    html += `
-    <div class="section payment-section">
-      <div class="row total-row bold"><span class="label">TOTAL</span><span class="value">${money(total)}</span></div>
-`;
-    if (is_piutang) {
-      html += `
-      <div class="row"><span class="label">Status</span><span class="value piutang">BELUM LUNAS (PIUTANG)</span></div>
-      ${jatuh_tempo ? `<div class="row"><span class="label">Jatuh Tempo</span><span class="value">${esc(jatuh_tempo)}</span></div>` : ''}
-      <div class="row"><span class="label">Sisa Tag</span><span class="value">${money(sisa_piutang ?? total)}</span></div>
-`;
-    } else {
-      html += `
-      <div class="row"><span class="label">Bayar</span><span class="value">${money(bayar)}</span></div>
-      <div class="row"><span class="label">Kembali</span><span class="value">${money(kembali ?? 0)}</span></div>
-      <div class="row"><span class="label">Metode</span><span class="value">${esc(metode_bayar)}</span></div>
-`;
-    }
-    if (hemat_total && Number(hemat_total) > 0) {
-      html += `<div class="row bold"><span class="label">HEMAT</span><span class="value">${money(hemat_total)}</span></div>`;
-    }
-    if (komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0) {
-      html += `<div class="row"><span class="label">Komisi</span><span class="value pos">+${money(komisi_mitra_nominal)} (Saldo)</span></div>`;
-    }
-    if (saldo_poin !== undefined) {
-      html += `<div class="row"><span class="label">Sisa Poin</span><span class="value">${Number(saldo_poin).toLocaleString('id-ID')} pts</span></div>`;
-    }
-    html += `      <hr class="rule">
-    </div>
-`;
-
-    // Footer
-    html += `
-    <div class="section footer centered">
-      <div>${esc(footer_text || 'Terima Kasih atas Kunjungan Anda!')}</div>
-      ${kebijakan_retur ? `<div class="policy">${esc(kebijakan_retur)}</div>` : ''}
-      ${catatan_kaki ? `<div class="note">${esc(catatan_kaki)}</div>` : ''}
-      ${is_piutang ? `
-        <div class="piutang-signature">
-          <p>"Barang diterima & berjanji melunasi sblm jatuh tempo"</p>
-          <div class="sig-row">
-            <div class="sig-col">Penerima,</div>
-            <div class="sig-col">Kasir,</div>
+      return `
+        <div style="width: 100%; margin-bottom: 4px;">
+          <div style="font-weight: 700; font-size: 9.5px; line-height: 1.25; word-break: break-word;">${esc(nama)}</div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: 9px; margin-top: 1px;">
+            <span>
+              ${qtySatuan} x ${hargaRetail > hargaJual ? `
+                <span style="text-decoration: line-through; opacity: 0.6; margin-right: 2px;">${money(hargaRetail)}</span>
+                <span style="font-weight: 700;">${money(hargaJual)}</span>
+              ` : `<span>${harga}</span>`}
+            </span>
+            <span style="font-weight: 700; text-align: right; margin-left: 4px;">${subtotalItem}</span>
           </div>
-          <div class="sig-row">
-            <div class="sig-col">(............)</div>
-            <div class="sig-col">(............)</div>
-          </div>
+          ${item.catatan ? `<div style="font-size: 8px; color: #4b5563; font-style: italic; margin-top: 1px;">* ${esc(item.catatan)}</div>` : ''}
+        </div>
+      `;
+    }).join('')}
+  </div>
+
+  <!-- SUBTOTAL BREAKDOWN & TOTALS (Directly follows items without extra dashed line) -->
+  <div style="width: 100%; font-size: 9px; line-height: 1.35;">
+    ${diskon_tier && Number(diskon_tier) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Subtotal Retail:</span>
+        <span>${money(Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier)))}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">${tier && tier !== 'Retail' ? 'Pot ' + esc(tier) + ':' : 'Pot Mitra:'}</span>
+        <span style="color: #dc2626;">-${money(diskon_tier)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Subtotal:</span>
+        <span>${money(subtotal ?? total)}</span>
+      </div>
+    ` : `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Subtotal:</span>
+        <span>${money(subtotal ?? total)}</span>
+      </div>
+    `}
+
+    ${diskon_partai && Number(diskon_partai) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Diskon Partai:</span>
+        <span style="color: #dc2626;">-${money(diskon_partai)}</span>
+      </div>
+    ` : ''}
+    ${diskon_poin && Number(diskon_poin) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Tukar Poin (${poin_ditukar || 0}pts):</span>
+        <span style="color: #dc2626;">-${money(diskon_poin)}</span>
+      </div>
+    ` : ''}
+    ${diskon && Number(diskon) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">${esc(lblDiskon)}:</span>
+        <span style="color: #dc2626;">-${money(diskon)}</span>
+      </div>
+    ` : ''}
+    ${pajak && Number(pajak) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">${esc(ppnLabel)}:</span>
+        <span>+${money(pajak)}</span>
+      </div>
+    ` : ''}
+    ${ongkir && Number(ongkir) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Ongkir:</span>
+        <span>+${money(ongkir)}</span>
+      </div>
+    ` : ''}
+
+    <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: 13px; font-weight: 900; padding: 2px 0;">
+      <span>TOTAL:</span>
+      <span>${money(total)}</span>
+    </div>
+
+    ${is_piutang ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #b45309;">
+        <span>Status:</span>
+        <span>BELUM LUNAS (PIUTANG)</span>
+      </div>
+      ${jatuh_tempo ? `
+        <div style="display: flex; justify-content: space-between; width: 100%;">
+          <span style="color: #4b5563;">Jatuh Tempo:</span>
+          <span>${esc(jatuh_tempo)}</span>
         </div>
       ` : ''}
-    </div>
+      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700;">
+        <span style="color: #4b5563;">Sisa Tag:</span>
+        <span>${money(sisa_piutang ?? total)}</span>
+      </div>
+    ` : `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">BAYAR (${esc(caraBayar)}):</span>
+        <span style="font-weight: 600;">${money(bayar || total)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">KEMBALI:</span>
+        <span style="font-weight: 600;">${money(kembali ?? 0)}</span>
+      </div>
+    `}
+
+    ${saldo_poin !== undefined ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Sisa Saldo Poin:</span>
+        <span>${Number(saldo_poin).toLocaleString('id-ID')} pts</span>
+      </div>
+    ` : ''}
+    ${hemat_total && Number(hemat_total) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #059669;">
+        <span>HEMAT:</span>
+        <span>${money(hemat_total)}</span>
+      </div>
+    ` : ''}
+    ${komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; color: #2563eb;">
+        <span style="color: #4b5563;">Komisi:</span>
+        <span>+${money(komisi_mitra_nominal)} (Saldo)</span>
+      </div>
+    ` : ''}
+  </div>
+
+  <div style="border-top: 1px dashed #000; width: 100%; margin: 4px 0;"></div>
+
+  <!-- FOOTER (Centered) -->
+  <div style="text-align: center; width: 100%; font-size: 8.5px; color: #374151; line-height: 1.3; padding-top: 2px;">
+    ${garansi ? `<div style="font-weight: 700; color: #111827; text-align: center;">Garansi: ${esc(garansi)}</div>` : ''}
+    <div style="text-align: center;">${esc(footer_text || 'Terima kasih atas kunjungan Anda!')}</div>
+    <div style="font-size: 8px; color: #4b5563; text-align: center;">${esc(kebijakan_retur || 'Segel toko wajib utuh & fisik barang tidak cacat.')}</div>
+    ${catatan_kaki ? `<div style="font-size: 8px; color: #6b7280; margin-top: 2px; text-align: center;">${esc(catatan_kaki)}</div>` : ''}
+    ${is_piutang ? `
+      <div style="margin-top: 8px; border-top: 1px dotted #d1d5db; padding-top: 4px;">
+        <div style="font-style: italic; font-size: 7.5px; text-align: center;">"Barang diterima & berjanji melunasi sblm jatuh tempo"</div>
+        <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 8px; padding: 0 8px;">
+          <div>Penerima,</div>
+          <div>Kasir,</div>
+        </div>
+        <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 16px; padding: 0 8px;">
+          <div>(............)</div>
+          <div>(............)</div>
+        </div>
+      </div>
+    ` : ''}
   </div>
 </div>
 `;
-    return html;
   }
 }
 
-/** Thermal printer manager — Web Bluetooth with auto-reconnect */
+/** Thermal printer manager — Web Bluetooth with persistent device & silent auto-reconnect */
 class ThermalPrinter {
   constructor() {
     this.device = null;
@@ -596,64 +680,152 @@ class ThermalPrinter {
     this.isConnecting = false;
     this.onStatusChange = null;
     this.onError = null;
+    this.status = 'unpaired';
 
-    // Auto-reconnect on page load if previously paired
+    // Candidate thermal BLE service UUIDs
+    this.serviceUuids = [
+      '000018f0-0000-1000-8000-00805f9b34fb', // Standard POS
+      'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // PosPrinter / Goojprt
+      '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC transparent UART
+      '0000ff00-0000-1000-8000-00805f9b34fb', // ESC/POS vendor
+      '0000fee7-0000-1000-8000-00805f9b34fb', // Tencent/WeChat POS
+    ];
+
+    // Attempt silent auto-reconnect on boot
     this.loadSavedDevice();
   }
 
-  /** Load previously paired device from localStorage */
+  /** Load previously paired device silently from localStorage via getDevices() */
   async loadSavedDevice() {
     try {
       const saved = localStorage.getItem('thermal_printer_device');
-      if (saved) {
-        const { name, id } = JSON.parse(saved);
-        // Request device with filter to re-use pairing
-        this.device = await navigator.bluetooth.requestDevice({
-          filters: [{ name }],
-          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Common thermal service
-        });
-        this.device.addEventListener('gattserverdisconnected', () => this.scheduleReconnect());
-        this.setStatus('ready');
+      if (!saved) {
+        this.setStatus('unpaired');
+        return;
       }
+
+      const { name, id } = JSON.parse(saved);
+      if (navigator.bluetooth && typeof navigator.bluetooth.getDevices === 'function') {
+        const devices = await navigator.bluetooth.getDevices();
+        const matched = devices.find(d => d.id === id || d.name === name);
+        if (matched) {
+          this.device = matched;
+          this.device.addEventListener('gattserverdisconnected', () => this.scheduleReconnect());
+          await this.connectGatt();
+          return;
+        }
+      }
+
+      // Saved info available even if silent auto-reconnect awaits user action
+      this.setStatus('saved');
     } catch (e) {
-      // No saved device or user cancelled
+      console.warn('Silent BLE reconnect skipped:', e);
       this.setStatus('unpaired');
     }
   }
 
-  /** Connect to printer — saves pairing for auto-reconnect */
-  async connect() {
-    if (this.isConnecting) return;
-    if (this.device?.gatt?.connected) return this.setStatus('connected');
+  /** Connect to GATT server & find writable characteristic */
+  async connectGatt() {
+    if (!this.device?.gatt) return;
+    if (this.device.gatt.connected && this.characteristic) {
+      this.setStatus('connected');
+      return;
+    }
 
     this.isConnecting = true;
     this.setStatus('connecting');
 
     try {
-      if (!this.device) {
+      const server = await this.device.gatt.connect();
+      this.characteristic = await this.discoverWritableCharacteristic(server);
+
+      localStorage.setItem('thermal_printer_device', JSON.stringify({
+        name: this.device.name,
+        id: this.device.id,
+      }));
+      localStorage.setItem('ute_ble_printer_name', this.device.name || 'Bluetooth Printer');
+
+      this.setStatus('connected');
+    } catch (e) {
+      console.error('GATT connection error:', e);
+      this.setStatus('error');
+      this.onError?.(e);
+      throw e;
+    } finally {
+      this.isConnecting = false;
+    }
+  }
+
+  /** Discover writable characteristic across known thermal printer services */
+  async discoverWritableCharacteristic(server) {
+    for (const sUuid of this.serviceUuids) {
+      try {
+        const service = await server.getPrimaryService(sUuid);
+        const characteristics = await service.getCharacteristics();
+        for (const c of characteristics) {
+          if (c.properties.write || c.properties.writeWithoutResponse) {
+            return c;
+          }
+        }
+      } catch (e) {
+        // Continue searching other services
+      }
+    }
+
+    // Generic fallback: check all primary services
+    try {
+      const services = await server.getPrimaryServices();
+      for (const service of services) {
+        const chars = await service.getCharacteristics();
+        for (const c of chars) {
+          if (c.properties.write || c.properties.writeWithoutResponse) {
+            return c;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    throw new Error('Tidak ditemukan karakteristik write pada printer thermal ini');
+  }
+
+  /** Connect to printer — prompts device picker if not connected */
+  async connect(pairNew = false) {
+    if (this.isConnecting) return;
+    if (!pairNew && this.device?.gatt?.connected && this.characteristic) {
+      return this.setStatus('connected');
+    }
+
+    if (!navigator.bluetooth) {
+      throw new Error('Web Bluetooth tidak didukung browser ini (gunakan Chrome/Edge)');
+    }
+
+    this.isConnecting = true;
+    this.setStatus('connecting');
+
+    try {
+      if (pairNew || !this.device) {
         this.device = await navigator.bluetooth.requestDevice({
           filters: [
             { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
             { namePrefix: 'POS' },
             { namePrefix: 'Thermal' },
-            { namePrefix: 'Printer' }
+            { namePrefix: 'Printer' },
+            { namePrefix: 'MPT' },
+            { namePrefix: 'RP' },
+            { namePrefix: 'PTP' },
+            { namePrefix: 'InnerPrinter' },
+            { namePrefix: 'BlueTooth' },
+            { namePrefix: 'MTP' },
           ],
-          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+          optionalServices: this.serviceUuids,
         });
+
         this.device.addEventListener('gattserverdisconnected', () => this.scheduleReconnect());
       }
 
-      const server = await this.device.gatt.connect();
-      const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-      this.characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-
-      // Save for auto-reconnect
-      localStorage.setItem('thermal_printer_device', JSON.stringify({
-        name: this.device.name,
-        id: this.device.id
-      }));
-
-      this.setStatus('connected');
+      await this.connectGatt();
     } catch (e) {
       this.setStatus('error');
       this.onError?.(e);
@@ -665,21 +837,40 @@ class ThermalPrinter {
 
   scheduleReconnect() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.characteristic = null;
     this.setStatus('disconnected');
-    this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+    // Try reconnecting after 3 seconds
+    this.reconnectTimer = setTimeout(async () => {
+      if (this.device) {
+        try {
+          await this.connectGatt();
+        } catch (e) {
+          // Reconnect will re-trigger on next print attempt
+        }
+      }
+    }, 3000);
   }
 
-  /** Print raw ESC/POS bytes */
+  /** Print raw ESC/POS bytes with safe MTU chunking */
   async print(bytes) {
-    if (!this.characteristic) await this.connect();
-    if (!this.characteristic) throw new Error('Printer not connected');
+    if (!this.characteristic) {
+      await this.connect();
+    }
+    if (!this.characteristic) {
+      throw new Error('Printer tidak tersambung');
+    }
 
-    const mtu = 20; // BLE MTU
-    for (let i = 0; i < bytes.length; i += mtu) {
-      const chunk = bytes.slice(i, i + mtu);
-      await this.characteristic.writeValue(chunk);
-      // Small delay to avoid overwhelming printer buffer
-      await new Promise(r => setTimeout(r, 10));
+    const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const mtu = 64; // Safe BLE write chunk
+    for (let i = 0; i < payload.length; i += mtu) {
+      const chunk = payload.slice(i, i + mtu);
+      if (this.characteristic.properties.writeWithoutResponse) {
+        await this.characteristic.writeValueWithoutResponse(chunk);
+      } else {
+        await this.characteristic.writeValue(chunk);
+      }
+      // Pacing delay to avoid choking thermal buffer
+      await new Promise(r => setTimeout(r, 15));
     }
   }
 
@@ -696,6 +887,7 @@ class ThermalPrinter {
     this.device = null;
     this.characteristic = null;
     localStorage.removeItem('thermal_printer_device');
+    localStorage.removeItem('ute_ble_printer_name');
     this.setStatus('unpaired');
   }
 }
@@ -706,130 +898,86 @@ window.ThermalPrinter = ThermalPrinter;
 
 /**
  * Alpine component for thermal receipt modal.
- * Returns an object with all methods needed for receipt preview and printing.
  * Merges with parent component via spread operator: ...thermalPrinter(config)
  */
 function thermalPrinter(config = {}) {
   const printer = new ThermalPrinter();
-  let isPrinting = false;
-  let autoDirectPrint = false;
-  let pairedPrinterName = null;
-
-  // Load saved Bluetooth MAC from config
   const savedBluetoothMac = config.thermal_bluetooth_mac || '';
   const savedCupsPrinter = config.thermal_printer_name || '';
-  const autoPrintEnabled = config.thermal_auto_print || config.auto_print || false;
+  const autoPrintEnabled = Boolean(config.thermal_auto_print || config.auto_print || false);
+  const storedBleName = localStorage.getItem('ute_ble_printer_name');
 
-  // Try to load previously paired device
-  if (savedBluetoothMac) {
-    pairedPrinterName = `BT: ${savedBluetoothMac}`;
+  let initialPairedName = null;
+  if (storedBleName) {
+    initialPairedName = storedBleName;
+  } else if (savedBluetoothMac) {
+    initialPairedName = `BT: ${savedBluetoothMac}`;
   } else if (savedCupsPrinter) {
-    pairedPrinterName = `CUPS: ${savedCupsPrinter}`;
+    initialPairedName = `CUPS: ${savedCupsPrinter}`;
   }
 
   return {
-    // State
     data: { ...config },
     paperSize: '58',
     isPrinting: false,
-    autoDirectPrint: false,
-    pairedPrinterName: pairedPrinterName,
+    autoDirectPrint: localStorage.getItem('ute_pos_auto_direct_print') === 'true' || autoPrintEnabled,
+    pairedPrinterName: initialPairedName,
     printer: printer,
 
-    // Init
     init() {
-      this.paperSize = localStorage.getItem('ute_pos_paper_size') || 
+      this.paperSize = localStorage.getItem('ute_pos_paper_size') ||
         (this.data.default_width?.includes('80') ? '80' : '58');
-      
+
       printer.onStatusChange = (status) => {
         if (status === 'connected') {
-          this.pairedPrinterName = this.printer.device?.name || `BT: ${savedBluetoothMac}`;
-          this.$nextTick(() => {
-            if (this.autoDirectPrint || autoPrintEnabled) {
-              setTimeout(() => this.directPrint(this.paperSize), 350);
-            }
-          });
+          this.pairedPrinterName = this.printer.device?.name || localStorage.getItem('ute_ble_printer_name') || 'Bluetooth Printer';
         } else if (status === 'disconnected') {
-          this.pairedPrinterName = savedBluetoothMac ? `BT: ${savedBluetoothMac} (terputus)` : null;
-        } else if (status === 'error') {
-          this.pairedPrinterName = 'Kesalahan sambungan';
+          const cached = localStorage.getItem('ute_ble_printer_name') || (savedBluetoothMac ? `BT: ${savedBluetoothMac}` : null);
+          this.pairedPrinterName = cached ? `${cached} (terputus)` : null;
+        } else if (status === 'unpaired') {
+          this.pairedPrinterName = null;
         }
       };
 
-      // Auto-connect if Bluetooth MAC is configured
-      if (savedBluetoothMac && navigator.bluetooth) {
-        this.connectBluetooth(savedBluetoothMac);
-      }
+      // Auto-trigger background print on checkout if configured
+      this.$nextTick(() => {
+        if (this.autoDirectPrint) {
+          setTimeout(() => {
+            this.directPrint(this.paperSize);
+          }, 350);
+        }
+      });
     },
 
-    // Bluetooth connection
-    async connectBluetooth(mac) {
-      if (!navigator.bluetooth) {
-        this.showToast('Web Bluetooth tidak didukung browser ini');
-        return;
-      }
-
-      try {
-        // Filter by MAC address prefix (Web Bluetooth doesn't support exact MAC filter directly)
-        // We'll use service filter and then verify the device
-        this.printer.device = await navigator.bluetooth.requestDevice({
-          filters: [
-            { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
-            { namePrefix: 'POS' },
-            { namePrefix: 'Thermal' },
-            { namePrefix: 'Printer' }
-          ],
-          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-        });
-
-        this.printer.device.addEventListener('gattserverdisconnected', () => this.printer.scheduleReconnect());
-        
-        const server = await this.printer.device.gatt.connect();
-        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-        this.printer.characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-
-        // Save for auto-reconnect
-        localStorage.setItem('thermal_printer_device', JSON.stringify({
-          name: this.printer.device.name,
-          id: this.printer.device.id
-        }));
-
-        this.pairedPrinterName = this.printer.device.name || `BT: ${mac}`;
-        this.printer.setStatus('connected');
-      } catch (e) {
-        console.error('Bluetooth connect failed:', e);
-        this.showToast('Gagal menyambung ke printer Bluetooth: ' + e.message);
-        this.pairedPrinterName = null;
-      }
-    },
-
-    // Print functions
     async directPrint(paperSize) {
       if (this.isPrinting) return;
       this.isPrinting = true;
 
       try {
-        const paperWidth = paperSize === '80' ? 80 : 58;
+        const paperWidth = Number(paperSize) === 80 ? 80 : 58;
         const esc = new window.EscPos(paperWidth);
-        const bytes = esc.build(this.data);
+        const bytes = esc.buildReceipt(this.data);
 
-        // Check if we have CUPS printer configured
+        // 1. CUPS raw printing if configured
         if (savedCupsPrinter) {
           await this.printViaCups(savedCupsPrinter, bytes);
           this.showToast(`Struk dikirim ke printer CUPS: ${savedCupsPrinter}`);
-        } 
-        // Check if we have Bluetooth printer
-        else if (this.printer.characteristic) {
-          await this.printer.print(bytes);
-          this.showToast('Struk dikirim ke printer Bluetooth');
         }
-        // Fallback: trigger browser print dialog
+        // 2. Web Bluetooth direct print
+        else if (this.printer.device || localStorage.getItem('thermal_printer_device')) {
+          await this.printer.print(bytes);
+          this.showToast('Struk berhasil dicetak via Bluetooth');
+        }
+        // 3. Browser fallback dialog
         else {
           this.printViaBrowser(paperSize);
         }
       } catch (e) {
         console.error('Print failed:', e);
-        this.showToast('Gagal mencetak: ' + e.message);
+        // Fallback to browser print on BLE error if user desires
+        if (confirm('Gagal cetak via Bluetooth (' + e.message + '). Buka cetak browser?')) {
+          this.printViaBrowser(paperSize);
+        }
       } finally {
         this.isPrinting = false;
       }
@@ -840,12 +988,12 @@ function thermalPrinter(config = {}) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
         },
         body: JSON.stringify({
           printer: printerName,
-          data: Array.from(bytes)
-        })
+          data: Array.from(bytes),
+        }),
       });
 
       if (!response.ok) {
@@ -855,42 +1003,60 @@ function thermalPrinter(config = {}) {
 
     printViaBrowser(paperSize) {
       const printWindow = window.open('', '_blank');
-      const paperWidth = paperSize === '80' ? 80 : 58;
+      if (!printWindow) {
+        window.print();
+        return;
+      }
+
+      const paperWidth = Number(paperSize) === 80 ? 80 : 58;
       const esc = new window.EscPos(paperWidth);
       const html = esc.buildPreviewHtml(this.data);
-      
+
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Struk Thermal</title>
+          <meta charset="utf-8">
+          <title>Struk UTEParts</title>
           <style>
             @media print {
-              @page { margin: 0; size: ${paperSize}mm auto; }
-              body { margin: 0; padding: 0; }
+              @page { margin: 0; size: ${paperWidth}mm auto; }
+              body { margin: 0; padding: 1mm; background: #fff; }
               .no-print { display: none !important; }
             }
-            .thermal-receipt-container { 
-              width: ${paperSize === '80' ? '302px' : '210px'}; 
-              margin: 0 auto; 
-              font-family: monospace; 
-              font-size: 10px; 
-              line-height: 1.3; 
+            body {
+              margin: 0;
+              padding: 4px;
+              background: #fff;
+              font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+              color: #000;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
+            * { box-sizing: border-box; }
           </style>
         </head>
-        <body>${html}</body>
+        <body>
+          ${html}
+        </body>
         </html>
       `);
       printWindow.document.close();
       printWindow.focus();
-      printWindow.print();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
     },
 
-    // Print specific sizes (for buttons)
     async printStruk58(pairNew = false) {
       if (pairNew) {
-        await this.connectBluetooth(savedBluetoothMac);
+        try {
+          await this.printer.connect(true);
+          this.pairedPrinterName = this.printer.device?.name || 'Bluetooth Printer';
+          this.showToast('Printer Bluetooth terhubung');
+        } catch (e) {
+          this.showToast('Gagal menyambung: ' + e.message);
+        }
         return;
       }
       await this.directPrint('58');
@@ -898,7 +1064,13 @@ function thermalPrinter(config = {}) {
 
     async printFaktur80(pairNew = false) {
       if (pairNew) {
-        await this.connectBluetooth(savedBluetoothMac);
+        try {
+          await this.printer.connect(true);
+          this.pairedPrinterName = this.printer.device?.name || 'Bluetooth Printer';
+          this.showToast('Printer Bluetooth terhubung');
+        } catch (e) {
+          this.showToast('Gagal menyambung: ' + e.message);
+        }
         return;
       }
       await this.directPrint('80');
@@ -917,9 +1089,9 @@ function thermalPrinter(config = {}) {
 
     showToast(message) {
       this.$dispatch('toast', { message, type: 'info' });
-    }
+    },
   };
 }
 
-// Make it globally available
+// Global exposure
 window.thermalPrinter = thermalPrinter;

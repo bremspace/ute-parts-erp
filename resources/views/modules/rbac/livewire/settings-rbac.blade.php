@@ -1598,117 +1598,120 @@
                             <div class="flex flex-col items-center justify-center p-4 sm:p-6 bg-ink-950/40 rounded-2xl border border-white/5">
                                 <!-- Kertas Struk Simulasi -->
                                 <div
-                                    class="bg-white text-black p-4 rounded-xl font-mono text-xs shadow-2xl space-y-2 border border-gray-300 transition-all duration-200 select-text"
-                                    style="width: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '210px' : '302px' }};"
+                                    class="bg-white text-black p-3 rounded-xl font-mono text-[10px] shadow-2xl space-y-1.5 border border-gray-300 transition-all duration-200 select-text"
+                                    style="width: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '210px' : '302px' }}; max-width: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '210px' : '302px' }}; margin: 0 auto; line-height: 1.25;"
                                 >
-                                    <!-- Header Toko -->
-                                    <div class="text-center pb-2 border-b border-dashed border-gray-400 space-y-0.5">
-                                        <h3 class="text-sm font-black tracking-wider text-gray-900 uppercase">{{ $strukForm['nama_toko'] ?: 'BREMSPACE' }}</h3>
-                                        @if(!empty($strukForm['slogan']))
-                                            <p class="text-[10px] text-gray-600 font-medium">{{ $strukForm['slogan'] }}</p>
-                                        @endif
+                                    <!-- Header Toko (Centered) -->
+                                    <div class="text-center pb-0.5 space-y-0.5">
+                                        <h3 class="text-sm font-black tracking-wider text-gray-900 uppercase">{{ $strukForm['nama_toko'] ?: 'UTEParts' }}</h3>
+                                        <p class="text-[9px] text-gray-700 font-semibold uppercase">{{ $strukForm['slogan'] ?: 'SPAREPARTS/ACCESORIES/SERVICE' }}</p>
                                         @if(!empty($strukForm['alamat']))
-                                            <p class="text-[9px] text-gray-500">{{ $strukForm['alamat'] }}</p>
+                                            <p class="text-[8px] text-gray-600 leading-tight">{{ $strukForm['alamat'] }}</p>
                                         @endif
                                         @if(!empty($strukForm['telepon']))
-                                            <p class="text-[9px] text-gray-500">Telp/WA: {{ $strukForm['telepon'] }}</p>
+                                            <p class="text-[8.5px] text-gray-700">Telp/WA: {{ $strukForm['telepon'] }}</p>
                                         @endif
-                                        @if(!empty($strukForm['website_medsos']))
-                                            <p class="text-[9px] text-gray-400">{{ $strukForm['website_medsos'] }}</p>
-                                        @endif
-                                        @if($strukForm['show_cabang'] ?? true)
-                                            <p class="text-[9px] text-gray-500">Cabang Pusat - Jakarta</p>
-                                        @endif
-                                        @if($strukForm['show_waktu'] ?? true)
-                                            <p class="text-[9px] text-gray-500">{{ now()->format('d/m/Y H:i:s') }}</p>
+                                        @if($strukForm['show_cabang'] ?? false)
+                                            <p class="text-[8.5px] text-gray-800 font-semibold">Cabang Pusat - Sukabumi</p>
                                         @endif
                                     </div>
 
-                                    <!-- Meta Transaksi -->
-                                    <div class="text-[10px] space-y-0.5 border-b border-dashed border-gray-300 pb-2">
+                                    <!-- 2-COL: QR (Left) + URL/Date/Warranty (Right) -->
+                                    <div class="flex flex-row items-center justify-between gap-2 py-1">
+                                        @if($strukForm['show_qr_retur'] ?? true)
+                                            <div class="shrink-0 flex items-center justify-center">
+                                                {!! app(\App\Modules\Wms\Services\QrCodeService::class)->generateSvg('TRX-C01-20261113-0016', 68, 0) !!}
+                                            </div>
+                                        @endif
+                                        <div class="flex-1 text-left text-[8.5px] leading-tight space-y-0.5">
+                                            <div class="font-bold text-gray-900">{{ $strukForm['website_medsos'] ?: 'www.uteparts.id' }}</div>
+                                            @if($strukForm['show_waktu'] ?? true)
+                                                <div class="text-gray-700">{{ now()->format('d/m/Y H:i') }}</div>
+                                            @endif
+                                            <div class="text-[8px] text-gray-500 leading-snug">{{ $strukForm['qr_caption'] ?: 'Scan QR ini untuk retur & klaim garansi' }}</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="border-t border-dashed border-gray-400 my-1"></div>
+
+                                    <!-- Meta Transaksi (Left-Right) -->
+                                    <div class="text-[9px] space-y-0.5 leading-tight">
                                         <div class="flex justify-between">
                                             <span class="text-gray-600">No. TRX:</span>
-                                            <span class="font-bold text-gray-900">TRX-20261018-0001</span>
+                                            <span class="font-bold text-gray-900">TRX-C01-20261113-0016</span>
                                         </div>
                                         @if($strukForm['show_kasir'] ?? true)
                                             <div class="flex justify-between">
                                                 <span class="text-gray-600">Kasir:</span>
-                                                <span class="text-gray-900">{{ auth()->user()?->name ?? 'Kasir 1' }}</span>
+                                                <span class="text-gray-900">{{ auth()->user()?->name ?? 'Super Admin UteParts' }}</span>
                                             </div>
                                         @endif
                                         @if($strukForm['show_pelanggan'] ?? true)
                                             <div class="flex justify-between">
                                                 <span class="text-gray-600">Pelanggan:</span>
-                                                <span class="text-gray-900 font-medium">Budi Santoso</span>
+                                                <span class="text-gray-900 font-medium">Umum</span>
                                             </div>
                                         @endif
                                     </div>
 
-                                    <!-- Sampel Item -->
-                                    <div class="space-y-1.5 border-b border-dashed border-gray-300 pb-2 pt-1 text-[11px]">
+                                    <!-- Sampel Item (Inline Strikethrough Discount) -->
+                                    <div class="space-y-1.5 my-1 text-[9px]">
                                         <div>
-                                            <div class="font-semibold text-gray-900 truncate">[Part] LCD iPhone 13 Pro OLED</div>
-                                            <div class="flex justify-between text-[10px] text-gray-600 mt-0.5">
-                                                <span>1 x 1.450.000</span>
-                                                <span class="font-bold text-gray-900">1.450.000</span>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div class="font-semibold text-gray-900 truncate">[Jasa] Pasang & Segel Garansi</div>
-                                            <div class="flex justify-between text-[10px] text-gray-600 mt-0.5">
-                                                <span>1 x 100.000</span>
-                                                <span class="font-bold text-gray-900">100.000</span>
+                                            <div class="font-bold text-gray-900 text-[9.5px] leading-snug break-words">LCD+TS VIVO (Y20/Y21/Y22/Y33S/Y35) BLACK OG SUPER</div>
+                                            <div class="flex justify-between items-baseline text-[9px] mt-0.5">
+                                                <span>
+                                                    1 PCS x <span class="line-through text-gray-400 mr-1" style="text-decoration: line-through;">Rp 125.000</span>
+                                                    <span class="font-bold text-gray-900">Rp 110.000</span>
+                                                </span>
+                                                <span class="font-bold text-gray-900 text-right">110.000</span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    @if($strukForm['show_subtotal_breakdown'] ?? true)
-                                        <div class="text-[10px] space-y-0.5 border-b border-dashed border-gray-300 pb-1 text-gray-600">
+                                    @if($strukForm['show_subtotal_breakdown'] ?? false)
+                                        <div class="text-[9px] space-y-0.5 text-gray-600">
                                             <div class="flex justify-between">
-                                                <span>Subtotal Part:</span>
-                                                <span>Rp 1.450.000</span>
+                                                <span>Subtotal Retail:</span>
+                                                <span>Rp 125.000</span>
                                             </div>
                                             <div class="flex justify-between">
-                                                <span>Subtotal Jasa:</span>
-                                                <span>Rp 100.000</span>
+                                                <span>Pot Mitra:</span>
+                                                <span class="text-red-600">-Rp 15.000</span>
                                             </div>
                                         </div>
                                     @endif
 
                                     <!-- Total & Bayar -->
-                                    <div class="space-y-1 text-[11px] pt-1 font-bold">
-                                        <div class="flex justify-between text-xs text-gray-950">
+                                    <div class="space-y-0.5 text-[9px] leading-tight">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Subtotal:</span>
+                                            <span>Rp 110.000</span>
+                                        </div>
+                                        <div class="flex justify-between items-baseline font-black text-xs text-gray-950 py-0.5">
                                             <span>TOTAL:</span>
-                                            <span class="font-black">Rp 1.550.000</span>
+                                            <span class="text-[13px]">Rp 110.000</span>
                                         </div>
-                                        <div class="flex justify-between text-gray-700 font-normal text-[10px]">
-                                            <span>BAYAR (TUNAI):</span>
-                                            <span>Rp 1.600.000</span>
+                                        <div class="flex justify-between text-gray-800">
+                                            <span class="text-gray-600">BAYAR (TUNAI):</span>
+                                            <span class="font-bold">Rp 110.000</span>
                                         </div>
-                                        <div class="flex justify-between text-gray-700 font-normal text-[10px]">
-                                            <span>KEMBALI:</span>
-                                            <span>Rp 50.000</span>
+                                        <div class="flex justify-between text-gray-800">
+                                            <span class="text-gray-600">KEMBALI:</span>
+                                            <span class="font-bold">Rp 0</span>
+                                        </div>
+                                        <div class="flex justify-between text-gray-600">
+                                            <span>Sisa Saldo Poin:</span>
+                                            <span>0 pts</span>
                                         </div>
                                     </div>
 
-                                    <!-- QR Code Faktur Retur & Garansi Anti-Fraud -->
-                                    @if($strukForm['show_qr_retur'] ?? true)
-                                        <div class="text-center py-2 flex flex-col items-center justify-center border-t border-dashed border-gray-300">
-                                            <div class="p-1 bg-white inline-block">
-                                                {!! app(\App\Modules\Wms\Services\QrCodeService::class)->generateSvg('TRX-20261018-0001', (int)($strukForm['qr_size'] ?? 80), 0) !!}
-                                            </div>
-                                            <p class="font-mono text-[9px] text-gray-900 font-bold mt-1 tracking-wider">TRX-20261018-0001</p>
-                                            <p class="text-[8px] text-gray-500 text-center mt-0.5">{{ $strukForm['qr_caption'] ?: 'Scan QR ini untuk retur & klaim garansi' }}</p>
-                                        </div>
-                                    @endif
+                                    <div class="border-t border-dashed border-gray-400 my-1"></div>
 
-                                    <!-- Footer & Ketentuan -->
-                                    <div class="text-center pt-2 text-[9px] text-gray-500 border-t border-dashed border-gray-300 space-y-0.5">
-                                        <p class="font-bold text-gray-800">Garansi: 3 Hari Toko</p>
-                                        <p class="font-medium text-gray-700">{{ $strukForm['footer_text'] ?: 'Terima Kasih atas Kunjungan Anda!' }}</p>
-                                        @if(!empty($strukForm['kebijakan_retur']))
-                                            <p class="text-[8px] text-gray-600 font-medium">{{ $strukForm['kebijakan_retur'] }}</p>
-                                        @endif
+                                    <!-- Footer & Ketentuan (Centered) -->
+                                    <div class="text-center text-[8.5px] text-gray-600 space-y-0.5 pt-0.5 leading-tight">
+                                        <p class="font-bold text-gray-900">Garansi: 3 Hari Toko (s/d 16/11/2026)</p>
+                                        <p class="font-medium text-gray-700">{{ $strukForm['footer_text'] ?: 'Terima kasih atas kunjungan Anda!' }}</p>
+                                        <p class="text-[8px] text-gray-500">{{ $strukForm['kebijakan_retur'] ?: 'Segel toko wajib utuh & fisik barang tidak cacat.' }}</p>
                                         @if(!empty($strukForm['catatan_kaki']))
                                             <p class="text-[8px] text-gray-400">{{ $strukForm['catatan_kaki'] }}</p>
                                         @endif

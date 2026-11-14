@@ -92,9 +92,9 @@ class EscPosWriter
 
         // ========== HEADER (Centered) ==========
         $this->alignCenter();
-        $this->bold(true)->sizeDoubleWidth(true)->text($data['nama_toko'] ?? 'UTEPARTS')->sizeDoubleWidth(false)->bold(false);
+        $this->bold(true)->sizeDoubleWidth(true)->text($data['nama_toko'] ?? 'UTEParts')->sizeDoubleWidth(false)->bold(false);
 
-        $slogan = $data['slogan'] ?? 'Sparepart & Aksesoris Gadget';
+        $slogan = $data['slogan'] ?? 'SPAREPARTS/ACCESORIES/SERVICE';
         if ($slogan) {
             $this->text($slogan);
         }
@@ -105,101 +105,84 @@ class EscPosWriter
         if (! empty($data['telepon'])) {
             $this->text('Telp/WA: '.$data['telepon']);
         }
-        if (! empty($data['website_medsos'])) {
+        if (! empty($data['website_medsos']) && empty($data['show_qr_retur'])) {
             $this->text($data['website_medsos']);
         }
 
-        if (($data['show_cabang'] ?? true) && ! empty($data['cabang'])) {
+        if (($data['show_cabang'] ?? false) && ! empty($data['cabang'])) {
             $this->text($data['cabang']);
         }
 
-        if (($data['show_waktu'] ?? true) && ! empty($data['tanggal'])) {
-            $this->text($data['tanggal']);
-        }
-
-        $this->rule();
-
         // ========== 2-COL: QR (Left) + URL/Date/Warranty (Right) ==========
         $noTrx = $data['no_transaksi'] ?? '-';
-        $qrUrl = $data['qr_url'] ?? 'www.uteparts.id';
+        $qrUrl = $data['qr_url'] ?? $data['website_medsos'] ?? 'www.uteparts.id';
+        $qrCaption = $data['qr_caption'] ?? 'Scan QR utk Retur/Garansi';
+        $tglStr = $data['tanggal'] ?? $data['waktu'] ?? '';
 
         if (($data['show_qr_retur'] ?? true) && $noTrx !== '-') {
-            $this->alignLeft();
-            // Print QR on left side (we'll simulate 2-col by printing QR then moving to right area)
-            // For true 2-col on thermal, we print QR first, then info lines.
-            // Since ESC/POS is sequential, we print QR centered, then info below, or use bitmap overlay.
-            // Paper-saving approach: QR centered, then compact info block.
             $this->alignCenter();
-            $this->qrcode($noTrx, $data['qr_size'] ?? 4);
+            $this->qrcode($noTrx, $data['qr_size'] ?? 3);
             $this->bold(true)->text($noTrx)->bold(false);
-            $this->text($data['qr_caption'] ?? 'Scan QR untuk Retur & Garansi');
+            $this->text($qrCaption);
 
-            // Right column info (printed after QR as compact lines)
             $this->alignLeft();
             $this->text('Web: '.$qrUrl);
-            if (! empty($data['tanggal'])) {
-                $this->text('Tgl: '.$data['tanggal']);
+            if (! empty($tglStr)) {
+                $this->text('Tgl: '.$tglStr);
             }
             if (! empty($data['garansi'])) {
                 $this->text('Garansi: '.$data['garansi']);
             }
-            $this->text('Barang fisik utk tukar tdk rusak');
+            $this->text('Scan QR ini untuk retur & klaim garansi');
         } else {
-            // No QR - just the right column info
             $this->alignLeft();
             $this->text('Web: '.$qrUrl);
-            if (! empty($data['tanggal'])) {
-                $this->text('Tgl: '.$data['tanggal']);
+            if (! empty($tglStr)) {
+                $this->text('Tgl: '.$tglStr);
             }
             if (! empty($data['garansi'])) {
                 $this->text('Garansi: '.$data['garansi']);
             }
-            $this->text('Barang fisik utk tukar tdk rusak');
+            $this->text('Scan QR ini untuk retur & klaim garansi');
         }
 
         $this->rule();
 
         // ========== TRANSACTION INFO (Left-Right aligned) ==========
         $this->alignLeft();
-        $this->text($this->pad('TRX', $noTrx));
+        $this->text($this->pad('No. TRX:', $noTrx));
 
-        if (! empty($data['sumber']) && ! in_array(strtolower($data['sumber']), ['pos', 'offline'])) {
-            $this->text($this->pad('Pesanan', strtoupper($data['sumber'])));
+        if (! empty($data['sumber']) && ! in_array(strtolower($data['sumber']), ['pos', 'offline'], true)) {
+            $this->text($this->pad('Pesanan:', strtoupper($data['sumber'])));
         }
 
         if (! empty($data['no_tiket'])) {
-            $this->bold(true)->text($this->pad('Tiket', $data['no_tiket']))->bold(false);
+            $this->bold(true)->text($this->pad('No. Tiket:', $data['no_tiket']))->bold(false);
         }
 
         if (! empty($data['jenis_hp'])) {
-            $this->text($this->pad('Unit', $data['jenis_hp']));
+            $this->text($this->pad('Unit:', $data['jenis_hp']));
         }
 
         if (! empty($data['kurir'])) {
-            $kurirLbl = ! empty($data['is_pickup']) ? 'Ambil' : 'Kurir';
+            $kurirLbl = ! empty($data['is_pickup']) ? 'Ambil:' : 'Kurir:';
             $resiTeks = (! empty($data['resi']) && $data['resi'] !== '-') ? ' ('.$data['resi'].')' : '';
             $this->text($this->pad($kurirLbl, $data['kurir'].$resiTeks));
         }
 
         if (($data['show_kasir'] ?? true) && ! empty($data['kasir'])) {
-            $this->text($this->pad('Kasir', $data['kasir']));
+            $this->text($this->pad('Kasir:', $data['kasir']));
         }
 
         if (($data['show_pelanggan'] ?? true)) {
             $pelanggan = $data['pelanggan'] ?? 'Umum';
-            $this->text($this->pad('Pelanggan', $pelanggan));
+            $this->text($this->pad('Pelanggan:', $pelanggan));
 
             if (! empty($data['tier']) && $data['tier'] !== 'Retail' && $data['tier'] !== 'Umum') {
-                $lbl = in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Mitra' : 'Tier';
+                $lbl = in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Mitra:' : 'Tier:';
                 $this->bold(true)->text($this->pad($lbl, $data['tier']))->bold(false);
             }
-
-            if (! empty($data['saldo_poin']) && (int) $data['saldo_poin'] > 0) {
-                $this->text($this->pad('Poin', number_format((int) $data['saldo_poin']).' Poin'));
-            }
         }
-
-        $this->rule();
 
         // ========== ITEMS ==========
         foreach ($data['items'] ?? [] as $item) {
@@ -208,27 +191,38 @@ class EscPosWriter
                 $this->bold(true)->text($namaLine)->bold(false);
             }
 
-            $qtySatuan = ($item['qty'] ?? 0).($item['satuan'] ? ' '.$item['satuan'] : '');
+            $qtySatuan = ($item['qty'] ?? 1).(! empty($item['satuan']) ? ' '.$item['satuan'] : ' PCS');
             $harga = $this->money($item['harga'] ?? 0);
             $subtotal = $this->money($item['subtotal'] ?? 0);
 
-            // Main line: "1x Rp 110.000        Rp 110.000"
-            $this->text($this->pad("{$qtySatuan} x {$harga}", $subtotal));
-
-            // Strikethrough retail price if discounted (paper-efficient: same line)
+            // Inline strikethrough: normal price next to final price without extra rows
             $hargaRetail = (float) ($item['harga_retail'] ?? 0);
             $hargaJual = (float) ($item['harga'] ?? 0);
+
             if ($hargaRetail > $hargaJual) {
                 $normal = $this->money($hargaRetail);
                 $disc = $this->money($hargaJual);
-                // ESC/POS strikethrough: GS ! 0 (normal) + ESC B 1 (strikethrough on) + text + ESC B 0
-                // Fallback ASCII: "Rp 125.000->Rp 110.000"
-                if ($this->supportsStrikethrough()) {
-                    $this->textStrikethrough("Normal: {$normal} -> {$disc}");
+                $mode = $data['strikethrough_mode'] ?? 'ascii';
+
+                if ($mode === 'overprint') {
+                    $prefix = "{$qtySatuan} x ";
+                    $padStrike = str_repeat(' ', strlen($prefix)).str_repeat('-', strlen($normal));
+                    $this->buf .= $padStrike."\r";
+                    $leftPrice = "{$prefix}{$normal} {$disc}";
+                } elseif ($mode === 'combining') {
+                    $striked = '';
+                    foreach (mb_str_split($normal) as $char) {
+                        $striked .= $char."\xcc\xb6";
+                    }
+                    $leftPrice = "{$qtySatuan} x {$striked} {$disc}";
                 } else {
-                    $this->text("   {$normal}->{$disc}");
+                    $leftPrice = "{$qtySatuan} x ({$normal}) -> {$disc}";
                 }
+            } else {
+                $leftPrice = "{$qtySatuan} x {$harga}";
             }
+
+            $this->text($this->pad($leftPrice, $subtotal));
 
             if (! empty($item['catatan'])) {
                 foreach ($this->wrap('  * '.$item['catatan']) as $catatanLine) {
@@ -237,89 +231,84 @@ class EscPosWriter
             }
         }
 
-        $this->rule();
-
-        // ========== SUBTOTAL BREAKDOWN ==========
+        // ========== SUBTOTAL BREAKDOWN & TOTALS (Directly follows items) ==========
         $showBreakdown = $data['show_subtotal_breakdown'] ?? true;
 
         if ($showBreakdown && ! empty($data['diskon_tier']) && (float) $data['diskon_tier'] > 0) {
             $subRetail = $data['subtotal_retail'] ?? ((float) ($data['subtotal'] ?? 0) + (float) $data['diskon_tier']);
-            $this->text($this->pad('Subtotal Retail', $this->money($subRetail)));
+            $this->text($this->pad('Subtotal Retail:', $this->money($subRetail)));
 
             $tierLbl = (! empty($data['tier']) && $data['tier'] !== 'Retail')
-                ? "Pot {$data['tier']}"
-                : (in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Pot Mitra' : 'Pot Tier');
+                ? "Pot {$data['tier']}:"
+                : (in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Pot Mitra:' : 'Pot Tier:');
             $this->text($this->pad($tierLbl, '-'.$this->money($data['diskon_tier'])));
-            $this->text($this->pad('Subtotal', $this->money($data['subtotal'] ?? $data['total'])));
+            $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
         } else {
-            $this->text($this->pad('Subtotal', $this->money($data['subtotal'] ?? $data['total'])));
+            $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
         }
 
         if (! empty($data['diskon_partai']) && (float) $data['diskon_partai'] > 0) {
-            $this->text($this->pad('Diskon Partai', '-'.$this->money($data['diskon_partai'])));
+            $this->text($this->pad('Diskon Partai:', '-'.$this->money($data['diskon_partai'])));
         }
 
         if (! empty($data['diskon_poin']) && (float) $data['diskon_poin'] > 0) {
             $pts = $data['poin_ditukar'] ?? 0;
-            $this->text($this->pad("Tukar Poin ({$pts}pts)", '-'.$this->money($data['diskon_poin'])));
+            $this->text($this->pad("Tukar Poin ({$pts}pts):", '-'.$this->money($data['diskon_poin'])));
         }
 
         if (! empty($data['diskon']) && (float) $data['diskon'] > 0) {
             $lbl = (! empty($data['diskon_persen']) && (float) $data['diskon_persen'] > 0)
-                ? "Diskon ({$data['diskon_persen']}%)"
-                : 'Diskon Kasir';
+                ? "Diskon ({$data['diskon_persen']}%):"
+                : 'Diskon Kasir:';
             $this->text($this->pad($lbl, '-'.$this->money($data['diskon'])));
         }
 
         if (! empty($data['pajak']) && (float) $data['pajak'] > 0) {
-            $ppnLbl = ! empty($data['ppn_persen']) ? "PPN ({$data['ppn_persen']}%)" : 'PPN';
+            $ppnLbl = ! empty($data['ppn_persen']) ? "PPN ({$data['ppn_persen']}%):" : 'PPN:';
             $this->text($this->pad($ppnLbl, '+'.$this->money($data['pajak'])));
         }
 
         if (! empty($data['ongkir']) && (float) $data['ongkir'] > 0) {
-            $this->text($this->pad('Ongkir', '+'.$this->money($data['ongkir'])));
+            $this->text($this->pad('Ongkir:', '+'.$this->money($data['ongkir'])));
+        }
+
+        // Bold total
+        $this->bold(true)->sizeDoubleHeight(true)->text($this->pad('TOTAL:', $this->money($data['total'])))->sizeDoubleHeight(false)->bold(false);
+
+        if (! empty($data['is_piutang'])) {
+            $this->text($this->pad('Status:', 'BELUM LUNAS (PIUTANG)'));
+            if (! empty($data['jatuh_tempo'])) {
+                $this->text($this->pad('Jatuh Tempo:', $data['jatuh_tempo']));
+            }
+            $this->text($this->pad('Sisa Tag:', $this->money($data['sisa_piutang'] ?? $data['total'])));
+        } else {
+            $metodeStr = strtoupper($data['metode_bayar'] ?? $data['metode'] ?? 'TUNAI');
+            $this->text($this->pad("BAYAR ({$metodeStr}):", $this->money($data['bayar'] ?? $data['total'])));
+            $this->text($this->pad('KEMBALI:', $this->money($data['kembali'] ?? $data['kembalian'] ?? 0)));
+        }
+
+        if (isset($data['saldo_poin'])) {
+            $this->text($this->pad('Sisa Saldo Poin:', number_format((float) $data['saldo_poin']).' pts'));
+        }
+
+        if (! empty($data['hemat_total']) && (float) $data['hemat_total'] > 0) {
+            $this->bold(true)->text($this->pad('HEMAT:', $this->money($data['hemat_total'])))->bold(false);
+        }
+
+        if (! empty($data['komisi_mitra_nominal']) && (float) $data['komisi_mitra_nominal'] > 0) {
+            $this->text($this->pad('Komisi:', '+'.$this->money($data['komisi_mitra_nominal']).' (Saldo)'));
         }
 
         $this->rule();
 
-        // ========== TOTAL & PAYMENT ==========
-        $this->bold(true)->sizeDoubleHeight(true)->text($this->pad('TOTAL', $this->money($data['total'])))->sizeDoubleHeight(false)->bold(false);
-
-        if (! empty($data['is_piutang'])) {
-            $this->text('Status: BELUM LUNAS (PIUTANG)');
-            if (! empty($data['jatuh_tempo'])) {
-                $this->text('Jatuh Tempo: '.$data['jatuh_tempo']);
-            }
-            $this->text('Sisa Tag: '.$this->money($data['sisa_piutang'] ?? $data['total']));
-        } else {
-            $this->text('Bayar: '.$this->money($data['bayar']));
-            $this->text('Kembali: '.$this->money($data['kembali'] ?? 0));
-            $this->text('Metode: '.$data['metode_bayar']);
-        }
-
-        if (! empty($data['hemat_total']) && (float) $data['hemat_total'] > 0) {
-            $this->bold(true)->text($this->pad('HEMAT', $this->money($data['hemat_total'])))->bold(false);
-        }
-
-        if (! empty($data['komisi_mitra_nominal']) && (float) $data['komisi_mitra_nominal'] > 0) {
-            $this->text('Komisi: +'.$this->money($data['komisi_mitra_nominal']).' (Saldo)');
-        }
-
-        if (isset($data['saldo_poin'])) {
-            $this->text('Sisa Poin: '.number_format((float) $data['saldo_poin']).' pts');
-        }
-
-        $this->rule()->feed(1);
-
         // ========== FOOTER (Centered) ==========
         $this->alignCenter();
-        $this->text($data['footer_text'] ?? 'Terima Kasih atas Kunjungan Anda!');
-
-        if (! empty($data['kebijakan_retur'])) {
-            foreach ($this->wrap($data['kebijakan_retur']) as $ln) {
-                $this->text($ln);
-            }
+        if (! empty($data['garansi'])) {
+            $this->text('Garansi: '.$data['garansi']);
         }
+        $this->text($data['footer_text'] ?? 'Terima kasih atas kunjungan Anda!');
+        $this->text($data['kebijakan_retur'] ?? 'Segel toko wajib utuh & fisik barang tidak cacat.');
+
         if (! empty($data['catatan_kaki'])) {
             foreach ($this->wrap($data['catatan_kaki']) as $ln) {
                 $this->text($ln);
