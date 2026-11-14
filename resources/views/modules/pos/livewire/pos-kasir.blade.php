@@ -418,8 +418,9 @@
                         </button>
                     </div>
 
-                    <div class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1 min-h-0"
-                        x-data="infiniteScrollProducts()"
+                    <div
+                        class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1 min-h-0"
+                        @scroll.passive="if ($wire.adaLebihBanyak && !window._posLoadingMore && ($el.scrollHeight - $el.scrollTop - $el.clientHeight < 350)) { window._posLoadingMore = true; $wire.call('muatLebihBanyak').finally(() => { window._posLoadingMore = false; }); }"
                     >
                         @forelse($products as $prod)
                             @php
@@ -632,20 +633,21 @@
 
                         @if($adaLebihBanyak)
                             <div
-                                x-ref="sentinel"
-                                @click="loadMore()"
+                                wire:key="pos-sentinel-{{ $batasProduk }}"
+                                wire:intersect.threshold.5="muatLebihBanyak"
+                                wire:click="muatLebihBanyak"
                                 role="button"
                                 tabindex="0"
-                                class="h-10 flex items-center justify-center p-2 rounded-xl text-xs font-semibold text-up-primary hover:bg-up-primary/10 transition-colors cursor-pointer select-none my-1"
-                                title="Klik untuk memuat lebih banyak"
+                                class="h-12 flex items-center justify-center p-2 rounded-xl text-xs font-semibold text-up-primary hover:bg-up-primary/10 transition-colors cursor-pointer select-none my-1"
+                                title="Klik untuk memuat lebih banyak produk"
                             >
-                                <span x-show="!loading" class="flex items-center gap-1.5">
+                                <span wire:loading.remove wire:target="muatLebihBanyak" class="flex items-center gap-1.5">
                                     <svg class="w-4 h-4 text-up-primary animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
                                     Memuat lebih banyak produk...
                                 </span>
-                                <span x-show="loading" class="flex items-center gap-2 text-ink-500 dark:text-ink-400">
+                                <span wire:loading wire:target="muatLebihBanyak" class="flex items-center gap-2 text-ink-500 dark:text-ink-400">
                                     <svg class="w-4 h-4 animate-spin text-up-primary" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -2571,103 +2573,3 @@
 
     @include('modules.pos.livewire.modals.offline-actions-modal')
 </div>
-
-<script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('infiniteScrollProducts', () => ({
-            loading: false,
-            observer: null,
-            mutationObserver: null,
-            init() {
-                // Direct scroll listener on container for instant lazy load while scrolling
-                this.$el.addEventListener('scroll', () => {
-                    this.onScroll();
-                }, { passive: true });
-
-                this.setupObserver();
-
-                // Re-setup & check when search dropdown opens
-                this.$watch('searchOpen', (open) => {
-                    if (open) {
-                        this.$nextTick(() => {
-                            this.setupObserver();
-                            this.checkIfSentinelVisible();
-                        });
-                    }
-                });
-
-                // Watch adaLebihBanyak from Livewire
-                this.$watch('$wire.adaLebihBanyak', (hasMore) => {
-                    if (hasMore) {
-                        this.$nextTick(() => {
-                            this.setupObserver();
-                            this.checkIfSentinelVisible();
-                        });
-                    } else if (this.observer) {
-                        this.observer.disconnect();
-                    }
-                });
-
-                // MutationObserver for Livewire DOM morphs
-                this.mutationObserver = new MutationObserver(() => {
-                    if (this.$wire.adaLebihBanyak && this.observer && this.$refs.sentinel) {
-                        this.observer.observe(this.$refs.sentinel);
-                    }
-                });
-                this.mutationObserver.observe(this.$el, { childList: true, subtree: true });
-
-                // Initial check if content is shorter than container height
-                this.$nextTick(() => {
-                    this.checkIfSentinelVisible();
-                });
-            },
-            setupObserver() {
-                if (this.observer) {
-                    this.observer.disconnect();
-                }
-                this.observer = new IntersectionObserver((entries) => {
-                    const entry = entries[0];
-                    if (entry && entry.isIntersecting && !this.loading && this.$wire.adaLebihBanyak) {
-                        this.loadMore();
-                    }
-                }, { root: this.$el, rootMargin: '200px', threshold: 0.01 });
-
-                if (this.$refs.sentinel && this.$wire.adaLebihBanyak) {
-                    this.observer.observe(this.$refs.sentinel);
-                }
-            },
-            onScroll() {
-                if (this.loading || !this.$wire.adaLebihBanyak) return;
-                const el = this.$el;
-                if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) {
-                    this.loadMore();
-                }
-            },
-            checkIfSentinelVisible() {
-                if (this.loading || !this.$wire.adaLebihBanyak || !this.$refs.sentinel) return;
-                const containerRect = this.$el.getBoundingClientRect();
-                const sentinelRect = this.$refs.sentinel.getBoundingClientRect();
-                if (containerRect.height > 0 && sentinelRect.top <= containerRect.bottom + 200) {
-                    this.loadMore();
-                }
-            },
-            loadMore() {
-                if (this.loading || !this.$wire.adaLebihBanyak) return;
-                this.loading = true;
-                this.$wire.call('muatLebihBanyak').then(() => {
-                    this.loading = false;
-                    this.$nextTick(() => {
-                        this.setupObserver();
-                        this.checkIfSentinelVisible();
-                    });
-                }).catch(() => {
-                    this.loading = false;
-                });
-            },
-            destroy() {
-                if (this.observer) this.observer.disconnect();
-                if (this.mutationObserver) this.mutationObserver.disconnect();
-            }
-        }));
-    });
-</script>
