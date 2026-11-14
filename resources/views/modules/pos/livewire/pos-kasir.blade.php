@@ -2559,7 +2559,7 @@
             loading: false,
             observer: null,
             init() {
-                // Observe the sentinel element directly (not the container)
+                // Use container (this.$el) as root - sentinel is last child inside scrollable container
                 this.observer = new IntersectionObserver((entries) => {
                     const entry = entries[0];
                     if (entry.isIntersecting && !this.loading && this.$wire.adaLebihBanyak) {
@@ -2570,7 +2570,7 @@
                             this.loading = false;
                         });
                     }
-                }, { root: this.$el.parentElement, rootMargin: '100px' });
+                }, { root: this.$el, rootMargin: '100px', threshold: 0.1 });
 
                 this.$watch('$wire.adaLebihBanyak', (val) => {
                     if (val && this.$refs.sentinel) {
@@ -2580,13 +2580,22 @@
                     }
                 });
 
-                // Initial observation
+                // Initial observation (sentinel may already exist)
                 if (this.$refs.sentinel && this.$wire.adaLebihBanyak) {
                     this.observer.observe(this.$refs.sentinel);
                 }
+
+                // Fallback: MutationObserver to catch sentinel added after Livewire re-render
+                this.mutationObserver = new MutationObserver(() => {
+                    if (this.$refs.sentinel && this.$wire.adaLebihBanyak && this.observer) {
+                        this.observer.observe(this.$refs.sentinel);
+                    }
+                });
+                this.mutationObserver.observe(this.$el, { childList: true, subtree: true });
             },
             destroy() {
                 if (this.observer) this.observer.disconnect();
+                if (this.mutationObserver) this.mutationObserver.disconnect();
             }
         }));
     });
