@@ -320,6 +320,12 @@ class RiwayatAktivitas extends Component
                         ->orWhere('email', 'like', "%{$filterCari}%");
                 });
 
+                // Causer juga bisa member (Pelanggan) — mis. aksi profil/login member.
+                $q->orWhereHasMorph('causer', [Pelanggan::class], function ($p) use ($filterCari) {
+                    $p->where('nama', 'like', "%{$filterCari}%")
+                        ->orWhere('telepon', 'like', "%{$filterCari}%");
+                });
+
                 if (ctype_digit($filterCari)) {
                     $idNum = (int) $filterCari;
                     $q->orWhere('subject_id', $idNum)
@@ -477,6 +483,15 @@ class RiwayatAktivitas extends Component
 
                 $q->where('causer_type', $tipeUser)
                     ->whereIn('causer_id', User::where('name', 'like', "%{$filterUser}%")->pluck('id'));
+
+                // Causer member (Pelanggan) — cari berdasarkan nama / no HP.
+                $q->orWhere(function ($sub) use ($filterUser) {
+                    $sub->where('causer_type', (new Pelanggan)->getMorphClass())
+                        ->whereIn('causer_id', Pelanggan::query()
+                            ->where('nama', 'like', "%{$filterUser}%")
+                            ->orWhere('telepon', 'like', "%{$filterUser}%")
+                            ->pluck('id'));
+                });
 
                 // Pencarian "sistem" = log tanpa causer (job queue / seed / webhook)
                 if (stripos($filterUser, 'sistem') !== false) {

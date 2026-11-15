@@ -35,7 +35,12 @@ class CustomerAccount extends Component
 
     public string $telepon = '';
 
+    public string $tanggalLahir = '';
+
     public string $alamat = '';
+
+    // Wajib diisi bila nomor HP / email diubah (re-authentikasi, ISO 27001 A.9.4.2)
+    public string $identitasPassword = '';
 
     public $avatarUpload = null;
 
@@ -64,6 +69,7 @@ class CustomerAccount extends Component
             $this->username = $customer->username ?? '';
             $this->email = $customer->email ?? '';
             $this->telepon = $customer->telepon ?? '';
+            $this->tanggalLahir = $customer->tanggal_lahir?->format('Y-m-d') ?? '';
             $this->alamat = $customer->alamat ?? '';
         }
     }
@@ -311,28 +317,55 @@ class CustomerAccount extends Component
             return;
         }
 
+        $teleponBaru = ! empty($this->telepon)
+            ? app(PelangganService::class)->normalizePhone($this->telepon)
+            : $customer->telepon;
+
+        $identitasBerubah =
+            $teleponBaru !== (string) ($customer->telepon ?? '')
+            || trim((string) $this->email) !== (string) ($customer->email ?? '');
+
         $this->validate([
             'nama' => 'required|string|max:255',
             'username' => 'nullable|string|min:3|max:40|regex:/^[a-zA-Z0-9._-]+$/|unique:pelanggan,username,'.$customer->id,
             'email' => 'nullable|email|max:255|unique:pelanggan,email,'.$customer->id,
             'telepon' => 'nullable|string|min:9|max:20|unique:pelanggan,telepon,'.$customer->id,
+            'tanggalLahir' => 'nullable|date',
             'alamat' => 'nullable|string|max:500',
             'avatarUpload' => 'nullable|image|max:2048',
+            'identitasPassword' => 'nullable|string',
         ], [
             'username.regex' => 'Username hanya boleh huruf, angka, titik, dash, dan garis bawah.',
             'username.unique' => 'Username tersebut sudah digunakan pelanggan lain.',
             'telepon.min' => 'Nomor HP tidak valid (minimal 9 digit).',
             'telepon.unique' => 'Nomor HP tersebut sudah digunakan member lain.',
+            'tanggalLahir.date' => 'Format tanggal lahir tidak valid.',
             'avatarUpload.max' => 'Ukuran foto profil maksimal 2MB.',
         ]);
+
+        // [ISO 27001 A.9.4.1/A.9.4.2] Mengubah identitas yang dipakai login
+        // (nomor HP / email) wajib re-authentikasi dengan kata sandi saat ini,
+        // supaya sesi yang bocor tidak bisa mengunci pemilik akun.
+        if ($identitasBerubah) {
+            if (empty($this->identitasPassword)) {
+                throw ValidationException::withMessages([
+                    'identitasPassword' => 'Kata sandi saat ini wajib diisi untuk mengubah nomor HP / email.',
+                ]);
+            }
+
+            if (! Hash::check($this->identitasPassword, (string) $customer->password)) {
+                throw ValidationException::withMessages([
+                    'identitasPassword' => 'Kata sandi saat ini tidak cocok.',
+                ]);
+            }
+        }
 
         $updateData = [
             'nama' => trim($this->nama),
             'username' => ! empty($this->username) ? trim($this->username) : null,
             'email' => ! empty($this->email) ? trim($this->email) : null,
-            'telepon' => ! empty($this->telepon)
-                ? app(PelangganService::class)->normalizePhone($this->telepon)
-                : $customer->telepon,
+            'telepon' => $teleponBaru,
+            'tanggal_lahir' => ! empty($this->tanggalLahir) ? $this->tanggalLahir : null,
             'alamat' => ! empty($this->alamat) ? trim($this->alamat) : null,
         ];
 
@@ -343,6 +376,8 @@ class CustomerAccount extends Component
         }
 
         $customer->update($updateData);
+
+        $this->identitasPassword = '';
 
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Profil akun Anda berhasil diperbarui.']);
     }

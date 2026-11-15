@@ -6,6 +6,7 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\PelangganKodeAktivasi;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Marketplace\Livewire\CustomerAccount;
+use App\Modules\Rbac\Models\AktivitasLog;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
@@ -204,6 +205,7 @@ class MemberActivationTest extends TestCase
 
         Livewire::test(CustomerAccount::class)
             ->set('telepon', '81999888777')
+            ->set('identitasPassword', 'secret123')
             ->call('simpanProfil')
             ->assertHasNoErrors();
 
@@ -231,6 +233,62 @@ class MemberActivationTest extends TestCase
         $this->assertSame($pelanggan->id, $service->cariByTelepon('6281234567890')?->id);
         $this->assertSame($pelanggan->id, $service->cariByTelepon('81234567890')?->id);
         $this->assertNull($service->cariByTelepon('081111222333'));
+    }
+
+    public function test_perubahan_telepon_wajib_reautentikasi(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081234567890',
+            'password' => Hash::make('secret123'),
+            'status' => 'aktif',
+        ]);
+
+        $this->actingAs($pelanggan, 'customer');
+
+        // Tanpa kata sandi konfirmasi → ditolak
+        Livewire::test(CustomerAccount::class)
+            ->set('telepon', '081999888777')
+            ->call('simpanProfil')
+            ->assertHasErrors(['identitasPassword']);
+
+        // Kata sandi konfirmasi salah → ditolak
+        Livewire::test(CustomerAccount::class)
+            ->set('telepon', '081999888777')
+            ->set('identitasPassword', 'salah')
+            ->call('simpanProfil')
+            ->assertHasErrors(['identitasPassword']);
+
+        $pelanggan->refresh();
+        $this->assertSame('081234567890', $pelanggan->telepon);
+    }
+
+    public function test_perubahan_profil_tercatat_dengan_causer_member(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081234567890',
+            'password' => Hash::make('secret123'),
+            'status' => 'aktif',
+        ]);
+
+        $this->actingAs($pelanggan, 'customer');
+
+        Livewire::test(CustomerAccount::class)
+            ->set('nama', 'Budi Santoso Updated')
+            ->call('simpanProfil')
+            ->assertHasNoErrors();
+
+        $log = AktivitasLog::query()
+            ->where('subject_type', Pelanggan::class)
+            ->where('subject_id', $pelanggan->id)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($log);
+        $this->assertSame($pelanggan->id, $log->causer_id);
+        $this->assertSame(Pelanggan::class, $log->causer_type);
+        $this->assertSame('Budi Santoso Updated', $log->causerNama);
     }
 
     public function test_booking_servis_menormalisasi_telepon_dan_tak_buat_akun_ganda(): void

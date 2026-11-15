@@ -1429,6 +1429,14 @@
                                        class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400" />
                                 @error('email') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                             </div>
+
+                            <!-- Tanggal Lahir -->
+                            <div>
+                                <label for="tanggalLahir" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Tanggal Lahir (Opsional)</label>
+                                <input type="date" id="tanggalLahir" wire:model="tanggalLahir"
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                                @error('tanggalLahir') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                            </div>
                         </div>
 
                         <!-- Alamat Pengiriman Utama -->
@@ -1437,6 +1445,15 @@
                             <textarea id="alamat" wire:model="alamat" rows="2" placeholder="Nama jalan, nomor rumah, RT/RW, kelurahan, kecamatan, kota..."
                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400"></textarea>
                             @error('alamat') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <!-- Re-authentikasi untuk perubahan identitas (HP/email) -->
+                        <div>
+                            <label for="identitasPassword" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Kata Sandi Saat Ini</label>
+                            <input type="password" id="identitasPassword" wire:model="identitasPassword" placeholder="Wajib bila mengubah nomor HP / email"
+                                   class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                            <p class="text-[10px] text-ink-400 mt-1">Dipakai untuk verifikasi ulang saat mengganti nomor HP atau email (identitas login).</p>
+                            @error('identitasPassword') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <div class="flex justify-end pt-2">

@@ -153,6 +153,7 @@ class CustomerLoginTest extends TestCase
             ->set('nama', 'Budi Santoso Updated')
             ->set('username', 'budi_baru')
             ->set('email', 'budi@new.com')
+            ->set('identitasPassword', 'oldpassword123')
             ->call('simpanProfil')
             ->assertHasNoErrors()
             ->set('currentPassword', 'oldpassword123')

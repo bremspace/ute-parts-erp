@@ -35,6 +35,16 @@ class AppServiceProvider extends ServiceProvider
         // [T-04] Prevent Eloquent lazy loading in local and testing environments
         Model::preventLazyLoading(! $this->app->isProduction());
 
+        // [ISO 27001 / ISO 9001 — audit trail] Default Spatie mencari causer di
+        // guard default (`web`/staf). Padahal ada aksi member lewat guard
+        // `customer` (mis. simpanProfil / updatePassword) — tanpa override ini
+        // semua perubahan itu tercatat sebagai "sistem", sehingga jejak audit
+        // kehilangan identitas pelaku. Prioritaskan guard customer, fallback
+        // ke guard staf.
+        app(\Spatie\Activitylog\Support\CauserResolver::class)->resolveUsing(
+            fn (): ?\Illuminate\Database\Eloquent\Model => auth('customer')->user() ?? auth()->user()
+        );
+
         // Dynamic Brand / App Name & Host Resolver (Multi-Port & LAN zero-config)
         // Abaikan saat console command (artisan package:discover / migrate) agar tidak probe DB prematur
         if (! $this->app->runningInConsole()) {

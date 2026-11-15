@@ -66,7 +66,9 @@ class AktivitasLog extends Activity
 
     public function getCauserNamaAttribute(): string
     {
-        return $this->causer?->name ?? 'sistem';
+        // Causer bisa User (name) maupun Pelanggan (nama) — keduanya Model.
+        return $this->causer?->name
+            ?? ($this->causer?->nama ?? 'sistem');
     }
 
     public function getIpAttribute(): ?string
