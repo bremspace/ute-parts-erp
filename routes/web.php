@@ -195,6 +195,7 @@ Route::get('/tracking/{token}', function ($token) {
             'perlu_persetujuan_ulang' => $tiket->perluPersetujuanUlang(),
             'perubahan_lingkup' => $tiket->getPerubahanLingkup(),
             'revisi_lingkup_disetujui_at' => $tiket->revisi_lingkup_disetujui_at?->format('d/m/Y H:i'),
+            'bisa_batal' => in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true),
             'timeline' => $tiket->statusLogs->map(fn ($log) => [
                 'status_dari' => $log->status_dari,
                 'status_ke' => $log->status_ke,
@@ -324,6 +325,31 @@ Route::post('/tracking/{token}/revisi/approve', function (Request $request, $tok
         return redirect()->back()->with('error', $e->getMessage());
     }
 })->middleware('throttle:15,1')->name('servis.tracking.revisi.approve');
+
+Route::post('/tracking/{token}/batal', function (Request $request, $token) {
+    $servisService = app(ServisService::class);
+    $tiket = TiketServis::with('pelanggan')->where('token_approval', $token)->first();
+
+    if (! $tiket) {
+        return redirect()->to(url('/tracking'))->with('error', 'Tiket servis tidak ditemukan.');
+    }
+
+    if (! $servisService->isTrackingAuthorized($tiket)) {
+        if ($request->has('no_hp') && $servisService->verifyTrackingPhone($tiket, (string) $request->input('no_hp'))) {
+            session()->put('tracking_verified_'.$token, true);
+        } else {
+            return redirect()->to(url('/tracking/'.$token))->with('error', 'Silakan verifikasi nomor HP terlebih dahulu.');
+        }
+    }
+
+    try {
+        $servisService->batalkanOlehPelanggan($token, (string) $request->input('alasan', ''));
+
+        return redirect()->back()->with('success', 'Servis telah dibatalkan. Unit akan diserahkan kembali kepada Anda tanpa biaya.');
+    } catch (\Throwable $e) {
+        return redirect()->back()->with('error', $e->getMessage());
+    }
+})->middleware('throttle:15,1')->name('servis.tracking.batal');
 
 if (class_exists(BookingServis::class)) {
     Route::get('/booking-servis', BookingServis::class)->middleware('throttle:30,1')->name('servis.booking');

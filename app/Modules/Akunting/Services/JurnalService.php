@@ -418,7 +418,7 @@ class JurnalService
      *
      * @throws \Exception jika jurnal tidak ditemukan, sudah di-reversed, atau periode ditutup
      */
-    public function reversalJurnal(string $noJurnalAsal, int $cabangId, int $userId, string $alasan): array
+    public function reversalJurnal(string $noJurnalAsal, int $cabangId, ?int $userId, string $alasan): array
     {
         $alasan = trim($alasan);
         if ($alasan === '') {

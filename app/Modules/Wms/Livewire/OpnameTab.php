@@ -143,7 +143,9 @@ class OpnameTab extends Component
             $query->where('brand_id', $this->opnameBrandId);
         }
 
-        $products = $query->take(100)->get();
+        // Urutan deterministik (independen dari index/plan query): opname rows
+        // mengikuti urutan pembuatan produk, bukan urutan baris fisik.
+        $products = $query->orderBy('id')->take(100)->get();
         $this->opnameRows = [];
 
         foreach ($products as $prod) {

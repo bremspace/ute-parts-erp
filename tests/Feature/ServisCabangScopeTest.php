@@ -7,7 +7,6 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
@@ -171,41 +170,42 @@ class ServisCabangScopeTest extends TestCase
         $tiketA = $this->buatTiket($this->cabangA, 'SRV-T06-A-0005');
         $tiketB = $this->buatTiket($this->cabangB, 'SRV-T06-B-0005');
 
-        $component = Livewire::test(ServisBoard::class);
+        // Tiket cabang lain: `tiketScoped()` melempar ModelNotFoundException
+        // (404). Livewire menelan exception itu di HTTP layer, jadi yang
+        // diverifikasi adalah jaminan bisnisnya: status & side effect utuh.
+        Livewire::test(ServisBoard::class)->call('updateStatus', $tiketB->id, 'diagnosa');
 
-        // Tiket cabang lain: tidak ditemukan (ModelNotFoundException) & status utuh
-        $tertangkap = null;
-        try {
-            $component->call('updateStatus', $tiketB->id, 'diagnosa');
-        } catch (\Throwable $e) {
-            $tertangkap = $e;
-        }
+        $tiketB = $tiketB->fresh();
+        $this->assertSame('diterima', $tiketB->status, 'Tiket cabang lain TIDAK boleh berubah status');
+        $this->assertSame(0, $tiketB->statusLogs()->count(), 'Tiket cabang lain TIDAK boleh punya log status');
+        $this->assertNull($tiketB->tanggal_selesai, 'Tiket cabang lain TIDAK boleh tersentuh side effect');
 
-        $this->assertInstanceOf(ModelNotFoundException::class, $tertangkap);
-        $this->assertSame('diterima', $tiketB->fresh()->status, 'Tiket cabang lain TIDAK boleh berubah status');
-
-        // Regresi: tiket cabang sendiri tetap bisa diubah
-        $component->call('updateStatus', $tiketA->id, 'diagnosa');
+        // Regresi: komponen baru — tiket cabang sendiri tetap bisa diubah
+        Livewire::test(ServisBoard::class)->call('updateStatus', $tiketA->id, 'diagnosa');
         $this->assertSame('diagnosa', $tiketA->fresh()->status);
     }
 
     public function test_approval_lintas_cabang_ditolak(): void
     {
+        $tiketA = $this->buatTiket($this->cabangA, 'SRV-T06-A-0006', 'menunggu_approval');
         $tiketB = $this->buatTiket($this->cabangB, 'SRV-T06-B-0006', 'menunggu_approval');
 
+        // Tiket cabang lain: 404 → status & log utuh
         $component = Livewire::test(ServisBoard::class);
         $component->set('approveTiketId', $tiketB->id);
+        $component->call('prosesApprove', 'approve');
 
-        $tertangkap = null;
-        try {
-            $component->call('prosesApprove', 'approve');
-        } catch (\Throwable $e) {
-            $tertangkap = $e;
-        }
+        $tiketB = $tiketB->fresh();
+        $this->assertSame('menunggu_approval', $tiketB->status);
+        $this->assertSame(0, $tiketB->statusLogs()->count(), 'Tiket cabang lain TIDAK boleh punya log status');
 
-        $this->assertInstanceOf(ModelNotFoundException::class, $tertangkap);
-        $this->assertSame('menunggu_approval', $tiketB->fresh()->status);
-        $this->assertSame(0, $tiketB->statusLogs()->count());
+        // Regresi: komponen baru — tiket cabang sendiri tetap bisa di-approve
+        $componentBaru = Livewire::test(ServisBoard::class);
+        $componentBaru->set('approveTiketId', $tiketA->id);
+        $componentBaru->set('approveAlasan', 'Pelanggan menyetujui estimasi');
+        $componentBaru->call('prosesApprove', 'approve');
+
+        $this->assertSame('disetujui', $tiketA->fresh()->status);
     }
 
     // ===== API =====

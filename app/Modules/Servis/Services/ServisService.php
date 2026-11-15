@@ -4,6 +4,7 @@ namespace App\Modules\Servis\Services;
 
 use App\Models\User;
 use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
@@ -391,6 +392,12 @@ class ServisService
             throw new \Exception('Status tidak valid');
         }
 
+        // [ISO 9001 §8.7 / audit] Pembatalan wajib alasan tertulis — untuk
+        // semua jalur (staf, override, maupun pelanggan via tracking).
+        if ($statusBaru === 'batal' && blank($alasan)) {
+            throw new \Exception('Alasan pembatalan servis wajib diisi');
+        }
+
         $statusLama = $tiket->status;
         $difasilitasiSistem = $sistemAutoCancel
             && in_array($statusLama, ['dikerjakan', 'qc'], true)
@@ -499,6 +506,7 @@ class ServisService
                 // [T-03] Pengembalian stok part saat tiket ditolak (belum ada
                 // jurnal onSelesai) — lihat onDitolak().
                 'ditolak' => $this->onDitolak($tiket),
+                'batal' => $this->onBatal($tiket, $user, $alasan),
                 'selesai' => $this->onSelesai($tiket),
                 'diambil' => $this->onDiambil($tiket),
                 default => null,
@@ -1198,6 +1206,43 @@ class ServisService
     }
 
     /**
+     * Kirim ulang link persetujuan perubahan lingkup ke pelanggan (WA).
+     * Dipakai regulator/staf untuk tiket yang tertahan menunggu persetujuan.
+     */
+    public function kirimUlangPersetujuan(TiketServis $tiket): bool
+    {
+        if (! $tiket->perluPersetujuanUlang()) {
+            return false;
+        }
+
+        $telepon = $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon;
+        if (! filled($telepon) || ! $tiket->token_approval) {
+            return false;
+        }
+
+        $link = url("/tracking/{$tiket->token_approval}");
+        $this->notifService->kirim(
+            'wa',
+            $telepon,
+            'Persetujuan Perubahan Lingkup Servis',
+            "Pembaruan: servis {$tiket->no_tiket} memerlukan persetujuan Anda. Tinjau & setujui di: {$link}",
+            [
+                'tiket_id' => $tiket->id,
+                'token' => $tiket->token_approval,
+                'pelanggan_id' => $tiket->pelanggan_id,
+                'audience' => 'pelanggan',
+            ]
+        );
+
+        $tiket->update([
+            'revisi_lingkup_diajukan_at' => now(),
+            'revisi_lingkup_diajukan_hash' => $tiket->hashPerubahanLingkup(),
+        ]);
+
+        return true;
+    }
+
+    /**
      * Publik: pelanggan menyetujui perubahan lingkup via token tracking.
      */
     public function approvePerubahanLingkupByToken(string $token, string $alasan = ''): TiketServis
@@ -1675,6 +1720,90 @@ class ServisService
         }
 
         $this->restoreStokPartDitolak($tiket);
+    }
+
+    /**
+     * [ISO 9001 §8.7] Pembatalan servis — konsumen/staf saat pengerjaan, atau
+     * override regulator setelah selesai.
+     *
+     * - Reversal jurnal (pendapatan `onSelesai` + pelunasan) bila sudah pernah
+     *   diposting. Fail-closed: periode tertutup → batal ditolak (audit).
+     * - Stok part dikembalikan hanya bila `tanggal_selesai` masih null (unit
+     *   belum selesai & diserahkan tanpa biaya). Setelah selesai, part sudah
+     *   terpasang → stok TIDAK dibalik (kerugian ditangani regulator).
+     * - Klaim SN dilepas karena unit diserahkan kembali ke pelanggan.
+     */
+    private function onBatal(TiketServis $tiket, ?User $user, string $alasan): void
+    {
+        $this->reversalJurnalTiket($tiket, $alasan, $user);
+
+        if ($tiket->tanggal_selesai === null) {
+            $this->restoreStokPartDitolak($tiket);
+        }
+
+        app(NomorSeriService::class)->lepasServis((int) $tiket->id);
+
+        // Unit diserahkan kembali → garansi servis dibatalkan.
+        Garansi::where('tiket_servis_id', $tiket->id)->delete();
+
+        // Piutang servis (bila pernah diakui saat selesai) ditutup agar tidak
+        // menggantung di laporan piutang.
+        $piutang = $this->piutangServis($tiket);
+        if ($piutang) {
+            $piutang->update([
+                'status' => 'batal',
+                'keterangan' => ($piutang->keterangan ?: 'Piutang Servis').' — servis dibatalkan ('.$alasan.')',
+            ]);
+        }
+    }
+
+    /**
+     * Balikkan semua jurnal yang pernah diposting untuk tiket ini (pendapatan
+     * + pelunasan); jurnal ber-sumber `reversal` diabaikan agar reversal dobel
+     * mustahil.
+     */
+    private function reversalJurnalTiket(TiketServis $tiket, string $alasan, ?User $user): void
+    {
+        $noJurnals = JurnalHeader::query()
+            ->where('referensi_tipe', TiketServis::class)
+            ->where('referensi_id', $tiket->id)
+            ->where('cabang_key', $tiket->cabang_id)
+            ->where('sumber', '!=', 'reversal')
+            ->pluck('no_jurnal')
+            ->all();
+
+        foreach (array_unique($noJurnals) as $noJurnal) {
+            app(JurnalService::class)->reversalJurnal(
+                (string) $noJurnal,
+                (int) $tiket->cabang_id,
+                $user?->id,
+                "Servis {$tiket->no_tiket} dibatalkan: {$alasan}"
+            );
+        }
+    }
+
+    /**
+     * Publik: pelanggan membatalkan servis saat pengerjaan via link tracking.
+     * Memakai `updateStatus()` (user NULL) agar melewati guard izin & guard
+     * transisi state machine yang sama persis.
+     */
+    public function batalkanOlehPelanggan(string $token, string $alasan): TiketServis
+    {
+        $tiket = TiketServis::where('token_approval', $token)->firstOrFail();
+
+        if (! in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true)) {
+            throw new \Exception('Servis hanya dapat dibatalkan saat tahap pengerjaan.');
+        }
+
+        $this->updateStatus(
+            $tiket,
+            'batal',
+            null,
+            $alasan ?: 'Dibatalkan pelanggan via tracking',
+            'manual'
+        );
+
+        return $tiket->fresh();
     }
 
     /**

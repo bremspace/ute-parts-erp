@@ -9,6 +9,9 @@ namespace App\Modules\Servis\Services;
  * Valid forward transitions:
  *   diajukan_online → diterima → diagnosa → menunggu_approval → disetujui → dikerjakan → qc → selesai → diambil
  *   menunggu_approval → ditolak → diagnosa (re-estimasi, allowed forward)
+ *   disetujui/dikerjakan/qc → batal (pembatalan konsumen/staf saat pengerjaan)
+ *   ditolak → diagnosa (re-estimasi) | diambil | batal
+ *   batal → diambil (serah terima unit tanpa biaya)
  *
  * Diakui sebagai 'override' jika user punya permission servis.override-status.
  */
@@ -22,9 +25,9 @@ class ServisStateMachine
         'diterima' => ['diagnosa'],
         'diagnosa' => ['menunggu_approval'],
         'menunggu_approval' => ['disetujui', 'ditolak'],
-        'disetujui' => ['dikerjakan'],
-        'dikerjakan' => ['qc'],
-        'qc' => ['selesai'],
+        'disetujui' => ['dikerjakan', 'batal'],
+        'dikerjakan' => ['qc', 'batal'],
+        'qc' => ['selesai', 'batal'],
         'selesai' => ['diambil'],
         'ditolak' => ['diagnosa', 'diambil', 'batal'], // re-estimasi atau unit diambil/batal
         'batal' => ['diambil'],
@@ -81,6 +84,7 @@ class ServisStateMachine
             'dikerjakan' => ['label' => 'Dikerjakan',     'color' => 'up-primary'],
             'qc' => ['label' => 'QC',             'color' => 'up-accent'],
             'selesai' => ['label' => 'Selesai',        'color' => 'up-mint'],
+            'batal' => ['label' => 'Dibatalkan',    'color' => 'up-red'],
             'diambil' => ['label' => 'Diambil',        'color' => 'ink-100'],
         ];
     }

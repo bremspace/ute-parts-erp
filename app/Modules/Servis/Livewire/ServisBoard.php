@@ -166,6 +166,13 @@ class ServisBoard extends Component
 
     public float $batalReturBiaya = 0;
 
+    // [ISO 9001 §8.7] Pembatalan servis saat pengerjaan (konsumen/staf)
+    public bool $showBatalModal = false;
+
+    public ?int $batalTiketId = null;
+
+    public string $batalAlasan = '';
+
     public string $batalReturMetode = 'tunai';
 
     // [Intake Booking Online] Modal Pemeriksaan & Penerimaan Fisik
@@ -373,13 +380,69 @@ class ServisBoard extends Component
             return collect();
         }
 
-        $query = Produk::where('is_active', true);
+        $query = Produk::query()
+            ->where('is_active', true)
+            ->select(['id', 'nama', 'slug', 'barcode', 'kategori', 'kategori_id', 'satuan', 'harga_beli', 'harga_jual_retail']);
 
-        if (strlen($this->cariPartQuery) >= 2) {
-            $query->cariPintar($this->cariPartQuery);
+        $q = trim((string) $this->cariPartQuery);
+
+        if (strlen($q) >= 2) {
+            // Pencarian 2 karakter memakai LIKE nama (index produk_is_active_nama_index);
+            // SmartSearchService (facet brand/kualitas/kategori/supplier/tipe HP) hanya
+            // dipanggil untuk query >= 3 karakter supaya modal tetap ringan.
+            if (strlen($q) < 3) {
+                $query->where('nama', 'like', "{$q}%");
+            } else {
+                $query->cariPintar($q);
+            }
         }
 
         return $query->orderBy('nama')->limit(30)->get();
+    }
+
+    /**
+     * Daftar tiket aktif yang menunggu persetujuan perubahan lingkup.
+     *
+     * @return array<int, array{id: int, no_tiket: string}>
+     */
+    public function getTiketPerluPersetujuanProperty(): array
+    {
+        return $this->queryTiketScoped()
+            ->whereIn('status', ['disetujui', 'dikerjakan', 'qc'])
+            ->get()
+            ->filter(fn ($t) => $t->perluPersetujuanUlang())
+            ->map(fn ($t) => ['id' => $t->id, 'no_tiket' => $t->no_tiket])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Kirim ulang link persetujuan perubahan lingkup ke semua pelanggan yang
+     * tertahan (WA). Regulator/staf memakai ini untuk menagih persetujuan.
+     */
+    public function kirimUlangPersetujuan(): void
+    {
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin mengirim ulang persetujuan')) {
+            return;
+        }
+
+        $terkirim = 0;
+        $gagal = 0;
+
+        foreach ($this->tiketPerluPersetujuan as $item) {
+            $tiket = $this->tiketScoped($item['id']);
+
+            if (app(ServisService::class)->kirimUlangPersetujuan($tiket)) {
+                $terkirim++;
+            } else {
+                $gagal++;
+            }
+        }
+
+        $this->dispatch('alert', [
+            'type' => $terkirim > 0 ? 'success' : 'error',
+            'message' => "Link persetujuan dikirim ke {$terkirim} pelanggan".($gagal > 0 ? " ({$gagal} gagal/tanpa nomor WA)" : '').'.',
+        ]);
     }
 
     public function pilihPartServis(int $produkId): void
@@ -519,7 +582,11 @@ class ServisBoard extends Component
         // Eager load item penagihan (estimasi + pekerjaan + sparepart) — dipakai
         // rincian/jurnal/penagihan; mencegah N+1 saat banyak tiket dimuat.
         return $this->scopeTiket(
-            TiketServis::query()->with(['items', 'estimasiItems', 'spareparts'])
+            TiketServis::query()->with([
+                'items.produk',
+                'estimasiItems.produk',
+                'spareparts.produk',
+            ])
         );
     }
 
@@ -1078,14 +1145,18 @@ class ServisBoard extends Component
     // --- Status update (state machine) ---
     public function updateStatus(int $tiketId, string $statusBaru, string $alasan = '')
     {
+        // [T-06] Otorisasi OBJEK duluan: tiket cabang lain → 404 (ModelNotFoundException)
+        // sebelum guard izin aksi. Guard izin lebih dulu membuat tiket cabang lain
+        // "menghilang" tanpa exception (bocorkan/tidak konsisten) dan Livewire
+        // mengembalikan early.
+        $tiket = $this->tiketScoped($tiketId);
+
         // [B-14] Guard permission level Livewire (route hanya `servis.view`).
-        // Override Mundur tetap butuh `servis.override-status` (dicek di
+        // Override mundur tetap butuh `servis.override-status` (dicek di
         // ServisService::updateStatus).
         if (! $this->boleh('servis.update-status', 'Anda tidak punya izin mengubah status tiket servis')) {
             return;
         }
-
-        $tiket = $this->tiketScoped($tiketId);
 
         // [T-16] Validasi wajib update catatan + foto per step sebelum membuka tombol step berikutnya
         if (in_array($statusBaru, ['qc', 'selesai'], true)) {
@@ -1500,11 +1571,13 @@ class ServisBoard extends Component
 
     public function prosesApprove(string $action)
     {
+        // [T-06] Otorisasi OBJEK duluan (404 untuk tiket cabang lain) sebelum
+        // guard izin aksi — konsisten dengan updateStatus().
+        $tiket = $this->tiketScoped($this->approveTiketId);
+
         if (! $this->boleh('servis.approve-estimasi', 'Anda tidak punya izin menyetujui/menolak estimasi servis')) {
             return;
         }
-
-        $tiket = $this->tiketScoped($this->approveTiketId);
         $statusBaru = $action === 'approve' ? 'disetujui' : 'ditolak';
 
         $this->updateStatus($tiket->id, $statusBaru, $this->approveAlasan ?: ($action === 'approve' ? 'Pelanggan menyetujui estimasi' : 'Estimasi ditolak'));
@@ -1538,6 +1611,49 @@ class ServisBoard extends Component
             $this->dispatch('alert', [
                 'type' => 'success',
                 'message' => "Servis ditutup: Unit {$tiket->no_tiket} telah diserahkan kembali kepada pelanggan.",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    // [ISO 9001 §8.7] Pembatalan servis saat pengerjaan (konsumen/staf)
+    public function openBatalModal(int $tiketId): void
+    {
+        $tiket = $this->tiketScoped($tiketId);
+
+        if (! in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Servis hanya dapat dibatalkan saat tahap pengerjaan.']);
+
+            return;
+        }
+
+        $this->batalTiketId = $tiketId;
+        $this->batalAlasan = '';
+        $this->showBatalModal = true;
+    }
+
+    public function prosesBatal(): void
+    {
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin membatalkan servis')) {
+            return;
+        }
+
+        $tiket = $this->tiketScoped($this->batalTiketId);
+
+        if (trim($this->batalAlasan) === '') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Alasan pembatalan wajib diisi.']);
+
+            return;
+        }
+
+        try {
+            app(ServisService::class)->updateStatus($tiket, 'batal', auth()->user(), $this->batalAlasan);
+            $this->showBatalModal = false;
+            $this->selectedTiketId = $tiket->id;
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Servis {$tiket->no_tiket} dibatalkan. Serahkan unit ke pelanggan (status 'diambil').",
             ]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
@@ -2018,6 +2134,7 @@ class ServisBoard extends Component
             'pelangganCariServis' => $this->pelangganCariServis,
             'bookingOnline' => $this->bookingOnline,
             'cariPartResults' => $this->cariPartResults,
+            'tiketPerluPersetujuan' => $this->tiketPerluPersetujuan,
         ])->layout('layouts.backoffice', ['header' => 'Servis HP — Papan Kanban']);
     }
 }

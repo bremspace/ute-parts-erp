@@ -3161,7 +3161,7 @@ class PosKasir extends Component
     {
         $cabangId = session('cabang_id');
 
-        return TiketServis::with(['pelanggan', 'items', 'spareparts.produk', 'estimasiItems'])
+        return TiketServis::with(['pelanggan', 'items.produk', 'spareparts.produk', 'estimasiItems.produk'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->whereIn('status', ['selesai', 'diambil'])
             ->where('status_pembayaran', '!=', 'lunas')
@@ -3199,7 +3199,7 @@ class PosKasir extends Component
     public function pilihTiketServis(int $id): void
     {
         $cabangId = session('cabang_id');
-        $tiket = TiketServis::with(['pelanggan', 'items', 'spareparts.produk'])
+        $tiket = TiketServis::with(['pelanggan', 'items.produk', 'spareparts.produk', 'estimasiItems.produk'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
 

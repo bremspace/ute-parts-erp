@@ -23,6 +23,15 @@
                 <option value="semua" class="bg-ink-900">Histori: Semua Transaksi</option>
             </select>
 
+            <!-- [BH/ISO] Kirim ulang link persetujuan perubahan lingkup (tiket tertahan) -->
+            @if(count($tiketPerluPersetujuan) > 0)
+                <button type="button" wire:click="kirimUlangPersetujuan"
+                    title="Kirim ulang link persetujuan perubahan lingkup ke pelanggan"
+                    class="px-3 py-2.5 rounded-xl bg-up-amber/15 hover:bg-up-amber/25 border border-up-amber/30 text-up-amber font-bold text-xs whitespace-nowrap cursor-pointer transition-[background-color] active:scale-[0.97] min-h-[44px]">
+                    Kirim Ulang Persetujuan ({{ count($tiketPerluPersetujuan) }})
+                </button>
+            @endif
+
             <!-- [F2-5] Export laporan servis (queue) -->
             @can('laporan.cabang')
                 <div class="flex items-center gap-1.5">
@@ -536,6 +545,10 @@
                                                 class="inline-flex items-center min-h-[44px] px-3 rounded-lg bg-up-primary text-white text-xs font-bold hover:bg-up-primary/80 cursor-pointer"
                                             >Bayar Kasir</a>
                                         @endcanany
+                                    @endif
+                                    @if(in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true))
+                                        <button type="button" wire:click="openBatalModal({{ $tiket->id }})"
+                                            class="min-h-[44px] px-3 rounded-lg bg-up-red/10 hover:bg-up-red text-up-red hover:text-white font-bold text-xs border border-up-red/30 transition-[background-color,color] duration-100 cursor-pointer">Batalkan Servis</button>
                                     @endif
                                     @if($tiket->status === 'ditolak')
                                         <button type="button" wire:click="revisiEstimasiDitolak({{ $tiket->id }})"
@@ -3076,6 +3089,55 @@
                             class="px-5 py-2.5 rounded-xl bg-up-red hover:bg-rose-700 text-white font-bold text-xs transition-[background-color,transform] duration-100 shadow-md shadow-up-red/30 cursor-pointer flex items-center gap-1.5 active:scale-95"
                         >
                             Konfirmasi Serah Terima & Tutup Tiket
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- ===== MODAL: BATALKAN SERVIS SAAT PENGERJAAN (ISO 9001 §8.7) ===== -->
+    @if($showBatalModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Batalkan Servis</h3>
+                        <p class="text-xs text-ink-400 mt-0.5">Unit akan diserahkan kembali kepada pelanggan tanpa biaya</p>
+                    </div>
+                    <button wire:click="$set('showBatalModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+
+                <div class="space-y-3.5">
+                    <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/20 text-xs text-ink-200">
+                        <p class="font-bold text-up-red mb-1">Perhatian:</p>
+                        <p>Stok part yang sudah dipakai akan dikembalikan ke gudang asal dan klaim Serial Number dilepas. Pembatalan wajib menyertakan alasan (audit ISO 9001 §8.7).</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Alasan Pembatalan <span class="text-up-red">*</span></label>
+                        <textarea
+                            wire:model="batalAlasan"
+                            rows="3"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                            placeholder="Contoh: Pelanggan membatalkan / unit tidak jadi diperbaiki / part tidak tersedia..."
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            wire:click="$set('showBatalModal', false)"
+                            class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs transition-colors cursor-pointer"
+                        >
+                            Kembali
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="prosesBatal"
+                            class="px-4 py-2 rounded-xl bg-up-red hover:bg-rose-700 text-white font-bold text-xs transition-colors shadow-md shadow-up-red/30 cursor-pointer"
+                        >
+                            Ya, Batalkan Servis
                         </button>
                     </div>
                 </div>
