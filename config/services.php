@@ -51,4 +51,21 @@ return [
         'device_id' => env('WA_GATEWAY_DEVICE_ID'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Gateway OpenWA (self-hosted)
+    |--------------------------------------------------------------------------
+    |
+    | Hanya dipakai bila wa_gateway_config.provider = "openwa" di UI Pengaturan.
+    | URL menunjuk ke API OpenWA (bukan dashboard). Sesi = nama sesi OpenWA.
+    | API key_operator disarankan (session-scoped), bukan admin.
+    |
+    */
+    'openwa' => [
+        'url' => env('WA_OPENWA_URL', 'http://127.0.0.1:2785/api'),
+        'api_key' => env('WA_OPENWA_API_KEY'),
+        'session' => env('WA_OPENWA_SESSION', 'default'),
+        'timeout' => (int) env('WA_OPENWA_TIMEOUT', 20),
+    ],
+
 ];

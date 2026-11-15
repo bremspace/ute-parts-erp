@@ -4161,7 +4161,7 @@
                 <!-- Main Form (Col Span 2) -->
                 <div class="lg:col-span-2 space-y-6">
                     <!-- WhatsApp Gateway Card -->
-                    <x-prism.glass-card title="WhatsApp Gateway & Notifikasi Otomatis" subtitle="Koneksi gateway pesan keluar via WhatsApp (Fonnte, Wablas, atau Custom)">
+                    <x-prism.glass-card title="WhatsApp Gateway & Notifikasi Otomatis" subtitle="Koneksi gateway pesan keluar via WhatsApp (Fonnte, Wablas, OpenWA self-hosted, atau Custom)">
                         <div class="space-y-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -4169,6 +4169,7 @@
                                     <select wire:model.live="integrasiForm.wa_provider" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                         <option value="fonnte" class="bg-ink-900">Fonnte (Rekomendasi)</option>
                                         <option value="wablas" class="bg-ink-900">Wablas</option>
+                                        <option value="openwa" class="bg-ink-900">OpenWA (Self-Hosted Gateway)</option>
                                         <option value="custom" class="bg-ink-900">Custom Webhook / HTTP Gateway</option>
                                     </select>
                                 </div>
@@ -4184,10 +4185,19 @@
                                     <input type="password" wire:model="integrasiForm.wa_token" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Masukkan token API gateway WA" />
                                     <p class="text-[10px] text-ink-400 mt-1">Dapatkan dari dashboard penyedia WA gateway Anda.</p>
                                 </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Device ID (Opsional)</label>
-                                    <input type="text" wire:model="integrasiForm.wa_device_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Kosongkan bila single-device" />
-                                </div>
+                                @if(($integrasiForm['wa_provider'] ?? '') === 'openwa')
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">ID Sesi OpenWA *</label>
+                                        <input type="text" wire:model="integrasiForm.wa_session" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="default" />
+                                        <p class="text-[10px] text-ink-400 mt-1">Nama sesi dari dasbor OpenWA. Biasanya <span class="font-mono">default</span>. API key sebaiknya role <span class="font-mono">operator</span> yang di-scope ke sesi ini.</p>
+                                        @error('integrasiForm.wa_session') <p class="text-up-red text-[10px] mt-1">{{ $message }}</p> @enderror
+                                    </div>
+                                @else
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Device ID (Opsional)</label>
+                                        <input type="text" wire:model="integrasiForm.wa_device_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Kosongkan bila single-device" />
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">

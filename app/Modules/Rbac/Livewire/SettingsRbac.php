@@ -7,6 +7,7 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Notifikasi\Services\WhatsAppGatewayService;
 use App\Modules\Pos\Models\QrisCabang;
 use App\Modules\Pos\Services\QrisService;
 use App\Modules\Rbac\Livewire\Concerns\ManagesUserRbac;
@@ -238,10 +239,11 @@ class SettingsRbac extends Component
 
     public array $integrasiForm = [
         // WhatsApp Gateway
-        'wa_provider' => 'fonnte', // fonnte, wablas, custom
+        'wa_provider' => 'fonnte', // fonnte, wablas, custom, openwa
         'wa_url' => 'https://api.fonnte.com/send',
         'wa_token' => '',
         'wa_device_id' => '',
+        'wa_session' => '',
         'wa_test_number' => '',
         'wa_auto_notif_transaksi' => true,
         'wa_auto_notif_servis' => true,
@@ -1037,6 +1039,7 @@ class SettingsRbac extends Component
             $this->integrasiForm['wa_url'] = $savedWa['url'] ?? 'https://api.fonnte.com/send';
             $this->integrasiForm['wa_token'] = $savedWa['token'] ?? '';
             $this->integrasiForm['wa_device_id'] = $savedWa['device_id'] ?? '';
+            $this->integrasiForm['wa_session'] = $savedWa['session'] ?? '';
             $this->integrasiForm['wa_auto_notif_transaksi'] = (bool) ($savedWa['auto_notif_transaksi'] ?? true);
             $this->integrasiForm['wa_auto_notif_servis'] = (bool) ($savedWa['auto_notif_servis'] ?? true);
         } else {
@@ -1047,6 +1050,11 @@ class SettingsRbac extends Component
                 $this->integrasiForm['wa_token'] = $envWa['token'] ?: '';
                 $this->integrasiForm['wa_device_id'] = $envWa['device_id'] ?: '';
             }
+        }
+
+        $envOpenWa = config('services.openwa', []);
+        if (is_array($envOpenWa)) {
+            $this->integrasiForm['wa_session'] = $this->integrasiForm['wa_session'] ?: ($envOpenWa['session'] ?? '');
         }
 
         $savedDuitku = $config->get('duitku_gateway_config');
@@ -1083,6 +1091,9 @@ class SettingsRbac extends Component
             $this->integrasiForm['wa_url'] = 'https://api.fonnte.com/send';
         } elseif ($this->integrasiForm['wa_provider'] === 'wablas') {
             $this->integrasiForm['wa_url'] = 'https://kudus.wablas.com/api/send-message';
+        } elseif ($this->integrasiForm['wa_provider'] === 'openwa') {
+            $this->integrasiForm['wa_url'] = (string) (config('services.openwa.url') ?: 'http://127.0.0.1:2785/api');
+            $this->integrasiForm['wa_session'] = $this->integrasiForm['wa_session'] ?: (string) (config('services.openwa.session') ?: 'default');
         }
     }
 
@@ -1093,10 +1104,11 @@ class SettingsRbac extends Component
         }
 
         $this->validate([
-            'integrasiForm.wa_provider' => 'required|in:fonnte,wablas,custom',
+            'integrasiForm.wa_provider' => 'required|in:fonnte,wablas,custom,openwa',
             'integrasiForm.wa_url' => 'required|url',
             'integrasiForm.wa_token' => 'nullable|string|max:255',
             'integrasiForm.wa_device_id' => 'nullable|string|max:100',
+            'integrasiForm.wa_session' => 'nullable|string|max:100',
             'integrasiForm.duitku_mode' => 'required|in:sandbox,production',
             'integrasiForm.duitku_merchant_code' => 'nullable|string|max:100',
             'integrasiForm.duitku_api_key' => 'nullable|string|max:255',
@@ -1113,6 +1125,7 @@ class SettingsRbac extends Component
             'url' => $this->integrasiForm['wa_url'],
             'token' => $this->integrasiForm['wa_token'],
             'device_id' => $this->integrasiForm['wa_device_id'],
+            'session' => $this->integrasiForm['wa_session'],
             'auto_notif_transaksi' => (bool) $this->integrasiForm['wa_auto_notif_transaksi'],
             'auto_notif_servis' => (bool) $this->integrasiForm['wa_auto_notif_servis'],
         ], 'Konfigurasi WhatsApp Gateway');
@@ -1164,39 +1177,28 @@ class SettingsRbac extends Component
             'integrasiForm.wa_token.required' => 'Token / API Key WhatsApp wajib diisi sebelum melakukan tes.',
         ]);
 
-        $target = preg_replace('/[^0-9]/', '', $this->integrasiForm['wa_test_number']);
-        if (str_starts_with($target, '0')) {
-            $target = '62'.substr($target, 1);
-        }
-
         $pesan = '🔔 *Uji Coba WhatsApp Gateway '.config('app.name', 'Bremspace')." ERP*\n\nKoneksi WhatsApp Gateway berhasil terhubung dengan sistem.\n\n📅 Waktu: ".now()->format('d M Y H:i:s')."\n👤 Diuji oleh: ".auth()->user()->name."\n\n_Pesan ini dikirim otomatis oleh sistem._";
 
-        try {
-            $response = Http::connectTimeout(3)->timeout(3)->withHeaders([
-                'Authorization' => $this->integrasiForm['wa_token'],
-            ])->post($this->integrasiForm['wa_url'], [
-                'target' => $target,
-                'message' => $pesan,
-            ]);
+        $hasil = app(WhatsAppGatewayService::class)->kirimDenganConfig([
+            'provider' => $this->integrasiForm['wa_provider'],
+            'url' => $this->integrasiForm['wa_url'],
+            'token' => $this->integrasiForm['wa_token'],
+            'session' => $this->integrasiForm['wa_session'],
+            'timeout' => (int) config('services.openwa.timeout', 20),
+        ], $this->integrasiForm['wa_test_number'], $pesan);
 
-            if ($response->successful()) {
-                $this->waTestStatus = 'success';
-                $this->dispatch('alert', [
-                    'type' => 'success',
-                    'message' => "Pesan tes WhatsApp berhasil dikirim ke {$target}!",
-                ]);
-            } else {
-                $this->waTestStatus = 'error';
-                $this->dispatch('alert', [
-                    'type' => 'error',
-                    'message' => "Gagal kirim WA (HTTP {$response->status()}): {$response->body()}",
-                ]);
-            }
-        } catch (\Throwable $e) {
+        if ($hasil['ok']) {
+            $this->waTestStatus = 'success';
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => 'Pesan tes WhatsApp berhasil dikirim ke '.$this->integrasiForm['wa_test_number'].'!',
+            ]);
+        } else {
             $this->waTestStatus = 'error';
+            // Pesan error sudah dibuat aman oleh gateway service (tanpa token).
             $this->dispatch('alert', [
                 'type' => 'error',
-                'message' => 'Koneksi ke gateway WA gagal: '.$e->getMessage(),
+                'message' => 'Gagal kirim WA: '.$hasil['error'],
             ]);
         }
     }

@@ -2,8 +2,8 @@
 
 namespace App\Modules\Notifikasi\Jobs;
 
-use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
+use App\Modules\Notifikasi\Services\WhatsAppGatewayService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -86,38 +86,19 @@ class KirimNotifikasiJob implements ShouldQueue
     protected function kirimWhatsApp(NotifikasiKeluar $log): bool
     {
         /**
-         * Integrasi WA gateway: Utamakan konfigurasi yang disimpan via UI Pengaturan (tabel konfigurasi),
-         * fallback ke config('services.wa') dari .env bila belum ada di DB.
+         * Semua provider (Fonnte/Wablas/Custom/OpenWA) lewat satu pintu:
+         * WhatsAppGatewayService. Kredensial dimask, timeout terpasang, dan
+         * pesan error tidak memuat token.
          */
-        $configService = app(KonfigurasiService::class);
-        $savedWa = $configService->get('wa_gateway_config');
-        $wa = (is_array($savedWa) && filled($savedWa['token'] ?? null))
-            ? $savedWa
-            : config('services.wa', []);
+        $hasil = app(WhatsAppGatewayService::class)->kirim($log->tujuan, (string) $log->konten);
 
-        if (! is_array($wa) || blank($wa['url'] ?? null) || blank($wa['token'] ?? null)) {
-            $this->tandaiGagal(
-                $log,
-                'gateway WA belum dikonfigurasi. Atur kredensial gateway WA sebelum mengirim.'
-            );
-
-            return false;
+        if ($hasil['ok']) {
+            return true;
         }
 
-        $response = Http::timeout(10)->withHeaders([
-            'Authorization' => $wa['token'],
-        ])->post($wa['url'], [
-            'target' => $log->tujuan,
-            'message' => $log->konten,
-        ]);
+        $this->tandaiGagal($log, (string) $hasil['error']);
 
-        if (! $response->successful()) {
-            $this->tandaiGagal($log, "Gateway WA error: HTTP {$response->status()} - {$response->body()}");
-
-            return false;
-        }
-
-        return true;
+        return false;
     }
 
     protected function tandaiGagal(NotifikasiKeluar $log, string $error): void

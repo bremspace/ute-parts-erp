@@ -220,7 +220,8 @@ class ServisFaseDIntegritasTest extends TestCase
         Http::assertSent(function ($request) use ($log) {
             return $request->url() === 'https://api.wa-gateway.test/send'
                 && $request->hasHeader('Authorization', 'test-bearer-token')
-                && $request['target'] === $log->tujuan
+                // Nomor dinormalisasi ke format internasional (62…) agar valid di gateway.
+                && $request['target'] === '62'.substr($log->tujuan, 1)
                 && $request['message'] === $log->konten;
         });
 

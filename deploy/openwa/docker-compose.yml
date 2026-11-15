@@ -1,0 +1,77 @@
+# OpenWA — tumpukan Docker untuk gateway WhatsApp self-hosted (mode produksi).
+#
+# Dipasang di VPS yang sama dengan ERP, tapi HANYA terikat ke 127.0.0.1
+# (tidak terekspos ke internet). Laravel menghubungi http://127.0.0.1:2785/api.
+#
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Catatan: plugin `docker compose` (v2) wajib ada. Bila belum, lihat
+# deploy/openwa/install-compose.sh.
+
+services:
+  openwa-api:
+    image: ghcr.io/rmyndharis/openwa:${OPENWA_VERSION:-v0.30.1}
+    container_name: openwa-api
+    restart: unless-stopped
+    stop_grace_period: 75s
+    networks:
+      - openwa-network
+    # Hardening dari image resmi: Chromium butuh --no-sandbox, jadi container
+    # adalah batas confinements. Rootfs read-only, tmpfs untuk /tmp.
+    security_opt:
+      - 'no-new-privileges:true'
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - KILL
+      - SETGID
+      - SETUID
+    read_only: true
+    tmpfs:
+      - /tmp
+    pids_limit: ${OPENWA_PIDS_LIMIT:-1024}
+    # 6 GB total di VPS ini: 1.5 GB untuk OpenWA + sisanya untuk MySQL/PHP-FPM.
+    mem_limit: ${OPENWA_MEM_LIMIT:-1500m}
+    ports:
+      # Hanya loopback. Dashboard Tidak boleh dipublikasikan tanpa reverse proxy + TLS.
+      - '127.0.0.1:${API_PORT:-2785}:2785'
+    environment:
+      - NODE_ENV=production
+      - TZ=UTC
+      - HOME=/tmp
+      - XDG_CONFIG_HOME=/tmp/.config
+      - XDG_CACHE_HOME=/tmp/.cache
+      - PORT=2785
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ENGINE_TYPE=${ENGINE_TYPE:-whatsapp-web.js}
+      - AUTO_START_SESSIONS=${AUTO_START_SESSIONS:-true}
+      - SIMULATE_TYPING=${SIMULATE_TYPING:-true}
+      - SIMULATE_TYPING_MAX_MS=${SIMULATE_TYPING_MAX_MS:-5000}
+      - SEND_PACING_ENABLED=${SEND_PACING_ENABLED:-true}
+      - SEND_PACING_WARMUP_SCHEDULE=${SEND_PACING_WARMUP_SCHEDULE:-20,40,80,160,320,640,1000}
+      - SEND_PACING_COLD_DAILY_CAP=${SEND_PACING_COLD_DAILY_CAP:-5,10,20,40,60,80,100}
+      - SEND_PACING_BREAKER_THRESHOLD=${SEND_PACING_BREAKER_THRESHOLD:-5}
+      - SEND_PACING_BREAKER_COOLDOWN_MS=${SEND_PACING_BREAKER_COOLDOWN_MS:-900000}
+      - SESSION_DATA_PATH=/app/data/sessions
+      - DATABASE_TYPE=${DATABASE_TYPE:-sqlite}
+    volumes:
+      - openwa-data:/app/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:2785/api/health/ready']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  openwa-network:
+    name: openwa-network
+
+volumes:
+  openwa-data:
+    name: openwa_openwa-data
+    driver: local
