@@ -31,6 +31,8 @@ use Spatie\Activitylog\Support\LogOptions;
     'revisi_lingkup_diajukan_at', 'revisi_lingkup_snapshot', 'revisi_lingkup_pending',
     'stok_estimasi_diproses', 'stok_estimasi_catatan',
     'tiket_servis_lama_id', 'garansi_berlaku', 'komplain_catatan',
+    'komplain_gratis', 'komplain_gratis_proposed_by', 'komplain_gratis_proposed_at',
+    'komplain_gratis_approved_by', 'komplain_gratis_approved_at',
 ]) ]
 class TiketServis extends Model
 {
@@ -56,6 +58,9 @@ class TiketServis extends Model
         'revisi_lingkup_diajukan_at' => 'datetime',
         'revisi_lingkup_pending' => 'boolean',
         'garansi_berlaku' => 'boolean',
+        'komplain_gratis' => 'boolean',
+        'komplain_gratis_proposed_at' => 'datetime',
+        'komplain_gratis_approved_at' => 'datetime',
         'durasi_pengerjaan_menit' => 'integer',
         'pengerjaan_mulai_at' => 'datetime',
         'pengerjaan_deadline_at' => 'datetime',

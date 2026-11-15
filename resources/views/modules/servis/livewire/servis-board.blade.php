@@ -1618,11 +1618,17 @@
                             <span class="text-xs font-bold text-up-mint tabular-nums">{{ $progressPersentase }}%</span>
                         </div>
                         <input type="range" min="5" max="100" step="5" wire:model.live="progressPersentase" class="w-full accent-up-primary cursor-pointer">
+                        <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            @foreach([25, 50, 75, 90] as $preset)
+                                <button type="button" wire:click="$set('progressPersentase', {{ $preset }})"
+                                    class="px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-[background-color,color] {{ (int) $progressPersentase === $preset ? 'bg-up-primary text-white' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">{{ $preset }}%</button>
+                            @endforeach
+                        </div>
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Judul Tahapan / Progres <span class="text-up-red">*</span></label>
-                        <input type="text" wire:model="progressJudul" placeholder="Contoh: Pembongkaran unit & tes modul LCD baru..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        <input type="text" wire:model="progressJudul" placeholder="Contoh: Pembongkaran unit & tes modul LCD baru..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" autofocus />
                         @error('progressJudul') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
                     </div>
 
@@ -2266,6 +2272,42 @@
                         </div>
                     @endif
 
+                    {{-- Komplain pasca-servis & garansi --}}
+                    @if($selectedTiket->sumber === 'komplain')
+                        <div class="p-3 rounded-xl bg-up-amber/10 border border-up-amber/30 space-y-2">
+                            <p class="text-[10px] uppercase font-semibold text-up-amber">
+                                Komplain pasca-servis — {{ $selectedTiket->garansi_berlaku ? 'garansi berlaku' : 'di luar garansi' }}
+                            </p>
+
+                            @if($selectedTiket->tiketLama)
+                                <p class="text-[10px] text-ink-300">Tiket asal: {{ $selectedTiket->tiketLama->no_tiket }}</p>
+                            @endif
+
+                            @if($selectedTiket->komplain_gratis)
+                                <p class="text-[10px] text-ink-200">
+                                    Perbaikan gratis: {{ $selectedTiket->komplain_gratis_approved_at ? 'DISETUJUI regulator' : 'menunggu persetujuan regulator' }}
+                                </p>
+
+                                @if(! $selectedTiket->komplain_gratis_approved_at)
+                                    <div class="flex flex-wrap gap-2">
+                                        @can('servis.create')
+                                            <button type="button" wire:click="ajukanGratis"
+                                                class="px-2.5 py-1.5 rounded-lg bg-up-primary text-white font-bold text-[10px] cursor-pointer">Ajukan Gratis</button>
+                                        @endcan
+                                        @can('servis.override-status')
+                                            <button type="button" wire:click="setujuiGratis"
+                                                class="px-2.5 py-1.5 rounded-lg bg-up-mint text-ink-950 font-bold text-[10px] cursor-pointer">Setujui (Regulator)</button>
+                                        @endcan
+                                    </div>
+                                @endif
+                            @endif
+
+                            @if($selectedTiket->batas_waktu_menit)
+                                <p class="text-[10px] text-ink-300">SLA komplain: {{ $selectedTiket->batas_waktu_menit }} menit</p>
+                            @endif
+                        </div>
+                    @endif
+
                     <!-- Status SLA & Batas Waktu Pengerjaan Teknisi -->
                     @if($selectedTiket->batas_waktu_menit || $selectedTiket->pengerjaan_mulai_at)
                         <div class="p-3.5 rounded-xl {{ $selectedTiket->pengerjaan_deadline_at && now()->greaterThan($selectedTiket->pengerjaan_deadline_at) && in_array($selectedTiket->status, ['dikerjakan', 'qc']) ? 'bg-up-red/10 border border-up-red/30' : 'bg-up-primary/10 border border-up-primary/30' }}">
@@ -2784,8 +2826,10 @@
                         </div>
                         <input type="text"
                                wire:model.live.debounce.300ms="cariPartQuery"
+                               wire:keydown.enter.prevent="pilihPartPertama()"
+                               wire:keydown.escape="$set('showCariPartModal', false)"
                                class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-medium"
-                               placeholder="Ketik minimal 2 huruf..."
+                               placeholder="Ketik minimal 2 huruf... (Enter = pilih, Esc = tutup)"
                                autofocus>
                     </div>
                 </div>
@@ -2805,6 +2849,7 @@
                                     @if($product->kategori)
                                         <span>{{ $product->kategori }}</span>
                                     @endif
+                                    <span class="ml-1">Stok: <span class="font-bold {{ ($product->stok_items_sum_jumlah ?? 0) > 0 ? 'text-up-mint' : 'text-up-red' }}">{{ (int) ($product->stok_items_sum_jumlah ?? 0) }}</span></span>
                                 </p>
                             </div>
                             <div class="text-right flex-shrink-0">

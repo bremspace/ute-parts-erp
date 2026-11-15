@@ -122,4 +122,97 @@ class ServisKomplainTest extends TestCase
 
         app(ServisService::class)->buatTiketKomplain($tiket, 'Komplain prematur', $this->admin);
     }
+
+    /** @test */
+    public function test_perbaikan_gratis_garansi_wajib_persetujuan_regulator(): void
+    {
+        $tiket = $this->buatTiketSelesai('SRV-KOM-4');
+
+        Garansi::create([
+            'tiket_servis_id' => $tiket->id,
+            'durasi_hari' => 30,
+            'tanggal_mulai' => now()->subDay()->toDateString(),
+            'tanggal_berakhir' => now()->addDays(29)->toDateString(),
+            'keterangan' => 'Garansi servis',
+        ]);
+
+        $komplain = app(ServisService::class)->buatTiketKomplain($tiket->fresh(), 'LCD bergaris lagi', $this->admin);
+
+        $this->assertTrue($komplain->komplain_gratis, 'Komplain garansi otomatis mengusulkan perbaikan gratis');
+        $this->assertSame(4320, $komplain->batas_waktu_menit, 'SLA komplain 72 jam');
+
+        $service = app(ServisService::class);
+        $service->updateStatus($komplain->fresh(), 'dikerjakan', $this->admin, 'Komplain garansi — tindak lanjut langsung');
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('belum disetujui regulator');
+
+        $service->updateStatus($komplain->fresh(), 'selesai', $this->admin, 'Selesaikan perbaikan');
+    }
+
+    /** @test */
+    public function test_setelah_disetujui_selesai_lunas_otomatis_tanpa_piutang(): void
+    {
+        $tiket = $this->buatTiketSelesai('SRV-KOM-5');
+
+        Garansi::create([
+            'tiket_servis_id' => $tiket->id,
+            'durasi_hari' => 30,
+            'tanggal_mulai' => now()->subDay()->toDateString(),
+            'tanggal_berakhir' => now()->addDays(29)->toDateString(),
+            'keterangan' => 'Garansi servis',
+        ]);
+
+        $komplain = app(ServisService::class)->buatTiketKomplain($tiket->fresh(), 'LCD bergaris lagi', $this->admin);
+
+        // Regulator berbeda menyetujui (four-eyes)
+        $regulator = User::create([
+            'name' => 'Regulator Komplain',
+            'email' => 'regulator-komplain@uteparts.test',
+            'password' => bcrypt('password'),
+            'is_active' => true,
+        ]);
+        $regulator->assignRole('super-admin');
+
+        app(ServisService::class)->setujuiGratisGaransi($komplain->fresh(), $regulator);
+
+        $service = app(ServisService::class);
+        $service->updateStatus($komplain->fresh(), 'dikerjakan', $this->admin, 'Komplain garansi — tindak lanjut langsung');
+        $service->updateStatus($komplain->fresh(), 'selesai', $this->admin, 'Selesaikan perbaikan');
+
+        $komplain = $komplain->fresh();
+        $this->assertSame('lunas', $komplain->status_pembayaran);
+        $this->assertSame('garansi', $komplain->metode_pembayaran);
+        $this->assertNotNull($komplain->tanggal_bayar);
+
+        // Tidak ada piutang untuk perbaikan garansi gratis
+        $this->assertSame(
+            0,
+            \App\Modules\Akunting\Models\Piutang::where('referensi_tipe', TiketServis::class)
+                ->where('referensi_id', $komplain->id)
+                ->count()
+        );
+    }
+
+    /** @test */
+    public function test_four_eyes_approver_beda_dengan_pengusul(): void
+    {
+        $tiket = $this->buatTiketSelesai('SRV-KOM-6');
+
+        Garansi::create([
+            'tiket_servis_id' => $tiket->id,
+            'durasi_hari' => 30,
+            'tanggal_mulai' => now()->subDay()->toDateString(),
+            'tanggal_berakhir' => now()->addDays(29)->toDateString(),
+            'keterangan' => 'Garansi servis',
+        ]);
+
+        $komplain = app(ServisService::class)->buatTiketKomplain($tiket->fresh(), 'LCD bergaris lagi', $this->admin);
+
+        // Pengusul = admin; approver yang sama harus ditolak
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('berbeda orang');
+
+        app(ServisService::class)->setujuiGratisGaransi($komplain->fresh(), $this->admin);
+    }
 }

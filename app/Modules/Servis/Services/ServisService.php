@@ -496,6 +496,14 @@ class ServisService
                 $this->setujuiPerubahanLingkup($tiket, $alasan ?: 'Override regulator', 'regulator');
             }
 
+            // [Komplain garansi] Perbaikan gratis hanya boleh 'selesai' setelah
+            // disetujui regulator (four-eyes). Fail-closed.
+            if ($statusBaru === 'selesai'
+                && $tiket->komplain_gratis
+                && ! $tiket->komplain_gratis_approved_at) {
+                throw new \Exception('Perbaikan gratis garansi belum disetujui regulator. Minta persetujuan sebelum tiket diselesaikan.');
+            }
+
             $tiket->update(['status' => $statusBaru]);
             $this->logStatus($tiket, $statusLama, $statusBaru, $user, $aksi, $alasan);
 
@@ -1401,6 +1409,16 @@ class ServisService
                 throw new \Exception('Tiket servis sudah lunas');
             }
 
+            // [Komplain garansi] Perbaikan gratis: lunas otomatis saat selesai
+            // setelah persetujuan regulator — tidak ada tagihan yang bisa dibayar.
+            if ($tiket->komplain_gratis) {
+                if (! $tiket->komplain_gratis_approved_at) {
+                    throw new \Exception('Perbaikan gratis garansi belum disetujui regulator.');
+                }
+
+                throw new \Exception('Tiket komplain garansi gratis sudah lunas otomatis (tanpa tagihan).');
+            }
+
             // [BH/ISO] Perubahan lingkup yang belum disetujui pelanggan memblokir
             // penagihan — fail-closed (pertahanan kedua setelah guard 'selesai').
             if ($tiket->perluPersetujuanUlang()) {
@@ -1639,6 +1657,8 @@ class ServisService
         $garansi = $tiketLama->garansi;
         $garansiBerlaku = (bool) ($garansi?->active ?? false);
 
+        // Komplain garansi: perbaikan ulang DIUSULKAN gratis (butuh persetujuan
+        // regulator terpisah) + SLA komplain 72 jam.
         $tiket = TiketServis::create([
             'no_tiket' => $this->buatNoTiket((int) $tiketLama->cabang_id),
             'cabang_id' => $tiketLama->cabang_id,
@@ -1655,6 +1675,11 @@ class ServisService
             'tiket_servis_lama_id' => $tiketLama->id,
             'garansi_berlaku' => $garansiBerlaku,
             'komplain_catatan' => $catatan,
+            'komplain_gratis' => $garansiBerlaku,
+            'komplain_gratis_proposed_by' => $garansiBerlaku ? $user->id : null,
+            'komplain_gratis_proposed_at' => $garansiBerlaku ? now() : null,
+            'batas_waktu_menit' => $tiketLama->batas_waktu_menit ?? 4320,
+            'auto_cancel_overdue' => false,
             'token_approval' => \Illuminate\Support\Str::random(64),
         ]);
 
@@ -1668,6 +1693,58 @@ class ServisService
         );
 
         return $tiket;
+    }
+
+    /**
+     * Usulkan perbaikan gratis garansi (bila belum otomatis saat komplain dibuat).
+     */
+    public function ajukanGratisGaransi(TiketServis $tiket, User $user): void
+    {
+        if (! $tiket->garansi_berlaku) {
+            throw new \Exception('Tiket bukan komplain dengan garansi berlaku.');
+        }
+
+        if ($tiket->komplain_gratis_approved_at) {
+            throw new \Exception('Perbaikan gratis garansi sudah disetujui.');
+        }
+
+        $tiket->update([
+            'komplain_gratis' => true,
+            'komplain_gratis_proposed_by' => $user->id,
+            'komplain_gratis_proposed_at' => now(),
+        ]);
+
+        $this->logStatus($tiket, $tiket->status, $tiket->status, $user, 'komplain_gratis_aju', 'Pengajuan perbaikan gratis garansi');
+    }
+
+    /**
+     * Regulator menyetujui perbaikan gratis garansi.
+     * Four-eyes: approver WAJIB berbeda dengan pengusul.
+     */
+    public function setujuiGratisGaransi(TiketServis $tiket, User $user): void
+    {
+        if (! $tiket->komplain_gratis) {
+            throw new \Exception('Tidak ada pengajuan perbaikan gratis garansi.');
+        }
+
+        if ($tiket->komplain_gratis_approved_at) {
+            throw new \Exception('Perbaikan gratis garansi sudah disetujui.');
+        }
+
+        if (! $user->can('servis.override-status')) {
+            throw new \Exception('Hanya regulator (servis.override-status) yang dapat menyetujui perbaikan gratis garansi.');
+        }
+
+        if ($tiket->komplain_gratis_proposed_by && (int) $tiket->komplain_gratis_proposed_by === (int) $user->id) {
+            throw new \Exception('Pengajuan dan persetujuan gratis garansi harus berbeda orang (four-eyes).');
+        }
+
+        $tiket->update([
+            'komplain_gratis_approved_at' => now(),
+            'komplain_gratis_approved_by' => $user->id,
+        ]);
+
+        $this->logStatus($tiket, $tiket->status, $tiket->status, $user, 'komplain_gratis_setuju', 'Perbaikan gratis garansi disetujui regulator');
     }
 
     /**
@@ -2128,16 +2205,21 @@ class ServisService
             $totalJualSparepart = (float) $rincian['total_part'];
             $totalHpp = $tiket->getTotalHppPenagihan();
             $totalTagihan = (float) $rincian['total'];
+            // [Komplain garansi] Perbaikan gratis: TANPA pendapatan & piutang;
+            // hanya biaya part (HPP) yang dicatat sebagai beban garansi.
+            $garansiGratis = (bool) $tiket->komplain_gratis;
 
-            if ($totalTagihan > 0) {
+            if ($totalTagihan > 0 || ($garansiGratis && $totalHpp > 0)) {
                 $noJurnal = $jurnalService->generateNoJurnal('servis', $tiket->cabang_id);
 
-                $lines = [
-                    ['akun_kode' => '120-01', 'debit' => $totalTagihan, 'kredit' => 0], // Piutang Usaha diakui saat servis selesai
-                    ['akun_kode' => '420-01', 'debit' => 0, 'kredit' => $jasaServis], // Pendapatan jasa servis
-                ];
+                $lines = [];
 
-                if ($totalJualSparepart > 0) {
+                if (! $garansiGratis) {
+                    $lines[] = ['akun_kode' => '120-01', 'debit' => $totalTagihan, 'kredit' => 0]; // Piutang Usaha diakui saat servis selesai
+                    $lines[] = ['akun_kode' => '420-01', 'debit' => 0, 'kredit' => $jasaServis]; // Pendapatan jasa servis
+                }
+
+                if (! $garansiGratis && $totalJualSparepart > 0) {
                     $lines[] = ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $totalJualSparepart]; // Pendapatan penjualan sparepart
                 }
                 if ($totalHpp > 0) {
@@ -2150,7 +2232,9 @@ class ServisService
                     tanggal: now(),
                     sumber: 'servis',
                     lines: $lines,
-                    deskripsi: "Jurnal servis {$tiket->no_tiket}",
+                    deskripsi: $garansiGratis
+                        ? "Jurnal servis garansi gratis {$tiket->no_tiket}"
+                        : "Jurnal servis {$tiket->no_tiket}",
                     cabangId: $tiket->cabang_id,
                     userId: auth()->id(),
                     referensiTipe: TiketServis::class,
@@ -2162,7 +2246,8 @@ class ServisService
                 );
 
                 // [SUBLEDGER-SYNC] Catat piutang servis ke subledger piutang agar selaras dengan akun 120-01
-                if ($tiket->pelanggan_id && Schema::hasTable('piutang')) {
+                // (perbaikan garansi gratis tidak menghasilkan piutang)
+                if (! $garansiGratis && $tiket->pelanggan_id && Schema::hasTable('piutang')) {
                     $existingPiutang = $this->piutangServis($tiket);
                     if (! $existingPiutang) {
                         $countPiutang = Piutang::where('cabang_id', $tiket->cabang_id)
@@ -2187,7 +2272,7 @@ class ServisService
                 }
 
                 // Komisi reseller: jika servis milik reseller, hitung komisi
-                if ($tiket->pelanggan?->is_reseller) {
+                if (! $garansiGratis && $tiket->pelanggan?->is_reseller) {
                     $komisiService = app(KomisiService::class);
                     $komisiService->hitungKomisiDariItems(
                         $tiket->pelanggan,
@@ -2207,12 +2292,15 @@ class ServisService
 
                 // [F3-8c] Komisi multi-aktor trigger tiket_servis (teknisi via
                 // engine baru; reseller servis tetap alur lama di atas — idempotent)
-                app(KomisiService::class)->hitungKomisiMultiAktor('tiket_servis', ['tiket_servis_id' => $tiket->id]);
+                // [Komplain garansi] Perbaikan gratis: TANPA komisi & bagi hasil.
+                if (! $garansiGratis) {
+                    app(KomisiService::class)->hitungKomisiMultiAktor('tiket_servis', ['tiket_servis_id' => $tiket->id]);
 
-                // [BH] Bagi hasil jasa teknisi non-gaji — accru 1 baris per tiket
-                // (idempoten). Teknisi bagi hasil sudah dikecualikan dari komisi
-                // (engine + legacy) supaya satu tiket tidak dibayar dua kali.
-                app(BagiHasilService::class)->accru($tiket);
+                    // [BH] Bagi hasil jasa teknisi non-gaji — accru 1 baris per tiket
+                    // (idempoten). Teknisi bagi hasil sudah dikecualikan dari komisi
+                    // (engine + legacy) supaya satu tiket tidak dibayar dua kali.
+                    app(BagiHasilService::class)->accru($tiket);
+                }
             }
         } catch (\Throwable $e) {
             // [B-10a / P0-4] Fail-closed: catat untuk investigasi, lalu lempar
@@ -2227,6 +2315,16 @@ class ServisService
                 0,
                 $e
             );
+        }
+
+        // [Komplain garansi] Perbaikan gratis: LUNAS OTOMATIS saat selesai
+        // (setelah persetujuan regulator) — tanpa piutang & tanpa tagihan.
+        if ($garansiGratis ?? false) {
+            $tiket->update([
+                'status_pembayaran' => 'lunas',
+                'tanggal_bayar' => now(),
+                'metode_pembayaran' => 'garansi',
+            ]);
         }
     }
 

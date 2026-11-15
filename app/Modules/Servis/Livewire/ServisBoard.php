@@ -391,7 +391,8 @@ class ServisBoard extends Component
 
         $query = Produk::query()
             ->where('is_active', true)
-            ->select(['id', 'nama', 'slug', 'barcode', 'kategori', 'kategori_id', 'satuan', 'harga_beli', 'harga_jual_retail']);
+            ->select(['id', 'nama', 'slug', 'barcode', 'kategori', 'kategori_id', 'satuan', 'harga_beli', 'harga_jual_retail'])
+            ->withSum('stokItems', 'jumlah');
 
         $q = trim((string) $this->cariPartQuery);
 
@@ -452,6 +453,15 @@ class ServisBoard extends Component
             'type' => $terkirim > 0 ? 'success' : 'error',
             'message' => "Link persetujuan dikirim ke {$terkirim} pelanggan".($gagal > 0 ? " ({$gagal} gagal/tanpa nomor WA)" : '').'.',
         ]);
+    }
+
+    public function pilihPartPertama(): void
+    {
+        $first = $this->cariPartResults->first();
+
+        if ($first) {
+            $this->pilihPartServis((int) $first->id);
+        }
     }
 
     public function pilihPartServis(int $produkId): void
@@ -1730,6 +1740,31 @@ class ServisBoard extends Component
                 'type' => 'success',
                 'message' => 'Tiket komplain pasca-servis dibuat. Tindak lanjut mengikuti garansi / estimasi.',
             ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    // [Komplain garansi] persetujuan regulator (four-eyes)
+    public function ajukanGratis(): void
+    {
+        if (! $this->boleh('servis.create', 'Anda tidak punya izin mengajukan perbaikan gratis garansi')) {
+            return;
+        }
+
+        try {
+            app(ServisService::class)->ajukanGratisGaransi($this->selectedTiket, auth()->user());
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Perbaikan gratis garansi diajukan. Menunggu persetujuan regulator.']);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function setujuiGratis(): void
+    {
+        try {
+            app(ServisService::class)->setujuiGratisGaransi($this->selectedTiket, auth()->user());
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Perbaikan gratis garansi disetujui regulator.']);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }

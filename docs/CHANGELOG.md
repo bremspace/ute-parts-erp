@@ -3,6 +3,13 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-15 — Servis: Perbaikan gratis garansi (four-eyes), SLA komplain & form lebih nyaman
+
+- **Perbaikan gratis garansi**: komplain dalam garansi otomatis mengusulkan `komplain_gratis`; transisi ke `selesai` diblokir sampai regulator menyetujui (**four-eyes**: approver ≠ pengusul, permission `servis.override-status`). Setelah disetujui: tagihan 0, **lunas otomatis**, tanpa piutang, jurnal khusus (HPP saja, tanpa pendapatan/piutang), tanpa komisi & bagi hasil. `bayar()` menolak tiket garansi (sudah lunas otomatis).
+- **SLA komplain**: tiket komplain mendapat `batas_waktu_menit` 4320 (72 jam), `auto_cancel_overdue=false`; banner status komplain + SLA di papan servis.
+- **Form lebih nyaman**: pencarian part menampilkan stok, Enter = pilih hasil pertama, Esc = tutup, autofocus; progres: preset persentase 25/50/75/90 + autofocus judul; batas 6 foto & ±1,5 MB.
+- **Testing**: `ServisKomplainTest` 6/6 (garansi, four-eyes, lunas otomatis, SLA); Servis+Tracking 253/253.
+
 ## 2026-11-15 — Servis: Perbaikan 500 tracking, performa progress/pencarian & komplain pasca-servis
 
 - **500 konsumen**: `revisi_lingkup_disetujui_at`/`revisi_lingkup_diajukan_at` kini di-cast `datetime` (dulu string → `format()` = Error 500 di halaman tracking).
