@@ -1783,30 +1783,6 @@ class ServisService
     }
 
     /**
-     * Publik: pelanggan membatalkan servis saat pengerjaan via link tracking.
-     * Memakai `updateStatus()` (user NULL) agar melewati guard izin & guard
-     * transisi state machine yang sama persis.
-     */
-    public function batalkanOlehPelanggan(string $token, string $alasan): TiketServis
-    {
-        $tiket = TiketServis::where('token_approval', $token)->firstOrFail();
-
-        if (! in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true)) {
-            throw new \Exception('Servis hanya dapat dibatalkan saat tahap pengerjaan.');
-        }
-
-        $this->updateStatus(
-            $tiket,
-            'batal',
-            null,
-            $alasan ?: 'Dibatalkan pelanggan via tracking',
-            'manual'
-        );
-
-        return $tiket->fresh();
-    }
-
-    /**
      * [T-03] Kembalikan stok part ke gudang ASAL + tandai baris dibatalkan.
      *
      * Sumber qty per baris:

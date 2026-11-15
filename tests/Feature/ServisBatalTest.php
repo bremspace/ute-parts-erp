@@ -139,25 +139,6 @@ class ServisBatalTest extends TestCase
     }
 
     /** @test */
-    public function test_batal_oleh_pelanggan_via_token_tracking(): void
-    {
-        $tiket = $this->buatTiket('SRV-BATAL-2-'.rand(10000, 99999));
-
-        app(ServisService::class)->setEstimasi($tiket, 300000, 'Estimasi', $this->admin, [
-            ['tipe' => 'jasa', 'nama_item' => 'Jasa ganti layar', 'qty' => 1, 'harga' => 300000],
-        ]);
-        app(ServisService::class)->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
-        app(ServisService::class)->updateStatus($tiket->fresh(), 'dikerjakan', $this->admin);
-
-        $token = $tiket->fresh()->token_approval;
-        $this->assertNotNull($token);
-
-        app(ServisService::class)->batalkanOlehPelanggan($token, 'Saya batalkan via link tracking');
-
-        $this->assertSame('batal', $tiket->fresh()->status);
-    }
-
-    /** @test */
     public function test_batal_wajib_alasan(): void
     {
         $tiket = $this->buatTiket('SRV-BATAL-3-'.rand(10000, 99999));
@@ -250,8 +231,15 @@ class ServisBatalTest extends TestCase
     }
 
     /** @test */
-    public function test_route_tracking_batal_oleh_pelanggan(): void
+    public function test_pembatalan_online_tidak_tersedia_lagi(): void
     {
+        // Pembatalan hanya atas permintaan langsung konsumen di toko → jalur
+        // online (tracking) dicabut total, bukan sekadar disembunyikan di UI.
+        $this->assertFalse(
+            \Illuminate\Support\Facades\Route::has('servis.tracking.batal'),
+            'Jalur pembatalan online harus dicabut'
+        );
+
         $tiket = $this->buatTiket('SRV-BATAL-6-'.rand(10000, 99999));
         app(ServisService::class)->setEstimasi($tiket, 300000, 'Estimasi', $this->admin, [
             ['tipe' => 'jasa', 'nama_item' => 'Jasa ganti layar', 'qty' => 1, 'harga' => 300000],
@@ -259,11 +247,10 @@ class ServisBatalTest extends TestCase
         app(ServisService::class)->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
         app(ServisService::class)->updateStatus($tiket->fresh(), 'dikerjakan', $this->admin);
 
-        $token = $tiket->fresh()->token_approval;
+        $response = $this->get("/tracking/".$tiket->fresh()->token_approval);
+        $response->assertOk();
 
-        $response = $this->post("/tracking/{$token}/batal", ['alasan' => 'Batal via web tracking']);
-        $response->assertRedirect();
-        $this->assertSame('batal', $tiket->fresh()->status);
+        $this->assertStringNotContainsString('Batalkan Servis Saya', $response->getContent());
     }
 
     /** @test */

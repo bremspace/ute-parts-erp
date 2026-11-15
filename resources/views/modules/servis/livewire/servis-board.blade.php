@@ -3111,7 +3111,8 @@
                 <div class="space-y-3.5">
                     <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/20 text-xs text-ink-200">
                         <p class="font-bold text-up-red mb-1">Perhatian:</p>
-                        <p>Stok part yang sudah dipakai akan dikembalikan ke gudang asal dan klaim Serial Number dilepas. Pembatalan wajib menyertakan alasan (audit ISO 9001 §8.7).</p>
+                        <p>Pembatalan hanya atas <strong>permintaan langsung konsumen di toko</strong> (tidak tersedia secara online) dan dieksekusi teknisi/admin berwenang.</p>
+                        <p class="mt-1">Stok part yang sudah dipakai akan dikembalikan ke gudang asal dan klaim Serial Number dilepas. Alasan wajib diisi (audit ISO 9001 §8.7).</p>
                     </div>
 
                     <div>
@@ -3120,7 +3121,7 @@
                             wire:model="batalAlasan"
                             rows="3"
                             class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
-                            placeholder="Contoh: Pelanggan membatalkan / unit tidak jadi diperbaiki / part tidak tersedia..."
+                            placeholder="Contoh: Konsumen membatalkan langsung di toko / unit tidak jadi diperbaiki / part tidak tersedia..."
                         ></textarea>
                     </div>
 

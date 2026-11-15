@@ -255,32 +255,6 @@
                     </div>
                 </div>
 
-                {{-- Card Pembatalan oleh Konsumen (saat pengerjaan) --}}
-                @if(!empty($tiket['bisa_batal']))
-                    <div class="rounded-2xl border border-rose-300/40 bg-rose-50 dark:bg-rose-950/20 p-5 md:p-6 space-y-4">
-                        <div class="space-y-1">
-                            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Batalkan Servis</h3>
-                            <p class="text-xs text-slate-600 dark:text-ink-300">
-                                Anda dapat membatalkan servis selama tahap pengerjaan. Unit akan diserahkan kembali tanpa biaya.
-                            </p>
-                        </div>
-
-                        <form action="{{ route('servis.tracking.batal', $tiket['token_approval']) }}" method="POST" class="space-y-3">
-                            @csrf
-                            <textarea
-                                name="alasan"
-                                rows="2"
-                                required
-                                placeholder="Alasan pembatalan (wajib diisi)"
-                                class="w-full text-sm px-4 py-3 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400"
-                            ></textarea>
-                            <button type="submit" class="w-full py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm shadow-md transition-colors cursor-pointer">
-                                Batalkan Servis Saya
-                            </button>
-                        </form>
-                    </div>
-                @endif
-
                 {{-- Card Persetujuan Perubahan Lingkup (tambah/ubah/kurang part & jasa) --}}
                 @php
                     $perluApprovalUlang = !empty($tiket['perlu_persetujuan_ulang']);
