@@ -28,6 +28,15 @@ Format: `[Fase X] T-XX — ringkasan`.
 - **Regulator workflow**: owner membuat rule komisi dari UI (`KomisiSkemaPage`) lalu rule dipakai engine; payout > Rp 10.000.000 wajib approval finance (four-eyes: admin mengajukan, finance menyetujui) — proses ditolak sebelum persetujuan.
 - **Audit**: `KomisiSkema` kini teraudit (`CatatAktivitas` + `LogsActivity`) — perubahan aturan komisi tercatat untuk regulator.
 
+## 2026-11-15 — Servis: Penagihan Estimasi + Tambahan Part (satu sumber, fail-closed)
+
+- **Akar masalah**: `getRincianBiayaLengkap()` (POS/struk) dan `onSelesai()`/`bayar()` (jurnal/piutang) menghitung item dengan aturan berbeda. Estimasi part (LCD) hilang dari rincian bila sudah ada item pekerjaan (lem) → POS menagih 120.000 sementara piutang/jurnal 420.000 (kas vs piutang tidak sesuai).
+- **Perbaikan struktural**: `TiketServis::getItemsPenagihan()` = SATU sumber item penagihan (pekerjaan aktif + estimasi yang disetujui; dedup per produk/varian; fallback `estimasi_biaya` khusus tiket legacy). `getRincianBiayaLengkap()`, `onSelesai()`, dan `bayar()` semuanya memakainya. HPP untuk part estimasi kini dari `produk.harga_beli`.
+- **Fail-closed pelunasan**: `ServisService::bayar()` menerima `jumlahBayar` opsional; bila berbeda dari rincian (>0,01) → ditolak. POS, papan servis, dan API mengirim nominal aktual.
+- **Kontrol perubahan (ISO 9001)**: `getPerubahanLingkup()` + `getRincianBiayaLengkap()['perubahan_lingkup']` — item di luar estimasi yang disetujui (mis. part lem) ditandai; tampil di papan servis & modal bayar POS ("Estimasi" + badge "+ tambahan").
+- **Optimasi**: eager load `items`, `estimasiItems`, `spareparts` di papan servis, daftar siap-bayar POS, dan riwayat transaksi (mencegah N+1). `inputSparepart` kini mengizinkan status `qc` (konsisten dengan form pekerjaan).
+- **Testing**: `tests/Feature/ServisEstimasiTambahanPartTest.php` 7/7 (rincian 420.000; jurnal 420-01=100.000 & 410-01=320.000; dedup part; fail-closed bayar; perubahan lingkup). Servis+POS+integrasi 400/402 (2 gagal pre-existing).
+
 ## 2026-11-06 — Servis: Re-Audit P0–P3 & Perbaikan Celah (Fallback Estimasi Items, CLI Notification Context, Deteksi Duplicate Key, Validasi Cabang Online)
 
 - **[AUDIT-1] TiketServis::getRincianBiayaLengkap() residual overbill gap ditutup** — Cabang `elseif ($estimasiItems->where('tipe', 'jasa')->isNotEmpty())` dan `elseif ($estimasiItems->isNotEmpty())` sebelumnya menagihkan item estimasi jasa/part meskipun item pekerjaan teknisi terkait pernah dibuat lalu dibatalkan. Ditambahkan helper `punyaRiwayatPartEksplisit()` dan guard `! $this->punyaRiwayatJasaEksplisit()` / `! $this->punyaRiwayatPartEksplisit()` agar pembatalan pekerjaan tidak lagi memicu overbill dari estimasi.

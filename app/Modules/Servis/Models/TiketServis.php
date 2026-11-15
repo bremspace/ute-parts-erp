@@ -8,6 +8,7 @@ use App\Modules\Marketplace\Models\WebReview;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
+use App\Modules\Wms\Models\Produk;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -205,10 +206,150 @@ class TiketServis extends Model
     }
 
     /**
+     * Item penagihan efektif — SATU sumber kebenaran untuk rincian tagihan,
+     * jurnal `onSelesai`, dan pelunasan `bayar()`.
+     *
+     * Aturan gabung (estimasi vs pekerjaan):
+     *  - Jasa: bila pernah ada item jasa pekerjaan (aktif atau dibatalkan),
+     *    jasa = item pekerjaan AKTIF (estimasi TIDAK dipakai — hindari overbill
+     *    saat jasa dibatalkan). Bila belum pernah ada item jasa, pakai jasa
+     *    estimasi yang disetujui pelanggan.
+     *  - Part: semua item pekerjaan aktif + sparepart legacy; item estimasi
+     *    dipakai hanya bila produk/variannya BELUM PERNAH dicatat sebagai
+     *    pekerjaan (aktif maupun dibatalkan). Estimasi yang sudah disetujui
+     *    pelanggan tetap ditagih, tanpa dobel dengan catatan teknisi.
+     *  - Tiket legacy tanpa item: fallback `estimasi_biaya` sebagai jasa.
+     *
+     * @return array<int, array{tipe: string, nama: string, qty: int, harga: float, subtotal: float, hpp: float, sumber: string, produk_id: ?int, sku_variant_id: ?int}>
+     */
+    public function getItemsPenagihan(): array
+    {
+        $pekerjaanAktif = $this->items()->whereNull('dibatalkan_at')->get();
+        $riwayatPart = $this->items()->where('tipe', 'part')->get();
+        $legacy = $this->spareparts()->whereNull('dibatalkan_at')->get();
+        $estimasi = $this->estimasiItems()->get();
+
+        // Kunci part yang sudah pernah dicatat (pekerjaan AKTIF maupun
+        // dibatalkan) atau lewat sparepart legacy — dipakai untuk mencegah
+        // penagihan ganda estimasi part yang sudah digantikan catatan teknisi.
+        $kunciPartRiwayat = collect(array_unique(array_merge(
+            $riwayatPart->map(fn ($p) => $this->kunciItemPart($p->produk_id, $p->sku_variant_id))->all(),
+            $legacy->map(fn ($s) => $this->kunciItemPart($s->produk_id, $s->sku_variant_id))->all(),
+        )))->flip();
+
+        $items = [];
+
+        // --- Jasa ---
+        if ($this->punyaRiwayatJasaEksplisit()) {
+            foreach ($pekerjaanAktif->where('tipe', 'jasa') as $j) {
+                $items[] = $this->susunItemPenagihan('jasa', $j->nama_item, (int) $j->qty, (float) $j->harga, (float) $j->hpp, 'pekerjaan', $j->produk_id, $j->sku_variant_id);
+            }
+        } else {
+            foreach ($estimasi->where('tipe', 'jasa') as $e) {
+                $items[] = $this->susunItemPenagihan('jasa', $e->nama_item, (int) $e->qty, (float) $e->harga, 0.0, 'estimasi', $e->produk_id, $e->sku_variant_id);
+            }
+        }
+
+        // --- Part: pekerjaan + legacy + estimasi yang belum tercakup ---
+        foreach ($pekerjaanAktif->where('tipe', 'part') as $p) {
+            $items[] = $this->susunItemPenagihan('part', $p->nama_item ?: ($p->produk?->nama ?? 'Sparepart'), (int) $p->qty, (float) $p->harga, (float) $p->hpp, 'pekerjaan', $p->produk_id, $p->sku_variant_id);
+        }
+
+        foreach ($legacy as $sp) {
+            $items[] = $this->susunItemPenagihan('part', $sp->produk?->nama ?? 'Sparepart', (int) $sp->jumlah, (float) $sp->harga_satuan, (float) $sp->hpp, 'legacy', $sp->produk_id, $sp->sku_variant_id);
+        }
+
+        foreach ($estimasi->where('tipe', 'part') as $e) {
+            if ($e->produk_id && $kunciPartRiwayat->has($this->kunciItemPart((int) $e->produk_id, $e->sku_variant_id))) {
+                continue; // sudah dicatat teknisi (atau legacy) — catatan itu yang menang
+            }
+
+            $hpp = $e->produk_id ? (float) (Produk::find($e->produk_id)?->harga_beli ?? 0) : 0.0;
+            $items[] = $this->susunItemPenagihan('part', $e->nama_item ?: ($e->produk?->nama ?? 'Sparepart'), (int) $e->qty, (float) $e->harga, $hpp, 'estimasi', $e->produk_id, $e->sku_variant_id);
+        }
+
+        // --- Fallback tiket legacy (tanpa item sama sekali) ---
+        if ($items === [] && ! $this->punyaRiwayatJasaEksplisit() && ! $this->punyaRiwayatPartEksplisit()) {
+            $biaya = (float) ($this->estimasi_biaya ?? 0);
+            if ($biaya > 0) {
+                $items[] = $this->susunItemPenagihan('jasa', 'Perbaikan '.$this->jenis_hp, 1, $biaya, 0.0, 'legacy', null, null);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Total HPP item penagihan (pekerjaan memakai hpp tercatat; estimasi part
+     * memakai harga beli produk). Dipakai jurnal HPP pada `onSelesai`.
+     */
+    public function getTotalHppPenagihan(): float
+    {
+        return (float) collect($this->getItemsPenagihan())
+            ->sum(fn ($i) => (float) $i['hpp'] * (int) $i['qty']);
+    }
+
+    /**
+     * Item pekerjaan yang berada DI LUAR estimasi yang disetujui pelanggan
+     * (mis. tambahan part lem saat pengerjaan). Dipakai untuk penanda
+     * perubahan lingkup + audit (kontrol perubahan).
+     *
+     * @return array<int, array{nama: string, subtotal: float}>
+     */
+    public function getPerubahanLingkup(): array
+    {
+        $estimasi = $this->estimasiItems()->get();
+        $estimasiPunyaJasa = $estimasi->contains(fn ($e) => $e->tipe === 'jasa');
+        $kunciEstimasiPart = $estimasi->where('tipe', 'part')
+            ->map(fn ($e) => $this->kunciItemPart((int) $e->produk_id, $e->sku_variant_id))
+            ->flip();
+
+        $diluar = [];
+        foreach ($this->items()->whereNull('dibatalkan_at')->get() as $p) {
+            if ($p->tipe === 'jasa') {
+                if ($estimasiPunyaJasa) {
+                    continue;
+                }
+            } elseif ($p->produk_id && $kunciEstimasiPart->has($this->kunciItemPart((int) $p->produk_id, $p->sku_variant_id))) {
+                continue;
+            }
+
+            $diluar[] = [
+                'nama' => $p->nama_item,
+                'subtotal' => round((float) $p->harga * (int) $p->qty, 2),
+            ];
+        }
+
+        return $diluar;
+    }
+
+    protected function susunItemPenagihan(string $tipe, string $nama, int $qty, float $harga, float $hpp, string $sumber, ?int $produkId, ?int $skuVariantId): array
+    {
+        $qty = max(1, $qty);
+
+        return [
+            'tipe' => $tipe,
+            'nama' => $nama,
+            'qty' => $qty,
+            'harga' => $harga,
+            'subtotal' => round($harga * $qty, 2),
+            'hpp' => $hpp,
+            'sumber' => $sumber,
+            'produk_id' => $produkId,
+            'sku_variant_id' => $skuVariantId,
+        ];
+    }
+
+    protected function kunciItemPart(?int $produkId, ?int $variantId): string
+    {
+        return ($produkId ?? 0).'|'.($variantId ?? 'null');
+    }
+
+    /**
      * Rincian lengkap item servis (Jasa & Part) untuk billing, struk thermal, dan riwayat.
      *
      * @return array{
-     *     items: array<int, array{tipe: string, nama: string, qty: int, harga: float, subtotal: float}>,
+     *     items: array<int, array{tipe: string, nama: string, qty: int, harga: float, subtotal: float, sumber: string}>,
      *     total_jasa: float,
      *     total_part: float,
      *     total: float
@@ -216,160 +357,37 @@ class TiketServis extends Model
      */
     public function getRincianBiayaLengkap(): array
     {
-        $pekerjaanItems = $this->items()->whereNull('dibatalkan_at')->with(['produk', 'skuVariant'])->get();
-        $sparepartsLegacy = $this->spareparts()->whereNull('dibatalkan_at')->with(['produk', 'skuVariant'])->get();
-        $estimasiItems = $this->estimasiItems()->with('produk')->get();
-
         $rincian = [];
         $totalJasa = 0.0;
         $totalPart = 0.0;
 
-        $hasPekerjaan = $pekerjaanItems->isNotEmpty() || $sparepartsLegacy->isNotEmpty();
-
-        if ($hasPekerjaan) {
-            // 1. Jasa dari pekerjaan teknisi
-            $jasaPekerjaan = $pekerjaanItems->where('tipe', 'jasa');
-            if ($jasaPekerjaan->isNotEmpty()) {
-                foreach ($jasaPekerjaan as $j) {
-                    $sub = (float) ($j->harga * $j->qty);
-                    $totalJasa += $sub;
-                    $rincian[] = [
-                        'tipe' => 'jasa',
-                        'nama' => '[Jasa] '.$j->nama_item,
-                        'qty' => (int) $j->qty,
-                        'harga' => (float) $j->harga,
-                        'subtotal' => $sub,
-                    ];
-                }
-            } elseif (! $this->punyaRiwayatJasaEksplisit() && $estimasiItems->where('tipe', 'jasa')->isNotEmpty()) {
-                foreach ($estimasiItems->where('tipe', 'jasa') as $ej) {
-                    $sub = (float) ($ej->harga * $ej->qty);
-                    $totalJasa += $sub;
-                    $rincian[] = [
-                        'tipe' => 'jasa',
-                        'nama' => '[Jasa] '.$ej->nama_item,
-                        'qty' => (int) $ej->qty,
-                        'harga' => (float) $ej->harga,
-                        'subtotal' => $sub,
-                    ];
-                }
+        foreach ($this->getItemsPenagihan() as $item) {
+            $subtotal = (float) $item['subtotal'];
+            if ($item['tipe'] === 'jasa') {
+                $totalJasa += $subtotal;
             } else {
-                // [P2-2/T-05] Fallback estimasi hanya tiket legacy tanpa item jasa.
-                $estimasi = ! $this->punyaRiwayatJasaEksplisit() ? (float) ($this->estimasi_biaya ?? 0) : 0.0;
-                if ($estimasi > 0 && $pekerjaanItems->where('tipe', 'part')->isEmpty()) {
-                    $totalJasa += $estimasi;
-                    $rincian[] = [
-                        'tipe' => 'jasa',
-                        'nama' => '[Jasa] Perbaikan '.$this->jenis_hp,
-                        'qty' => 1,
-                        'harga' => $estimasi,
-                        'subtotal' => $estimasi,
-                    ];
-                }
+                $totalPart += $subtotal;
             }
 
-            // 2. Part dari pekerjaan teknisi
-            foreach ($pekerjaanItems->where('tipe', 'part') as $p) {
-                $sub = (float) ($p->harga * $p->qty);
-                $totalPart += $sub;
-                $nama = $p->produk?->nama ?: $p->nama_item;
-                if ($p->skuVariant?->nama_varian) {
-                    $nama .= ' ('.$p->skuVariant->nama_varian.')';
-                }
-                $rincian[] = [
-                    'tipe' => 'part',
-                    'nama' => '[Part] '.$nama,
-                    'qty' => (int) $p->qty,
-                    'harga' => (float) $p->harga,
-                    'subtotal' => $sub,
-                ];
-            }
-
-            // 3. Part legacy (ServisSparepart)
-            foreach ($sparepartsLegacy as $sp) {
-                $sub = (float) ($sp->harga_satuan * $sp->jumlah);
-                $totalPart += $sub;
-                $nama = $sp->produk?->nama ?: 'Sparepart';
-                if ($sp->skuVariant?->nama_varian) {
-                    $nama .= ' ('.$sp->skuVariant->nama_varian.')';
-                }
-                $rincian[] = [
-                    'tipe' => 'part',
-                    'nama' => '[Part] '.$nama,
-                    'qty' => (int) $sp->jumlah,
-                    'harga' => (float) $sp->harga_satuan,
-                    'subtotal' => $sub,
-                ];
-            }
-
-            // Bila di pekerjaan tidak ada part tapi di estimasi ada part (hanya jika tiket legacy tanpa riwayat part pekerjaan)
-            if (! $this->punyaRiwayatPartEksplisit() && $pekerjaanItems->where('tipe', 'part')->isEmpty() && $sparepartsLegacy->isEmpty() && $estimasiItems->where('tipe', 'part')->isNotEmpty()) {
-                foreach ($estimasiItems->where('tipe', 'part') as $ep) {
-                    $sub = (float) ($ep->harga * $ep->qty);
-                    $totalPart += $sub;
-                    $nama = $ep->produk?->nama ?: $ep->nama_item;
-                    $rincian[] = [
-                        'tipe' => 'part',
-                        'nama' => '[Part] '.$nama,
-                        'qty' => (int) $ep->qty,
-                        'harga' => (float) $ep->harga,
-                        'subtotal' => $sub,
-                    ];
-                }
-            }
-        } elseif ($estimasiItems->isNotEmpty()) {
-            foreach ($estimasiItems as $ei) {
-                // [P2-2/T-05-AUDIT] Jika item jenis tsb pernah ada di pekerjaan lalu dibatalkan,
-                // jangan tagihkan fallback dari estimasi (overbill).
-                if ($ei->tipe === 'jasa' && $this->punyaRiwayatJasaEksplisit()) {
-                    continue;
-                }
-                if ($ei->tipe === 'part' && $this->punyaRiwayatPartEksplisit()) {
-                    continue;
-                }
-
-                $sub = (float) ($ei->harga * $ei->qty);
-                if ($ei->tipe === 'part') {
-                    $totalPart += $sub;
-                    $nama = $ei->produk?->nama ?: $ei->nama_item;
-                    $rincian[] = [
-                        'tipe' => 'part',
-                        'nama' => '[Part] '.$nama,
-                        'qty' => (int) $ei->qty,
-                        'harga' => (float) $ei->harga,
-                        'subtotal' => $sub,
-                    ];
-                } else {
-                    $totalJasa += $sub;
-                    $rincian[] = [
-                        'tipe' => 'jasa',
-                        'nama' => '[Jasa] '.($ei->nama_item ?: 'Jasa Servis'),
-                        'qty' => (int) $ei->qty,
-                        'harga' => (float) $ei->harga,
-                        'subtotal' => $sub,
-                    ];
-                }
-            }
-        } else {
-            // [P2-2/T-05] Fallback estimasi hanya tiket legacy tanpa item jasa.
-            $biaya = ! $this->punyaRiwayatJasaEksplisit() ? (float) ($this->estimasi_biaya ?? 0) : 0.0;
-            $totalJasa = $biaya;
-            if ($biaya > 0) {
-                $rincian[] = [
-                    'tipe' => 'jasa',
-                    'nama' => '[Jasa] Perbaikan '.$this->jenis_hp,
-                    'qty' => 1,
-                    'harga' => $biaya,
-                    'subtotal' => $biaya,
-                ];
-            }
+            $rincian[] = [
+                'tipe' => $item['tipe'],
+                'nama' => ($item['tipe'] === 'jasa' ? '[Jasa] ' : '[Part] ').$item['nama'],
+                'qty' => (int) $item['qty'],
+                'harga' => (float) $item['harga'],
+                'subtotal' => $subtotal,
+                'sumber' => $item['sumber'],
+            ];
         }
+
+        $perubahanLingkup = $this->getPerubahanLingkup();
 
         return [
             'items' => $rincian,
             'total_jasa' => $totalJasa,
             'total_part' => $totalPart,
             'total' => $totalJasa + $totalPart,
+            'perubahan_lingkup' => $perubahanLingkup !== [],
+            'item_diluar_estimasi' => $perubahanLingkup,
         ];
     }
 

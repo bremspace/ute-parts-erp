@@ -876,8 +876,8 @@ class ServisService
             throw new \Exception('Tidak dapat menambah item pada tiket yang sudah pernah diselesaikan');
         }
 
-        if (! in_array($tiket->status, ['disetujui', 'dikerjakan'], true)) {
-            throw new \Exception('Input sparepart hanya dapat dilakukan saat status disetujui atau dikerjakan');
+        if (! in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true)) {
+            throw new \Exception('Input sparepart hanya dapat dilakukan saat status disetujui atau dikerjakan (termasuk qc)');
         }
 
         // [T-17/T-05] Anti dobel potong stok: jalur legacy hanya boleh dipakai bila
@@ -1158,9 +1158,9 @@ class ServisService
     /**
      * [T-12] Pelunasan pembayaran servis.
      */
-    public function bayar(TiketServis $tiket, string $metodePembayaran, User $user, ?string $catatan = null, ?array $splitDetail = null, ?int $transaksiId = null): TiketServis
+    public function bayar(TiketServis $tiket, string $metodePembayaran, User $user, ?string $catatan = null, ?array $splitDetail = null, ?int $transaksiId = null, ?float $jumlahBayar = null): TiketServis
     {
-        return DB::transaction(function () use ($tiket, $metodePembayaran, $user, $catatan, $splitDetail, $transaksiId) {
+        return DB::transaction(function () use ($tiket, $metodePembayaran, $user, $catatan, $splitDetail, $transaksiId, $jumlahBayar) {
             $tiket = TiketServis::whereKey($tiket->id)->lockForUpdate()->firstOrFail();
 
             if (! in_array($tiket->status, ['selesai', 'diambil'], true)) {
@@ -1171,21 +1171,18 @@ class ServisService
                 throw new \Exception('Tiket servis sudah lunas');
             }
 
-            $itemsServis = $tiket->items()->whereNull('dibatalkan_at')->get();
-            $sparepartsLegacy = $tiket->spareparts()->whereNull('dibatalkan_at')->get();
+            // [penagihan] SATU sumber: rincian item efektif (estimasi + pekerjaan).
+            $rincian = $tiket->getRincianBiayaLengkap();
+            $totalTagihan = (float) $rincian['total'];
 
-            $pendapatanJasa = (float) $itemsServis->where('tipe', 'jasa')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
-            $pendapatanPart = (float) $itemsServis->where('tipe', 'part')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
-            $jualLegacy = (float) $sparepartsLegacy->sum(fn ($sp) => (float) $sp->harga_satuan * (int) $sp->jumlah);
-
-            // [P2-2/T-05] Fallback estimasi hanya untuk tiket legacy TANPA
-            // riwayat item jasa. Jika jasa pernah ada namun semua dibatalkan →
-            // jasa = 0 (menagih estimasi = overbill).
-            $jasaServis = $pendapatanJasa > 0 || $tiket->punyaRiwayatJasaEksplisit()
-                ? $pendapatanJasa
-                : (float) ($tiket->estimasi_biaya ?? 0);
-            $totalJualSparepart = $pendapatanPart + $jualLegacy;
-            $totalTagihan = $jasaServis + $totalJualSparepart;
+            // [fail-closed] Bila pemanggil menyertakan uang yang benar-benar
+            // diterima (POS/API), nominal itu WAJIB sama dengan rincian —
+            // mencegah kas bertambah tanpa sesuaian piutang/jurnal.
+            if ($jumlahBayar !== null && abs(((float) $jumlahBayar) - $totalTagihan) > 0.01) {
+                throw new \Exception(
+                    'Jumlah pembayaran (Rp '.number_format((float) $jumlahBayar, 0, ',', '.').') tidak sesuai rincian penagihan (Rp '.number_format($totalTagihan, 0, ',', '.').').'
+                );
+            }
 
             $noJurnal = null;
             if ($totalTagihan > 0) {
@@ -1687,12 +1684,10 @@ class ServisService
         // (tiket_servis_id & tiket_servis_item_id) TETAP disimpan utk trace garansi.
         app(NomorSeriService::class)->lepasServis((int) $tiket->id);
 
-        $itemsServis = $tiket->items()->whereNull('dibatalkan_at')->get();
-        $sparepartsLegacy = $tiket->spareparts()->whereNull('dibatalkan_at')->get();
-
-        $hasPart = $itemsServis->where('tipe', 'part')->isNotEmpty()
-            || $sparepartsLegacy->isNotEmpty()
-            || $tiket->estimasiItems()->where('tipe', 'part')->exists();
+        // [penagihan] Satu sumber item (estimasi + pekerjaan) juga dipakai
+        // untuk menentukan ada/tidaknya part (garansi).
+        $rincian = $tiket->getRincianBiayaLengkap();
+        $hasPart = collect($rincian['items'])->contains(fn ($i) => $i['tipe'] === 'part');
 
         // Aturan garansi servis: jika pengerjaan HANYA jasa tanpa part/sparepart, tidak ada kartu garansi (durasi 0 / skip garansi)
         // Kecuali jika ada durasi garansi custom eksplisit (> 0)
@@ -1743,39 +1738,13 @@ class ServisService
         try {
             $jurnalService = app(JurnalService::class);
 
-            // [P2-2/T-05] Fallback estimasi hanya untuk tiket legacy TANPA
-            // riwayat item jasa (lihat bayar()).
-            $jasaServis = $tiket->punyaRiwayatJasaEksplisit()
-                ? 0.0
-                : (float) ($tiket->estimasi_biaya ?? 0);
-
-            // [T-04] Baris part yang SUDAH dibatalkan (reversal saat tiket
-            // ditolak) TIDAK ikut dihitung — kalau tidak, HPP 510-02 & Persediaan
-            // 130-01 dobel-credit pada siklus ditolak → re-estimasi → selesai.
-            $itemsServis = $tiket->items()->whereNull('dibatalkan_at')->get();
-            $sparepartsLegacy = $tiket->spareparts()->whereNull('dibatalkan_at')->get();
-
-            // [T-17/T-05] Kedua sumber DIABUKAN (bukan cabang if/else): legacy
-            // tetap ikut dihitung walau `items()` tidak kosong, dan tidak ada
-            // double-count karena guard anti-dobel T-05 membuat satu produk
-            // tidak mungkin tercatat di kedua jalur sekaligus.
-            $pendapatanJasa = (float) $itemsServis->where('tipe', 'jasa')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
-            $pendapatanPart = (float) $itemsServis->where('tipe', 'part')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
-            $hppPart = (float) $itemsServis->where('tipe', 'part')->sum(fn ($i) => (float) $i->hpp * (int) $i->qty);
-
-            // Nilai jual sparepart (pendapatan penjualan sparepart) & HPP
-            $jualLegacy = (float) $sparepartsLegacy->sum(fn ($sp) => (float) $sp->harga_satuan * (int) $sp->jumlah);
-            $hppLegacy = (float) $sparepartsLegacy->sum(fn ($sp) => (float) $sp->hpp * (int) $sp->jumlah);
-
-            $totalJualSparepart = $pendapatanPart + $jualLegacy;
-            $totalHpp = $hppPart + $hppLegacy;
-
-            // jasa dari items lebih akurat dari estimasi jika diisi
-            if ($pendapatanJasa > 0) {
-                $jasaServis = $pendapatanJasa;
-            }
-
-            $totalTagihan = $jasaServis + $totalJualSparepart;
+            // [penagihan] SATU sumber kebenaran: item penagihan efektif
+            // (estimasi yang disetujui + pekerjaan teknisi digabung konsisten).
+            // Jurnal, piutang, struk, dan POS semuanya memakai angka ini.
+            $jasaServis = (float) $rincian['total_jasa'];
+            $totalJualSparepart = (float) $rincian['total_part'];
+            $totalHpp = $tiket->getTotalHppPenagihan();
+            $totalTagihan = (float) $rincian['total'];
 
             if ($totalTagihan > 0) {
                 $noJurnal = $jurnalService->generateNoJurnal('servis', $tiket->cabang_id);

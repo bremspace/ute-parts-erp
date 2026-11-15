@@ -491,7 +491,7 @@ class RiwayatTransaksiIndex extends Component
     public function lihatDetailServis(int $id): void
     {
         $cabangId = $this->getActiveCabangId();
-        $tiket = TiketServis::with(['pelanggan', 'teknisi', 'items', 'spareparts.produk', 'transaksi.kasir', 'cabang'])
+        $tiket = TiketServis::with(['pelanggan', 'teknisi', 'items', 'estimasiItems', 'spareparts.produk', 'transaksi.kasir', 'cabang'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
 
@@ -1000,7 +1000,7 @@ class RiwayatTransaksiIndex extends Component
 
             $this->showReceiptModal = true;
         } elseif ($tipe === 'servis') {
-            $tiket = TiketServis::with(['pelanggan', 'cabang', 'transaksi.kasir'])
+            $tiket = TiketServis::with(['pelanggan', 'cabang', 'transaksi.kasir', 'items', 'estimasiItems', 'spareparts'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->find($id);
 

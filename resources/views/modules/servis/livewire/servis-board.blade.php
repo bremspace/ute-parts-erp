@@ -2180,6 +2180,24 @@
                         </div>
                     @endif
 
+                    {{-- Perubahan lingkup: item di luar estimasi yang disetujui --}}
+                    @php
+                        $perubahanLingkup = $selectedTiket->getPerubahanLingkup();
+                    @endphp
+                    @if(count($perubahanLingkup) > 0)
+                        <div class="p-3 rounded-xl bg-up-amber/10 border border-up-amber/30">
+                            <p class="text-[10px] text-up-amber uppercase font-semibold mb-1.5">Perubahan Lingkup — di luar estimasi disetujui</p>
+                            <div class="space-y-1">
+                                @foreach($perubahanLingkup as $pl)
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-ink-100">{{ $pl['nama'] }}</span>
+                                        <span class="font-bold text-up-amber tabular-nums">+Rp {{ number_format($pl['subtotal'], 0, ',', '.') }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Status SLA & Batas Waktu Pengerjaan Teknisi -->
                     @if($selectedTiket->batas_waktu_menit || $selectedTiket->pengerjaan_mulai_at)
                         <div class="p-3.5 rounded-xl {{ $selectedTiket->pengerjaan_deadline_at && now()->greaterThan($selectedTiket->pengerjaan_deadline_at) && in_array($selectedTiket->status, ['dikerjakan', 'qc']) ? 'bg-up-red/10 border border-up-red/30' : 'bg-up-primary/10 border border-up-primary/30' }}">

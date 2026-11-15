@@ -107,9 +107,13 @@
                                         </p>
                                     </div>
                                     <div class="text-right flex flex-col items-end gap-1.5 flex-shrink-0">
+                                        <span class="text-[9px] uppercase font-bold text-ink-400">Estimasi</span>
                                         <span class="font-black text-sm text-up-mint tabular-nums">
                                             Rp {{ number_format($ts->estimasi_biaya ?? 0, 0, ',', '.') }}
                                         </span>
+                                        @if($ts->getPerubahanLingkup() !== [])
+                                            <span class="text-[9px] font-bold text-up-amber bg-up-amber/10 border border-up-amber/30 px-1.5 py-0.5 rounded-full">+ tambahan</span>
+                                        @endif
                                         <button
                                             type="button"
                                             wire:click="pilihTiketServis({{ $ts->id }})"

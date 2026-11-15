@@ -3161,7 +3161,7 @@ class PosKasir extends Component
     {
         $cabangId = session('cabang_id');
 
-        return TiketServis::with(['pelanggan', 'items', 'spareparts.produk'])
+        return TiketServis::with(['pelanggan', 'items', 'spareparts.produk', 'estimasiItems'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->whereIn('status', ['selesai', 'diambil'])
             ->where('status_pembayaran', '!=', 'lunas')
@@ -3387,7 +3387,8 @@ class PosKasir extends Component
                     auth()->user(),
                     $this->servisCatatan ?: "Kasir POS {$noTransaksi}",
                     $splitData,
-                    $transaksi->id
+                    $transaksi->id,
+                    $total
                 );
 
                 // Update status ke 'diambil' jika unit diserahkan

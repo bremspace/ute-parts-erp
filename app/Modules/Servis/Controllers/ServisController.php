@@ -275,6 +275,7 @@ class ServisController extends Controller
         $request->validate([
             'metode_pembayaran' => 'required|string|in:tunai,transfer,qris,kartu',
             'catatan' => 'nullable|string',
+            'jumlah_bayar' => 'nullable|numeric|min:0',
         ]);
 
         $tiket = $this->tiketScoped($id);
@@ -284,7 +285,10 @@ class ServisController extends Controller
                 $tiket,
                 $request->metode_pembayaran,
                 $request->user(),
-                $request->catatan
+                $request->catatan,
+                null,
+                null,
+                $request->filled('jumlah_bayar') ? (float) $request->input('jumlah_bayar') : null
             );
 
             return $this->success($tiket, 'Pembayaran servis berhasil dicatat');

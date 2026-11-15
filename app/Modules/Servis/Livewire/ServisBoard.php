@@ -516,7 +516,11 @@ class ServisBoard extends Component
      */
     private function queryTiketScoped(): Builder
     {
-        return $this->scopeTiket(TiketServis::query());
+        // Eager load item penagihan (estimasi + pekerjaan + sparepart) — dipakai
+        // rincian/jurnal/penagihan; mencegah N+1 saat banyak tiket dimuat.
+        return $this->scopeTiket(
+            TiketServis::query()->with(['items', 'estimasiItems', 'spareparts'])
+        );
     }
 
     /**
@@ -1593,7 +1597,7 @@ class ServisBoard extends Component
         $tiket = $this->tiketScoped($this->bayarTiketId);
 
         try {
-            app(ServisService::class)->bayar($tiket, $this->bayarMetode, auth()->user(), $this->bayarCatatan);
+            app(ServisService::class)->bayar($tiket, $this->bayarMetode, auth()->user(), $this->bayarCatatan, null, null, (float) $tiket->getRincianBiayaLengkap()['total']);
             $this->showBayarModal = false;
             $this->dispatch('alert', ['type' => 'success', 'message' => "Pembayaran servis {$tiket->no_tiket} berhasil dicatat (Lunas)."]);
             $this->bukaStrukServis($tiket->id);
