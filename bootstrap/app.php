@@ -168,6 +168,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Mencegah 500 "touch(): Utime failed" jika CLI (root) regenerasi cache
         $schedule->command('ute:fix-permissions --force')->dailyAt('05:00');
 
+        // [MEMBER] Ingatkan owner atas pendaftaran member yang mengendap > 12 jam
+        // (member tak bisa login selama status masih pending).
+        $schedule->command('ute:ingatkan-approval-member')->dailyAt('09:00')->withoutOverlapping();
+
         // Refresh token OAuth marketplace sebelum kedaluwarsa (tiap 2 jam)
         $schedule->call(function () {
             app(ChannelSyncService::class)->refreshExpiredTokens();

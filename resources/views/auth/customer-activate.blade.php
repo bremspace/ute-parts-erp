@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aktivasi Akun — {{ config('app.name', 'Bremspace') }}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+<body class="bg-[#F8FAFC] text-ink-900 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
+    <div class="w-full max-w-md relative z-10">
+        <div class="text-center mb-8 flex justify-center">
+            <x-prism.logo size="lg" layout="vertical" mode="light" title="Aktivasi Akun" subtitle="Atur kata sandi akun member Anda" :href="route('shop')" />
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-8 relative overflow-hidden">
+            <div class="circuit-line absolute top-0 left-0 w-full h-[2px]"></div>
+
+            <div class="mb-4 p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-700 text-xs leading-relaxed">
+                <strong>Bagaimana mendapat kode?</strong> Kode aktivasi 6 digit dibuat oleh CS / kasir toko.
+                Tunjukkan nomor HP Anda ke toko (datang langsung atau via WhatsApp) untuk menerima kode.
+            </div>
+
+            @if(session('info'))
+                <div class="mb-4 p-3.5 rounded-xl bg-up-mint/10 border border-up-mint/20 text-up-mint text-xs font-medium">
+                    {{ session('info') }}
+                </div>
+            @endif
+
+            @if(session('error'))
+                <div class="mb-4 p-3.5 rounded-xl bg-up-red/10 border border-up-red/20 text-up-red text-xs font-medium">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @if($errors->any())
+                <div class="mb-5 p-3.5 rounded-xl bg-up-red/10 border border-up-red/20 text-up-red text-xs font-medium">
+                    @foreach($errors->all() as $e)
+                        <p>{{ $e }}</p>
+                    @endforeach
+                </div>
+            @endif
+
+            <form action="{{ route('customer.activation.post') }}" method="POST" class="space-y-4">
+                @csrf
+                <div>
+                    <label for="telepon" class="block text-xs font-semibold text-ink-700 mb-1.5">Nomor HP / Username</label>
+                    <input type="text" id="telepon" name="telepon" value="{{ old('telepon') }}" required autofocus placeholder="08xx atau username"
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
+                </div>
+                <div>
+                    <label for="kode" class="block text-xs font-semibold text-ink-700 mb-1.5">Kode Aktivasi (6 digit)</label>
+                    <input type="text" id="kode" name="kode" value="{{ old('kode') }}" required maxlength="6" inputmode="numeric" placeholder="••••••"
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-mono tracking-[0.5em] text-center" />
+                </div>
+                <div>
+                    <label for="password" class="block text-xs font-semibold text-ink-700 mb-1.5">Kata Sandi Baru</label>
+                    <input type="password" id="password" name="password" required minlength="6" placeholder="Minimal 6 karakter"
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
+                </div>
+                <div>
+                    <label for="password_confirmation" class="block text-xs font-semibold text-ink-700 mb-1.5">Ulangi Kata Sandi Baru</label>
+                    <input type="password" id="password_confirmation" name="password_confirmation" required minlength="6" placeholder="Minimal 6 karakter"
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
+                </div>
+
+                <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:from-up-primary-dark text-white font-bold text-sm shadow-lg shadow-up-primary/25 transition-[transform,background-color] duration-150 cursor-pointer active:scale-[0.97] min-h-[44px]">
+                    Aktifkan Akun
+                </button>
+            </form>
+
+            <p class="text-center text-xs text-ink-500 mt-5">
+                Sudah punya kata sandi?
+                <a href="{{ route('customer.login') }}" class="text-up-primary font-bold hover:underline">Masuk di sini</a>
+            </p>
+            <p class="text-center text-xs text-ink-500 mt-1">
+                Belum punya akun?
+                <a href="{{ route('customer.register') }}" class="text-up-primary font-bold hover:underline">Daftar gratis</a>
+            </p>
+        </div>
+
+        <p class="text-center text-xs text-ink-400 mt-6">
+            <a href="{{ route('shop') }}" class="hover:text-up-primary">← Kembali ke katalog</a>
+        </p>
+    </div>
+</body>
+</html>

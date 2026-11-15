@@ -217,7 +217,18 @@ class CrmDashboard extends Component
     public array $editPelangganForm = [
         'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
         'tanggal_lahir' => '', 'tier_membership_id' => null, 'status' => 'aktif', 'is_reseller' => false,
-        'tipe_konsumen' => 'retail', 'kode_agen' => '', 'referral_kode' => '',
+        'tipe_konsumen' => 'retail', 'kode_agen' => '', 'referral_kode' => '', 'password' => '',
+    ];
+
+    // Aktivasi akun member tanpa kata sandi (kode 6 digit untuk disampaikan ke member)
+    public bool $showAktivasiModal = false;
+
+    public ?int $aktivasiPelangganId = null;
+
+    public array $aktivasiForm = [
+        'nama' => '',
+        'telepon' => '',
+        'kode' => '',
     ];
 
     // Reset Password Konsumen Modal
@@ -287,6 +298,7 @@ class CrmDashboard extends Component
             'tipe_konsumen' => $p->tipe_konsumen ?? ($p->is_reseller ? 'reseller' : 'retail'),
             'kode_agen' => $p->kode_agen ?? '',
             'referral_kode' => $p->referral_kode ?? '',
+            'password' => '',
         ];
         $this->showEditPelangganModal = true;
     }
@@ -348,6 +360,7 @@ class CrmDashboard extends Component
             'editPelangganForm.status' => 'required|in:aktif,pending,nonaktif,ditolak',
             'editPelangganForm.kode_agen' => 'nullable|string|max:40|unique:pelanggan,kode_agen,'.$this->editPelangganId,
             'editPelangganForm.referral_kode' => 'nullable|string|max:40',
+            'editPelangganForm.password' => 'nullable|string|min:6',
         ]);
 
         try {
@@ -441,6 +454,31 @@ class CrmDashboard extends Component
         $this->showResetPasswordModal = false;
         $this->resetPasswordPelangganId = null;
         $this->reset(['resetPasswordForm']);
+    }
+
+    // ================= AKTIVASI AKUN (akun belum punya password) =================
+
+    /**
+     * Bangkitkan kode aktivasi 6 digit untuk member yang belum memiliki kata sandi.
+     * Kode ditampilkan SEKALI ke staff, lalu staff menyampaikannya ke member.
+     */
+    public function openAktivasiModal(int $pelangganId): void
+    {
+        $pelanggan = Pelanggan::findOrFail($pelangganId);
+        $this->aktivasiPelangganId = $pelanggan->id;
+        $this->aktivasiForm = [
+            'nama' => $pelanggan->nama,
+            'telepon' => $pelanggan->telepon ?? '-',
+            'kode' => app(PelangganService::class)->buatKodeAktivasi($pelanggan),
+        ];
+        $this->showAktivasiModal = true;
+    }
+
+    public function closeAktivasiModal(): void
+    {
+        $this->showAktivasiModal = false;
+        $this->aktivasiPelangganId = null;
+        $this->reset(['aktivasiForm']);
     }
 
     public function ajukanResetPassword(ApprovalService $approvalService): void

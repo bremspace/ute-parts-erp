@@ -79,6 +79,44 @@ class CustomerLoginTest extends TestCase
         $this->assertGuest('customer');
     }
 
+    public function test_customer_can_login_with_phone_without_leading_zero(): void
+    {
+        Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081234567890',
+            'password' => Hash::make('secret123'),
+            'status' => 'aktif',
+        ]);
+
+        // Pengguna sering mengetik HP tanpa prefix 0 (8xxxxxxxxxx).
+        $response = $this->post('/login-pelanggan', [
+            'telepon' => '81234567890',
+            'password' => 'secret123',
+        ]);
+
+        $response->assertRedirect('/shop');
+        $this->assertAuthenticated('customer');
+    }
+
+    public function test_customer_with_nonaktif_status_cannot_login(): void
+    {
+        Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081234567890',
+            'password' => Hash::make('secret123'),
+            'status' => 'nonaktif',
+        ]);
+
+        $response = $this->from('/login-pelanggan')->post('/login-pelanggan', [
+            'telepon' => '081234567890',
+            'password' => 'secret123',
+        ]);
+
+        $response->assertRedirect('/login-pelanggan');
+        $response->assertSessionHasErrors('telepon');
+        $this->assertGuest('customer');
+    }
+
     public function test_customer_can_login_with_username(): void
     {
         Pelanggan::create([

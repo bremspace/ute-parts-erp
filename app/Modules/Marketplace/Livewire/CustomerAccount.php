@@ -4,6 +4,7 @@ namespace App\Modules\Marketplace\Livewire;
 
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
@@ -31,6 +32,8 @@ class CustomerAccount extends Component
     public string $username = '';
 
     public string $email = '';
+
+    public string $telepon = '';
 
     public string $alamat = '';
 
@@ -60,6 +63,7 @@ class CustomerAccount extends Component
             $this->nama = $customer->nama ?? '';
             $this->username = $customer->username ?? '';
             $this->email = $customer->email ?? '';
+            $this->telepon = $customer->telepon ?? '';
             $this->alamat = $customer->alamat ?? '';
         }
     }
@@ -311,11 +315,14 @@ class CustomerAccount extends Component
             'nama' => 'required|string|max:255',
             'username' => 'nullable|string|min:3|max:40|regex:/^[a-zA-Z0-9._-]+$/|unique:pelanggan,username,'.$customer->id,
             'email' => 'nullable|email|max:255|unique:pelanggan,email,'.$customer->id,
+            'telepon' => 'nullable|string|min:9|max:20|unique:pelanggan,telepon,'.$customer->id,
             'alamat' => 'nullable|string|max:500',
             'avatarUpload' => 'nullable|image|max:2048',
         ], [
             'username.regex' => 'Username hanya boleh huruf, angka, titik, dash, dan garis bawah.',
             'username.unique' => 'Username tersebut sudah digunakan pelanggan lain.',
+            'telepon.min' => 'Nomor HP tidak valid (minimal 9 digit).',
+            'telepon.unique' => 'Nomor HP tersebut sudah digunakan member lain.',
             'avatarUpload.max' => 'Ukuran foto profil maksimal 2MB.',
         ]);
 
@@ -323,6 +330,9 @@ class CustomerAccount extends Component
             'nama' => trim($this->nama),
             'username' => ! empty($this->username) ? trim($this->username) : null,
             'email' => ! empty($this->email) ? trim($this->email) : null,
+            'telepon' => ! empty($this->telepon)
+                ? app(PelangganService::class)->normalizePhone($this->telepon)
+                : $customer->telepon,
             'alamat' => ! empty($this->alamat) ? trim($this->alamat) : null,
         ];
 

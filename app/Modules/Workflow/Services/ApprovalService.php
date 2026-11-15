@@ -302,6 +302,26 @@ class ApprovalService
                         'approved_at' => now(),
                         'approved_by' => $actionedBy,
                     ]);
+
+                    // Kabari member: akun sudah bisa dipakai login.
+                    $label = match ($tipeKonsumen) {
+                        'agen' => 'Agen / Mitra B2B',
+                        'reseller' => 'Reseller',
+                        default => 'Member Retail',
+                    };
+
+                    app(NotificationService::class)->kirim(
+                        'inapp',
+                        $pelanggan->telepon,
+                        'Pendaftaran Akun Member Disetujui',
+                        "Pendaftaran akun member Anda telah DISETUJUI sebagai {$label}. Silakan masuk dengan nomor HP dan kata sandi Anda.",
+                        [
+                            'pelanggan_id' => $pelanggan->id,
+                            'kategori' => 'membership',
+                            'action_url' => '/login-pelanggan',
+                            'cabang_id' => $request->cabang_id,
+                        ]
+                    );
                 } else {
                     $pelanggan->update([
                         'status' => 'ditolak',
@@ -309,6 +329,19 @@ class ApprovalService
                         'approved_at' => now(),
                         'approved_by' => $actionedBy,
                     ]);
+
+                    app(NotificationService::class)->kirim(
+                        'inapp',
+                        $pelanggan->telepon,
+                        'Pendaftaran Akun Member Ditolak',
+                        'Pendaftaran akun member Anda DITOLAK.'.($catatan ? ' Alasan: '.$catatan : ' Silakan hubungi toko untuk informasi lebih lanjut.'),
+                        [
+                            'pelanggan_id' => $pelanggan->id,
+                            'kategori' => 'membership',
+                            'action_url' => '/login-pelanggan',
+                            'cabang_id' => $request->cabang_id,
+                        ]
+                    );
                 }
             }
 

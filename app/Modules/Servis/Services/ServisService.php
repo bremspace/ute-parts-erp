@@ -137,25 +137,17 @@ class ServisService
         $namaPelanggan = $data['nama_pelanggan'] ?? $pelanggan?->nama;
         $teleponPelanggan = $data['telepon_pelanggan'] ?? $pelanggan?->telepon;
 
-        if (! empty($teleponPelanggan)) {
-            $clean = preg_replace('/[^0-9+]/', '', (string) $teleponPelanggan);
-            if (str_starts_with($clean, '+62')) {
-                $clean = '0'.substr($clean, 3);
-            } elseif (str_starts_with($clean, '62')) {
-                $clean = '0'.substr($clean, 2);
-            }
-            $teleponPelanggan = $clean;
-        }
+        // [NORMALISASI SATU SUMBER] Pakai PelangganService agar format identik
+        // dengan registrasi/login — mencegah akun ganda & login tak cocok.
+        $teleponPelanggan = app(PelangganService::class)->normalizePhone($teleponPelanggan);
 
         // Auto-sync konsumen baru ke database CRM Pelanggan
         if (! $pelanggan && ! empty($namaPelanggan)) {
-            $query = Pelanggan::query();
-            if (! empty($teleponPelanggan)) {
-                $query->where('telepon', $teleponPelanggan);
-            } else {
-                $query->where('nama', $namaPelanggan);
+            $pelanggan = app(PelangganService::class)->cariByTelepon($teleponPelanggan);
+
+            if (! $pelanggan && empty($teleponPelanggan)) {
+                $pelanggan = Pelanggan::where('nama', $namaPelanggan)->first();
             }
-            $pelanggan = $query->first();
 
             if (! $pelanggan) {
                 $pelanggan = Pelanggan::create([
@@ -172,15 +164,7 @@ class ServisService
             $teleponPelanggan = $teleponPelanggan ?: $pelanggan->telepon;
         }
 
-        if (! empty($teleponPelanggan)) {
-            $clean = preg_replace('/[^0-9+]/', '', (string) $teleponPelanggan);
-            if (str_starts_with($clean, '+62')) {
-                $clean = '0'.substr($clean, 3);
-            } elseif (str_starts_with($clean, '62')) {
-                $clean = '0'.substr($clean, 2);
-            }
-            $teleponPelanggan = $clean;
-        }
+        $teleponPelanggan = app(PelangganService::class)->normalizePhone($teleponPelanggan);
 
         // [P1-1/T-01] Race-safe: generation LIKE-locked + retry duplicate-key
         // (unique index `no_tiket` = jaring pengaman terakhir).
@@ -276,25 +260,17 @@ class ServisService
         $namaPelanggan = $data['nama'] ?? ($data['nama_pelanggan'] ?? $pelanggan?->nama);
         $teleponPelanggan = $data['telepon'] ?? ($data['telepon_pelanggan'] ?? $pelanggan?->telepon);
 
-        if (! empty($teleponPelanggan)) {
-            $clean = preg_replace('/[^0-9+]/', '', (string) $teleponPelanggan);
-            if (str_starts_with($clean, '+62')) {
-                $clean = '0'.substr($clean, 3);
-            } elseif (str_starts_with($clean, '62')) {
-                $clean = '0'.substr($clean, 2);
-            }
-            $teleponPelanggan = $clean;
-        }
+        // [NORMALISASI SATU SUMBER] Pakai PelangganService agar format identik
+        // dengan registrasi/login — mencegah akun ganda & login tak cocok.
+        $teleponPelanggan = app(PelangganService::class)->normalizePhone($teleponPelanggan);
 
         // Auto-sync booking konsumen online ke database CRM Pelanggan
         if (! $pelanggan && ! empty($namaPelanggan)) {
-            $query = Pelanggan::query();
-            if (! empty($teleponPelanggan)) {
-                $query->where('telepon', $teleponPelanggan);
-            } else {
-                $query->where('nama', $namaPelanggan);
+            $pelanggan = app(PelangganService::class)->cariByTelepon($teleponPelanggan);
+
+            if (! $pelanggan && empty($teleponPelanggan)) {
+                $pelanggan = Pelanggan::where('nama', $namaPelanggan)->first();
             }
-            $pelanggan = $query->first();
 
             if (! $pelanggan) {
                 $pelanggan = Pelanggan::create([
@@ -311,15 +287,7 @@ class ServisService
             $teleponPelanggan = $teleponPelanggan ?: $pelanggan->telepon;
         }
 
-        if (! empty($teleponPelanggan)) {
-            $clean = preg_replace('/[^0-9+]/', '', (string) $teleponPelanggan);
-            if (str_starts_with($clean, '+62')) {
-                $clean = '0'.substr($clean, 3);
-            } elseif (str_starts_with($clean, '62')) {
-                $clean = '0'.substr($clean, 2);
-            }
-            $teleponPelanggan = $clean;
-        }
+        $teleponPelanggan = app(PelangganService::class)->normalizePhone($teleponPelanggan);
 
         // [P1-1/T-01] Race-safe booking: pola sama dengan terimaUnit().
         $tiket = null;

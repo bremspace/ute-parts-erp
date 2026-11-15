@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Services;
 
 use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\PelangganKodeAktivasi;
 use App\Modules\Crm\Models\PelangganPoinLog;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Pos\Models\HargaTier;
@@ -17,7 +18,9 @@ use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 /**
  * [T-36] Single source of truth untuk pembuatan pelanggan (CRM-06, POS quick-add, Servis).
@@ -49,9 +52,146 @@ class PelangganService
             $teleponBersih = '08'.substr($teleponBersih, 3);
         } elseif (str_starts_with($teleponBersih, '62')) {
             $teleponBersih = '0'.substr($teleponBersih, 2);
+        } elseif (str_starts_with($teleponBersih, '8') && strlen($teleponBersih) >= 10) {
+            // Pengguna sering mengetik HP tanpa prefix 0 (mis. 81234567890).
+            $teleponBersih = '0'.$teleponBersih;
         }
 
         return $teleponBersih;
+    }
+
+    /**
+     * Semua varian format nomor yang mungkin dipakai konsumen saat login,
+     * turunan dari SATU kanonik (08…). Login mencoba semua kandidat ini
+     * supaya nomor tersimpan dengan format terlanjur berbeda (mis. 8… /
+     * 62… dari input walk-in lama) tetap bisa masuk.
+     *
+     * @return array<int, string>
+     */
+    public function kandidatTelepon(?string $telepon): array
+    {
+        $kanonik = $this->normalizePhone($telepon);
+
+        if ($kanonik === '') {
+            return [];
+        }
+
+        $kandidat = [$kanonik];
+
+        if (str_starts_with($kanonik, '08')) {
+            $kandidat[] = '8'.substr($kanonik, 2);
+            $kandidat[] = '62'.substr($kanonik, 1);
+        } elseif (str_starts_with($kanonik, '8')) {
+            $kandidat[] = '0'.$kanonik;
+            $kandidat[] = '62'.$kanonik;
+        } elseif (str_starts_with($kanonik, '62')) {
+            $kandidat[] = '0'.substr($kanonik, 2);
+            $kandidat[] = substr($kanonik, 2);
+        }
+
+        return array_values(array_unique($kandidat));
+    }
+
+    /**
+     * Cari pelanggan untuk keperluan login/diagnosa: mencocokkan semua
+     * kandidat nomor telepon, lalu fallback ke username.
+     */
+    public function cariUntukLogin(string $input): ?Pelanggan
+    {
+        $input = trim($input);
+
+        if ($input === '') {
+            return null;
+        }
+
+        foreach ($this->kandidatTelepon($input) as $kandidat) {
+            $pelanggan = Pelanggan::where('telepon', $kandidat)->first();
+            if ($pelanggan) {
+                return $pelanggan;
+            }
+        }
+
+        return Pelanggan::where('username', $input)->first();
+    }
+
+    /**
+     * Cari pelanggan berdasarkan semua varian telepon (untuk jalur non-login
+     * seperti auto-sync servis) supaya tidak membuat akun ganda.
+     */
+    public function cariByTelepon(?string $telepon): ?Pelanggan
+    {
+        foreach ($this->kandidatTelepon($telepon) as $kandidat) {
+            $pelanggan = Pelanggan::where('telepon', $kandidat)->first();
+            if ($pelanggan) {
+                return $pelanggan;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Bangkitkan kode aktivasi 6 digit untuk akun yang belum punya kata sandi.
+     * Kode lama yang belum dipakai dibatalkan (satu aktif per akun).
+     */
+    public function buatKodeAktivasi(Pelanggan $pelanggan): string
+    {
+        PelangganKodeAktivasi::where('pelanggan_id', $pelanggan->id)
+            ->whereNull('dipakai_at')
+            ->delete();
+
+        do {
+            $kode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        } while (PelangganKodeAktivasi::where('kode', $kode)->exists());
+
+        PelangganKodeAktivasi::create([
+            'pelanggan_id' => $pelanggan->id,
+            'kode' => $kode,
+            'kedaluwarsa_at' => now()->addDay(),
+            'dibuat_oleh' => auth()->id(),
+        ]);
+
+        return $kode;
+    }
+
+    /**
+     * Member menyetel kata sandi pertama kali dengan kode aktivasi dari CS.
+     * Hanya untuk akun yang memang belum memiliki kata sandi.
+     *
+     * @throws ValidationException
+     */
+    public function aktifkanAkun(string $telepon, string $kode, string $password): Pelanggan
+    {
+        $pelanggan = $this->cariUntukLogin($telepon);
+
+        if (! $pelanggan) {
+            throw ValidationException::withMessages([
+                'telepon' => 'Nomor HP / username tidak terdaftar. Silakan periksa kembali atau daftar akun baru.',
+            ]);
+        }
+
+        if (! empty($pelanggan->password)) {
+            throw ValidationException::withMessages([
+                'telepon' => 'Akun ini sudah memiliki kata sandi. Silakan masuk, atau minta CS toko mengajukan reset kata sandi.',
+            ]);
+        }
+
+        $record = PelangganKodeAktivasi::where('pelanggan_id', $pelanggan->id)
+            ->where('kode', $kode)
+            ->whereNull('dipakai_at')
+            ->where('kedaluwarsa_at', '>', now())
+            ->first();
+
+        if (! $record) {
+            throw ValidationException::withMessages([
+                'kode' => 'Kode aktivasi tidak valid atau sudah kedaluwarsa. Minta kode baru ke CS toko.',
+            ]);
+        }
+
+        $pelanggan->update(['password' => Hash::make($password)]);
+        $record->update(['dipakai_at' => now()]);
+
+        return $pelanggan;
     }
 
     public function messages(): array
@@ -236,6 +376,11 @@ class PelangganService
         }
         if (array_key_exists('referral_kode', $validated)) {
             $updateData['referral_kode'] = $validated['referral_kode'] ? strtoupper(trim($validated['referral_kode'])) : null;
+        }
+        // Password opsional: dipakai staff untuk menyetel kata sandi akun member
+        // yang belum/tidak memiliki password (mis. hasil input walk-in).
+        if (array_key_exists('password', $validated) && ! empty($validated['password'])) {
+            $updateData['password'] = Hash::make($validated['password']);
         }
 
         if (array_key_exists('tipe_konsumen', $validated)) {

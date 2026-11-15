@@ -107,6 +107,11 @@
                     </svg>
                     <span>Lupa password? Hubungi CS Toko untuk reset instan.</span>
                 </p>
+
+                <p class="text-[11px] text-ink-400 dark:text-ink-500">
+                    Belum punya kata sandi / akun dari toko?
+                    <a href="{{ route('customer.activation') }}" class="text-up-primary font-bold hover:underline">Aktivasi akun di sini</a>
+                </p>
             </div>
         </div>
 

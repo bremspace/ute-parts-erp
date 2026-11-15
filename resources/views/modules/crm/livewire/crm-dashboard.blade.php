@@ -203,6 +203,16 @@
                             @endcan
 
                             @can('crm.edit')
+                            @if(empty($c->password))
+                            <button
+                                type="button"
+                                wire:click="openAktivasiModal({{ $c->id }})"
+                                class="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition text-xs cursor-pointer active:scale-95"
+                                title="Akun belum punya kata sandi — buat kode aktivasi untuk member"
+                            >
+                                🔐
+                            </button>
+                            @endif
                             <button
                                 type="button"
                                 wire:click="openResetPasswordModal({{ $c->id }})"
@@ -308,6 +318,16 @@
                             </button>
                             @endcan
                             @can('crm.edit')
+                            @if(empty($c->password))
+                            <button
+                                type="button"
+                                wire:click="openAktivasiModal({{ $c->id }})"
+                                class="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition text-xs cursor-pointer active:scale-95"
+                                title="Akun belum punya kata sandi — buat kode aktivasi untuk member"
+                            >
+                                🔐
+                            </button>
+                            @endif
                             <button
                                 type="button"
                                 wire:click="openResetPasswordModal({{ $c->id }})"
@@ -1467,6 +1487,14 @@
                     </div>
 
                     <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kata Sandi Akun Member</label>
+                        <input type="text" wire:model="editPelangganForm.password" placeholder="Kosongkan jika tidak diubah"
+                               class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        <p class="text-[10px] text-ink-400 mt-1">Isi untuk menyetel kata sandi (mis. akun walk-in yang belum punya kata sandi). Minimal 6 karakter.</p>
+                        @error('editPelangganForm.password') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tanggal Lahir (opsional)</label>
                         <input type="date" wire:model="editPelangganForm.tanggal_lahir" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                     </div>
@@ -1587,6 +1615,53 @@
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-4 flex-shrink-0">
                     <button type="button" wire:click="closeResetPasswordModal" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                     <button type="button" wire:click="ajukanResetPassword" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs cursor-pointer min-h-[44px]">Kirim Pengajuan Reset</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal Kode Aktivasi Akun Member (untuk akun yang belum punya kata sandi) --}}
+    @if($showAktivasiModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <div class="w-full max-w-md glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl relative">
+                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-white/10">
+                    <h3 class="text-base sm:text-lg font-bold text-white">Kode Aktivasi Akun</h3>
+                    <button wire:click="closeAktivasiModal" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs leading-relaxed">
+                        Akun ini <strong>belum memiliki kata sandi</strong>, sehingga member belum bisa login.
+                        Sampaikan kode di bawah ke member, lalu member menyetel kata sandinya sendiri di
+                        <span class="font-mono font-semibold">/aktivasi-akun</span>.
+                    </div>
+
+                    <div class="text-xs space-y-1">
+                        <p class="text-ink-400 text-[10px] uppercase font-semibold">Nama Member</p>
+                        <p class="font-bold text-white text-sm">{{ $aktivasiForm['nama'] }}</p>
+                        <p class="text-ink-400 text-[10px] uppercase font-semibold mt-2">Nomor HP</p>
+                        <p class="font-bold font-mono text-white text-sm">{{ $aktivasiForm['telepon'] }}</p>
+                    </div>
+
+                    <div class="text-center py-4 rounded-2xl bg-black/30 border border-white/10">
+                        <p class="text-[10px] uppercase font-semibold text-ink-400 mb-2">Kode Aktivasi (6 digit)</p>
+                        <p class="font-mono font-black text-4xl tracking-[0.4em] text-up-mint select-all">{{ $aktivasiForm['kode'] }}</p>
+                        <p class="text-[10px] text-ink-400 mt-2">Berlaku 24 jam • Sekali pakai</p>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/20 text-xs text-ink-300 leading-relaxed">
+                        <p class="font-bold text-white mb-1">Langkah untuk member</p>
+                        <ol class="list-decimal list-inside space-y-0.5 text-[11px]">
+                            <li>Buka halaman <span class="font-mono">/aktivasi-akun</span></li>
+                            <li>Masukkan nomor HP + kode ini</li>
+                            <li>Set kata sandi baru, lalu masuk</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-4">
+                    <button type="button" wire:click="closeAktivasiModal" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Tutup</button>
+                    <button type="button" onclick="navigator.clipboard.writeText('{{ $aktivasiForm['kode'] }}')" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs cursor-pointer min-h-[44px]">Salin Kode</button>
                 </div>
             </div>
         </div>

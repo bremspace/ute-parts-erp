@@ -1410,15 +1410,16 @@
                                 @error('username') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                             </div>
 
-                            <!-- Nomor Telepon (Readonly) -->
+                            <!-- Nomor Telepon (editable, dipakai untuk login) -->
                             <div>
                                 <div class="flex items-center justify-between mb-1.5">
-                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300">Nomor WhatsApp / HP</label>
-                                    <span class="text-[10px] text-ink-400">Terdaftar</span>
+                                    <label for="telepon" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">Nomor WhatsApp / HP</label>
+                                    <span class="text-[10px] text-ink-400">Dipakai untuk login</span>
                                 </div>
-                                <input type="text" value="{{ $customer->telepon }}" readonly disabled
-                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-100 dark:bg-white/5 border border-ink-200 dark:border-white/5 text-ink-500 font-mono text-sm cursor-not-allowed" />
-                                <p class="text-[10px] text-ink-400 mt-1">Untuk ubah nomor HP, silakan hubungi Customer Service toko.</p>
+                                <input type="text" id="telepon" wire:model="telepon" placeholder="08xx-xxxx-xxxx"
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white font-mono" />
+                                @error('telepon') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                                <p class="text-[10px] text-ink-400 mt-1">Nomor ini dipakai sebagai identitas login akun Anda.</p>
                             </div>
 
                             <!-- Email -->

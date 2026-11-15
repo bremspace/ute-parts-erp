@@ -340,17 +340,24 @@ Route::post('/login-pelanggan', function (Request $request) {
         'password' => 'required|string',
     ]);
 
-    // Deteksi apakah input login adalah nomor telepon atau username
-    $teleponBersih = preg_replace('/[^0-9]/', '', $loginInput);
-    if (str_starts_with($teleponBersih, '628')) {
-        $teleponBersih = '08'.substr($teleponBersih, 3);
-    }
+    // Deteksi apakah input login adalah nomor telepon atau username.
+    // Normalisasi memakai SATU sumber kebenaran (PelangganService) agar perilaku
+    // identik dengan saat registrasi/POS/Servis menyimpan nomor telepon.
+    $pelangganService = app(PelangganService::class);
 
     $attemptSuccess = false;
 
-    // 1. Coba via normalisasi nomor telepon jika dominan angka
-    if (! empty($teleponBersih) && strlen($teleponBersih) >= 9) {
-        $attemptSuccess = Auth::guard('customer')->attempt(['telepon' => $teleponBersih, 'password' => $password]);
+    // 1. Coba semua varian format nomor telepon (08… / 8… / 62…) — nomor yang
+    //    tersimpan dengan format terlanjur berbeda tetap bisa masuk.
+    foreach ($pelangganService->kandidatTelepon($loginInput) as $kandidatTelepon) {
+        $attemptSuccess = Auth::guard('customer')->attempt([
+            'telepon' => $kandidatTelepon,
+            'password' => $password,
+        ]);
+
+        if ($attemptSuccess) {
+            break;
+        }
     }
 
     // 2. Jika gagal atau format bukan nomor telepon, coba via username
@@ -358,30 +365,44 @@ Route::post('/login-pelanggan', function (Request $request) {
         $attemptSuccess = Auth::guard('customer')->attempt(['username' => $loginInput, 'password' => $password]);
     }
 
-    // 3. Fallback jika nomor telepon tersimpan persis apa adanya tanpa format 08
-    if (! $attemptSuccess && ! empty($loginInput)) {
-        $attemptSuccess = Auth::guard('customer')->attempt(['telepon' => $loginInput, 'password' => $password]);
-    }
-
     if ($attemptSuccess) {
         $user = Auth::guard('customer')->user();
-        if (($user->status ?? 'aktif') === 'pending') {
+        // 'approved' = alias status lama dari 'aktif' (sisa data POS lama).
+        $status = (string) ($user->status ?? 'aktif');
+        $status = $status === 'approved' ? 'aktif' : $status;
+
+        // Hanya akun berstatus "aktif" yang boleh masuk. Nonaktif pun diblokir
+        // supaya penonaktifan oleh owner benar-benar menghentikan akses.
+        if ($status !== 'aktif') {
+            $pesan = match ($status) {
+                'pending' => 'Pendaftaran Anda sedang menunggu persetujuan (approval) dari owner. Silakan tunggu konfirmasi.',
+                'ditolak' => 'Pendaftaran akun Anda ditolak oleh owner.'.($user->catatan_approval ? " Alasan: {$user->catatan_approval}" : ''),
+                'nonaktif' => 'Akun Anda sedang dinonaktifkan. Silakan hubungi toko / CS untuk mengaktifkan kembali.',
+                default => 'Status akun Anda tidak aktif. Silakan hubungi toko / CS.',
+            };
+
             Auth::guard('customer')->logout();
 
-            return back()->withInput($request->only('telepon'))->withErrors(['telepon' => 'Pendaftaran Anda sedang menunggu persetujuan (approval) dari owner. Silakan tunggu konfirmasi.']);
-        }
-
-        if (($user->status ?? 'aktif') === 'ditolak') {
-            $catatan = $user->catatan_approval ? " Alasan: {$user->catatan_approval}" : '';
-            Auth::guard('customer')->logout();
-
-            return back()->withInput($request->only('telepon'))->withErrors(['telepon' => 'Pendaftaran akun Anda ditolak oleh owner.'.$catatan]);
+            return back()->withInput($request->only('telepon'))->withErrors(['telepon' => $pesan]);
         }
 
         $cart = session()->get('shop.cart', []);
         $fallback = ! empty($cart) ? '/checkout' : '/shop';
 
         return redirect()->intended($fallback);
+    }
+
+    // Diagnosa kegagalan: akun yang belum pernah mendapat kata sandi tidak akan
+    // pernah bisa masuk — beri pesan yang bisa ditindaklanjuti, bukan pesan generik.
+    $terkait = $pelangganService->cariUntukLogin($loginInput);
+
+    if ($terkait && empty($terkait->password)) {
+        $statusTerkait = (string) ($terkait->status ?? 'aktif');
+        $statusTerkait = $statusTerkait === 'approved' ? 'aktif' : $statusTerkait;
+
+        return back()->withInput($request->only('telepon'))->withErrors([
+            'telepon' => 'Akun dengan nomor ini belum memiliki kata sandi. Ambil kode aktivasi di CS toko, lalu aktifkan akun Anda.'.($statusTerkait !== 'aktif' ? ' (Status akun: '.strtoupper($statusTerkait).')' : ''),
+        ]);
     }
 
     return back()->withInput($request->only('telepon'))->withErrors(['telepon' => 'Nomor HP/Username atau kata sandi tidak cocok.']);
@@ -400,6 +421,19 @@ Route::post('/daftar-pelanggan', function (Request $request) {
 
         return redirect()->route('customer.login')->with('info', 'Pendaftaran berhasil! Akun member Anda sudah aktif dan siap digunakan.');
     } catch (ValidationException $e) {
+        // Bila nomor HP sudah terdaftar tapi akun lamanya belum punya kata sandi,
+        // beri jalan keluar (aktivasi) — bukan pesan "sudah terdaftar" yang membuat
+        // member mentok tanpa bisa login maupun daftar ulang.
+        $adaErrorTelepon = $e->validator->errors()->has('telepon');
+        $teleponInput = (string) $request->input('telepon', '');
+        $terdaftar = $adaErrorTelepon ? app(PelangganService::class)->cariUntukLogin($teleponInput) : null;
+
+        if ($terdaftar && empty($terdaftar->password)) {
+            return back()
+                ->withInput($request->only('nama', 'telepon', 'email', 'alamat', 'referral_kode'))
+                ->withErrors(['telepon' => 'Nomor HP ini sudah terdaftar dan akunnya belum memiliki kata sandi. Ambil kode aktivasi di CS toko, lalu aktifkan akun Anda di halaman aktivasi akun.']);
+        }
+
         return back()->withInput($request->only('nama', 'telepon', 'email', 'alamat', 'referral_kode'))->withErrors($e->validator);
     }
 })->middleware('throttle:10,1')->name('customer.register.post');
@@ -409,6 +443,33 @@ Route::post('/logout-pelanggan', function () {
 
     return redirect('/shop');
 })->name('customer.logout');
+
+// Aktivasi akun member yang belum pernah memiliki kata sandi (mis. akun dibuat
+// kasir/teknisi saat walk-in). Kode 6 digit dibangkitkan staff di CRM, disampaikan
+// ke member, lalu member menyetel kata sandinya sendiri di sini.
+Route::get('/aktivasi-akun', fn () => view('auth.customer-activate'))->name('customer.activation');
+Route::post('/aktivasi-akun', function (Request $request) {
+    $data = $request->validate([
+        'telepon' => 'required|string|max:30',
+        'kode' => 'required|string|size:6',
+        'password' => 'required|string|min:6|confirmed',
+    ], [
+        'telepon.required' => 'Nomor HP / username wajib diisi.',
+        'kode.required' => 'Kode aktivasi wajib diisi.',
+        'kode.size' => 'Kode aktivasi harus 6 digit.',
+        'password.required' => 'Kata sandi baru wajib diisi.',
+        'password.min' => 'Kata sandi baru minimal 6 karakter.',
+        'password.confirmed' => 'Konfirmasi kata sandi baru tidak cocok.',
+    ]);
+
+    try {
+        app(PelangganService::class)->aktifkanAkun($data['telepon'], $data['kode'], $data['password']);
+    } catch (ValidationException $e) {
+        return back()->withInput($request->only('telepon', 'kode'))->withErrors($e->validator);
+    }
+
+    return redirect()->route('customer.login')->with('info', 'Akun Anda berhasil diaktifkan. Silakan masuk dengan kata sandi baru Anda.');
+})->middleware('throttle:10,1')->name('customer.activation.post');
 
 // Keranjang & checkout (wajib login customer) — halaman cart menampilkan form login bila guest
 Route::get('/cart', CartCheckout::class)->name('cart');
