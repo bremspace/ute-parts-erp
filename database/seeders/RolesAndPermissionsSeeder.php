@@ -72,6 +72,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'kelola-hr',
             // [PRD §4.3] RBAC payroll: permission khusus `kelola-payroll` (super-admin + finance saja)
             'kelola-payroll',
+            // [BH] RBAC bagi hasil jasa teknisi non-gaji (super-admin + finance)
+            'kelola-bagi-hasil',
             'payroll.view',
             'payroll.create',
             'payroll.approve',
@@ -179,7 +181,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // [PRD §4.3] `kelola-payroll` hanya super-admin + finance (payroll management);
         // admin-toko TIDAK lagi dapat payroll.view (hanya kelola-hr + hr.lihat-sendiri)
         $superAdmin->givePermissionTo(['kelola-hr', 'kelola-payroll', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
-        $finance->givePermissionTo(['kelola-hr', 'kelola-payroll', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
+        $finance->givePermissionTo(['kelola-hr', 'kelola-payroll', 'kelola-bagi-hasil', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
         $adminToko->givePermissionTo(['kelola-hr', 'hr.lihat-sendiri']);
 
         // [F3-8b] Karyawan (kasir/teknisi/marketing/staff/karyawan) lihat absensi & KPI sendiri

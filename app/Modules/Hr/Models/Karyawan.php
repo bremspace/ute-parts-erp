@@ -17,7 +17,7 @@ use Spatie\Activitylog\Support\LogOptions;
  * [F3-8] Karyawan — master data karyawan link ke users.
  */
 #[Fillable([
-    'user_id', 'nik', 'nama', 'telepon', 'email', 'jabatan', 'cabang_id',
+    'user_id', 'nik', 'nama', 'telepon', 'email', 'jabatan', 'metode_penghasilan', 'cabang_id',
     'tgl_masuk', 'tgl_keluar', 'alasan_keluar', 'catatan_keluar',
     'gaji_pokok', 'status_aktif', 'rekening_bank',
 ])]
@@ -110,7 +110,7 @@ class Karyawan extends Model
     {
         return LogOptions::defaults()
             ->logOnly([
-                'user_id', 'nik', 'nama', 'telepon', 'email', 'jabatan', 'cabang_id',
+                'user_id', 'nik', 'nama', 'telepon', 'email', 'jabatan', 'metode_penghasilan', 'cabang_id',
                 'tgl_masuk', 'tgl_keluar', 'alasan_keluar', 'catatan_keluar',
                 'gaji_pokok', 'status_aktif',
             ])

@@ -404,6 +404,11 @@ class KomisiService
 
         $karyawan = Karyawan::where('user_id', $tiket->teknisi_id)->where('status_aktif', true)->first();
 
+        // [BH] Teknisi non-gaji dibayar lewat bagi hasil jasa, bukan komisi engine.
+        if ($karyawan && $karyawan->metode_penghasilan === 'bagi_hasil') {
+            return [];
+        }
+
         return $karyawan ? [['karyawan', (int) $karyawan->id]] : [];
     }
 

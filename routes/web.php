@@ -17,6 +17,7 @@ use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Dashboard\Livewire\DashboardIndex;
 use App\Modules\Hr\Livewire\AbsensiMobileScanPage;
+use App\Modules\Hr\Livewire\BagiHasilPage;
 use App\Modules\Hr\Livewire\HrAbsensiKpiPage;
 use App\Modules\Hr\Livewire\HrSayaPage;
 use App\Modules\Hr\Livewire\KaryawanPage;
@@ -952,6 +953,15 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
     Route::get('/hr/komisi-skema', KomisiSkemaPage::class)
         ->name('hr.komisi-skema')
         ->middleware('permission:kelola-hr');
+
+    // [BH] Bagi hasil jasa teknisi non-gaji — admin/finance (kelola-bagi-hasil)
+    Route::get('/hr/bagi-hasil', BagiHasilPage::class)
+        ->name('hr.bagi-hasil')
+        ->middleware('permission:kelola-bagi-hasil');
+    Route::get('/hr/bagi-hasil/{tab}', BagiHasilPage::class)
+        ->name('hr.bagi-hasil.tab')
+        ->whereIn('tab', ['rule', 'transaksi', 'payout'])
+        ->middleware('permission:kelola-bagi-hasil');
 
     // [F1-1] Workflow Approval Inbox — RBAC: permission approve-workflow (spatie middleware)
     Route::get('/approvals', ApprovalInbox::class)

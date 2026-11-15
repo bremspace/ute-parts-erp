@@ -3,6 +3,15 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-15 — HR: Bagi Hasil Jasa Teknisi Non-Gaji (Skema + UI + Akunting)
+
+- **Skema bagi hasil** — `karyawan.metode_penghasilan` (gaji|bagi_hasil), `bagi_hasil_rules` (prioritas per teknisi &gt; cabang &gt; global, persen + ambang min jasa), `bagi_hasil` (1 tiket = 1 baris, idempoten), `bagi_hasil_periode` (draft → selesai → dibayar). Migration `2026_11_15_100000_create_bagi_hasil_tables`.
+- **Engine `BagiHasilService`** — accru otomatis dari total JASA tiket saat `selesai` (part/sparepart tidak masuk dasar), reversal otomatis saat tiket dibatalkan/ditolak, payout bulanan dengan jurnal fail-closed & idempoten per periode, approval F1-1 di atas Rp 10.000.000.
+- **Akunting** — COA `520-11 Beban Bagi Hasil Jasa Teknisi` + `210-06 Utang Bagi Hasil Teknisi`; jurnal accrual (debit beban / kredit utang) lalu pembayaran (debit utang / kredit kas); `sumber='bagi_hasil'` di `JurnalService::SUMBER_VALID`.
+- **Anti double-pay** — teknisi bagi hasil dikecualikan dari payroll, komisi teknisi legacy, dan komisi multi-aktor tiket servis (1 tiket = 1 penghasilan).
+- **UI/UX** — halaman `/app/hr/bagi-hasil` (menu HR) tab Aturan / Transaksi / Payout, modal bayar dengan pilihan akun kas/bank; widget "Bagi Hasil Jasa Saya" di Portal Karyawan; flag metode penghasilan di master karyawan. Permission `kelola-bagi-hasil` (super-admin + finance).
+- **Testing**: `tests/Feature/BagiHasilTest.php` 13/13 pass (accru, idempotensi, prioritas rule, min jasa, reversal, hook `onSelesai`, jurnal balance + idempoten payout, eksklusi payroll & komisi, render UI + widget). Regression 218 test payroll/komisi/HR/jurnal hijau.
+
 ## 2026-11-06 — Servis: Re-Audit P0–P3 & Perbaikan Celah (Fallback Estimasi Items, CLI Notification Context, Deteksi Duplicate Key, Validasi Cabang Online)
 
 - **[AUDIT-1] TiketServis::getRincianBiayaLengkap() residual overbill gap ditutup** — Cabang `elseif ($estimasiItems->where('tipe', 'jasa')->isNotEmpty())` dan `elseif ($estimasiItems->isNotEmpty())` sebelumnya menagihkan item estimasi jasa/part meskipun item pekerjaan teknisi terkait pernah dibuat lalu dibatalkan. Ditambahkan helper `punyaRiwayatPartEksplisit()` dan guard `! $this->punyaRiwayatJasaEksplisit()` / `! $this->punyaRiwayatPartEksplisit()` agar pembatalan pekerjaan tidak lagi memicu overbill dari estimasi.

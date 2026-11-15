@@ -10,6 +10,7 @@ use App\Modules\Hr\Models\KomisiTeknisiRule;
 use App\Modules\Hr\Models\PayrollKomisiDetail;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
+use App\Modules\Hr\Models\BagiHasil;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Workflow\Models\ApprovalRequest;
@@ -47,7 +48,10 @@ class PayrollService
             throw new \DomainException("Periode {$periode} sudah dibayar. Tidak dapat dihitung ulang.");
         }
 
+        // [BH] Teknisi non-gaji (bagi hasil) bukan bagian dari payroll —
+        // penghasilannya dibayarkan lewat modul Bagi Hasil Jasa.
         $karyawans = Karyawan::where('status_aktif', true)
+            ->where('metode_penghasilan', 'gaji')
             ->when($targetCabangId, fn ($q) => $q->where('cabang_id', $targetCabangId))
             ->get();
         $totalGaji = 0;
@@ -389,7 +393,7 @@ class PayrollService
 
     protected function hitungKomisiTeknisiWithDetails(Karyawan $karyawan, string $periode, ?int $cabangId = null): array
     {
-        if ($karyawan->jabatan !== 'teknisi') {
+        if ($karyawan->jabatan !== 'teknisi' || $karyawan->metode_penghasilan !== 'gaji') {
             return ['total' => 0.0, 'items' => []];
         }
 
@@ -473,6 +477,14 @@ class PayrollService
         $items = [];
 
         foreach ($komisis as $kom) {
+            // [BH] Tiket yang dibayar lewat bagi hasil teknisi non-gaji tidak
+            // boleh sekaligus jadi komisi karyawan — 1 tiket = 1 penghasilan.
+            if ($kom->tiket_servis_id && BagiHasil::where('tiket_servis_id', $kom->tiket_servis_id)
+                ->where('status', '!=', BagiHasil::STATUS_DIBATALKAN)
+                ->exists()) {
+                continue;
+            }
+
             $nom = (float) $kom->nominal_komisi;
             $total += $nom;
             $items[] = [

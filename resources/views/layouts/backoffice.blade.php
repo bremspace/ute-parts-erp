@@ -437,6 +437,12 @@
                                     <span>Skema Komisi</span>
                                 </a>
                             @endcan
+                            @can('kelola-bagi-hasil')
+                                <a href="/app/hr/bagi-hasil" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/bagi-hasil*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/bagi-hasil*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
+                                    <span>Bagi Hasil Teknisi</span>
+                                </a>
+                            @endcan
                         </div>
                     </div>
                 @endcanany
@@ -636,6 +642,7 @@
                                 request()->is('app/hr/payroll*') => 'Payroll Karyawan',
                                 request()->is('app/hr/saya*') => 'Portal Karyawan',
                                 request()->is('app/hr/komisi-skema*') => 'Skema Komisi Multi-Aktor',
+                                request()->is('app/hr/bagi-hasil*') => 'Bagi Hasil Teknisi',
                                 request()->is('app/hr*') => 'HR & Payroll',
                                 request()->is('app/omnichannel*') => 'Omnichannel Command Center',
                                 request()->is('app/approvals*') => 'Approval Inbox',

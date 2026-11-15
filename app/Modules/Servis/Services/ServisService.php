@@ -15,6 +15,7 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Reseller\Services\KomisiService;
+use App\Modules\Hr\Services\BagiHasilService;
 use App\Modules\Servis\Models\Garansi;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\ServisSparepart;
@@ -488,6 +489,13 @@ class ServisService
                 'diambil' => $this->onDiambil($tiket),
                 default => null,
             };
+
+            // [BH] Tiket yang sudah pernah selesai lalu dibatalkan/ditolak →
+            // batalkan bagi hasil jasa yang sudah diakui (baris cair tidak disentuh;
+            // pengembalian dana setelah cair tanggung jawab finance).
+            if (in_array($statusBaru, ['batal', 'ditolak'], true) && $statusLama === 'selesai') {
+                app(BagiHasilService::class)->reversal($tiket);
+            }
 
             // [P1-5] Lepas klaim SN: saat transisi ke 'ditolak' (valid maupun
             // override), atau override mundur melewati 'disetujui' — tanpa ini SN
@@ -1848,6 +1856,11 @@ class ServisService
                 // [F3-8c] Komisi multi-aktor trigger tiket_servis (teknisi via
                 // engine baru; reseller servis tetap alur lama di atas — idempotent)
                 app(KomisiService::class)->hitungKomisiMultiAktor('tiket_servis', ['tiket_servis_id' => $tiket->id]);
+
+                // [BH] Bagi hasil jasa teknisi non-gaji — accru 1 baris per tiket
+                // (idempoten). Teknisi bagi hasil sudah dikecualikan dari komisi
+                // (engine + legacy) supaya satu tiket tidak dibayar dua kali.
+                app(BagiHasilService::class)->accru($tiket);
             }
         } catch (\Throwable $e) {
             // [B-10a / P0-4] Fail-closed: catat untuk investigasi, lalu lempar

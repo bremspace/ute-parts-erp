@@ -60,6 +60,70 @@
             </div>
         </div>
 
+        {{-- CARD 1B: BAGI HASIL SAYA (teknisi non-gaji) --}}
+        @if(($karyawan->metode_penghasilan ?? 'gaji') === 'bagi_hasil')
+            <div class="glass-card p-5 border border-up-amber/30 space-y-4 bg-up-amber/5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-ink-800 dark:text-ink-100">Bagi Hasil Jasa Saya — {{ $periode }}</h2>
+                    <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-up-amber/15 text-up-amber border border-up-amber/20">Teknisi Non-Gaji</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="p-3.5 rounded-xl text-center border border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5">
+                        <p class="text-2xl font-black tabular-nums">{{ $bagiHasil['jumlah_tiket'] ?? 0 }}</p>
+                        <p class="text-xs font-semibold mt-0.5 text-ink-500 dark:text-ink-400">Tiket Selesai</p>
+                    </div>
+                    <div class="p-3.5 rounded-xl text-center border border-black/5 dark:border-white/5 bg-up-amber/10">
+                        <p class="text-2xl font-black tabular-nums text-up-amber">Rp {{ number_format($bagiHasil['pending'] ?? 0, 0, ',', '.') }}</p>
+                        <p class="text-xs font-semibold mt-0.5 text-ink-500 dark:text-ink-400">Menunggu Payout</p>
+                    </div>
+                    <div class="p-3.5 rounded-xl text-center border border-black/5 dark:border-white/5 bg-up-primary/10">
+                        <p class="text-2xl font-black tabular-nums text-up-primary">Rp {{ number_format($bagiHasil['disetujui'] ?? 0, 0, ',', '.') }}</p>
+                        <p class="text-xs font-semibold mt-0.5 text-ink-500 dark:text-ink-400">Disetujui</p>
+                    </div>
+                    <div class="p-3.5 rounded-xl text-center border border-black/5 dark:border-white/5 bg-up-mint/10">
+                        <p class="text-2xl font-black tabular-nums text-up-mint">Rp {{ number_format($bagiHasil['cair'] ?? 0, 0, ',', '.') }}</p>
+                        <p class="text-xs font-semibold mt-0.5 text-ink-500 dark:text-ink-400">Sudah Dibayar</p>
+                    </div>
+                </div>
+                @if($bagiHasilRows->isNotEmpty())
+                    <x-prism.dual-scroll>
+                        <table class="min-w-full divide-y divide-ink-200 dark:divide-white/10 text-xs">
+                            <thead class="bg-black/5 dark:bg-white/5">
+                                <tr>
+                                    <th class="px-3 py-2 text-left font-semibold text-ink-600 dark:text-ink-300">Tiket</th>
+                                    <th class="px-3 py-2 text-right font-semibold text-ink-600 dark:text-ink-300">Total Jasa</th>
+                                    <th class="px-3 py-2 text-right font-semibold text-ink-600 dark:text-ink-300">Persen</th>
+                                    <th class="px-3 py-2 text-right font-semibold text-ink-600 dark:text-ink-300">Nominal</th>
+                                    <th class="px-3 py-2 text-center font-semibold text-ink-600 dark:text-ink-300">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-ink-100 dark:divide-white/5">
+                                @foreach($bagiHasilRows as $r)
+                                    <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                                        <td class="px-3 py-2 font-mono text-ink-800 dark:text-ink-200">{{ $r['no_tiket'] }}</td>
+                                        <td class="px-3 py-2 text-right tabular-nums text-ink-700 dark:text-ink-300">Rp {{ number_format($r['total_jasa'], 0, ',', '.') }}</td>
+                                        <td class="px-3 py-2 text-right tabular-nums text-ink-700 dark:text-ink-300">{{ number_format($r['persen'], 2, ',', '.') }}%</td>
+                                        <td class="px-3 py-2 text-right tabular-nums font-semibold text-ink-900 dark:text-white">Rp {{ number_format($r['nominal'], 0, ',', '.') }}</td>
+                                        <td class="px-3 py-2 text-center">
+                                            @php
+                                                $warna = match($r['status']) {
+                                                    'pending' => 'bg-up-amber/15 text-up-amber',
+                                                    'disetujui' => 'bg-up-primary/15 text-up-primary',
+                                                    'cair' => 'bg-up-mint/15 text-up-mint',
+                                                    default => 'bg-black/5 text-ink-500 dark:bg-white/10 dark:text-ink-400',
+                                                };
+                                            @endphp
+                                            <span class="inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full {{ $warna }}">{{ ucfirst($r['status']) }}</span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </x-prism.dual-scroll>
+                @endif
+            </div>
+        @endif
+
         {{-- CARD 2: REKAP BULANAN & SLIP GAJI SAYA --}}
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             {{-- Rekap Bulanan --}}

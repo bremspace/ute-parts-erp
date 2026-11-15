@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use App\Modules\Hr\Models\Karyawan;
+use App\Modules\Hr\Models\BagiHasilRule;
 use App\Modules\Hr\Models\KomisiTeknisiRule;
 use App\Modules\Hr\Models\KpiMetric;
 use App\Modules\Hr\Models\Shift;
@@ -23,6 +24,18 @@ class HrSeeder extends Seeder
         // ApprovalRule untuk payroll (F1-1)
         ApprovalRule::updateOrCreate(
             ['entity_type' => 'payroll', 'level' => 1],
+            [
+                'cabang_id' => null,
+                'min_amount' => 10000000,
+                'max_amount' => null,
+                'approver_role' => 'finance',
+                'is_aktif' => true,
+            ]
+        );
+
+        // ApprovalRule untuk payout bagi hasil teknisi (F1-1) — threshold sama dgn payroll
+        ApprovalRule::updateOrCreate(
+            ['entity_type' => 'bagi_hasil', 'level' => 1],
             [
                 'cabang_id' => null,
                 'min_amount' => 10000000,
@@ -72,6 +85,19 @@ class HrSeeder extends Seeder
                 'nominal' => 50000,
                 'persen' => null,
                 'min_status_tiket' => 'selesai',
+                'is_aktif' => true,
+            ]
+        );
+
+        // [BH] Demo aturan bagi hasil — global 50% dari jasa (hanya berlaku untuk
+        // karyawan ber-metode bagi_hasil). Idempoten.
+        BagiHasilRule::updateOrCreate(
+            ['nama' => 'Teknisi bagi hasil 50% jasa'],
+            [
+                'cabang_id' => null,
+                'karyawan_id' => null,
+                'persen' => 50,
+                'min_jasa' => 0,
                 'is_aktif' => true,
             ]
         );

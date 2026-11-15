@@ -57,7 +57,8 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '210-02', 'nama' => 'Utang Gaji',                   'tipe' => 'kewajiban',  'kelompok' => 'utang_gaji',  'saldo_normal' => 'kredit'],
             ['kode' => '210-03', 'nama' => 'Utang Komisi',                 'tipe' => 'kewajiban',  'kelompok' => 'utang_komisi', 'saldo_normal' => 'kredit'],
             ['kode' => '210-04', 'nama' => 'Titipan Ongkir Pengiriman',    'tipe' => 'kewajiban',  'kelompok' => 'utang_lain',   'saldo_normal' => 'kredit'],
-            ['kode' => '210-05', 'nama' => 'Titipan Pembayaran Konsumen (Holding)', 'tipe' => 'kewajiban', 'kelompok' => 'utang_lain', 'saldo_normal' => 'kredit'],
+            ['kode' => '210-05', 'nama' => 'Titipan Pembayaran Konsumen (Holding)', 'tipe' => 'kewajiban', 'kelompok' => 'utang_lain',   'saldo_normal' => 'kredit'],
+            ['kode' => '210-06', 'nama' => 'Utang Bagi Hasil Teknisi', 'tipe' => 'kewajiban', 'kelompok' => 'utang_gaji', 'saldo_normal' => 'kredit'], // [BH] bagi hasil jasa teknisi non-gaji
             ['kode' => '220-01', 'nama' => 'PPN Keluaran',                 'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'], // [F1-2] kontrak AC: jurnal PPN keluaran
             ['kode' => '220-02', 'nama' => 'PPN Keluaran (Legacy 220-02)', 'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'],
 
@@ -86,6 +87,7 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '520-08', 'nama' => 'Selisih Stok (Opname)',        'tipe' => 'beban', 'kelompok' => 'hpp',               'saldo_normal' => 'debit'], // [T-14] selisih opname
             ['kode' => '520-09', 'nama' => 'Beban Komisi Teknisi',        'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit'], // [F3-8] komisi teknisi / karyawan
             ['kode' => '520-10', 'nama' => 'Beban Fee Transaksi Payment Gateway', 'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit'],
+            ['kode' => '520-11', 'nama' => 'Beban Bagi Hasil Jasa Teknisi', 'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit'], // [BH] bagi hasil jasa teknisi non-gaji,
         ];
 
         foreach ($coa as $data) {

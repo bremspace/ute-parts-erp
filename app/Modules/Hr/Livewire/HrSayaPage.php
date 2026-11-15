@@ -7,6 +7,7 @@ use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KpiHasil;
 use App\Modules\Hr\Models\PayrollSlip;
 use App\Modules\Hr\Services\AbsensiService;
+use App\Modules\Hr\Services\BagiHasilService;
 use Livewire\Component;
 
 /**
@@ -148,6 +149,8 @@ class HrSayaPage extends Component
                 'logs' => collect(),
                 'kpi' => collect(),
                 'slip' => null,
+                'bagiHasil' => [],
+                'bagiHasilRows' => collect(),
             ])->layout('layouts.backoffice', ['header' => 'Absensi & KPI Saya', 'title' => 'Absensi & KPI Saya']);
         }
 
@@ -171,12 +174,40 @@ class HrSayaPage extends Component
             ->whereHas('periode', fn ($q) => $q->where('periode', $this->periode))
             ->first();
 
+        // [BH] Ringkasan bagi hasil jasa untuk teknisi non-gaji
+        $bagiHasil = [
+            'periode' => $this->periode,
+            'jumlah_tiket' => 0,
+            'total_jasa' => 0,
+            'pending' => 0,
+            'disetujui' => 0,
+            'cair' => 0,
+            'dibatalkan' => 0,
+        ];
+        $bagiHasilRows = collect();
+
+        if (($this->karyawan->metode_penghasilan ?? 'gaji') === 'bagi_hasil') {
+            $service = app(BagiHasilService::class);
+            $bagiHasil = $service->ringkasanTeknisi($this->karyawan->id, $this->periode);
+            $bagiHasilRows = $service->riwayatTeknisi($this->karyawan->id, 8)
+                ->map(fn ($r) => [
+                    'no_tiket' => $r->tiketServis?->no_tiket ?? '-',
+                    'periode' => $r->periode,
+                    'total_jasa' => (float) $r->total_jasa,
+                    'persen' => (float) $r->persen,
+                    'nominal' => (float) $r->nominal,
+                    'status' => $r->status,
+                ]);
+        }
+
         return view('modules.hr.saya', [
             'karyawan' => $this->karyawan,
             'rekap' => $rekap,
             'logs' => $logs,
             'kpi' => $kpi,
             'slip' => $slip,
+            'bagiHasil' => $bagiHasil,
+            'bagiHasilRows' => $bagiHasilRows,
         ])->layout('layouts.backoffice', ['header' => 'Absensi & KPI Saya', 'title' => 'Absensi & KPI Saya']);
     }
 }

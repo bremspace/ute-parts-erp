@@ -152,6 +152,9 @@
                     <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border {{ $badgeJabatan }}">
                         {{ $k->jabatan }}
                     </span>
+                    @if(($k->metode_penghasilan ?? 'gaji') === 'bagi_hasil')
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border bg-up-amber/10 text-up-amber border-up-amber/20 ml-1">Bagi Hasil</span>
+                    @endif
                     <div class="text-[11px] text-ink-500 dark:text-ink-400 mt-1 font-medium">
                         {{ $k->cabang?->nama ?? 'Cabang Tidak Ditentukan' }}
                     </div>
@@ -350,6 +353,17 @@
                                 <option value="other">Lainnya</option>
                             </select>
                             @error('karyawanForm.jabatan') <p class="text-[11px] text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <!-- Metode Penghasilan -->
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Metode Penghasilan *</label>
+                            <select wire:model="karyawanForm.metode_penghasilan" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                <option value="gaji">Gaji (payroll bulanan)</option>
+                                <option value="bagi_hasil">Bagi Hasil Jasa (teknisi non-gaji)</option>
+                            </select>
+                            <p class="text-[10px] text-ink-400 dark:text-ink-500 mt-1">Bagi hasil: penghasilan dihitung dari jasa tiket servis, dibayar lewat modul Bagi Hasil Teknisi.</p>
+                            @error('karyawanForm.metode_penghasilan') <p class="text-[11px] text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                         </div>
 
                         <!-- Cabang Penugasan -->
