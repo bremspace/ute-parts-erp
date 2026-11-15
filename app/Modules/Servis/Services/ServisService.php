@@ -475,6 +475,20 @@ class ServisService
                 }
             }
 
+            // [BH/ISO] Kontrol perubahan lingkup: tiket hanya boleh 'selesai' bila
+            // semua perubahan (tambah/ubah/kurang part & jasa) di luar estimasi
+            // yang disetujui sudah disetujui pelanggan. Regulator dapat override
+            // dengan alasan (tercatat di log status).
+            if ($statusBaru === 'selesai' && $tiket->perluPersetujuanUlang()) {
+                $override = $user && $user->can('servis.override-status');
+
+                if (! $override) {
+                    throw new \Exception('Ada perubahan lingkup (part/jasa) di luar estimasi yang belum disetujui pelanggan. Minta pelanggan menyetujui via link tracking.');
+                }
+
+                $this->setujuiPerubahanLingkup($tiket, $alasan ?: 'Override regulator', 'regulator');
+            }
+
             $tiket->update(['status' => $statusBaru]);
             $this->logStatus($tiket, $statusLama, $statusBaru, $user, $aksi, $alasan);
 
@@ -944,6 +958,8 @@ class ServisService
             }
         });
 
+        $this->tandaiPerubahanLingkup($tiket->fresh());
+
         return $created;
     }
 
@@ -1042,6 +1058,8 @@ class ServisService
             }
         });
 
+        $this->tandaiPerubahanLingkup($tiket->fresh());
+
         return $created;
     }
 
@@ -1108,6 +1126,159 @@ class ServisService
                 "Batal item [{$item->tipe}] {$item->nama_item}".($alasan ? " — Alasan: {$alasan}" : '')
             );
         });
+
+        // [BH/ISO] Pembatalan item juga perubahan lingkup — evaluasi ulang.
+        $this->tandaiPerubahanLingkup($tiket->fresh());
+    }
+
+    /**
+     * [BH/ISO] Kontrol perubahan lingkup — catat & notifikasi bila ada
+     * tambah/ubah/kurang di luar estimasi yang disetujui.
+     */
+    private function tandaiPerubahanLingkup(TiketServis $tiket): void
+    {
+        $hash = $tiket->hashPerubahanLingkup();
+
+        if ($hash === null) {
+            if ($tiket->revisi_lingkup_diajukan_hash !== null) {
+                $tiket->update(['revisi_lingkup_diajukan_hash' => null]);
+            }
+
+            return;
+        }
+
+        if ($hash === $tiket->revisi_lingkup_diajukan_hash) {
+            return; // isi yang sama sudah dinotifikasi
+        }
+
+        $tiket->update([
+            'revisi_lingkup_diajukan_hash' => $hash,
+            'revisi_lingkup_diajukan_at' => now(),
+            'revisi_lingkup_snapshot' => json_encode($tiket->getPerubahanLingkup()),
+        ]);
+
+        $telepon = $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon;
+        if (filled($telepon) && $tiket->token_approval) {
+            $link = url("/tracking/{$tiket->token_approval}");
+            $this->notifService->kirim(
+                'wa',
+                $telepon,
+                'Perubahan Lingkup Servis',
+                "Ada perubahan lingkup pada servis {$tiket->no_tiket} di luar estimasi yang Anda setujui. Tinjau & setujui di: {$link}",
+                [
+                    'tiket_id' => $tiket->id,
+                    'token' => $tiket->token_approval,
+                    'pelanggan_id' => $tiket->pelanggan_id,
+                    'audience' => 'pelanggan',
+                ]
+            );
+        }
+    }
+
+    /**
+     * Tandai perubahan lingkup sebagai disetujui (pelanggan via token, atau
+     * override regulator dengan alasan). Hash mengikat persetujuan pada isi.
+     */
+    public function setujuiPerubahanLingkup(TiketServis $tiket, ?string $alasan = null, string $sumber = 'pelanggan'): void
+    {
+        $tiket->update([
+            'revisi_lingkup_hash' => $tiket->hashPerubahanLingkup(),
+            'revisi_lingkup_disetujui_at' => now(),
+            'revisi_lingkup_snapshot' => json_encode($tiket->getPerubahanLingkup()),
+        ]);
+
+        $this->logStatus(
+            $tiket,
+            $tiket->status,
+            $tiket->status,
+            null,
+            'perubahan_lingkup',
+            'Perubahan lingkup disetujui'.($sumber ? " ({$sumber})" : '').($alasan ? ": {$alasan}" : '')
+        );
+    }
+
+    /**
+     * Publik: pelanggan menyetujui perubahan lingkup via token tracking.
+     */
+    public function approvePerubahanLingkupByToken(string $token, string $alasan = ''): TiketServis
+    {
+        $tiket = TiketServis::where('token_approval', $token)->firstOrFail();
+
+        if (! $tiket->perluPersetujuanUlang()) {
+            throw new \Exception('Tidak ada perubahan lingkup yang menunggu persetujuan.');
+        }
+
+        $this->setujuiPerubahanLingkup($tiket, $alasan ?: 'Disetujui pelanggan via web tracking');
+
+        return $tiket->fresh();
+    }
+
+    /**
+     * [BH/ISO] Part estimasi yang dipakai memotong stok dari gudang default
+     * cabang. Gagal stok TIDAK memblokir selesai — dicatat & diaudit agar
+     * regulator/finance menindaklanjuti penyesuaian.
+     */
+    private function prosesStokEstimasi(TiketServis $tiket): void
+    {
+        $items = $tiket->getItemEstimasiPerluStok();
+
+        if ($items === []) {
+            if (! $tiket->stok_estimasi_diproses) {
+                $tiket->update(['stok_estimasi_diproses' => true, 'stok_estimasi_catatan' => null]);
+            }
+
+            return;
+        }
+
+        $gudang = Gudang::where('cabang_id', $tiket->cabang_id)
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderByRaw("CASE WHEN LOWER(nama) LIKE '%toko%' THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->first();
+
+        $gagal = [];
+
+        foreach ($items as $item) {
+            if (! $gudang) {
+                $gagal[] = $item['nama'].': gudang tidak ditemukan';
+
+                continue;
+            }
+
+            try {
+                app(StokDeductionService::class)->kurangi(
+                    produkId: (int) $item['produk_id'],
+                    skuVariantId: $item['sku_variant_id'] ?: null,
+                    gudangId: (int) $gudang->id,
+                    qty: (int) $item['qty'],
+                    jenis: 'servis',
+                    referensiTipe: TiketServis::class,
+                    referensiId: $tiket->id,
+                    userId: auth()->id(),
+                    catatan: "Servis {$tiket->no_tiket} — part estimasi {$item['nama']}",
+                );
+            } catch (\Throwable $e) {
+                $gagal[] = $item['nama'].': '.$e->getMessage();
+            }
+        }
+
+        $catatan = $gagal ? implode('; ', $gagal) : null;
+
+        $tiket->update([
+            'stok_estimasi_diproses' => true,
+            'stok_estimasi_catatan' => $catatan,
+        ]);
+
+        if ($catatan) {
+            Log::warning("Stok part estimasi gagal dipotong untuk tiket {$tiket->no_tiket}: {$catatan}");
+            app(AuditService::class)->catat(
+                'TiketServis',
+                'stok_estimasi_gagal',
+                $tiket->id,
+                "Pemotongan stok part estimasi gagal: {$catatan}"
+            );
+        }
     }
 
     /**
@@ -1169,6 +1340,12 @@ class ServisService
 
             if ($tiket->status_pembayaran === 'lunas') {
                 throw new \Exception('Tiket servis sudah lunas');
+            }
+
+            // [BH/ISO] Perubahan lingkup yang belum disetujui pelanggan memblokir
+            // penagihan — fail-closed (pertahanan kedua setelah guard 'selesai').
+            if ($tiket->perluPersetujuanUlang()) {
+                throw new \Exception('Perubahan lingkup (part/jasa) belum disetujui pelanggan — tiket tidak dapat ditagih.');
             }
 
             // [penagihan] SATU sumber: rincian item efektif (estimasi + pekerjaan).
@@ -1725,6 +1902,10 @@ class ServisService
         if ($sudahDiposting) {
             return;
         }
+
+        // [BH/ISO] Part estimasi yang dipakai tetap memotong stok — sekali saja
+        // (flag `stok_estimasi_diproses` + idempotensi jurnal di bawah).
+        $this->prosesStokEstimasi($tiket);
 
         // Jurnal akuntansi otomatis (PRD §4.6):
         // - Pendapatan Jasa Servis (420-01) kredit = estimasi biaya

@@ -2180,21 +2180,48 @@
                         </div>
                     @endif
 
-                    {{-- Perubahan lingkup: item di luar estimasi yang disetujui --}}
+                    {{-- Perubahan lingkup: tambah/ubah/kurang di luar estimasi yang disetujui (kontrol perubahan) --}}
                     @php
-                        $perubahanLingkup = $selectedTiket->getPerubahanLingkup();
+                        $perluApprovalUlang = $selectedTiket->perluPersetujuanUlang();
+                        $itemDiluarEstimasi = $selectedTiket->getItemDiluarEstimasi();
                     @endphp
-                    @if(count($perubahanLingkup) > 0)
-                        <div class="p-3 rounded-xl bg-up-amber/10 border border-up-amber/30">
-                            <p class="text-[10px] text-up-amber uppercase font-semibold mb-1.5">Perubahan Lingkup — di luar estimasi disetujui</p>
+                    @if($perluApprovalUlang || $itemDiluarEstimasi !== [])
+                        <div class="p-3 rounded-xl {{ $perluApprovalUlang ? 'bg-up-amber/10 border border-up-amber/30' : 'bg-up-mint/10 border border-up-mint/30' }}">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <p class="text-[10px] uppercase font-semibold {{ $perluApprovalUlang ? 'text-up-amber' : 'text-up-mint' }}">
+                                    Perubahan lingkup — {{ $perluApprovalUlang ? 'menunggu persetujuan pelanggan' : 'sudah disetujui' }}
+                                </p>
+                                @if($perluApprovalUlang && $selectedTiket->token_approval)
+                                    <a href="{{ url('/tracking/'.$selectedTiket->token_approval) }}" target="_blank" class="text-[10px] font-bold text-up-primary hover:underline">
+                                        Buka link persetujuan
+                                    </a>
+                                @endif
+                            </div>
                             <div class="space-y-1">
-                                @foreach($perubahanLingkup as $pl)
+                                @foreach($itemDiluarEstimasi as $pl)
                                     <div class="flex justify-between text-xs">
-                                        <span class="text-ink-100">{{ $pl['nama'] }}</span>
-                                        <span class="font-bold text-up-amber tabular-nums">+Rp {{ number_format($pl['subtotal'], 0, ',', '.') }}</span>
+                                        <span class="text-ink-100">
+                                            {{ $pl['nama'] }}
+                                            <span class="text-[9px] font-bold {{ $pl['jenis'] === 'berkurang' ? 'text-up-red' : ($pl['jenis'] === 'ubah' ? 'text-up-amber' : 'text-up-mint') }}">
+                                                {{ strtoupper($pl['jenis']) }}
+                                            </span>
+                                        </span>
+                                        <span class="font-bold {{ $perluApprovalUlang ? 'text-up-amber' : 'text-up-mint' }} tabular-nums">
+                                            {{ $pl['jenis'] === 'berkurang' ? '-' : '+' }}Rp {{ number_format($pl['subtotal'], 0, ',', '.') }}
+                                        </span>
                                     </div>
                                 @endforeach
                             </div>
+                            @if($perluApprovalUlang)
+                                <p class="text-[10px] text-ink-300 mt-2">Tiket tidak dapat diselesaikan/ditagih sebelum pelanggan menyetujui.</p>
+                            @endif
+                        </div>
+                    @endif
+
+                    @if($selectedTiket->stok_estimasi_catatan)
+                        <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/30">
+                            <p class="text-[10px] text-up-red uppercase font-semibold mb-1">Penyesuaian stok perlu ditindaklanjuti</p>
+                            <p class="text-xs text-ink-100">{{ $selectedTiket->stok_estimasi_catatan }}</p>
                         </div>
                     @endif
 

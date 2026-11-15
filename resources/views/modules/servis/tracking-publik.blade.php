@@ -255,6 +255,84 @@
                     </div>
                 </div>
 
+                {{-- Card Persetujuan Perubahan Lingkup (tambah/ubah/kurang part & jasa) --}}
+                @php
+                    $perluApprovalUlang = !empty($tiket['perlu_persetujuan_ulang']);
+                    $perubahanLingkup = $tiket['perubahan_lingkup'] ?? ['tambah' => [], 'ubah' => [], 'berkurang' => []];
+                    $adaPerubahan = !empty($perubahanLingkup['tambah']) || !empty($perubahanLingkup['ubah']) || !empty($perubahanLingkup['berkurang']);
+                @endphp
+
+                @if($perluApprovalUlang)
+                    <div class="rounded-2xl border border-up-amber/40 bg-up-amber/5 dark:bg-up-amber/10 p-5 md:p-6 space-y-4">
+                        <div class="space-y-1">
+                            <span class="text-xs font-bold text-up-amber uppercase tracking-wider bg-up-amber/15 px-2.5 py-1 rounded-full">
+                                Memerlukan Persetujuan Anda
+                            </span>
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Perubahan Lingkup Servis</h3>
+                            <p class="text-xs text-slate-600 dark:text-ink-300">
+                                Terjadi perubahan di luar estimasi yang Anda setujui (part / jasa). Tinjau sebelum perbaikan diselesaikan & ditagih.
+                            </p>
+                        </div>
+
+                        <div class="overflow-x-auto rounded-xl border border-up-amber/20 bg-white dark:bg-ink-900 shadow-sm">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-up-amber/5 dark:bg-ink-850 text-ink-600 dark:text-ink-400 uppercase font-bold text-[10px] tracking-wider border-b border-up-amber/10">
+                                    <tr>
+                                        <th class="p-3">Jenis</th>
+                                        <th class="p-3">Item</th>
+                                        <th class="p-3 text-center">Qty</th>
+                                        <th class="p-3 text-right">Harga</th>
+                                        <th class="p-3 text-right">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-up-amber/10 text-ink-700 dark:text-ink-300">
+                                    @foreach(($perubahanLingkup['tambah'] ?? []) as $c)
+                                        <tr>
+                                            <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/15 text-up-mint">TAMBAH</span></td>
+                                            <td class="p-3 font-medium text-ink-900 dark:text-white">{{ $c['nama'] }}</td>
+                                            <td class="p-3 text-center tabular-nums">{{ $c['qty'] }}</td>
+                                            <td class="p-3 text-right tabular-nums">Rp {{ number_format((float) $c['harga'], 0, ',', '.') }}</td>
+                                            <td class="p-3 text-right font-bold tabular-nums text-ink-900 dark:text-white">Rp {{ number_format((float) $c['subtotal'], 0, ',', '.') }}</td>
+                                        </tr>
+                                    @endforeach
+                                    @foreach(($perubahanLingkup['ubah'] ?? []) as $c)
+                                        <tr>
+                                            <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/15 text-up-amber">UBAH</span></td>
+                                            <td class="p-3 font-medium text-ink-900 dark:text-white">{{ $c['nama'] }}</td>
+                                            <td class="p-3 text-right tabular-nums" colspan="2">
+                                                Estimasi Rp {{ number_format((float) $c['estimasi'], 0, ',', '.') }} → Aktual Rp {{ number_format((float) $c['aktual'], 0, ',', '.') }}
+                                            </td>
+                                            <td class="p-3 text-right font-bold tabular-nums text-ink-900 dark:text-white">Rp {{ number_format((float) $c['aktual'], 0, ',', '.') }}</td>
+                                        </tr>
+                                    @endforeach
+                                    @foreach(($perubahanLingkup['berkurang'] ?? []) as $c)
+                                        <tr>
+                                            <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">BERKURANG</span></td>
+                                            <td class="p-3 font-medium text-ink-900 dark:text-white">{{ $c['nama'] }}</td>
+                                            <td class="p-3 text-right tabular-nums" colspan="3">
+                                                Estimasi Rp {{ number_format((float) $c['estimasi'], 0, ',', '.') }} → tidak dikerjakan
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <form action="{{ route('servis.tracking.revisi.approve', $tiket['token_approval']) }}" method="POST" class="pt-1">
+                            @csrf
+                            <input type="hidden" name="alasan" value="Disetujui perubahan lingkup oleh pelanggan via web tracking">
+                            <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-up-mint hover:bg-teal-600 text-ink-950 font-bold text-sm shadow-sm shadow-up-mint/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] cursor-pointer">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                Setujui Perubahan Lingkup
+                            </button>
+                        </form>
+                    </div>
+                @elseif($adaPerubahan)
+                    <div class="rounded-2xl border border-up-mint/30 bg-up-mint/5 dark:bg-up-mint/10 p-4 text-xs text-slate-700 dark:text-ink-300">
+                        Perubahan lingkup servis telah disetujui{{ !empty($tiket['revisi_lingkup_disetujui_at']) ? ' pada '.$tiket['revisi_lingkup_disetujui_at'] : '' }}.
+                    </div>
+                @endif
+
                 <!-- Card Approval Estimasi (Jika menunggu_approval) -->
                 @if($tiket['status'] === 'menunggu_approval')
                     <div class="rounded-2xl border border-up-primary/30 bg-up-primary/5 dark:bg-up-primary/10 p-5 md:p-6 space-y-4">

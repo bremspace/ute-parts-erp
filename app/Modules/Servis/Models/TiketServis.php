@@ -27,7 +27,10 @@ use Spatie\Activitylog\Support\LogOptions;
     'tanggal_diambil', 'catatan_admin',
     'status_pembayaran', 'tanggal_bayar', 'metode_pembayaran', 'no_jurnal_bayar',
     'offline_pickup_uuid', 'is_offline_pickup', 'pickup_synced_at',
-])]
+    'revisi_lingkup_hash', 'revisi_lingkup_diajukan_hash', 'revisi_lingkup_disetujui_at',
+    'revisi_lingkup_diajukan_at', 'revisi_lingkup_snapshot',
+    'stok_estimasi_diproses', 'stok_estimasi_catatan',
+]) ]
 class TiketServis extends Model
 {
     use CatatAktivitas;
@@ -47,6 +50,7 @@ class TiketServis extends Model
         'batas_waktu_menit' => 'integer',
         'durasi_garansi_custom' => 'integer',
         'auto_cancel_overdue' => 'boolean',
+        'stok_estimasi_diproses' => 'boolean',
         'durasi_pengerjaan_menit' => 'integer',
         'pengerjaan_mulai_at' => 'datetime',
         'pengerjaan_deadline_at' => 'datetime',
@@ -290,37 +294,194 @@ class TiketServis extends Model
     }
 
     /**
-     * Item pekerjaan yang berada DI LUAR estimasi yang disetujui pelanggan
-     * (mis. tambahan part lem saat pengerjaan). Dipakai untuk penanda
-     * perubahan lingkup + audit (kontrol perubahan).
+     * Diff lingkup: item pekerjaan teknisi vs estimasi yang disetujui pelanggan.
+     * Mencakup penambahan, perubahan (qty/harga — termasuk harga jasa manual),
+     * dan pengurangan jasa. Bagian yang berkurang untuk part ditangani jalur
+     * re-estimasi (`setEstimasi` → menunggu_approval).
      *
-     * @return array<int, array{nama: string, subtotal: float}>
+     * @return array{tambah: array, ubah: array, berkurang: array}
      */
     public function getPerubahanLingkup(): array
     {
         $estimasi = $this->estimasiItems()->get();
-        $estimasiPunyaJasa = $estimasi->contains(fn ($e) => $e->tipe === 'jasa');
-        $kunciEstimasiPart = $estimasi->where('tipe', 'part')
-            ->map(fn ($e) => $this->kunciItemPart((int) $e->produk_id, $e->sku_variant_id))
-            ->flip();
 
-        $diluar = [];
-        foreach ($this->items()->whereNull('dibatalkan_at')->get() as $p) {
-            if ($p->tipe === 'jasa') {
-                if ($estimasiPunyaJasa) {
-                    continue;
-                }
-            } elseif ($p->produk_id && $kunciEstimasiPart->has($this->kunciItemPart((int) $p->produk_id, $p->sku_variant_id))) {
-                continue;
+        // Tanpa estimasi item (tiket legacy) tidak ada baseline → tidak ada
+        // perubahan lingkup yang bisa dibandingkan.
+        if ($estimasi->isEmpty()) {
+            return ['tambah' => [], 'ubah' => [], 'berkurang' => []];
+        }
+
+        $penagihan = collect($this->getItemsPenagihan());
+
+        $estimasiJasa = $estimasi->where('tipe', 'jasa');
+        $penagihanJasa = $penagihan->where('tipe', 'jasa');
+        $estimasiPart = $estimasi->where('tipe', 'part');
+        $penagihanPart = $penagihan->where('tipe', 'part');
+
+        $tambah = [];
+        $ubah = [];
+        $berkurang = [];
+
+        // --- Jasa: bandingkan total nilai penagihan aktual vs estimasi ---
+        $totalEstimasiJasa = (float) $estimasiJasa->sum(fn ($e) => (float) $e->harga * (int) $e->qty);
+        $totalPenagihanJasa = (float) $penagihanJasa->sum(fn ($p) => (float) $p['subtotal']);
+
+        if ($estimasiJasa->isEmpty()) {
+            foreach ($penagihanJasa as $p) {
+                $tambah[] = $this->deskripsiPerubahan('jasa', $p['nama'], (int) $p['qty'], (float) $p['harga']);
             }
-
-            $diluar[] = [
-                'nama' => $p->nama_item,
-                'subtotal' => round((float) $p->harga * (int) $p->qty, 2),
+        } elseif ($totalPenagihanJasa <= 0.01) {
+            // Estimasi punya jasa tapi penagihan jasa nol → berkurang
+            if ($totalEstimasiJasa > 0.01) {
+                $berkurang[] = [
+                    'tipe' => 'jasa',
+                    'nama' => 'Jasa servis',
+                    'estimasi' => round($totalEstimasiJasa, 2),
+                    'aktual' => 0.0,
+                ];
+            }
+        } elseif (abs($totalPenagihanJasa - $totalEstimasiJasa) > 0.01) {
+            $ubah[] = [
+                'tipe' => 'jasa',
+                'nama' => 'Jasa servis',
+                'estimasi' => round($totalEstimasiJasa, 2),
+                'aktual' => round($totalPenagihanJasa, 2),
             ];
         }
 
-        return $diluar;
+        // --- Part: per kunci produk/varian ---
+        $estimasiPartKunci = $estimasiPart->mapWithKeys(
+            fn ($e) => [$this->kunciItemPart((int) $e->produk_id, $e->sku_variant_id) => $e]
+        );
+
+        foreach ($penagihanPart as $p) {
+            // Item yang berasal dari estimasi itu sendiri tidak mungkin
+            // "di luar estimasi" — yang dibandingkan adalah catatan teknisi.
+            if (($p['sumber'] ?? '') === 'estimasi') {
+                continue;
+            }
+
+            $kunci = $p['produk_id'] ? $this->kunciItemPart((int) $p['produk_id'], $p['sku_variant_id']) : null;
+            $padanan = $kunci ? ($estimasiPartKunci[$kunci] ?? null) : null;
+
+            if (! $padanan) {
+                $tambah[] = $this->deskripsiPerubahan('part', $p['nama'], (int) $p['qty'], (float) $p['harga']);
+
+                continue;
+            }
+
+            if (abs((float) $p['harga'] - (float) $padanan->harga) > 0.01 || (int) $p['qty'] !== (int) $padanan->qty) {
+                $ubah[] = [
+                    'tipe' => 'part',
+                    'nama' => $p['nama'],
+                    'estimasi' => round((float) $padanan->harga * (int) $padanan->qty, 2),
+                    'aktual' => round((float) $p['subtotal'], 2),
+                ];
+            }
+        }
+
+        return ['tambah' => $tambah, 'ubah' => $ubah, 'berkurang' => $berkurang];
+    }
+
+    /**
+     * Daftar datar item di luar estimasi (untuk UI & rincian).
+     *
+     * @return array<int, array{nama: string, subtotal: float, jenis: string}>
+     */
+    public function getItemDiluarEstimasi(): array
+    {
+        $detail = $this->getPerubahanLingkup();
+        $hasil = [];
+
+        foreach ($detail['tambah'] as $item) {
+            $hasil[] = [
+                'nama' => $item['nama'],
+                'subtotal' => (float) $item['subtotal'],
+                'jenis' => 'tambah',
+            ];
+        }
+
+        foreach ($detail['ubah'] as $item) {
+            $hasil[] = [
+                'nama' => $item['nama'],
+                'subtotal' => (float) $item['aktual'],
+                'jenis' => 'ubah',
+            ];
+        }
+
+        foreach ($detail['berkurang'] as $item) {
+            $hasil[] = [
+                'nama' => $item['nama'],
+                'subtotal' => 0.0,
+                'jenis' => 'berkurang',
+            ];
+        }
+
+        return $hasil;
+    }
+
+    public function punyaPerubahanLingkup(): bool
+    {
+        return $this->getItemDiluarEstimasi() !== [];
+    }
+
+    /**
+     * Hash isi perubahan — mengikat persetujuan pada isi yang spesifik.
+     */
+    public function hashPerubahanLingkup(): ?string
+    {
+        if (! $this->punyaPerubahanLingkup()) {
+            return null;
+        }
+
+        return hash('sha256', (string) json_encode($this->getPerubahanLingkup()));
+    }
+
+    /**
+     * Perlu persetujuan ulang pelanggan? (perubahan ada & belum ada
+     * persetujuan yang cocok dengan isi perubahan saat ini).
+     */
+    public function perluPersetujuanUlang(): bool
+    {
+        $hash = $this->hashPerubahanLingkup();
+
+        return $hash !== null && $hash !== $this->revisi_lingkup_hash;
+    }
+
+    /**
+     * Item part estimasi yang dipakai & belum dipotong stoknya.
+     *
+     * @return array<int, array{nama: string, produk_id: int, sku_variant_id: ?int, qty: int}>
+     */
+    public function getItemEstimasiPerluStok(): array
+    {
+        if ($this->stok_estimasi_diproses) {
+            return [];
+        }
+
+        return collect($this->getItemsPenagihan())
+            ->where('tipe', 'part')
+            ->where('sumber', 'estimasi')
+            ->filter(fn ($i) => ! empty($i['produk_id']))
+            ->map(fn ($i) => [
+                'nama' => $i['nama'],
+                'produk_id' => (int) $i['produk_id'],
+                'sku_variant_id' => $i['sku_variant_id'],
+                'qty' => (int) $i['qty'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    protected function deskripsiPerubahan(string $tipe, string $nama, int $qty, float $harga): array
+    {
+        return [
+            'tipe' => $tipe,
+            'nama' => $nama,
+            'qty' => $qty,
+            'harga' => $harga,
+            'subtotal' => round($harga * $qty, 2),
+        ];
     }
 
     protected function susunItemPenagihan(string $tipe, string $nama, int $qty, float $harga, float $hpp, string $sumber, ?int $produkId, ?int $skuVariantId): array
@@ -379,15 +540,15 @@ class TiketServis extends Model
             ];
         }
 
-        $perubahanLingkup = $this->getPerubahanLingkup();
+        $itemDiluarEstimasi = $this->getItemDiluarEstimasi();
 
         return [
             'items' => $rincian,
             'total_jasa' => $totalJasa,
             'total_part' => $totalPart,
             'total' => $totalJasa + $totalPart,
-            'perubahan_lingkup' => $perubahanLingkup !== [],
-            'item_diluar_estimasi' => $perubahanLingkup,
+            'perubahan_lingkup' => $itemDiluarEstimasi !== [],
+            'item_diluar_estimasi' => $itemDiluarEstimasi,
         ];
     }
 

@@ -3,6 +3,15 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-15 — Servis: Kontrol Perubahan Lingkup (Persetujuan Ulang) + Stok Part Estimasi
+
+- **Kontrol perubahan (ISO 9001 §8.3/§8.5)**: setiap tambah/ubah/kurang (part & jasa, termasuk harga jasa manual) di luar estimasi yang disetujui kini wajib **persetujuan ulang pelanggan**. `TiketServis::getPerubahanLingkup()` menghitung diff dari item penagihan aktual vs estimasi (tambah/ubah/berkurang); `hashPerubahanLingkup()` mengikat persetujuan pada isi; `perluPersetujuanUlang()` fail-closed.
+- **Guard**: transisi ke `selesai` dan `bayar()` ditolak bila ada perubahan belum disetujui; override hanya pemegang `servis.override-status` dengan alasan tercatat di log status. Persetujuan pelanggan via link tracking publik (`POST /tracking/{token}/revisi/approve`) + notifikasi WA.
+- **UI**: kartu "Perubahan Lingkup" di halaman tracking (tabel tambah/ubah/berkurang + tombol setuju), panel status di papan servis (menunggu/sudah disetujui + link persetujuan), penanda perubahan di rincian POS.
+- **Stok estimasi**: part estimasi yang dipakai kini memotong stok gudang default cabang saat `selesai` (sekali, idempoten). Gagal stok **tidak** memblokir — dicatat di `stok_estimasi_catatan`, tampil di papan servis, dan diaudit (`stok_estimasi_gagal`).
+- **Migration**: `2026_11_15_120000_add_kontrol_perubahan_lingkup_to_tiket_servis` (`revisi_lingkup_*`, `stok_estimasi_*`).
+- **Testing**: `tests/Feature/ServisEstimasiTambahanPartTest.php` 12/12 (guard selesai, ubah harga jasa, berkurang jasa, pemotongan stok, gagal stok teraudit); suite servis 234/236 (2 gagal pre-existing).
+
 ## 2026-11-15 — HR: Bagi Hasil Jasa Teknisi Non-Gaji (Skema + UI + Akunting)
 
 - **Skema bagi hasil** — `karyawan.metode_penghasilan` (gaji|bagi_hasil), `bagi_hasil_rules` (prioritas per teknisi &gt; cabang &gt; global, persen + ambang min jasa), `bagi_hasil` (1 tiket = 1 baris, idempoten), `bagi_hasil_periode` (draft → selesai → dibayar). Migration `2026_11_15_100000_create_bagi_hasil_tables`.

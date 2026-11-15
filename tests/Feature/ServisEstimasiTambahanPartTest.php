@@ -77,6 +77,12 @@ class ServisEstimasiTambahanPartTest extends TestCase
             'dibatalkan_at' => null,
         ]);
 
+        // Pelanggan menyetujui perubahan lingkup (lem) via link tracking
+        app(ServisService::class)->setujuiPerubahanLingkup(
+            $tiket->fresh(),
+            'Disetujui pelanggan via web tracking'
+        );
+
         // Selesai
         $service = app(ServisService::class);
         $service->updateStatus($tiket->fresh(), 'dikerjakan', $this->admin);
@@ -215,5 +221,208 @@ class ServisEstimasiTambahanPartTest extends TestCase
 
         $jurnalBayar = JurnalAkuntansi::where('no_jurnal', $tiket->fresh()->no_jurnal_bayar)->get();
         $this->assertEquals($rincianTotal, (float) $jurnalBayar->sum('debit'));
+    }
+
+    private function buatTiketDasar(string $noTiket): TiketServis
+    {
+        return TiketServis::create([
+            'no_tiket' => $noTiket,
+            'cabang_id' => 1,
+            'jenis_hp' => 'iPhone 14',
+            'tipe_kunci' => 'tidak_ada',
+            'keluhan' => 'Layar retak',
+            'kondisi_fisik' => [],
+            'foto_unit' => [],
+            'status' => 'diagnosa',
+            'sumber' => 'walk_in',
+        ]);
+    }
+
+    /** @test */
+    public function test_selesai_ditolak_saat_perubahan_lingkup_belum_disetujui(): void
+    {
+        $tiket = $this->buatTiketDasar('SRV-GUARD-'.rand(10000, 99999));
+
+        app(ServisService::class)->setEstimasi($tiket, 400000, 'Estimasi', $this->admin, [
+            ['tipe' => 'jasa', 'nama_item' => 'Jasa ganti layar', 'qty' => 1, 'harga' => 100000],
+            ['tipe' => 'part', 'nama_item' => 'LCD', 'qty' => 1, 'harga' => 300000],
+        ]);
+        app(ServisService::class)->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
+
+        TiketServisItem::create([
+            'tiket_servis_id' => $tiket->id,
+            'tipe' => 'part',
+            'nama_item' => 'Lem layar',
+            'qty' => 1,
+            'harga' => 20000,
+            'dibatalkan_at' => null,
+        ]);
+
+        $tiket = $tiket->fresh();
+        $this->assertTrue($tiket->perluPersetujuanUlang());
+        $this->assertTrue($tiket->getRincianBiayaLengkap()['perubahan_lingkup']);
+
+        $service = app(ServisService::class);
+        $service->updateStatus($tiket, 'dikerjakan', $this->admin);
+        $service->updateStatus($tiket->fresh(), 'qc', $this->admin);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('perubahan lingkup');
+
+        $service->updateStatus($tiket->fresh(), 'selesai', $this->admin);
+    }
+
+    /** @test */
+    public function test_perubahan_harga_jasa_terdeteksi_dan_blokir_hingga_disetujui(): void
+    {
+        $tiket = $this->buatTiketDasar('SRV-JASA-'.rand(10000, 99999));
+
+        app(ServisService::class)->setEstimasi($tiket, 100000, 'Estimasi jasa', $this->admin, [
+            ['tipe' => 'jasa', 'nama_item' => 'Jasa ganti layar', 'qty' => 1, 'harga' => 100000],
+        ]);
+        app(ServisService::class)->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
+
+        // Teknisi menaikkan harga jasa manual jadi 150.000
+        TiketServisItem::create([
+            'tiket_servis_id' => $tiket->id,
+            'tipe' => 'jasa',
+            'nama_item' => 'Jasa ganti layar',
+            'qty' => 1,
+            'harga' => 150000,
+            'dibatalkan_at' => null,
+        ]);
+
+        $tiket = $tiket->fresh();
+        $this->assertTrue($tiket->perluPersetujuanUlang());
+
+        $ubah = $tiket->getPerubahanLingkup()['ubah'];
+        $this->assertCount(1, $ubah);
+        $this->assertSame('jasa', $ubah[0]['tipe']);
+        $this->assertEquals(100000, $ubah[0]['estimasi']);
+        $this->assertEquals(150000, $ubah[0]['aktual']);
+
+        $service = app(ServisService::class);
+        $service->updateStatus($tiket, 'dikerjakan', $this->admin);
+        $service->updateStatus($tiket->fresh(), 'qc', $this->admin);
+
+        try {
+            $service->updateStatus($tiket->fresh(), 'selesai', $this->admin);
+            $this->fail('Selesai harus ditolak sebelum perubahan lingkup disetujui');
+        } catch (\Exception $e) {
+            $this->assertStringContainsString('perubahan lingkup', $e->getMessage());
+        }
+
+        // Pelanggan setuju → selesai bisa dilanjutkan
+        app(ServisService::class)->setujuiPerubahanLingkup($tiket->fresh(), 'Disetujui pelanggan');
+
+        $service->updateStatus($tiket->fresh(), 'selesai', $this->admin);
+        $this->assertSame('selesai', $tiket->fresh()->status);
+        $this->assertFalse($tiket->fresh()->perluPersetujuanUlang());
+    }
+
+    /** @test */
+    public function test_batalkan_jasa_menimbulkan_perubahan_berkurang(): void
+    {
+        $tiket = $this->buatTiketDasar('SRV-KURANG-'.rand(10000, 99999));
+
+        app(ServisService::class)->setEstimasi($tiket, 100000, 'Estimasi jasa', $this->admin, [
+            ['tipe' => 'jasa', 'nama_item' => 'Jasa ganti layar', 'qty' => 1, 'harga' => 100000],
+        ]);
+        app(ServisService::class)->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
+
+        // Catatan jasa sesuai estimasi → belum ada perubahan
+        $item = TiketServisItem::create([
+            'tiket_servis_id' => $tiket->id,
+            'tipe' => 'jasa',
+            'nama_item' => 'Jasa ganti layar',
+            'qty' => 1,
+            'harga' => 100000,
+            'dibatalkan_at' => null,
+        ]);
+        $this->assertFalse($tiket->fresh()->perluPersetujuanUlang());
+
+        // Teknisi membatalkan jasa → lingkup berkurang dari estimasi
+        app(ServisService::class)->batalkanItemPekerjaan($tiket->fresh(), $item, $this->admin, 'Koreksi: jasa tidak dikerjakan');
+
+        $tiket = $tiket->fresh();
+        $this->assertTrue($tiket->perluPersetujuanUlang());
+        $this->assertNotEmpty($tiket->getPerubahanLingkup()['berkurang']);
+    }
+
+    /** @test */
+    public function test_part_estimasi_memotong_stok_saat_selesai(): void
+    {
+        $gudang = \App\Modules\Wms\Models\Gudang::getDefault(1);
+
+        $lcd = Produk::create([
+            'nama' => 'LCD iPhone 14',
+            'slug' => 'lcd-stok-'.uniqid(),
+            'satuan' => 'pcs',
+            'harga_beli' => 100000,
+            'harga_jual_retail' => 300000,
+            'is_active' => true,
+        ]);
+
+        app(\App\Modules\Wms\Services\ProdukService::class)->tambahStokPembelian(
+            $lcd->id,
+            null,
+            $gudang->id,
+            5,
+            100000,
+            'Stok awal pengujian',
+            $this->admin->id,
+            postJurnal: false
+        );
+
+        $tiket = $this->buatTiketDasar('SRV-STOK-'.rand(10000, 99999));
+        app(ServisService::class)->setEstimasi($tiket, 300000, 'Estimasi part', $this->admin, [
+            ['tipe' => 'part', 'produk_id' => $lcd->id, 'nama_item' => 'LCD iPhone 14', 'qty' => 1, 'harga' => 300000],
+        ]);
+        app(ServisService::class)->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
+
+        $service = app(ServisService::class);
+        $service->updateStatus($tiket->fresh(), 'dikerjakan', $this->admin);
+        $service->updateStatus($tiket->fresh(), 'qc', $this->admin);
+        $service->updateStatus($tiket->fresh(), 'selesai', $this->admin);
+
+        $tiket = $tiket->fresh();
+        $this->assertTrue($tiket->stok_estimasi_diproses);
+
+        $stok = \App\Modules\Wms\Models\StokItem::where('produk_id', $lcd->id)
+            ->where('gudang_id', $gudang->id)
+            ->first();
+
+        $this->assertNotNull($stok);
+        $this->assertEquals(4, (int) $stok->jumlah);
+    }
+
+    /** @test */
+    public function test_gagal_stok_estimasi_tidak_memblokir_selesai_dan_diaudit(): void
+    {
+        $lcd = Produk::create([
+            'nama' => 'LCD Stok Nol',
+            'slug' => 'lcd-stok-nol-'.uniqid(),
+            'satuan' => 'pcs',
+            'harga_beli' => 100000,
+            'harga_jual_retail' => 300000,
+            'is_active' => true,
+        ]);
+
+        $tiket = $this->buatTiketDasar('SRV-STOK-0-'.rand(10000, 99999));
+        app(ServisService::class)->setEstimasi($tiket, 300000, 'Estimasi part', $this->admin, [
+            ['tipe' => 'part', 'produk_id' => $lcd->id, 'nama_item' => 'LCD Stok Nol', 'qty' => 1, 'harga' => 300000],
+        ]);
+        app(ServisService::class)->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
+
+        $service = app(ServisService::class);
+        $service->updateStatus($tiket->fresh(), 'dikerjakan', $this->admin);
+        $service->updateStatus($tiket->fresh(), 'qc', $this->admin);
+        $service->updateStatus($tiket->fresh(), 'selesai', $this->admin);
+
+        $tiket = $tiket->fresh();
+        $this->assertSame('selesai', $tiket->status);
+        $this->assertTrue($tiket->stok_estimasi_diproses);
+        $this->assertNotNull($tiket->stok_estimasi_catatan);
+        $this->assertStringContainsString('Stok', $tiket->stok_estimasi_catatan);
     }
 }
