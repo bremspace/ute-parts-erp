@@ -621,6 +621,29 @@
                     </div>
                 @endif
 
+                <!-- Komplain Pasca-Servis -->
+                @if(!empty($tiket['komplain']))
+                    <div class="p-4 rounded-2xl {{ ($tiket['komplain']['garansi_berlaku'] ?? false) ? 'bg-up-amber/10 border border-up-amber/30 dark:bg-up-amber/15' : 'bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10' }}">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 {{ ($tiket['komplain']['garansi_berlaku'] ?? false) ? 'text-up-amber' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <p class="text-sm font-bold {{ ($tiket['komplain']['garansi_berlaku'] ?? false) ? 'text-up-amber' : 'text-slate-700 dark:text-ink-200' }}">
+                                Komplain Pasca-Servis
+                            </p>
+                        </div>
+                        <div class="mt-2 space-y-1 text-xs text-slate-600 dark:text-ink-300">
+                            @if(!empty($tiket['komplain']['tiket_asal']))
+                                <p>Tiket servis asal: <span class="font-semibold">{{ $tiket['komplain']['tiket_asal'] }}</span></p>
+                            @endif
+                            <p>Status: {{ ($tiket['komplain']['garansi_berlaku'] ?? false) ? 'Dalam masa garansi' : 'Di luar garansi (estimasi berlaku)' }}</p>
+                            @if($tiket['komplain']['perbaikan_gratis'] ?? false)
+                                <p>Perbaikan gratis: {{ ($tiket['komplain']['gratis_disetujui'] ?? false) ? 'disetujui regulator' : 'menunggu persetujuan regulator' }}</p>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
                 <!-- Timeline Riwayat Status -->
                 @if(!empty($tiket['timeline']))
                     <div class="space-y-3 pt-2">

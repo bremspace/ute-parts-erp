@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Servis\Models\Garansi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
@@ -27,6 +29,7 @@ class ServisKomplainTest extends TestCase
         parent::setUp();
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->seed(CabangSeeder::class);
+        $this->seed(\Database\Seeders\AkunCoaSeeder::class);
 
         $this->admin = User::create([
             'name' => 'Admin Komplain',
@@ -214,5 +217,68 @@ class ServisKomplainTest extends TestCase
         $this->expectExceptionMessage('berbeda orang');
 
         app(ServisService::class)->setujuiGratisGaransi($komplain->fresh(), $this->admin);
+    }
+
+    /** @test */
+    public function test_goodwill_hanya_berlaku_setelah_disetujui(): void
+    {
+        $tiket = TiketServis::create([
+            'no_tiket' => 'SRV-KOM-7',
+            'cabang_id' => 1,
+            'jenis_hp' => 'iPhone 12',
+            'keluhan' => 'LCD bergaris',
+            'status' => 'diagnosa',
+            'sumber' => 'walk_in',
+            'telepon_pelanggan' => '0812',
+        ]);
+
+        $service = app(ServisService::class);
+        $service->setEstimasi($tiket, 200000, 'Estimasi jasa', $this->admin, [
+            ['tipe' => 'jasa', 'nama_item' => 'Jasa perbaikan', 'qty' => 1, 'harga' => 200000],
+        ]);
+        $service->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
+
+        $service->usulkanGoodwill($tiket->fresh(), 50000, 'Penyebab ambigu', $this->admin);
+        $this->assertSame(0.0, $service->getGoodwillBerlaku($tiket->fresh()), 'Goodwill belum disetujui');
+
+        $regulator = User::create([
+            'name' => 'Regulator Goodwill',
+            'email' => 'regulator-goodwill@uteparts.test',
+            'password' => bcrypt('password'),
+            'is_active' => true,
+        ]);
+        $regulator->assignRole('super-admin');
+
+        $service->setujuiGoodwill($tiket->fresh(), $regulator);
+        $this->assertSame(50000.0, $service->getGoodwillBerlaku($tiket->fresh()));
+        $this->assertSame(150000.0, $service->getTotalTagihanBersih($tiket->fresh()));
+
+        $service->updateStatus($tiket->fresh(), 'dikerjakan', $this->admin, 'Tindak lanjut');
+        $service->updateStatus($tiket->fresh(), 'qc', $this->admin, 'QC');
+        $service->updateStatus($tiket->fresh(), 'selesai', $this->admin, 'Selesai');
+
+        $jurnal = JurnalAkuntansi::with('akun')
+            ->where('referensi_tipe', TiketServis::class)
+            ->where('referensi_id', $tiket->id)
+            ->get();
+
+        $this->assertEquals(150000.0, (float) $jurnal->sum('debit'), 'Piutang = total bersih');
+
+        $idAkunJasa = \App\Modules\Akunting\Models\AkunCOA::where('kode', '420-01')->value('id');
+        $this->assertEquals(
+            150000.0,
+            (float) $jurnal->where('akun_coa_id', $idAkunJasa)->sum('kredit'),
+            'Pendapatan jasa net setelah goodwill'
+        );
+    }
+
+    /** @test */
+    public function test_dashboard_komplain_render(): void
+    {
+        $this->actingAs($this->admin, 'web');
+
+        $response = $this->get('/app/servis/komplain');
+        $response->assertOk();
+        $response->assertSee('Dashboard Komplain');
     }
 }

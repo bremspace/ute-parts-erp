@@ -193,6 +193,12 @@
                             @if(!empty($receiptData['garansi']))
                                 <div style="font-weight: 700; color: #111827;">Garansi: {{ $receiptData['garansi'] }}</div>
                             @endif
+                            @if(!empty($receiptData['komplain']))
+                                <div style="font-weight: 700; color: #b45309;">Komplain: {{ $receiptData['komplain'] }}</div>
+                            @endif
+                            @if(!empty($receiptData['goodwill']))
+                                <div style="font-weight: 700; color: #b45309;">{{ $receiptData['goodwill'] }}</div>
+                            @endif
                             <div>{{ $receiptData['footer_text'] ?? $strukConfig['footer_text'] ?? 'Terima kasih atas kunjungan Anda!' }}</div>
                             <div style="font-size: 8px; color: #4b5563;">{{ $receiptData['kebijakan_retur'] ?? $strukConfig['kebijakan_retur'] ?? 'Segel toko wajib utuh & fisik barang tidak cacat.' }}</div>
                         </div>

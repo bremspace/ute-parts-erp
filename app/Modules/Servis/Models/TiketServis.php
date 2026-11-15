@@ -33,6 +33,8 @@ use Spatie\Activitylog\Support\LogOptions;
     'tiket_servis_lama_id', 'garansi_berlaku', 'komplain_catatan',
     'komplain_gratis', 'komplain_gratis_proposed_by', 'komplain_gratis_proposed_at',
     'komplain_gratis_approved_by', 'komplain_gratis_approved_at',
+    'goodwill_amount', 'goodwill_alasan', 'goodwill_proposed_by', 'goodwill_proposed_at',
+    'goodwill_approved_by', 'goodwill_approved_at',
 ]) ]
 class TiketServis extends Model
 {
@@ -61,6 +63,9 @@ class TiketServis extends Model
         'komplain_gratis' => 'boolean',
         'komplain_gratis_proposed_at' => 'datetime',
         'komplain_gratis_approved_at' => 'datetime',
+        'goodwill_amount' => 'decimal:2',
+        'goodwill_proposed_at' => 'datetime',
+        'goodwill_approved_at' => 'datetime',
         'durasi_pengerjaan_menit' => 'integer',
         'pengerjaan_mulai_at' => 'datetime',
         'pengerjaan_deadline_at' => 'datetime',

@@ -182,6 +182,15 @@ class ServisBoard extends Component
 
     public string $komplainCatatan = '';
 
+    // [Goodwill] diskon kompensasi dengan approval regulator
+    public bool $showGoodwillModal = false;
+
+    public ?int $goodwillTiketId = null;
+
+    public float $goodwillAmount = 0;
+
+    public string $goodwillAlasan = '';
+
     public string $batalReturMetode = 'tunai';
 
     // [Intake Booking Online] Modal Pemeriksaan & Penerimaan Fisik
@@ -1770,6 +1779,46 @@ class ServisBoard extends Component
         }
     }
 
+    // [Goodwill] usulan + persetujuan regulator (four-eyes)
+    public function openGoodwillModal(int $tiketId): void
+    {
+        $tiket = $this->tiketScoped($tiketId);
+        $this->goodwillTiketId = $tiketId;
+        $this->goodwillAmount = 0;
+        $this->goodwillAlasan = '';
+        $this->showGoodwillModal = true;
+    }
+
+    public function prosesGoodwill(): void
+    {
+        if (! $this->boleh('servis.create', 'Anda tidak punya izin mengajukan goodwill')) {
+            return;
+        }
+
+        try {
+            app(ServisService::class)->usulkanGoodwill(
+                $this->tiketScoped($this->goodwillTiketId),
+                (float) $this->goodwillAmount,
+                $this->goodwillAlasan,
+                auth()->user()
+            );
+            $this->showGoodwillModal = false;
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Goodwill diajukan. Menunggu persetujuan regulator.']);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function setujuiGoodwill(): void
+    {
+        try {
+            app(ServisService::class)->setujuiGoodwill($this->selectedTiket, auth()->user());
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Goodwill disetujui regulator.']);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
     public function revisiEstimasiDitolak(int $tiketId): void
     {
         if (! $this->boleh('servis.update-status', 'Anda tidak punya izin mengubah status tiket servis')) {
@@ -1860,14 +1909,14 @@ class ServisBoard extends Component
             'subtotal_jasa' => $rincian['total_jasa'],
             'subtotal_part' => $rincian['total_part'],
             'subtotal' => $rincian['total'],
-            'diskon' => 0,
+            'diskon' => app(\App\Modules\Servis\Services\ServisService::class)->getGoodwillBerlaku($tiket),
             'dpp' => $rincian['total'],
             'pajak' => 0,
             'ppn_persen' => 0,
-            'total' => $rincian['total'],
-            'bayar' => $isLunas ? $rincian['total'] : 0,
+            'total' => app(\App\Modules\Servis\Services\ServisService::class)->getTotalTagihanBersih($tiket),
+            'bayar' => $isLunas ? app(\App\Modules\Servis\Services\ServisService::class)->getTotalTagihanBersih($tiket) : 0,
             'kembali' => 0,
-            'sisa_tagihan' => $isLunas ? 0 : $rincian['total'],
+            'sisa_tagihan' => $isLunas ? 0 : app(\App\Modules\Servis\Services\ServisService::class)->getTotalTagihanBersih($tiket),
             'metode' => strtoupper($tiket->metode_pembayaran ?? 'TUNAI'),
             'status_pembayaran' => $tiket->status_pembayaran ?? 'belum_bayar',
             'is_lunas' => $isLunas,
@@ -1875,6 +1924,8 @@ class ServisBoard extends Component
             'tipe_struk' => $isLunas ? 'kwitansi' : 'spk',
             'label_struk' => $isLunas ? 'KWITANSI PELUNASAN SERVIS' : 'SPK / TANDA TERIMA ESTIMASI',
             'garansi' => $tiket->garansi ? ($tiket->garansi->durasi_hari.' Hari (s/d '.$tiket->garansi->tanggal_berakhir?->format('d/m/Y').')') : null,
+            'komplain' => $tiket->sumber === 'komplain' ? ('Komplain pasca-servis'.($tiket->tiketLama ? ' — asal '.$tiket->tiketLama->no_tiket : '').($tiket->garansi_berlaku ? ' (garansi)' : ' (di luar garansi)')) : null,
+            'goodwill' => $tiket->goodwill_approved_at ? ('Goodwill: Rp '.number_format((float) $tiket->goodwill_amount, 0, ',', '.')) : null,
             'cabang' => $cabang?->nama ?? session('cabang_nama') ?? null,
         ];
 

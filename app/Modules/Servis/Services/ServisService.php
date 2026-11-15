@@ -1419,15 +1419,22 @@ class ServisService
                 throw new \Exception('Tiket komplain garansi gratis sudah lunas otomatis (tanpa tagihan).');
             }
 
+            // [Goodwill] Pengajuan yang belum disetujui regulator memblokir
+            // penagihan (approval di muka, bukan diskon diam-diam).
+            if (($tiket->goodwill_amount ?? 0) > 0 && ! $tiket->goodwill_approved_at) {
+                throw new \Exception('Goodwill belum disetujui regulator — tiket tidak dapat ditagih.');
+            }
+
             // [BH/ISO] Perubahan lingkup yang belum disetujui pelanggan memblokir
             // penagihan — fail-closed (pertahanan kedua setelah guard 'selesai').
             if ($tiket->perluPersetujuanUlang()) {
                 throw new \Exception('Perubahan lingkup (part/jasa) belum disetujui pelanggan — tiket tidak dapat ditagih.');
             }
 
-            // [penagihan] SATU sumber: rincian item efektif (estimasi + pekerjaan).
+            // [penagihan] SATU sumber: rincian item efektif (estimasi + pekerjaan),
+            // dikurangi goodwill yang sudah disetujui regulator.
             $rincian = $tiket->getRincianBiayaLengkap();
-            $totalTagihan = (float) $rincian['total'];
+            $totalTagihan = $this->getTotalTagihanBersih($tiket);
 
             // [fail-closed] Bila pemanggil menyertakan uang yang benar-benar
             // diterima (POS/API), nominal itu WAJIB sama dengan rincian —
@@ -1692,7 +1699,53 @@ class ServisService
             "Komplain pasca-servis dari {$tiketLama->no_tiket}".($garansiBerlaku ? ' (garansi berlaku)' : ' (di luar garansi)')
         );
 
+        $this->kirimNotifikasiKomplain($tiket, $tiketLama, $garansiBerlaku);
+
         return $tiket;
+    }
+
+    /**
+     * WA: pelanggan (konfirmasi penerimaan komplain) + regulator cabang
+     * (ada komplain masuk). Best-effort — gagal gateway tidak menggagalkan
+     * pencatatan komplain.
+     */
+    private function kirimNotifikasiKomplain(TiketServis $tiket, TiketServis $tiketLama, bool $garansiBerlaku): void
+    {
+        $telepon = $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon;
+        if (filled($telepon) && $tiket->token_approval) {
+            $link = url("/tracking/{$tiket->token_approval}");
+            $status = $garansiBerlaku
+                ? 'Komplain Anda dalam masa garansi'
+                : 'Komplain di luar garansi — unit akan dicek & estimasi';
+
+            $this->notifService->kirim(
+                'wa',
+                $telepon,
+                'Komplain Pasca-Servis Diterima',
+                "Komplain untuk {$tiket->no_tiket} ({$tiket->jenis_hp}) telah kami terima. {$status}. Pantau tindak lanjut di: {$link}",
+                [
+                    'tiket_id' => $tiket->id,
+                    'token' => $tiket->token_approval,
+                    'pelanggan_id' => $tiket->pelanggan_id,
+                    'audience' => 'pelanggan',
+                ]
+            );
+        }
+
+        $teleponToko = $tiket->cabang?->telepon;
+        if (filled($teleponToko)) {
+            $this->notifService->kirim(
+                'wa',
+                $teleponToko,
+                'Komplain Pasca-Servis Masuk',
+                "Komplain masuk {$tiket->no_tiket} ({$tiket->jenis_hp}) dari tiket {$tiketLama->no_tiket}".($garansiBerlaku ? ' — GARANSI berlaku' : '').".",
+                [
+                    'tiket_id' => $tiket->id,
+                    'cabang_id' => $tiket->cabang_id,
+                    'audience' => 'staf',
+                ]
+            );
+        }
     }
 
     /**
@@ -1745,6 +1798,96 @@ class ServisService
         ]);
 
         $this->logStatus($tiket, $tiket->status, $tiket->status, $user, 'komplain_gratis_setuju', 'Perbaikan gratis garansi disetujui regulator');
+    }
+
+    /**
+     * Nominal goodwill yang berlaku (hanya bila sudah disetujui regulator).
+     */
+    public function getGoodwillBerlaku(TiketServis $tiket): float
+    {
+        if (! $tiket->goodwill_approved_at) {
+            return 0.0;
+        }
+
+        $total = (float) $tiket->getRincianBiayaLengkap()['total'];
+
+        return min($total, (float) ($tiket->goodwill_amount ?? 0));
+    }
+
+    /**
+     * Total tagihan setelah goodwill (perbaikan garansi gratis = 0).
+     */
+    public function getTotalTagihanBersih(TiketServis $tiket): float
+    {
+        if ($tiket->komplain_gratis) {
+            return 0.0;
+        }
+
+        return max(0.0, (float) $tiket->getRincianBiayaLengkap()['total'] - $this->getGoodwillBerlaku($tiket));
+    }
+
+    /**
+     * Usulkan goodwill (diskon kompensasi) — butuh persetujuan regulator.
+     */
+    public function usulkanGoodwill(TiketServis $tiket, float $amount, string $alasan, User $user): void
+    {
+        if ($tiket->komplain_gratis) {
+            throw new \Exception('Perbaikan garansi gratis tidak dapat diberi goodwill tambahan.');
+        }
+
+        if ($amount <= 0) {
+            throw new \Exception('Nominal goodwill harus lebih dari 0.');
+        }
+
+        if (trim($alasan) === '') {
+            throw new \Exception('Alasan goodwill wajib diisi.');
+        }
+
+        if ($tiket->goodwill_approved_at) {
+            throw new \Exception('Goodwill sudah disetujui regulator.');
+        }
+
+        if ($amount > (float) $tiket->getRincianBiayaLengkap()['total']) {
+            throw new \Exception('Goodwill melebihi total tagihan.');
+        }
+
+        $tiket->update([
+            'goodwill_amount' => $amount,
+            'goodwill_alasan' => $alasan,
+            'goodwill_proposed_by' => $user->id,
+            'goodwill_proposed_at' => now(),
+        ]);
+
+        $this->logStatus($tiket, $tiket->status, $tiket->status, $user, 'goodwill_aju', 'Pengajuan goodwill Rp '.number_format($amount, 0, ',', '.').': '.$alasan);
+    }
+
+    /**
+     * Regulator menyetujui goodwill (four-eyes: approver ≠ pengusul).
+     */
+    public function setujuiGoodwill(TiketServis $tiket, User $user): void
+    {
+        if (! $tiket->goodwill_proposed_at) {
+            throw new \Exception('Tidak ada pengajuan goodwill.');
+        }
+
+        if ($tiket->goodwill_approved_at) {
+            throw new \Exception('Goodwill sudah disetujui regulator.');
+        }
+
+        if (! $user->can('servis.override-status')) {
+            throw new \Exception('Hanya regulator (servis.override-status) yang dapat menyetujui goodwill.');
+        }
+
+        if ($tiket->goodwill_proposed_by && (int) $tiket->goodwill_proposed_by === (int) $user->id) {
+            throw new \Exception('Pengajuan dan persetujuan goodwill harus berbeda orang (four-eyes).');
+        }
+
+        $tiket->update([
+            'goodwill_approved_at' => now(),
+            'goodwill_approved_by' => $user->id,
+        ]);
+
+        $this->logStatus($tiket, $tiket->status, $tiket->status, $user, 'goodwill_setuju', 'Goodwill disetujui regulator');
     }
 
     /**
@@ -2200,7 +2343,7 @@ class ServisService
 
             // [penagihan] SATU sumber kebenaran: item penagihan efektif
             // (estimasi yang disetujui + pekerjaan teknisi digabung konsisten).
-            // Jurnal, piutang, struk, dan POS semuanya memakai angka ini.
+            // Jurnal, piutang, struk, dan POS semua memakai angka ini.
             $jasaServis = (float) $rincian['total_jasa'];
             $totalJualSparepart = (float) $rincian['total_part'];
             $totalHpp = $tiket->getTotalHppPenagihan();
@@ -2208,6 +2351,21 @@ class ServisService
             // [Komplain garansi] Perbaikan gratis: TANPA pendapatan & piutang;
             // hanya biaya part (HPP) yang dicatat sebagai beban garansi.
             $garansiGratis = (bool) $tiket->komplain_gratis;
+
+            // [Goodwill] Diskon kompensasi (disetujui regulator) dialokasikan
+            // proporsional ke jasa & part; piutang = total bersih.
+            $diskonGoodwill = $garansiGratis ? $totalTagihan : $this->getGoodwillBerlaku($tiket);
+
+            if ($garansiGratis) {
+                $jasaServis = 0.0;
+                $totalJualSparepart = 0.0;
+                $totalTagihan = 0.0;
+            } elseif ($diskonGoodwill > 0) {
+                $bruto = $totalTagihan;
+                $jasaServis = round($jasaServis - ($diskonGoodwill * $jasaServis / $bruto), 2);
+                $totalJualSparepart = round($totalJualSparepart - ($diskonGoodwill * $totalJualSparepart / $bruto), 2);
+                $totalTagihan = max(0.0, $totalTagihan - $diskonGoodwill);
+            }
 
             if ($totalTagihan > 0 || ($garansiGratis && $totalHpp > 0)) {
                 $noJurnal = $jurnalService->generateNoJurnal('servis', $tiket->cabang_id);

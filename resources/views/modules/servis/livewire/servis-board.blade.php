@@ -34,6 +34,10 @@
 
             <!-- [F2-5] Export laporan servis (queue) -->
             @can('laporan.cabang')
+                <a href="{{ route('servis.komplain') }}"
+                    class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px] inline-flex items-center">
+                    Dashboard Komplain
+                </a>
                 <div class="flex items-center gap-1.5">
                     <button type="button" wire:click="exportLaporan('xlsx')" title="Export Excel" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">
                         <span class="hidden sm:inline">Export Excel</span>
@@ -2305,6 +2309,27 @@
                             @if($selectedTiket->batas_waktu_menit)
                                 <p class="text-[10px] text-ink-300">SLA komplain: {{ $selectedTiket->batas_waktu_menit }} menit</p>
                             @endif
+
+                            @if(! $selectedTiket->komplain_gratis)
+                                @if($selectedTiket->goodwill_approved_at)
+                                    <p class="text-[10px] text-up-mint">Goodwill disetujui: Rp {{ number_format((float) $selectedTiket->goodwill_amount, 0, ',', '.') }}</p>
+                                @elseif($selectedTiket->goodwill_proposed_at)
+                                    <p class="text-[10px] text-up-amber">Goodwill diusulkan: Rp {{ number_format((float) $selectedTiket->goodwill_amount, 0, ',', '.') }} — menunggu regulator</p>
+                                @endif
+
+                                <div class="flex flex-wrap gap-2">
+                                    @can('servis.create')
+                                        <button type="button" wire:click="openGoodwillModal({{ $selectedTiket->id }})"
+                                            class="px-2.5 py-1.5 rounded-lg bg-up-primary text-white font-bold text-[10px] cursor-pointer">Ajukan Goodwill</button>
+                                    @endcan
+                                    @can('servis.override-status')
+                                        @if($selectedTiket->goodwill_proposed_at && ! $selectedTiket->goodwill_approved_at)
+                                            <button type="button" wire:click="setujuiGoodwill"
+                                                class="px-2.5 py-1.5 rounded-lg bg-up-mint text-ink-950 font-bold text-[10px] cursor-pointer">Setujui Goodwill</button>
+                                        @endif
+                                    @endcan
+                                </div>
+                            @endif
                         </div>
                     @endif
 
@@ -3163,6 +3188,44 @@
                         >
                             Konfirmasi Serah Terima & Tutup Tiket
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- ===== MODAL: GOODWILL (diskon kompensasi, approval regulator) ===== -->
+    @if($showGoodwillModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Ajukan Goodwill</h3>
+                        <p class="text-xs text-ink-400 mt-0.5">Diskon kompensasi untuk kasus ambigu — butuh persetujuan regulator</p>
+                    </div>
+                    <button wire:click="$set('showGoodwillModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+
+                <div class="space-y-3.5">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Nominal Goodwill (Rp) <span class="text-up-red">*</span></label>
+                        <input type="number" min="0" wire:model="goodwillAmount"
+                            class="w-full px-3 py-2.5 rounded-xl glass-input text-xs text-white"
+                            placeholder="Contoh: 50000" />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Alasan <span class="text-up-red">*</span></label>
+                        <textarea wire:model="goodwillAlasan" rows="3"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                            placeholder="Contoh: Penyebab kerusakan ambigu antara garansi & pemakaian konsumen; diberi kompensasi sebagian..."></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" wire:click="$set('showGoodwillModal', false)"
+                            class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs transition-colors cursor-pointer">Kembali</button>
+                        <button type="button" wire:click="prosesGoodwill"
+                            class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-colors cursor-pointer">Ajukan</button>
                     </div>
                 </div>
             </div>

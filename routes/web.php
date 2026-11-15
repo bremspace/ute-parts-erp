@@ -51,6 +51,7 @@ use App\Modules\Report\Livewire\DrillDownViewer;
 use App\Modules\Report\Livewire\ReportBuilder;
 use App\Modules\Reseller\Livewire\ResellerDashboard;
 use App\Modules\Servis\Livewire\ServisBoard;
+use App\Modules\Servis\Livewire\KomplainDashboard;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Controllers\BulkFotoUploadController;
@@ -177,6 +178,12 @@ Route::get('/tracking/{token}', function ($token) {
                 'mulai' => $tiket->garansi->tanggal_mulai?->format('d/m/Y'),
                 'berakhir' => $tiket->garansi->tanggal_berakhir?->format('d/m/Y'),
                 'aktif' => $tiket->garansi->active,
+            ] : null,
+            'komplain' => $tiket->sumber === 'komplain' ? [
+                'tiket_asal' => $tiket->tiketLama?->no_tiket,
+                'garansi_berlaku' => (bool) $tiket->garansi_berlaku,
+                'perbaikan_gratis' => (bool) $tiket->komplain_gratis,
+                'gratis_disetujui' => $tiket->komplain_gratis_approved_at !== null,
             ] : null,
             'estimasi_items' => $tiket->estimasiItems->map(fn ($item) => [
                 'nama_item' => $item->nama_item,
@@ -851,6 +858,11 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
 
     // Servis HP Kanban Screen — [T-06] wajib role dgn permission servis.view (staf)
     Route::get('/servis', ServisBoard::class)->name('servis')->middleware('permission:servis.view');
+
+    // Dashboard Komplain Pasca-Servis — regulator/admin (laporan.cabang)
+    Route::get('/servis/komplain', KomplainDashboard::class)
+        ->name('servis.komplain')
+        ->middleware('permission:laporan.cabang');
 
     // CRM & Membership Screen — RBAC: permission crm.view
     Route::get('/crm', CrmDashboard::class)->name('crm')->middleware('permission:crm.view');

@@ -3,6 +3,14 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-15 — Servis: Notifikasi komplain, dashboard, goodwill & struk/tracking
+
+- **Notifikasi WA komplain**: pelanggan (konfirmasi penerimaan + link tracking) dan regulator cabang (komplain masuk + penanda garansi).
+- **Dashboard Komplain Pasca-Servis** (`/app/servis/komplain`, permission `laporan.cabang`): volume, garansi berlaku, gratis/goodwill disetujui, SLA overdue, komplain berulang per teknisi, per jenis HP, dan tabel komplain terbaru.
+- **Goodwill**: diskon kompensasi dengan usulan + persetujuan regulator (four-eyes); memperkecil piutang & jurnal (dialokasikan proporsional ke jasa & part), memblokir penagihan sebelum approval, dan tampil di struk.
+- **Tracking konsumen & struk**: info komplain (tiket asal, status garansi, status gratis) + garansi & goodwill dicetak di struk.
+- **Testing**: `ServisKomplainTest` 8/8 (garansi, four-eyes, lunas otomatis, SLA, goodwill, render dashboard).
+
 ## 2026-11-15 — Servis: Perbaikan gratis garansi (four-eyes), SLA komplain & form lebih nyaman
 
 - **Perbaikan gratis garansi**: komplain dalam garansi otomatis mengusulkan `komplain_gratis`; transisi ke `selesai` diblokir sampai regulator menyetujui (**four-eyes**: approver ≠ pengusul, permission `servis.override-status`). Setelah disetujui: tagihan 0, **lunas otomatis**, tanpa piutang, jurnal khusus (HPP saja, tanpa pendapatan/piutang), tanpa komisi & bagi hasil. `bayar()` menolak tiket garansi (sudah lunas otomatis).
