@@ -3,10 +3,13 @@
 namespace App\Modules\Reseller\Models;
 
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 /**
  * [F3-8c] Rule komisi multi-aktor (PRD §4.3):
@@ -19,6 +22,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class KomisiSkema extends Model
 {
+    use CatatAktivitas;
+    use LogsActivity;
+
     public const TRIGGER_TARGET_KPI = 'target_kpi';
 
     protected $table = 'komisi_skema';
@@ -28,6 +34,14 @@ class KomisiSkema extends Model
         'min_amount' => 'decimal:2',
         'is_aktif' => 'boolean',
     ];
+
+    /**
+     * [F1-4] Audit trail aturan komisi — siapa mengubah persen/nilai aturan.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return $this->opsilogAktivitas('Skema Komisi');
+    }
 
     public function cabang(): BelongsTo
     {

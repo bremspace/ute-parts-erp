@@ -21,6 +21,13 @@ Format: `[Fase X] T-XX — ringkasan`.
 - **Seeder**: `HrSeeder` demo memakai engine (hapus seed legacy); banner panduan di halaman Skema Komisi.
 - **Testing**: `BagiHasilTest` 14/14 + `PayrollServiceTest`/`Komisi*`/`HrAuditLogging`/`PayrollPage` 73/73 hijau; basis jasa aktual diverifikasi (estimasi 300.000, jasa 150.000 → komisi 20% = 30.000).
 
+## 2026-11-15 — HR: Simulasi E2E Kompensasi (peran teknisi vs regulator)
+
+- **`tests/Feature/SimulasiE2ETest.php` (7/7)** — simulasi end-to-end dua persona teknis yang dipisah: (a) **teknisi gaji** → login → terima/menjalankan servis → state machine `diterima→…→selesai` → komisi engine (20% jasa aktual) → payroll slip; (b) **teknisi bagi hasil** → servis → accru 50% jasa → payout (hitung→proses→bayar + jurnal balance) → widget portal, dan **tidak** masuk payroll/komisi.
+- **Kontrol akses minimum privilege**: teknisi hanya `/app/servis` + `/app/hr/saya`; 403 untuk payroll/karyawan/komisi-skema/bagi-hasil/audit/approvals/akunting/wms/laporan. Finance tanpa `servis.view` (403 di papan servis) namun boleh payroll/bagi-hasil/audit/approvals. Owner/regulator akses penuh.
+- **Regulator workflow**: owner membuat rule komisi dari UI (`KomisiSkemaPage`) lalu rule dipakai engine; payout > Rp 10.000.000 wajib approval finance (four-eyes: admin mengajukan, finance menyetujui) — proses ditolak sebelum persetujuan.
+- **Audit**: `KomisiSkema` kini teraudit (`CatatAktivitas` + `LogsActivity`) — perubahan aturan komisi tercatat untuk regulator.
+
 ## 2026-11-06 — Servis: Re-Audit P0–P3 & Perbaikan Celah (Fallback Estimasi Items, CLI Notification Context, Deteksi Duplicate Key, Validasi Cabang Online)
 
 - **[AUDIT-1] TiketServis::getRincianBiayaLengkap() residual overbill gap ditutup** — Cabang `elseif ($estimasiItems->where('tipe', 'jasa')->isNotEmpty())` dan `elseif ($estimasiItems->isNotEmpty())` sebelumnya menagihkan item estimasi jasa/part meskipun item pekerjaan teknisi terkait pernah dibuat lalu dibatalkan. Ditambahkan helper `punyaRiwayatPartEksplisit()` dan guard `! $this->punyaRiwayatJasaEksplisit()` / `! $this->punyaRiwayatPartEksplisit()` agar pembatalan pekerjaan tidak lagi memicu overbill dari estimasi.
