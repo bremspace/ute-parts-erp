@@ -4,6 +4,7 @@ use App\Console\Commands\FixStoragePermissionsCommand;
 use App\Console\Commands\SidImportRaw;
 use App\Http\Middleware\EnsureCabangSelected;
 use App\Http\Middleware\EnsureLicenseValid;
+use App\Http\Middleware\EnsurePelangganSesiAktif;
 use App\Http\Middleware\EnsureSetupCompleted;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\SecurityHeaders;
@@ -72,6 +73,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // Enforce inisialisasi awal toko / post-factory reset
             'setup.completed' => EnsureSetupCompleted::class,
+
+            // Penegakan sesi perangkat member (guard customer)
+            'pelanggan.sesi' => EnsurePelangganSesiAktif::class,
         ]);
 
         // Arahkan guest sesuai zona: /app/* ke backoffice login, lainnya ke customer login
@@ -171,6 +175,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // [MEMBER] Ingatkan owner atas pendaftaran member yang mengendap > 12 jam
         // (member tak bisa login selama status masih pending).
         $schedule->command('ute:ingatkan-approval-member')->dailyAt('09:00')->withoutOverlapping();
+
+        // [SES] Bersihkan sesi perangkat kedaluwarsa (staf & member) — jaga tabel
+        // device session tetap kecil di server 1GB.
+        $schedule->call(function () {
+            $service = app(\App\Modules\Rbac\Services\SessionManagementService::class);
+            $service->cleanupExpired(30);
+            $service->cleanupExpiredPelanggan(120);
+        })->name('cleanup-device-sessions')->dailyAt('05:30')->withoutOverlapping();
 
         // Refresh token OAuth marketplace sebelum kedaluwarsa (tiap 2 jam)
         $schedule->call(function () {

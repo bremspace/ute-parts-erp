@@ -7,6 +7,7 @@ use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Services\SessionManagementService;
 use App\Modules\Servis\Models\TiketServis;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +23,7 @@ class CustomerAccount extends Component
 {
     use WithFileUploads;
 
-    public const VALID_TABS = ['orders', 'servis', 'notifikasi', 'komisi', 'membership', 'profil'];
+    public const VALID_TABS = ['orders', 'servis', 'notifikasi', 'komisi', 'membership', 'profil', 'sesi'];
 
     public string $activeTab = 'orders'; // orders, servis, notifikasi, komisi, membership, profil
 
@@ -265,6 +266,53 @@ class CustomerAccount extends Component
             ->get();
     }
 
+    // ===== MANAJEMEN SESI PERANGKAT (ISO 27001 A.9.4.2) =====
+
+    public function getPerangkatProperty()
+    {
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return collect();
+        }
+
+        return app(SessionManagementService::class)->getPelangganDeviceList($customer->id);
+    }
+
+    public function akhiriSesi(string $deviceToken): void
+    {
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return;
+        }
+
+        if ($deviceToken === (string) session('customer_device_token', '')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak dapat mengakhiri sesi yang sedang digunakan. Silakan keluar dari akun ini.']);
+
+            return;
+        }
+
+        if (app(SessionManagementService::class)->forceLogoutPelangganDevice($deviceToken, $customer->id)) {
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Sesi perangkat berhasil diakhiri.']);
+        } else {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Sesi perangkat tidak ditemukan atau sudah tidak aktif.']);
+        }
+    }
+
+    public function akhiriSemuaSesiLain(): void
+    {
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return;
+        }
+
+        $count = app(SessionManagementService::class)->forceLogoutAllPelanggan(
+            $customer->id,
+            (string) session('customer_device_token', '')
+        );
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => "{$count} sesi perangkat lain telah diakhiri."]);
+    }
+
     public function getTiersProperty()
     {
         return TierMembership::where('is_active', true)
@@ -422,6 +470,12 @@ class CustomerAccount extends Component
             'password' => Hash::make($this->newPassword),
         ]);
 
+        // [ISO 27001 A.9.4.2] Ganti kata sandi mengakhiri semua sesi perangkat lain.
+        app(SessionManagementService::class)->forceLogoutAllPelanggan(
+            $customer->id,
+            (string) session('customer_device_token', '')
+        );
+
         $this->reset(['currentPassword', 'newPassword', 'newPassword_confirmation']);
 
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Kata sandi akun Anda berhasil diperbarui.']);
@@ -440,6 +494,7 @@ class CustomerAccount extends Component
             'notifikasi' => $this->notifikasi,
             'komisi' => $this->komisi,
             'downlines' => $this->downlines,
+            'perangkat' => $this->activeTab === 'sesi' ? $this->perangkat : collect(),
             'membershipInfo' => $this->activeTab === 'membership' ? $this->membershipInfo : [],
         ])->layout('layouts.marketplace', ['title' => 'Akun Saya']);
     }

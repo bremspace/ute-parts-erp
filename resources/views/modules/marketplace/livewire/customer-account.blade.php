@@ -419,6 +419,7 @@
                         'notifikasi' => ['label' => 'Pemberitahuan', 'icon' => 'bell'],
                         'membership' => ['label' => 'Status Membership & Poin', 'icon' => 'star'],
                         'profil' => ['label' => 'Profil & Keamanan', 'icon' => 'user'],
+                        'sesi' => ['label' => 'Perangkat & Sesi', 'icon' => 'shield'],
                     ];
                     if ($customer->is_reseller) {
                         $tabList['komisi'] = ['label' => 'Komisi Saya', 'icon' => 'wallet'];
@@ -455,6 +456,10 @@
                         @elseif($item['icon'] === 'wallet')
                             <svg class="w-4 h-4 shrink-0 {{ $isActive ? 'text-white' : 'text-ink-400 dark:text-ink-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            </svg>
+                        @elseif($item['icon'] === 'shield')
+                            <svg class="w-4 h-4 shrink-0 {{ $isActive ? 'text-white' : 'text-ink-400 dark:text-ink-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                             </svg>
                         @endif
 
@@ -1339,6 +1344,59 @@
                             </div>
                         @endforeach
                     </div>
+                </div>
+            </div>
+        @endif
+
+        <!-- PERANGKAT & SESI -->
+        @if($activeTab === 'sesi')
+            <div class="space-y-6">
+                <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 sm:p-8 shadow-sm">
+                    <div class="border-b border-ink-100 dark:border-white/10 pb-4 mb-6 flex items-start justify-between gap-4 flex-wrap">
+                        <div>
+                            <h2 class="text-base sm:text-lg font-black text-ink-900 dark:text-white">Perangkat & Sesi Aktif</h2>
+                            <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Kelola perangkat yang sedang login di akun Anda. Sesi yang diakhiri tidak bisa dipakai lagi.</p>
+                        </div>
+                        @if($perangkat->count() > 1)
+                            <button type="button" wire:click="akhiriSemuaSesiLain"
+                                    wire:confirm="Yakin mengakhiri semua sesi perangkat lain?"
+                                    class="px-4 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs cursor-pointer min-h-[44px] active:scale-[0.98]">
+                                Akhiri Semua Sesi Lain
+                            </button>
+                        @endif
+                    </div>
+
+                    @if($perangkat->isEmpty())
+                        <p class="text-sm text-ink-500 dark:text-ink-400 py-6 text-center">Tidak ada perangkat aktif.</p>
+                    @else
+                        <ul class="divide-y divide-ink-100 dark:divide-white/5 space-y-0">
+                            @foreach($perangkat as $device)
+                                @php
+                                    $isCurrent = $device->device_token === session('customer_device_token');
+                                @endphp
+                                <li class="py-4 flex items-center justify-between gap-4 flex-wrap">
+                                    <div class="min-w-[180px]">
+                                        <p class="text-sm font-bold text-ink-900 dark:text-white flex items-center gap-2 flex-wrap">
+                                            {{ $device->device_name }}
+                                            @if($isCurrent)
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/10 text-up-mint border border-up-mint/30">Perangkat Ini</span>
+                                            @endif
+                                        </p>
+                                        <p class="text-[11px] text-ink-400 font-mono mt-0.5">
+                                            {{ $device->ip_address ?: '-' }} • Terakhir aktif {{ $device->last_activity?->diffForHumans() ?? '-' }}
+                                        </p>
+                                    </div>
+                                    @unless($isCurrent)
+                                        <button type="button" wire:click="akhiriSesi('{{ $device->device_token }}')"
+                                                wire:confirm="Yakin mengakhiri sesi perangkat ini?"
+                                                class="px-3.5 py-2 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs cursor-pointer min-h-[44px] active:scale-[0.98]">
+                                            Akhiri Sesi
+                                        </button>
+                                    @endunless
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
                 </div>
             </div>
         @endif

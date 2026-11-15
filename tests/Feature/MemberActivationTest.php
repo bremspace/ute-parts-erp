@@ -8,6 +8,7 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Marketplace\Livewire\CustomerAccount;
 use App\Modules\Rbac\Models\AktivitasLog;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\SessionManagementService;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -289,6 +290,103 @@ class MemberActivationTest extends TestCase
         $this->assertSame($pelanggan->id, $log->causer_id);
         $this->assertSame(Pelanggan::class, $log->causer_type);
         $this->assertSame('Budi Santoso Updated', $log->causerNama);
+    }
+
+    public function test_login_mendaftarkan_perangkat_member(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081234567890',
+            'password' => Hash::make('secret123'),
+            'status' => 'aktif',
+        ]);
+
+        $this->post('/login-pelanggan', [
+            'telepon' => '081234567890',
+            'password' => 'secret123',
+        ]);
+
+        $this->assertAuthenticated('customer');
+        $this->assertNotNull(session('customer_device_token'));
+        $this->assertDatabaseHas('pelanggan_device_sessions', [
+            'pelanggan_id' => $pelanggan->id,
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_sesi_yang_diakhiri_ditegakkan_middleware(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081234567890',
+            'password' => Hash::make('secret123'),
+            'status' => 'aktif',
+        ]);
+
+        $this->actingAs($pelanggan, 'customer');
+
+        // Sesi lama (tanpa token) otomatis diberi penanda perangkat.
+        $this->get('/account')->assertOk();
+        $token = session('customer_device_token');
+        $this->assertNotNull($token);
+
+        app(SessionManagementService::class)->forceLogoutPelangganDevice($token, $pelanggan->id);
+
+        // Request berikutnya diarahkan ke login dan sesi member dicabut.
+        $this->get('/account')->assertRedirect(route('customer.login'));
+        $this->assertGuest('customer');
+    }
+
+    public function test_member_bisa_mengakhiri_sesi_perangkat_lain(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081234567890',
+            'password' => Hash::make('secret123'),
+            'status' => 'aktif',
+        ]);
+
+        $service = app(SessionManagementService::class);
+        $service->registerPelangganDevice($pelanggan->id, 'Chrome Android', 'token-a');
+        $service->registerPelangganDevice($pelanggan->id, 'Safari iPhone', 'token-b');
+
+        $this->actingAs($pelanggan, 'customer');
+        $this->withSession(['customer_device_token' => 'token-a']);
+
+        Livewire::test(CustomerAccount::class, ['tab' => 'sesi'])
+            ->assertSee('Perangkat Ini')
+            ->call('akhiriSesi', 'token-b')
+            ->assertDispatched('alert');
+
+        $this->assertTrue($service->pelangganDeviceAktif($pelanggan->id, 'token-a'));
+        $this->assertFalse($service->pelangganDeviceAktif($pelanggan->id, 'token-b'));
+    }
+
+    public function test_ganti_password_mengakhiri_sesi_perangkat_lain(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081234567890',
+            'password' => Hash::make('secret123'),
+            'status' => 'aktif',
+        ]);
+
+        $service = app(SessionManagementService::class);
+        $service->registerPelangganDevice($pelanggan->id, 'Chrome Android', 'token-a');
+        $service->registerPelangganDevice($pelanggan->id, 'Safari iPhone', 'token-b');
+
+        $this->actingAs($pelanggan, 'customer');
+        $this->withSession(['customer_device_token' => 'token-a']);
+
+        Livewire::test(CustomerAccount::class)
+            ->set('currentPassword', 'secret123')
+            ->set('newPassword', 'sandiBaru123')
+            ->set('newPassword_confirmation', 'sandiBaru123')
+            ->call('updatePassword')
+            ->assertHasNoErrors();
+
+        $this->assertTrue($service->pelangganDeviceAktif($pelanggan->id, 'token-a'));
+        $this->assertFalse($service->pelangganDeviceAktif($pelanggan->id, 'token-b'));
     }
 
     public function test_booking_servis_menormalisasi_telepon_dan_tak_buat_akun_ganda(): void

@@ -312,7 +312,7 @@ Route::match(['get', 'post'], '/webhook/qris-notif', [QrisNotificationController
 // ===== Endpoint Pembayaran Duitku (Web Session / AJAX) =====
 // Didaftarkan di web.php agar berjalan di bawah session web/customer tanpa kendala Sanctum domain mismatch.
 Route::get('/api/payment/methods', [PaymentController::class, 'paymentMethods']);
-Route::post('/api/payment/create', [PaymentController::class, 'create'])->middleware('auth:customer');
+Route::post('/api/payment/create', [PaymentController::class, 'create'])->middleware(['auth:customer', 'pelanggan.sesi']);
 Route::post('/api/payment/check-status', [PaymentController::class, 'checkStatus']);
 
 // ===== [API: OMNI-05] Webhook channel marketplace (publik) =====
@@ -386,6 +386,18 @@ Route::post('/login-pelanggan', function (Request $request) {
             return back()->withInput($request->only('telepon'))->withErrors(['telepon' => $pesan]);
         }
 
+        // [F3-4] Catat sesi perangkat member (untuk manajemen sesi & penghentian jarak jauh)
+        $deviceToken = (string) Str::uuid();
+        $userAgent = $request->userAgent() ?? '';
+        app(SessionManagementService::class)->registerPelangganDevice(
+            $user->id,
+            $userAgent ? Str::limit($userAgent, 40) : 'Web Browser',
+            $deviceToken,
+            $request->ip(),
+            $userAgent
+        );
+        session(['customer_device_token' => $deviceToken]);
+
         $cart = session()->get('shop.cart', []);
         $fallback = ! empty($cart) ? '/checkout' : '/shop';
 
@@ -439,10 +451,15 @@ Route::post('/daftar-pelanggan', function (Request $request) {
 })->middleware('throttle:10,1')->name('customer.register.post');
 
 Route::post('/logout-pelanggan', function () {
+    $deviceToken = (string) session('customer_device_token', '');
+    if ($deviceToken !== '' && auth('customer')->check()) {
+        app(SessionManagementService::class)->forceLogoutPelangganDevice($deviceToken, auth('customer')->id());
+    }
+
     Auth::guard('customer')->logout();
 
     return redirect('/shop');
-})->name('customer.logout');
+})->middleware('pelanggan.sesi')->name('customer.logout');
 
 // Aktivasi akun member yang belum pernah memiliki kata sandi (mis. akun dibuat
 // kasir/teknisi saat walk-in). Kode 6 digit dibangkitkan staff di CRM, disampaikan
@@ -472,17 +489,17 @@ Route::post('/aktivasi-akun', function (Request $request) {
 })->middleware('throttle:10,1')->name('customer.activation.post');
 
 // Keranjang & checkout (wajib login customer) — halaman cart menampilkan form login bila guest
-Route::get('/cart', CartCheckout::class)->name('cart');
-Route::get('/checkout', CartCheckout::class)->name('checkout');
+Route::get('/cart', CartCheckout::class)->middleware('pelanggan.sesi')->name('cart');
+Route::get('/checkout', CartCheckout::class)->middleware('pelanggan.sesi')->name('checkout');
 
 // Dashboard akun pelanggan (ACCOUNT-01..05)
 Route::get('/account', CustomerAccount::class)
-    ->middleware('auth:customer')
+    ->middleware(['auth:customer', 'pelanggan.sesi'])
     ->name('customer.account');
 
 Route::get('/account/{tab}', CustomerAccount::class)
-    ->whereIn('tab', ['orders', 'servis', 'notifikasi', 'komisi', 'membership', 'profil'])
-    ->middleware('auth:customer')
+    ->whereIn('tab', ['orders', 'servis', 'notifikasi', 'komisi', 'membership', 'profil', 'sesi'])
+    ->middleware(['auth:customer', 'pelanggan.sesi'])
     ->name('customer.account.tab');
 
 // [T-15] Cetak label barcode / QR Code produk (multi-produk via ?ids=1,2,3)
