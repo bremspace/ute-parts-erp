@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -23,6 +24,12 @@ class SecurityHeaders
         // Generate CSP nonce for this request
         $nonce = base64_encode(random_bytes(16));
         $request->attributes->set('csp_nonce', $nonce);
+
+        // [FIX] Sediakan nonce yang sama ke Vite/Livewire. Tanpa ini `@livewireStyles`
+        // me-render <style> TANPA nonce → diblokir CSP `style-src` → aturan bawaan
+        // Livewire `[wire\:loading]{display:none}` tidak pernah diterapkan →
+        // elemen wire:loading (mis. "Memuat modul WMS...") terlihat selamanya.
+        Vite::useCspNonce($nonce);
 
         $response = $next($request);
 
