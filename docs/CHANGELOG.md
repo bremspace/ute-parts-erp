@@ -3,6 +3,15 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-15 — Servis: Perbaikan 500 tracking, performa progress/pencarian & komplain pasca-servis
+
+- **500 konsumen**: `revisi_lingkup_disetujui_at`/`revisi_lingkup_diajukan_at` kini di-cast `datetime` (dulu string → `format()` = Error 500 di halaman tracking).
+- **Index & migrasi**: index `produk(is_active, nama)` gagal di MySQL (`nama` TEXT, error 1170) sehingga migrasi tak pernah jalan → diganti index `is_active` (barcode sudah unique); `OpnameTab` mengurutkan rows dengan `orderBy id` agar deterministik.
+- **Flag `revisi_lingkup_pending`**: daftar tiket tertahan & panel status memakai kolom flag (diisi saat item berubah/di-<em>approve</em>), render papan tidak lagi menghitung diff untuk semua tiket di setiap request. Guard `selesai`/`bayar` tetap memakai perhitungan akurat.
+- **Foto progress ringan**: kompresi di browser (maks 1280px, JPEG 0.72), batas 6 foto & ±1,5 MB, disimpan sebagai **file** di disk public (bukan base64 di JSON); `TiketServisProgress::getFotoUrls()` tetap menampilkan data URL lama (backward-compatible).
+- **Komplain pasca-servis**: tiket komplain ditautkan ke tiket asal + flag `garansi_berlaku`; tombol/modal “Komplain Pasca-Servis” di papan servis untuk tiket selesai/diambil. Aturan uang (gratis/berbayar) dibasis flag + estimasi/approval regulator.
+- **Testing**: `ServisPerfTrackingRegressionTest` 3/3, `ServisKomplainTest` 3/3; Servis+Tracking+WMS 258/258.
+
 ## 2026-11-15 — Servis: Pembatalan, Kirim Ulang Persetujuan & Optimasi N+1
 
 - **Pembatalan (ISO 9001 §8.7)**: transisi `disetujui/dikerjakan/qc → batal` dengan alasan wajib; `onBatal` me-reverse jurnal (pendapatan + pelunasan, fail-closed), mengembalikan stok part bila `tanggal_selesai` masih null, melepas klaim SN, membatalkan garansi & menutup piutang. Batal setelah `selesai` (override regulator) me-reverse jurnal; stok TIDAK dibalik karena part sudah terpasang. **Hanya atas permintaan langsung konsumen di toko** — dieksekusi teknisi/admin berwenang; jalur pembatalan online (tracking) dicabut total (route + UI + service method), tombol/modal hanya di papan servis.

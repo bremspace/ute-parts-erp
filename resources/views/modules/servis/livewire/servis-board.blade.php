@@ -550,6 +550,10 @@
                                         <button type="button" wire:click="openBatalModal({{ $tiket->id }})"
                                             class="min-h-[44px] px-3 rounded-lg bg-up-red/10 hover:bg-up-red text-up-red hover:text-white font-bold text-xs border border-up-red/30 transition-[background-color,color] duration-100 cursor-pointer">Batalkan Servis</button>
                                     @endif
+                                    @if(in_array($tiket->status, ['selesai', 'diambil'], true))
+                                        <button type="button" wire:click="openKomplainModal({{ $tiket->id }})"
+                                            class="min-h-[44px] px-3 rounded-lg bg-up-amber/10 hover:bg-up-amber text-up-amber hover:text-ink-950 font-bold text-xs border border-up-amber/30 transition-[background-color,color] duration-100 cursor-pointer">Komplain Pasca-Servis</button>
+                                    @endif
                                     @if($tiket->status === 'ditolak')
                                         <button type="button" wire:click="revisiEstimasiDitolak({{ $tiket->id }})"
                                             class="min-h-[44px] px-3 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-[background-color] duration-100 cursor-pointer">Revisi Estimasi</button>
@@ -1632,14 +1636,38 @@
                         pickFile() {
                             this.$refs.fileInput.click();
                         },
-                        fileSelected(e) {
+                        async fileSelected(e) {
                             const file = e.target.files[0];
                             if (!file) return;
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                                $wire.handleProgressFotoUpload(event.target.result);
-                            };
-                            reader.readAsDataURL(file);
+                            e.target.value = '';
+                            if (file.size > 10 * 1024 * 1024) {
+                                alert('Foto maksimal 10 MB');
+                                return;
+                            }
+                            // Kompresi di sisi browser (maks 1280px, JPEG 0.72)
+                            // supaya payload Livewire & snapshot tetap ringan.
+                            const dataUrl = await this.compressImage(file, 1280, 0.72);
+                            $wire.handleProgressFotoUpload(dataUrl);
+                        },
+                        compressImage(file, maxDimension, quality) {
+                            return new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+                                        const width = Math.max(1, Math.round(img.width * scale));
+                                        const height = Math.max(1, Math.round(img.height * scale));
+                                        const canvas = document.createElement('canvas');
+                                        canvas.width = width;
+                                        canvas.height = height;
+                                        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                                        resolve(canvas.toDataURL('image/jpeg', quality));
+                                    };
+                                    img.src = ev.target.result;
+                                };
+                                reader.readAsDataURL(file);
+                            });
                         }
                     }">
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Dokumentasi Foto Pengerjaan</label>
@@ -2195,7 +2223,7 @@
 
                     {{-- Perubahan lingkup: tambah/ubah/kurang di luar estimasi yang disetujui (kontrol perubahan) --}}
                     @php
-                        $perluApprovalUlang = $selectedTiket->perluPersetujuanUlang();
+                        $perluApprovalUlang = (bool) $selectedTiket->revisi_lingkup_pending;
                         $itemDiluarEstimasi = $selectedTiket->getItemDiluarEstimasi();
                     @endphp
                     @if($perluApprovalUlang || $itemDiluarEstimasi !== [])
@@ -2363,7 +2391,7 @@
                                         @endif
                                         @if(!empty($pr->foto))
                                             <div class="flex flex-wrap gap-1.5 pt-1">
-                                                @foreach($pr->foto as $ft)
+                                                @foreach($pr->getFotoUrls() as $ft)
                                                     <a href="{{ $ft }}" target="_blank" class="w-14 h-14 rounded-lg overflow-hidden border border-white/10 block hover:opacity-80">
                                                         <img src="{{ $ft }}" alt="Foto Progress" class="w-full h-full object-cover">
                                                     </a>
@@ -3089,6 +3117,59 @@
                             class="px-5 py-2.5 rounded-xl bg-up-red hover:bg-rose-700 text-white font-bold text-xs transition-[background-color,transform] duration-100 shadow-md shadow-up-red/30 cursor-pointer flex items-center gap-1.5 active:scale-95"
                         >
                             Konfirmasi Serah Terima & Tutup Tiket
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- ===== MODAL: KOMPLAIN PASCA-SERVIS ===== -->
+    @if($showKomplainModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Komplain Pasca-Servis</h3>
+                        <p class="text-xs text-ink-400 mt-0.5">Konsumen kembali ke toko dengan keluhan setelah servis selesai</p>
+                    </div>
+                    <button wire:click="$set('showKomplainModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+
+                <div class="space-y-3.5">
+                    <div class="p-3 rounded-xl bg-up-amber/10 border border-up-amber/20 text-xs text-ink-200">
+                        <p class="font-bold text-up-amber mb-1">Alur:</p>
+                        <p>Tiket komplain baru ditautkan ke tiket servis asal. Status garansi (berlaku / habis) dicatat otomatis sebagai dasar kebijakan perbaikan ulang.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Keluhan Konsumen <span class="text-up-red">*</span></label>
+                        <textarea
+                            wire:model="komplainKeluhan"
+                            rows="3"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                            placeholder="Contoh: LCD mulai bergaris 3 hari setelah servis / tombol power tidak berfungsi..."
+                        ></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Catatan Toko</label>
+                        <textarea
+                            wire:model="komplainCatatan"
+                            rows="2"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                            placeholder="Kondisi unit saat diterima, hasil pengecekan awal..."
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" wire:click="$set('showKomplainModal', false)"
+                            class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs transition-colors cursor-pointer">
+                            Kembali
+                        </button>
+                        <button type="button" wire:click="prosesKomplain"
+                            class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-colors cursor-pointer">
+                            Buat Tiket Komplain
                         </button>
                     </div>
                 </div>

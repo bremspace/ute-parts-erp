@@ -173,6 +173,15 @@ class ServisBoard extends Component
 
     public string $batalAlasan = '';
 
+    // [Komplain pasca-servis] tiket konsumen kembali dengan keluhan
+    public bool $showKomplainModal = false;
+
+    public ?int $komplainTiketId = null;
+
+    public string $komplainKeluhan = '';
+
+    public string $komplainCatatan = '';
+
     public string $batalReturMetode = 'tunai';
 
     // [Intake Booking Online] Modal Pemeriksaan & Penerimaan Fisik
@@ -408,9 +417,9 @@ class ServisBoard extends Component
     public function getTiketPerluPersetujuanProperty(): array
     {
         return $this->queryTiketScoped()
+            ->where('revisi_lingkup_pending', true)
             ->whereIn('status', ['disetujui', 'dikerjakan', 'qc'])
             ->get()
-            ->filter(fn ($t) => $t->perluPersetujuanUlang())
             ->map(fn ($t) => ['id' => $t->id, 'no_tiket' => $t->no_tiket])
             ->values()
             ->all();
@@ -1513,9 +1522,25 @@ class ServisBoard extends Component
 
     public function handleProgressFotoUpload($content): void
     {
-        if ($content) {
-            $this->progressFoto[] = $content;
+        if (! $content) {
+            return;
         }
+
+        // Batas jumlah & ukuran menjaga snapshot Livewire ringan (tiap upload
+        // memicu render ulang seluruh papan servis).
+        if (count($this->progressFoto) >= 6) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Maksimal 6 foto progress.']);
+
+            return;
+        }
+
+        if (strlen((string) $content) > 1_800_000) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Foto terlalu besar (maks ~1,5 MB).']);
+
+            return;
+        }
+
+        $this->progressFoto[] = $content;
     }
 
     public function removeProgressFoto(int $index): void
@@ -1554,6 +1579,7 @@ class ServisBoard extends Component
             );
 
             $this->showProgressModal = false;
+            $this->progressFoto = [];
             $this->selectedTiketId = $tiket->id;
             $this->dispatch('alert', ['type' => 'success', 'message' => "Progress {$this->progressPersentase}% berhasil disimpan & diunggah"]);
         } catch (\Throwable $e) {
@@ -1654,6 +1680,55 @@ class ServisBoard extends Component
             $this->dispatch('alert', [
                 'type' => 'success',
                 'message' => "Servis {$tiket->no_tiket} dibatalkan. Serahkan unit ke pelanggan (status 'diambil').",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    // [Komplain pasca-servis] konsumen kembali ke toko dengan keluhan
+    public function openKomplainModal(int $tiketId): void
+    {
+        $tiket = $this->tiketScoped($tiketId);
+
+        if (! in_array($tiket->status, ['selesai', 'diambil'], true)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Komplain pasca-servis hanya untuk tiket yang sudah selesai.']);
+
+            return;
+        }
+
+        $this->komplainTiketId = $tiketId;
+        $this->komplainKeluhan = '';
+        $this->komplainCatatan = '';
+        $this->showKomplainModal = true;
+    }
+
+    public function prosesKomplain(): void
+    {
+        if (! $this->boleh('servis.create', 'Anda tidak punya izin membuat tiket komplain')) {
+            return;
+        }
+
+        $tiket = $this->tiketScoped($this->komplainTiketId);
+
+        if (trim($this->komplainKeluhan) === '') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Keluhan wajib diisi.']);
+
+            return;
+        }
+
+        try {
+            app(ServisService::class)->buatTiketKomplain(
+                $tiket,
+                trim($this->komplainKeluhan),
+                auth()->user(),
+                trim($this->komplainCatatan)
+            );
+
+            $this->showKomplainModal = false;
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => 'Tiket komplain pasca-servis dibuat. Tindak lanjut mengikuti garansi / estimasi.',
             ]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);

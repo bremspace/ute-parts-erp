@@ -207,7 +207,7 @@ Route::get('/tracking/{token}', function ($token) {
                 'persentase' => $p->persentase,
                 'judul' => $p->judul,
                 'deskripsi' => $p->deskripsi,
-                'foto' => $p->foto ?? [],
+                'foto' => $p->getFotoUrls(),
                 'waktu' => $p->created_at?->format('d/m/Y H:i'),
             ])->toArray(),
             'pengerjaan' => [

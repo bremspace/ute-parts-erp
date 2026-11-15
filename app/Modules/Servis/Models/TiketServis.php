@@ -28,8 +28,9 @@ use Spatie\Activitylog\Support\LogOptions;
     'status_pembayaran', 'tanggal_bayar', 'metode_pembayaran', 'no_jurnal_bayar',
     'offline_pickup_uuid', 'is_offline_pickup', 'pickup_synced_at',
     'revisi_lingkup_hash', 'revisi_lingkup_diajukan_hash', 'revisi_lingkup_disetujui_at',
-    'revisi_lingkup_diajukan_at', 'revisi_lingkup_snapshot',
+    'revisi_lingkup_diajukan_at', 'revisi_lingkup_snapshot', 'revisi_lingkup_pending',
     'stok_estimasi_diproses', 'stok_estimasi_catatan',
+    'tiket_servis_lama_id', 'garansi_berlaku', 'komplain_catatan',
 ]) ]
 class TiketServis extends Model
 {
@@ -51,6 +52,10 @@ class TiketServis extends Model
         'durasi_garansi_custom' => 'integer',
         'auto_cancel_overdue' => 'boolean',
         'stok_estimasi_diproses' => 'boolean',
+        'revisi_lingkup_disetujui_at' => 'datetime',
+        'revisi_lingkup_diajukan_at' => 'datetime',
+        'revisi_lingkup_pending' => 'boolean',
+        'garansi_berlaku' => 'boolean',
         'durasi_pengerjaan_menit' => 'integer',
         'pengerjaan_mulai_at' => 'datetime',
         'pengerjaan_deadline_at' => 'datetime',
@@ -93,6 +98,11 @@ class TiketServis extends Model
     public function garansi(): HasOne
     {
         return $this->hasOne(Garansi::class);
+    }
+
+    public function tiketLama(): BelongsTo
+    {
+        return $this->belongsTo(TiketServis::class, 'tiket_servis_lama_id');
     }
 
     public function spareparts(): HasMany

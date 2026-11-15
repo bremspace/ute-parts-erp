@@ -276,6 +276,9 @@ class ServisBatalTest extends TestCase
             'dibatalkan_at' => null,
         ]);
 
+        // Item dibuat langsung (bukan lewat inputPekerjaan) → evaluasi ulang flag
+        app(ServisService::class)->refreshPerubahanLingkup($tiket->fresh());
+
         $component = Livewire::test(ServisBoard::class);
 
         $daftar = $component->viewData('tiketPerluPersetujuan');

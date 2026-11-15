@@ -1148,8 +1148,11 @@ class ServisService
         $hash = $tiket->hashPerubahanLingkup();
 
         if ($hash === null) {
-            if ($tiket->revisi_lingkup_diajukan_hash !== null) {
-                $tiket->update(['revisi_lingkup_diajukan_hash' => null]);
+            if ($tiket->revisi_lingkup_diajukan_hash !== null || $tiket->revisi_lingkup_pending) {
+                $tiket->update([
+                    'revisi_lingkup_diajukan_hash' => null,
+                    'revisi_lingkup_pending' => false,
+                ]);
             }
 
             return;
@@ -1163,6 +1166,7 @@ class ServisService
             'revisi_lingkup_diajukan_hash' => $hash,
             'revisi_lingkup_diajukan_at' => now(),
             'revisi_lingkup_snapshot' => json_encode($tiket->getPerubahanLingkup()),
+            'revisi_lingkup_pending' => true,
         ]);
 
         $telepon = $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon;
@@ -1184,6 +1188,15 @@ class ServisService
     }
 
     /**
+     * Evaluasi ulang & catat flag perubahan lingkup tiket.
+     * Dipakai jalur servis (input/batalkan item), pengujian, dan backfill.
+     */
+    public function refreshPerubahanLingkup(TiketServis $tiket): void
+    {
+        $this->tandaiPerubahanLingkup($tiket->fresh());
+    }
+
+    /**
      * Tandai perubahan lingkup sebagai disetujui (pelanggan via token, atau
      * override regulator dengan alasan). Hash mengikat persetujuan pada isi.
      */
@@ -1193,6 +1206,7 @@ class ServisService
             'revisi_lingkup_hash' => $tiket->hashPerubahanLingkup(),
             'revisi_lingkup_disetujui_at' => now(),
             'revisi_lingkup_snapshot' => json_encode($tiket->getPerubahanLingkup()),
+            'revisi_lingkup_pending' => false,
         ]);
 
         $this->logStatus(
@@ -1542,13 +1556,20 @@ class ServisService
         bool $tampilkanKeKonsumen = true
     ): TiketServisProgress {
         return DB::transaction(function () use ($tiket, $user, $persentase, $judul, $deskripsi, $foto, $tampilkanKeKonsumen) {
+            // Foto disimpan sebagai FILE di disk public (bukan base64 di JSON)
+            // agar halaman tracking konsumen & snapshot Livewire ringan.
+            $fotoDisimpan = [];
+            foreach ($foto as $item) {
+                $fotoDisimpan[] = $this->simpanFotoProgress($tiket, (string) $item);
+            }
+
             $progress = TiketServisProgress::create([
                 'tiket_servis_id' => $tiket->id,
                 'user_id' => $user->id,
                 'persentase' => min(100, max(0, $persentase)),
                 'judul' => $judul,
                 'deskripsi' => $deskripsi,
-                'foto' => $foto,
+                'foto' => $fotoDisimpan,
                 'tampilkan_ke_konsumen' => $tampilkanKeKonsumen,
             ]);
 
@@ -1571,6 +1592,82 @@ class ServisService
 
             return $progress;
         });
+    }
+
+    /**
+     * Simpan foto progress (data URL dari browser) sebagai FILE di disk public.
+     * Foto lama berupa data URL tetap dipakai apa adanya (backward-compatible).
+     */
+    private function simpanFotoProgress(TiketServis $tiket, string $dataUrl): string
+    {
+        if (! str_starts_with($dataUrl, 'data:image/')) {
+            return $dataUrl;
+        }
+
+        try {
+            $comma = strpos($dataUrl, ',');
+            $binary = $comma !== false ? base64_decode(substr($dataUrl, $comma + 1), true) : false;
+
+            if ($binary === false || $binary === '') {
+                return $dataUrl;
+            }
+
+            $path = 'servis/progress/'.$tiket->id.'/'.Str::uuid()->toString().'.jpg';
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $binary);
+
+            return $path;
+        } catch (\Throwable $e) {
+            Log::warning('Foto progress gagal disimpan sebagai file, pakai data URL: '.$e->getMessage());
+
+            return $dataUrl;
+        }
+    }
+
+    /**
+     * Buat tiket komplain pasca-servis — konsumen kembali ke toko karena
+     * keluhan setelah servis selesai (mis. LCD bermasalah beberapa hari
+     * kemudian). Tiket ditautkan ke tiket asal + menandai garansi yang masih
+     * berlaku. Aturan uang (gratis/berbayar) diserahkan ke estimasi + approval
+     * regulator; flag ini yang menjadi dasarnya.
+     */
+    public function buatTiketKomplain(TiketServis $tiketLama, string $keluhan, User $user, ?string $catatan = null): TiketServis
+    {
+        if (! in_array($tiketLama->status, ['selesai', 'diambil'], true)) {
+            throw new \Exception('Komplain pasca-servis hanya untuk tiket yang sudah selesai');
+        }
+
+        $garansi = $tiketLama->garansi;
+        $garansiBerlaku = (bool) ($garansi?->active ?? false);
+
+        $tiket = TiketServis::create([
+            'no_tiket' => $this->buatNoTiket((int) $tiketLama->cabang_id),
+            'cabang_id' => $tiketLama->cabang_id,
+            'pelanggan_id' => $tiketLama->pelanggan_id,
+            'nama_pelanggan' => $tiketLama->nama_pelanggan,
+            'telepon_pelanggan' => $tiketLama->telepon_pelanggan,
+            'jenis_hp' => $tiketLama->jenis_hp,
+            'tipe_kunci' => $tiketLama->tipe_kunci,
+            'keluhan' => $keluhan,
+            'kondisi_fisik' => [],
+            'foto_unit' => [],
+            'status' => 'diterima',
+            'sumber' => 'komplain',
+            'tiket_servis_lama_id' => $tiketLama->id,
+            'garansi_berlaku' => $garansiBerlaku,
+            'komplain_catatan' => $catatan,
+            'token_approval' => \Illuminate\Support\Str::random(64),
+        ]);
+
+        $this->logStatus(
+            $tiket,
+            null,
+            'diterima',
+            $user,
+            'komplain_pasca_servis',
+            "Komplain pasca-servis dari {$tiketLama->no_tiket}".($garansiBerlaku ? ' (garansi berlaku)' : ' (di luar garansi)')
+        );
+
+        return $tiket;
     }
 
     /**
