@@ -18,6 +18,7 @@ use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\KomisiSkema;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Services\ServisService;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\CabangSeeder;
@@ -289,6 +290,61 @@ class BagiHasilTest extends TestCase
         app(BagiHasilService::class)->accru($tiket);
         $this->assertSame(1, BagiHasil::count());
         $this->assertSame(0, Komisi::count());
+    }
+
+    /** @test */
+    public function test_komisi_servis_teknisi_gaji_pakai_jasa_aktual(): void
+    {
+        $this->buatKaryawan('gaji', 5000000);
+
+        KomisiSkema::create([
+            'nama' => 'Teknisi servis 20% jasa',
+            'aktor_tipe' => 'karyawan',
+            'aktor_id' => null,
+            'trigger_tipe' => 'tiket_servis',
+            'kategori' => null,
+            'tipe' => 'persen',
+            'nilai' => 20,
+            'min_amount' => 0,
+            'cabang_id' => null,
+            'is_aktif' => true,
+        ]);
+
+        // Estimasi 300.000, tapi jasa aktual 150.000 + part 50.000
+        $tiket = $this->buatTiket(300000);
+        TiketServisItem::create([
+            'tiket_servis_id' => $tiket->id,
+            'tipe' => 'jasa',
+            'nama_item' => 'Ganti layar',
+            'qty' => 1,
+            'harga' => 150000,
+            'hpp' => 0,
+            'dibatalkan_at' => null,
+        ]);
+        TiketServisItem::create([
+            'tiket_servis_id' => $tiket->id,
+            'tipe' => 'part',
+            'nama_item' => 'LCD',
+            'qty' => 1,
+            'harga' => 50000,
+            'hpp' => 0,
+            'dibatalkan_at' => null,
+        ]);
+
+        app(KomisiService::class)->hitungKomisiMultiAktor('tiket_servis', ['tiket_servis_id' => $tiket->id]);
+
+        // 20% x 150.000 jasa = 30.000 (bukan 20% x 300.000 estimasi)
+        $this->assertEquals(30000, (float) Komisi::first()->nominal_komisi);
+
+        app(PayrollService::class)->hitungDraft($this->periode);
+
+        $slip = PayrollSlip::first();
+        $this->assertNotNull($slip);
+        $this->assertEquals(30000, (float) $slip->total_komisi);
+
+        $rincian = json_decode($slip->rincian, true);
+        $this->assertEquals(30000, (float) $rincian['komisi_teknisi']);
+        $this->assertEquals(0, (float) $rincian['komisi_internal']);
     }
 
     /** @test */

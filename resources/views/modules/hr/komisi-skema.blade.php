@@ -6,6 +6,15 @@
         </div>
     </div>
 
+    <div class="px-4 py-3 rounded-xl bg-up-primary/10 border border-up-primary/30 text-xs text-ink-700 dark:text-ink-300 flex items-start gap-2">
+        <svg class="w-4 h-4 flex-shrink-0 mt-0.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>
+            <strong>Komisi teknisi gaji</strong> diatur di sini: Aktor = <em>Karyawan</em>, Trigger = <em>Tiket Servis</em>.
+            Dasar hitungan = <strong>total jasa aktual tiket</strong> (bukan estimasi; part/sparepart tidak dihitung).
+            Teknisi non-gaji (bagi hasil) otomatis dikecualikan dari engine ini.
+        </span>
+    </div>
+
     @if($pesan)
         <div class="px-4 py-3 rounded-xl bg-up-mint/10 border border-up-mint/30 text-sm text-up-mint font-medium flex items-center gap-2">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>

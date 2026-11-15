@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\User;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\BagiHasilRule;
-use App\Modules\Hr\Models\KomisiTeknisiRule;
 use App\Modules\Hr\Models\KpiMetric;
 use App\Modules\Hr\Models\Shift;
 use App\Modules\Rbac\Models\Cabang;
@@ -78,13 +77,19 @@ class HrSeeder extends Seeder
             );
         }
 
-        // Demo KomisiTeknisiRule — idempotent
-        KomisiTeknisiRule::updateOrCreate(
-            ['jabatan_target' => 'teknisi', 'jenis' => 'per_tiket', 'cabang_id' => null],
+        // [BH/arsitektur] Demo komisi servis teknisi — SATU engine multi-aktor
+        // (aktor karyawan × trigger tiket_servis). Dasar hitung = jasa aktual.
+        KomisiSkema::updateOrCreate(
+            ['nama' => 'Teknisi servis Rp50.000 per tiket'],
             [
-                'nominal' => 50000,
-                'persen' => null,
-                'min_status_tiket' => 'selesai',
+                'aktor_tipe' => 'karyawan',
+                'aktor_id' => null,
+                'trigger_tipe' => 'tiket_servis',
+                'kategori' => null,
+                'tipe' => 'nominal',
+                'nilai' => 50000,
+                'min_amount' => 0,
+                'cabang_id' => null,
                 'is_aktif' => true,
             ]
         );

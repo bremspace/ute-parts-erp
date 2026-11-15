@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Modules\Hr\Models\AbsensiLog;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KaryawanKomponenGaji;
-use App\Modules\Hr\Models\KomisiTeknisiRule;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
 use App\Modules\Hr\Services\PayrollService;
@@ -92,15 +91,21 @@ class PayrollServiceTest extends TestCase
             'is_aktif' => true,
         ]);
 
-        KomisiTeknisiRule::create([
-            'jabatan_target' => 'teknisi',
-            'jenis' => 'per_tiket',
-            'nominal' => 50000,
-            'min_status_tiket' => 'selesai',
+        // [BH/arsitektur] Komisi servis teknisi = engine multi-aktor
+        KomisiSkema::create([
+            'nama' => 'Teknisi servis 50000',
+            'aktor_tipe' => 'karyawan',
+            'aktor_id' => null,
+            'trigger_tipe' => 'tiket_servis',
+            'kategori' => null,
+            'tipe' => 'nominal',
+            'nilai' => 50000,
+            'min_amount' => 0,
+            'cabang_id' => null,
             'is_aktif' => true,
         ]);
 
-        TiketServis::create([
+        $tiket = TiketServis::create([
             'no_tiket' => 'TS-TEST-001',
             'cabang_id' => 1,
             'teknisi_id' => $user->id,
@@ -114,6 +119,8 @@ class PayrollServiceTest extends TestCase
             'estimasi_biaya' => 100000,
             'tanggal_selesai' => now()->format('Y-m-d'),
         ]);
+
+        app(KomisiService::class)->hitungKomisiMultiAktor('tiket_servis', ['tiket_servis_id' => $tiket->id]);
 
         $result = $this->payrollService->hitungDraft($this->periode);
 
@@ -193,15 +200,6 @@ class PayrollServiceTest extends TestCase
             'tgl_masuk' => '2024-01-01',
             'gaji_pokok' => 5000000,
             'status_aktif' => true,
-        ]);
-
-        // Legacy rule teknisi (Rp50.000/tiket)
-        KomisiTeknisiRule::create([
-            'jabatan_target' => 'teknisi',
-            'jenis' => 'per_tiket',
-            'nominal' => 50000,
-            'min_status_tiket' => 'selesai',
-            'is_aktif' => true,
         ]);
 
         $tiket = TiketServis::create([

@@ -6,22 +6,22 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KaryawanKomponenGaji;
-use App\Modules\Hr\Models\KomisiTeknisiRule;
 use App\Modules\Hr\Models\PayrollKomisiDetail;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
 use App\Modules\Hr\Models\BagiHasil;
 use App\Modules\Reseller\Models\Komisi;
-use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Support\Facades\DB;
 
 /**
- * [F3-8] Payroll Service — hitung gaji, komisi teknisi, posting jurnal.
+ * [F3-8] Payroll Service — hitung gaji, komisi, posting jurnal.
  *
  * Formula payroll: gaji_pokok + total_tunjangan - total_potongan + total_komisi
- * Komisi teknisi: dari tiket servis selesai dalam periode, berdasarkan rule.
+ * Komisi (termasuk komisi servis teknisi) = SATU engine `komisi_skema`
+ * (aktor karyawan × trigger penjualan/lead_won/tiket_servis/target_kpi).
+ * Basis komisi servis = total JASA aktual tiket (getRincianBiayaLengkap).
  */
 class PayrollService
 {
@@ -305,11 +305,18 @@ class PayrollService
         $tunjangan = $this->hitungTunjangan($karyawan->id);
         $potonganAbsen = app(AbsensiService::class)->potonganAbsen($karyawan->id, $periode);
         $potongan = $this->hitungPotongan($karyawan->id, $periode);
-        $resTeknisi = $this->hitungKomisiTeknisiWithDetails($karyawan, $periode, $cabangId);
-        $komisiTeknisi = $resTeknisi['total'];
-        $resInternal = $this->hitungKomisiInternalWithDetails($karyawan->id, $periode);
-        $komisiInternal = $resInternal['total'];
-        $komisi = $komisiTeknisi + $komisiInternal;
+        $resKomisi = $this->hitungKomisiInternalWithDetails($karyawan->id, $periode);
+        $komisi = $resKomisi['total'];
+
+        // [BH/arsitektur] Komisi teknisi kini SATU engine (komisi_skema). Bagi
+        // rincian slip: porsi dari tiket servis vs komisi lain (penjualan/lead).
+        $komisiServis = 0.0;
+        foreach ($resKomisi['items'] as $item) {
+            if (! empty($item['tiket_id'])) {
+                $komisiServis += $item['nominal'];
+            }
+        }
+        $komisiLain = max(0.0, $komisi - $komisiServis);
 
         $totalGaji = max(0, $pokok + $tunjangan - $potongan + $komisi);
 
@@ -329,8 +336,8 @@ class PayrollService
                     'potongan' => $potongan,
                     'potongan_absen' => $potonganAbsen,
                     'komisi' => $komisi,
-                    'komisi_teknisi' => $komisiTeknisi,
-                    'komisi_internal' => $komisiInternal,
+                    'komisi_teknisi' => $komisiServis,
+                    'komisi_internal' => $komisiLain,
                     'periode' => $periode,
                 ]),
             ]
@@ -338,7 +345,7 @@ class PayrollService
 
         // Simpan rincian komisi ke payroll_komisi_detail
         PayrollKomisiDetail::where('slip_id', $slip->id)->delete();
-        foreach (array_merge($resTeknisi['items'], $resInternal['items']) as $item) {
+        foreach ($resKomisi['items'] as $item) {
             PayrollKomisiDetail::create([
                 'slip_id' => $slip->id,
                 'tiket_servis_id' => $item['tiket_id'],
@@ -379,79 +386,6 @@ class PayrollService
     }
 
     /**
-     * Hitung komisi teknisi dari tiket servis selesai dalam periode.
-     */
-    protected function hitungKomisiTeknisi(int $karyawanId, string $periode): float
-    {
-        $karyawan = Karyawan::find($karyawanId);
-        if (! $karyawan) {
-            return 0.0;
-        }
-
-        return $this->hitungKomisiTeknisiWithDetails($karyawan, $periode)['total'];
-    }
-
-    protected function hitungKomisiTeknisiWithDetails(Karyawan $karyawan, string $periode, ?int $cabangId = null): array
-    {
-        if ($karyawan->jabatan !== 'teknisi' || $karyawan->metode_penghasilan !== 'gaji') {
-            return ['total' => 0.0, 'items' => []];
-        }
-
-        $targetCabangId = $cabangId ?? $karyawan->cabang_id ?? currentCabangId();
-
-        $rules = KomisiTeknisiRule::where('is_aktif', true)
-            ->where(function ($q) use ($targetCabangId) {
-                $q->whereNull('cabang_id')
-                    ->when($targetCabangId, fn ($sub) => $sub->orWhere('cabang_id', $targetCabangId));
-            })
-            ->get();
-
-        $totalKomisi = 0;
-        $items = [];
-        $tanggalMulai = $periode.'-01';
-        $tanggalSelesai = date('Y-m-t', strtotime($periode.'-01'));
-
-        // [F3-8c] 1 tiket = 1 komisi di slip; engine menang, KomisiTeknisiRule
-        // hanya utk tiket tanpa catatan engine (status pending/disetujui).
-        $tiketDibayarEngine = Komisi::where('aktor_tipe', 'karyawan')
-            ->where('aktor_id', $karyawan->id)
-            ->whereNotNull('tiket_servis_id')
-            ->whereIn('status', [Komisi::STATUS_PENDING, Komisi::STATUS_DISETUJUI])
-            ->whereBetween('created_at', [$periode.'-01 00:00:00', $tanggalSelesai.' 23:59:59'])
-            ->pluck('tiket_servis_id');
-
-        // tiket_servis.teknisi_id → users (bukan karyawan.id) — konsisten dgn KPI §4.2
-        $tiket = TiketServis::where('teknisi_id', $karyawan->user_id)
-            ->where('status', 'selesai')
-            ->whereBetween('tanggal_selesai', [$tanggalMulai, $tanggalSelesai])
-            ->get();
-
-        foreach ($tiket as $t) {
-            if ($tiketDibayarEngine->contains($t->id)) {
-                continue;
-            }
-            foreach ($rules as $rule) {
-                $nominal = 0.0;
-                if ($rule->jenis === 'per_tiket') {
-                    $nominal = (float) $rule->nominal;
-                } elseif ($rule->jenis === 'persen_nilai_servis') {
-                    $nominal = round((float) ($t->estimasi_biaya ?? 0) * ($rule->persen / 100), 2);
-                }
-                if ($nominal > 0) {
-                    $totalKomisi += $nominal;
-                    $items[] = [
-                        'tiket_id' => $t->id,
-                        'jenis' => 'servis',
-                        'nominal' => $nominal,
-                    ];
-                }
-            }
-        }
-
-        return ['total' => round($totalKomisi, 2), 'items' => $items];
-    }
-
-    /**
      * [F3-8c] Komisi internal (karyawan) dari engine multi-aktor (PRD §4.3):
      * trigger penjualan/lead_won/tiket_servis/target_kpi → komponen komisi payroll.
      * Status pending & disetujui ikut dihitung (payroll bisa diajukan sebelum
@@ -489,7 +423,7 @@ class PayrollService
             $total += $nom;
             $items[] = [
                 'tiket_id' => $kom->tiket_servis_id,
-                'jenis' => $kom->tiket_servis_id ? 'servis_engine' : ($kom->lead_id ? 'lead_won' : 'penjualan'),
+                'jenis' => $kom->tiket_servis_id ? 'servis' : ($kom->lead_id ? 'lead_won' : 'penjualan'),
                 'nominal' => $nom,
             ];
         }

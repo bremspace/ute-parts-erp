@@ -12,6 +12,15 @@ Format: `[Fase X] T-XX — ringkasan`.
 - **UI/UX** — halaman `/app/hr/bagi-hasil` (menu HR) tab Aturan / Transaksi / Payout, modal bayar dengan pilihan akun kas/bank; widget "Bagi Hasil Jasa Saya" di Portal Karyawan; flag metode penghasilan di master karyawan. Permission `kelola-bagi-hasil` (super-admin + finance).
 - **Testing**: `tests/Feature/BagiHasilTest.php` 13/13 pass (accru, idempotensi, prioritas rule, min jasa, reversal, hook `onSelesai`, jurnal balance + idempoten payout, eksklusi payroll & komisi, render UI + widget). Regression 218 test payroll/komisi/HR/jurnal hijau.
 
+## 2026-11-15 — HR: Konsolidasi Komisi Servis Teknisi (Satu Engine, Basis Jasa Aktual)
+
+- **Keputusan arsitektur**: komisi servis teknisi **digaji** dan bagi hasil **non-gaji** kini punya perjalanan uang yang beda dan eksplisit — payroll+komisi vs payout bagi hasil. `KomisiTeknisiRule` (engine paralel, tanpa UI) **dikeluarkan dari perhitungan payroll**; aturan komisi servis kini SATU engine `komisi_skema` (aktor `karyawan` × trigger `tiket_servis`) yang sudah punya UI di `/app/hr/komisi-skema`. Tabel `komisi_teknisi_rules` dipertahankan sebagai arsip audit (tidak dihapus, tidak dipakai).
+- **Basis hitung resmi**: `KomisiService::resolusiTiketServis()` kini memakai `TiketServis::getRincianBiayaLengkap()['total_jasa']` (jasa aktual dari item; fallback `estimasi_biaya` hanya tiket legacy tanpa item). Part/sparepart tidak masuk dasar — konsisten dengan bagi hasil dan aturan skill "basis dari sumber resmi".
+- **PayrollService**: jalur legacy `hitungKomisiTeknisi()`/`hitungKomisiTeknisiWithDetails()` dihapus; `komisi_teknisi` di slip = porsi komisi ber-tiket servis dari engine, `komisi_internal` = komisi lain (penjualan/lead). Perilaku tampilan slip & payroll tidak berubah.
+- **Iso/standar**: satu sumber aturan (ISO 9001 §7.5 dokumentasi & kontrol perubahan), traceability per tiket (§8.5), dasar hitung dari data aktual (§9 evaluasi), RBAC + audit (ISO 27001 A.9/A.12.4), ambang approval F1-1, anti double-pay 1 tiket = 1 penghasilan.
+- **Seeder**: `HrSeeder` demo memakai engine (hapus seed legacy); banner panduan di halaman Skema Komisi.
+- **Testing**: `BagiHasilTest` 14/14 + `PayrollServiceTest`/`Komisi*`/`HrAuditLogging`/`PayrollPage` 73/73 hijau; basis jasa aktual diverifikasi (estimasi 300.000, jasa 150.000 → komisi 20% = 30.000).
+
 ## 2026-11-06 — Servis: Re-Audit P0–P3 & Perbaikan Celah (Fallback Estimasi Items, CLI Notification Context, Deteksi Duplicate Key, Validasi Cabang Online)
 
 - **[AUDIT-1] TiketServis::getRincianBiayaLengkap() residual overbill gap ditutup** — Cabang `elseif ($estimasiItems->where('tipe', 'jasa')->isNotEmpty())` dan `elseif ($estimasiItems->isNotEmpty())` sebelumnya menagihkan item estimasi jasa/part meskipun item pekerjaan teknisi terkait pernah dibuat lalu dibatalkan. Ditambahkan helper `punyaRiwayatPartEksplisit()` dan guard `! $this->punyaRiwayatJasaEksplisit()` / `! $this->punyaRiwayatPartEksplisit()` agar pembatalan pekerjaan tidak lagi memicu overbill dari estimasi.

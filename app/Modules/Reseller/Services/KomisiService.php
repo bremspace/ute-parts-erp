@@ -323,7 +323,12 @@ class KomisiService
             return [null, 0, null, 0.0, null];
         }
 
-        return [$tiket, (int) $tiket->id, $tiket->pelanggan, (float) ($tiket->estimasi_biaya ?? 0), $tiket->cabang_id];
+        // [BH/arsitektur] Basis komisi servis = total JASA AKTUAL dari rincian
+        // tiket (item jasa; fallback estimasi hanya utk tiket legacy tanpa item).
+        // Part/sparepart tidak masuk dasar — konsisten dgn bagi hasil teknisi.
+        $jasa = (float) $tiket->getRincianBiayaLengkap()['total_jasa'];
+
+        return [$tiket, (int) $tiket->id, $tiket->pelanggan, $jasa, $tiket->cabang_id];
     }
 
     /**
