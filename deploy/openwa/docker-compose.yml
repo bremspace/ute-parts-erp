@@ -11,7 +11,7 @@
 
 services:
   openwa-api:
-    image: ghcr.io/rmyndharis/openwa:${OPENWA_VERSION:-v0.30.1}
+    image: ghcr.io/rmyndharis/openwa:${OPENWA_VERSION:-0.30.1}
     container_name: openwa-api
     restart: unless-stopped
     stop_grace_period: 75s
