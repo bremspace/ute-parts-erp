@@ -3,6 +3,13 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-15 — Servis: KPI komplain berulang, eskalasi SLA & voucher goodwill
+
+- **KPI `komplain_berulang`**: metrik HR baru menghitung komplain pasca-servis yang tiket asalnya ditangani teknisi (target 2/komplain, makin rendah makin baik; dipakai di KPI & payroll).
+- **Eskalasi komplain**: `servis:cek-batas-waktu` menandai komplain yang melewati SLA (`komplain_eskalasi_at`, idempoten) + WA regulator cabang & teknisi; dashboard menampilkan kartu Eskalasi.
+- **Voucher goodwill**: goodwill bisa diusulkan sebagai voucher (tiket asal TIDAK terdiskon); voucher terbit saat approval regulator dan **dipakai otomatis** pada servis berikutnya pelanggan yang sama (bukan tiket asal), memotong piutang/jurnal net; struk mencetak voucher.
+- **Testing**: `ServisKomplainTest` 11/11 (KPI, eskalasi idempoten, voucher redeem + jurnal net).
+
 ## 2026-11-15 — Servis: Notifikasi komplain, dashboard, goodwill & struk/tracking
 
 - **Notifikasi WA komplain**: pelanggan (konfirmasi penerimaan + link tracking) dan regulator cabang (komplain masuk + penanda garansi).

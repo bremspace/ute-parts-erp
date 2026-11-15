@@ -28,6 +28,7 @@ class KpiService
     public const RUMUS_WHITELIST = [
         'tiket_selesai' => ['teknisi'],
         'sla_servis_ontime' => ['teknisi'],
+        'komplain_berulang' => ['teknisi'],
         'rata_durasi_servis' => ['teknisi'],
         'transaksi_kasir' => ['kasir'],
         'selisih_kas' => ['kasir'],
@@ -109,6 +110,13 @@ class KpiService
                 ->where('status_sla_kpi', 'on_time')
                 ->whereBetween('tanggal_selesai', [$mulai.' 00:00:00', $selesai.' 23:59:59'])
                 ->count(),
+            // Komplain pasca-servis yang tiket servis ASALNYA ditangani teknisi
+            // ini (bukan teknisi pengerjaan komplain) — sinyal kualitas pekerjaan.
+            'komplain_berulang' => (float) TiketServis::where('sumber', 'komplain')
+                ->whereNotNull('tiket_servis_lama_id')
+                ->whereHas('tiketLama', fn ($q) => $q->where('teknisi_id', $userId))
+                ->whereBetween('created_at', [$mulai.' 00:00:00', $selesai.' 23:59:59'])
+                ->count(),
             'rata_durasi_servis' => (float) (TiketServis::where('teknisi_id', $userId)
                 ->whereNotNull('durasi_pengerjaan_menit')
                 ->whereBetween('tanggal_selesai', [$mulai.' 00:00:00', $selesai.' 23:59:59'])
@@ -185,6 +193,15 @@ class KpiService
             }
 
             return round(min(120, ($nilai / $target) * 100), 2);
+        }
+
+        if ($rumus === 'komplain_berulang') {
+            // Makin sedikit komplain berulang makin baik.
+            if ($target <= 0) {
+                return $nilai == 0 ? 100 : 0;
+            }
+
+            return round(max(0, 100 - ($nilai / $target * 100)), 2);
         }
 
         if ($target <= 0) {

@@ -127,6 +127,7 @@ class HrSeeder extends Seeder
             ['kode' => 'selisih_kas', 'nama' => 'Selisih Kas (min)', 'rumus' => 'selisih_kas', 'target' => 50000, 'satuan' => 'rp'],
             ['kode' => 'lead_won', 'nama' => 'Lead Won', 'rumus' => 'lead_won', 'target' => 10, 'satuan' => 'lead'],
             ['kode' => 'penjualan_lead_won', 'nama' => 'Nilai Penjualan Lead Won', 'rumus' => 'penjualan_lead_won', 'target' => 50000000, 'satuan' => 'rp'],
+            ['kode' => 'komplain_berulang', 'nama' => 'Komplain Berulang Teknisi', 'rumus' => 'komplain_berulang', 'target' => 2, 'satuan' => 'komplain'],
         ] as $m) {
             KpiMetric::updateOrCreate(
                 ['kode' => $m['kode']],

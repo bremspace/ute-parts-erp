@@ -60,6 +60,7 @@ class KomplainDashboard extends Component
             'gratisDisetujui' => $semua->filter(fn ($t) => $t->komplain_gratis_approved_at)->count(),
             'goodwillDisetujui' => $semua->filter(fn ($t) => $t->goodwill_approved_at)->count(),
             'overdue' => $overdue->count(),
+            'eskalasi' => $semua->filter(fn ($t) => $t->komplain_eskalasi_at !== null)->count(),
             'berulangTeknisi' => $berulangTeknisi,
             'perJenis' => $perJenis,
             'terbaru' => $semua->take(20)->values(),

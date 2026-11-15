@@ -191,6 +191,8 @@ class ServisBoard extends Component
 
     public string $goodwillAlasan = '';
 
+    public bool $goodwillSebagaiVoucher = false;
+
     public string $batalReturMetode = 'tunai';
 
     // [Intake Booking Online] Modal Pemeriksaan & Penerimaan Fisik
@@ -1800,7 +1802,8 @@ class ServisBoard extends Component
                 $this->tiketScoped($this->goodwillTiketId),
                 (float) $this->goodwillAmount,
                 $this->goodwillAlasan,
-                auth()->user()
+                auth()->user(),
+                (bool) $this->goodwillSebagaiVoucher
             );
             $this->showGoodwillModal = false;
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Goodwill diajukan. Menunggu persetujuan regulator.']);
@@ -1909,7 +1912,8 @@ class ServisBoard extends Component
             'subtotal_jasa' => $rincian['total_jasa'],
             'subtotal_part' => $rincian['total_part'],
             'subtotal' => $rincian['total'],
-            'diskon' => app(\App\Modules\Servis\Services\ServisService::class)->getGoodwillBerlaku($tiket),
+            'diskon' => app(\App\Modules\Servis\Services\ServisService::class)->getGoodwillBerlaku($tiket)
+                + app(\App\Modules\Servis\Services\ServisService::class)->getDiskonVoucher($tiket),
             'dpp' => $rincian['total'],
             'pajak' => 0,
             'ppn_persen' => 0,
@@ -1926,6 +1930,9 @@ class ServisBoard extends Component
             'garansi' => $tiket->garansi ? ($tiket->garansi->durasi_hari.' Hari (s/d '.$tiket->garansi->tanggal_berakhir?->format('d/m/Y').')') : null,
             'komplain' => $tiket->sumber === 'komplain' ? ('Komplain pasca-servis'.($tiket->tiketLama ? ' — asal '.$tiket->tiketLama->no_tiket : '').($tiket->garansi_berlaku ? ' (garansi)' : ' (di luar garansi)')) : null,
             'goodwill' => $tiket->goodwill_approved_at ? ('Goodwill: Rp '.number_format((float) $tiket->goodwill_amount, 0, ',', '.')) : null,
+            'voucher' => app(\App\Modules\Servis\Services\ServisService::class)->getDiskonVoucher($tiket) > 0
+                ? ('Voucher dipakai: Rp '.number_format(app(\App\Modules\Servis\Services\ServisService::class)->getDiskonVoucher($tiket), 0, ',', '.'))
+                : null,
             'cabang' => $cabang?->nama ?? session('cabang_nama') ?? null,
         ];
 

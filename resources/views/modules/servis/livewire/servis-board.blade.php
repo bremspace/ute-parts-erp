@@ -3221,6 +3221,11 @@
                             placeholder="Contoh: Penyebab kerusakan ambigu antara garansi & pemakaian konsumen; diberi kompensasi sebagian..."></textarea>
                     </div>
 
+                    <label class="flex items-start gap-2 text-xs text-ink-200 cursor-pointer">
+                        <input type="checkbox" wire:model="goodwillSebagaiVoucher" class="mt-0.5 rounded border-white/10 text-up-primary focus:ring-0">
+                        <span>Berikan sebagai <strong>voucher</strong> (tidak mengurangi tagihan tiket ini; dipakai otomatis pada servis berikutnya pelanggan yang sama)</span>
+                    </label>
+
                     <div class="flex justify-end gap-2 pt-2">
                         <button type="button" wire:click="$set('showGoodwillModal', false)"
                             class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs transition-colors cursor-pointer">Kembali</button>

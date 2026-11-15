@@ -114,6 +114,48 @@ class CekBatasWaktuServisCommand extends Command
 
         $this->info("Pemeriksaan selesai: {$peringatanCount} peringatan terkirim, {$overdueCount} tiket overdue, {$autoCancelCount} auto-cancel.");
 
+        // 2. Komplain pasca-servis yang melewati SLA → ESKALASI regulator
+        //    (sekali per tiket; penanda `komplain_eskalasi_at`).
+        $komplainOverdue = TiketServis::with(['cabang', 'teknisi'])
+            ->where('sumber', 'komplain')
+            ->whereIn('status', ['dikerjakan', 'qc'])
+            ->whereNotNull('pengerjaan_deadline_at')
+            ->where('pengerjaan_deadline_at', '<', $now)
+            ->whereNull('komplain_eskalasi_at')
+            ->get();
+
+        $eskalasiCount = 0;
+
+        foreach ($komplainOverdue as $tiket) {
+            $tiket->update(['komplain_eskalasi_at' => $now]);
+
+            $pesan = "ESKALASI KOMPLAIN: {$tiket->no_tiket} ({$tiket->jenis_hp}) melewati SLA komplain. Segera tindak lanjuti & koordinasikan dengan konsumen.";
+
+            if ($tiket->teknisi?->phone) {
+                $notifService->kirim('wa', $tiket->teknisi->phone, 'Eskalasi Komplain Servis', $pesan, [
+                    'audience' => 'staf',
+                    'user_id' => $tiket->teknisi_id,
+                    'cabang_id' => $tiket->cabang_id,
+                    'tiket_id' => $tiket->id,
+                ]);
+            }
+
+            if ($tiket->cabang?->telepon) {
+                $notifService->kirim('wa', $tiket->cabang->telepon, 'Eskalasi Komplain Servis', $pesan, [
+                    'audience' => 'staf',
+                    'cabang_id' => $tiket->cabang_id,
+                    'tiket_id' => $tiket->id,
+                ]);
+            }
+
+            Log::warning("Komplain {$tiket->no_tiket} melewati SLA — eskalasi regulator");
+            $eskalasiCount++;
+        }
+
+        if ($eskalasiCount > 0) {
+            $this->warn("{$eskalasiCount} komplain di-eskalasi ke regulator.");
+        }
+
         return self::SUCCESS;
     }
 }

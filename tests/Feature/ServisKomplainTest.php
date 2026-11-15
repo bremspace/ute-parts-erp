@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Hr\Models\Karyawan;
+use App\Modules\Hr\Services\KpiService;
 use App\Modules\Servis\Models\Garansi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
@@ -280,5 +282,155 @@ class ServisKomplainTest extends TestCase
         $response = $this->get('/app/servis/komplain');
         $response->assertOk();
         $response->assertSee('Dashboard Komplain');
+    }
+
+    /** @test */
+    public function test_kpi_komplain_berulang_dihitung_dari_tiket_asal(): void
+    {
+        $teknisi = User::create([
+            'name' => 'Teknisi KPI',
+            'email' => 'teknisi-kpi@uteparts.test',
+            'password' => bcrypt('password'),
+            'is_active' => true,
+        ]);
+        $teknisi->assignRole('teknisi');
+
+        $karyawan = Karyawan::create([
+            'user_id' => $teknisi->id,
+            'cabang_id' => 1,
+            'nik' => 'TEK-KOM-01',
+            'nama' => 'Teknisi KPI',
+            'jabatan' => 'teknisi',
+            'tgl_masuk' => now()->subYear()->toDateString(),
+            'status_aktif' => true,
+        ]);
+
+        $tiketAsal = TiketServis::create([
+            'no_tiket' => 'SRV-KOM-KPI',
+            'cabang_id' => 1,
+            'teknisi_id' => $teknisi->id,
+            'jenis_hp' => 'iPhone 13',
+            'keluhan' => 'Ganti LCD',
+            'status' => 'selesai',
+            'sumber' => 'walk_in',
+        ]);
+
+        app(ServisService::class)->buatTiketKomplain($tiketAsal, 'LCD bermasalah lagi', $this->admin);
+
+        $kpi = app(KpiService::class);
+        $periode = now()->format('Y-m');
+
+        $this->assertSame(1.0, $kpi->nilaiAktual('komplain_berulang', $karyawan, $periode));
+        $this->assertSame(50.0, $kpi->persenCapaian('komplain_berulang', 1, 2));
+    }
+
+    /** @test */
+    public function test_komplain_overdue_dieskalasi_oleh_command(): void
+    {
+        $tiket = $this->buatTiketSelesai('SRV-KOM-ESC');
+        Garansi::create([
+            'tiket_servis_id' => $tiket->id,
+            'durasi_hari' => 30,
+            'tanggal_mulai' => now()->subDay()->toDateString(),
+            'tanggal_berakhir' => now()->addDays(29)->toDateString(),
+            'keterangan' => 'Garansi servis',
+        ]);
+
+        $komplain = app(ServisService::class)->buatTiketKomplain($tiket->fresh(), 'Komplain overdue', $this->admin);
+        app(ServisService::class)->updateStatus($komplain->fresh(), 'dikerjakan', $this->admin, 'Mulai tindak lanjut');
+
+        $komplain = $komplain->fresh();
+        $komplain->update(['pengerjaan_deadline_at' => now()->subHour()]);
+        $this->assertNull($komplain->fresh()->komplain_eskalasi_at);
+
+        $this->artisan('servis:cek-batas-waktu')->assertSuccessful();
+
+        $this->assertNotNull($komplain->fresh()->komplain_eskalasi_at, 'Komplain overdue harus di-eskalasi');
+
+        // Idempoten: jalan kedua tidak mengubah penanda
+        $pertama = $komplain->fresh()->komplain_eskalasi_at;
+        $this->artisan('servis:cek-batas-waktu')->assertSuccessful();
+        $this->assertSame($pertama?->toDateTimeString(), $komplain->fresh()->komplain_eskalasi_at?->toDateTimeString());
+    }
+
+    /** @test */
+    public function test_goodwill_voucher_dipakai_servis_berikutnya(): void
+    {
+        $pelanggan = \App\Modules\Crm\Models\Pelanggan::create([
+            'nama' => 'Pelanggan Voucher',
+            'telepon' => '08123456789',
+        ]);
+
+        $service = app(ServisService::class);
+
+        $tiket = TiketServis::create([
+            'no_tiket' => 'SRV-KOM-VCR',
+            'cabang_id' => 1,
+            'pelanggan_id' => $pelanggan->id,
+            'nama_pelanggan' => $pelanggan->nama,
+            'telepon_pelanggan' => $pelanggan->telepon,
+            'jenis_hp' => 'iPhone 12',
+            'keluhan' => 'LCD bergaris',
+            'status' => 'diagnosa',
+            'sumber' => 'walk_in',
+        ]);
+
+        $service->setEstimasi($tiket, 200000, 'Estimasi jasa', $this->admin, [
+            ['tipe' => 'jasa', 'nama_item' => 'Jasa perbaikan', 'qty' => 1, 'harga' => 200000],
+        ]);
+        $service->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
+
+        $service->usulkanGoodwill($tiket->fresh(), 80000, 'Ambigu — bentuk voucher', $this->admin, true);
+
+        $regulator = User::create([
+            'name' => 'Regulator Voucher',
+            'email' => 'regulator-voucher@uteparts.test',
+            'password' => bcrypt('password'),
+            'is_active' => true,
+        ]);
+        $regulator->assignRole('super-admin');
+        $service->setujuiGoodwill($tiket->fresh(), $regulator);
+
+        $voucher = \App\Modules\Servis\Models\Voucher::where('pelanggan_id', $pelanggan->id)->first();
+        $this->assertNotNull($voucher, 'Voucher harus terbit');
+        $this->assertSame('aktif', $voucher->status);
+        $this->assertSame(80000.0, (float) $voucher->sisa);
+
+        // Tiket asal TIDAK terdiskon (goodwill berbentuk voucher)
+        $this->assertSame(200000.0, $service->getTotalTagihanBersih($tiket->fresh()));
+
+        // Servis baru pelanggan yang sama → voucher dipakai otomatis
+        $tiket2 = TiketServis::create([
+            'no_tiket' => 'SRV-KOM-VCR-2',
+            'cabang_id' => 1,
+            'pelanggan_id' => $pelanggan->id,
+            'nama_pelanggan' => $pelanggan->nama,
+            'telepon_pelanggan' => $pelanggan->telepon,
+            'jenis_hp' => 'iPhone 12',
+            'keluhan' => 'Servis lanjutan',
+            'status' => 'diagnosa',
+            'sumber' => 'walk_in',
+        ]);
+
+        $service->setEstimasi($tiket2, 300000, 'Estimasi jasa', $this->admin, [
+            ['tipe' => 'jasa', 'nama_item' => 'Jasa servis lanjutan', 'qty' => 1, 'harga' => 300000],
+        ]);
+        $service->updateStatus($tiket2->fresh(), 'disetujui', $this->admin);
+
+        $this->assertSame(220000.0, $service->getTotalTagihanBersih($tiket2->fresh()), 'Voucher 80.000 dipakai pada servis ini');
+
+        $service->updateStatus($tiket2->fresh(), 'dikerjakan', $this->admin, 'Mulai');
+        $service->updateStatus($tiket2->fresh(), 'qc', $this->admin, 'QC');
+        $service->updateStatus($tiket2->fresh(), 'selesai', $this->admin, 'Selesai');
+
+        $jurnal = JurnalAkuntansi::where('referensi_tipe', TiketServis::class)
+            ->where('referensi_id', $tiket2->id)
+            ->get();
+        $this->assertEquals(220000.0, (float) $jurnal->sum('debit'), 'Piutang = total setelah voucher');
+
+        $voucher = $voucher->fresh();
+        $this->assertSame('terpakai', $voucher->status);
+        $this->assertSame(0.0, (float) $voucher->sisa);
+        $this->assertSame($tiket2->id, (int) $voucher->used_tiket_id);
     }
 }

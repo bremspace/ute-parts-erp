@@ -16,6 +16,7 @@
                 ['label' => 'Gratis Disetujui', 'value' => $gratisDisetujui, 'color' => 'text-up-mint'],
                 ['label' => 'Goodwill Disetujui', 'value' => $goodwillDisetujui, 'color' => 'text-up-amber'],
                 ['label' => 'SLA Overdue', 'value' => $overdue, 'color' => 'text-up-red'],
+                ['label' => 'Eskalasi', 'value' => $eskalasi, 'color' => 'text-up-red'],
             ];
         @endphp
 

@@ -25,6 +25,7 @@ use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisEstimasiItem;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Models\TiketServisProgress;
+use App\Modules\Servis\Models\Voucher;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Models\Produk;
@@ -1805,7 +1806,8 @@ class ServisService
      */
     public function getGoodwillBerlaku(TiketServis $tiket): float
     {
-        if (! $tiket->goodwill_approved_at) {
+        // Goodwill yang diputuskan sebagai VOUCHER tidak mengurangi tiket asal.
+        if ($tiket->goodwill_voucher || ! $tiket->goodwill_approved_at) {
             return 0.0;
         }
 
@@ -1815,7 +1817,7 @@ class ServisService
     }
 
     /**
-     * Total tagihan setelah goodwill (perbaikan garansi gratis = 0).
+     * Total tagihan setelah goodwill + voucher yang dipakai otomatis.
      */
     public function getTotalTagihanBersih(TiketServis $tiket): float
     {
@@ -1823,16 +1825,49 @@ class ServisService
             return 0.0;
         }
 
-        return max(0.0, (float) $tiket->getRincianBiayaLengkap()['total'] - $this->getGoodwillBerlaku($tiket));
+        return max(
+            0.0,
+            (float) $tiket->getRincianBiayaLengkap()['total']
+                - $this->getGoodwillBerlaku($tiket)
+                - $this->getDiskonVoucher($tiket)
+        );
+    }
+
+    /**
+     * Voucher goodwill milik pelanggan yang dipakai pada servis ini (otomatis).
+     */
+    public function getDiskonVoucher(TiketServis $tiket): float
+    {
+        if ($tiket->komplain_gratis || ! $tiket->pelanggan_id) {
+            return 0.0;
+        }
+
+        $voucher = Voucher::where('pelanggan_id', $tiket->pelanggan_id)
+            ->where('status', 'aktif')
+            ->where('sisa', '>', 0)
+            ->where(fn ($q) => $q->whereNull('expired_at')->orWhere('expired_at', '>', now()))
+            ->where(fn ($q) => $q->whereNull('tiket_servis_id')->orWhere('tiket_servis_id', '!=', $tiket->id))
+            ->orderBy('expired_at')
+            ->first();
+
+        if (! $voucher) {
+            return 0.0;
+        }
+
+        return min((float) $tiket->getRincianBiayaLengkap()['total'], (float) $voucher->sisa);
     }
 
     /**
      * Usulkan goodwill (diskon kompensasi) — butuh persetujuan regulator.
      */
-    public function usulkanGoodwill(TiketServis $tiket, float $amount, string $alasan, User $user): void
+    public function usulkanGoodwill(TiketServis $tiket, float $amount, string $alasan, User $user, bool $sebagaiVoucher = false): void
     {
         if ($tiket->komplain_gratis) {
             throw new \Exception('Perbaikan garansi gratis tidak dapat diberi goodwill tambahan.');
+        }
+
+        if ($sebagaiVoucher && ! $tiket->pelanggan_id) {
+            throw new \Exception('Voucher goodwill hanya untuk tiket yang terikat pelanggan.');
         }
 
         if ($amount <= 0) {
@@ -1856,6 +1891,7 @@ class ServisService
             'goodwill_alasan' => $alasan,
             'goodwill_proposed_by' => $user->id,
             'goodwill_proposed_at' => now(),
+            'goodwill_voucher' => $sebagaiVoucher,
         ]);
 
         $this->logStatus($tiket, $tiket->status, $tiket->status, $user, 'goodwill_aju', 'Pengajuan goodwill Rp '.number_format($amount, 0, ',', '.').': '.$alasan);
@@ -1887,7 +1923,27 @@ class ServisService
             'goodwill_approved_by' => $user->id,
         ]);
 
-        $this->logStatus($tiket, $tiket->status, $tiket->status, $user, 'goodwill_setuju', 'Goodwill disetujui regulator');
+        // Goodwill bentuk VOUCHER: terbitkan voucher untuk servis berikutnya.
+        if ($tiket->goodwill_voucher) {
+            if (! $tiket->pelanggan_id) {
+                throw new \Exception('Voucher goodwill wajib tiket terikat pelanggan.');
+            }
+
+            $kode = 'VCR-'.strtoupper(\Illuminate\Support\Str::random(10));
+
+            Voucher::create([
+                'kode' => $kode,
+                'pelanggan_id' => $tiket->pelanggan_id,
+                'tiket_servis_id' => $tiket->id,
+                'amount' => $tiket->goodwill_amount,
+                'sisa' => $tiket->goodwill_amount,
+                'status' => 'aktif',
+                'expired_at' => now()->addDays(90),
+                'catatan' => 'Goodwill servis '.$tiket->no_tiket.($tiket->goodwill_alasan ? ' — '.$tiket->goodwill_alasan : ''),
+            ]);
+        }
+
+        $this->logStatus($tiket, $tiket->status, $tiket->status, $user, 'goodwill_setuju', 'Goodwill disetujui regulator'.($tiket->goodwill_voucher ? ' (bentuk voucher)' : ''));
     }
 
     /**
@@ -2355,16 +2411,18 @@ class ServisService
             // [Goodwill] Diskon kompensasi (disetujui regulator) dialokasikan
             // proporsional ke jasa & part; piutang = total bersih.
             $diskonGoodwill = $garansiGratis ? $totalTagihan : $this->getGoodwillBerlaku($tiket);
+            $diskonVoucher = $garansiGratis ? 0.0 : $this->getDiskonVoucher($tiket);
+            $totalDiskon = min($totalTagihan, $diskonGoodwill + $diskonVoucher);
 
             if ($garansiGratis) {
                 $jasaServis = 0.0;
                 $totalJualSparepart = 0.0;
                 $totalTagihan = 0.0;
-            } elseif ($diskonGoodwill > 0) {
+            } elseif ($totalDiskon > 0) {
                 $bruto = $totalTagihan;
-                $jasaServis = round($jasaServis - ($diskonGoodwill * $jasaServis / $bruto), 2);
-                $totalJualSparepart = round($totalJualSparepart - ($diskonGoodwill * $totalJualSparepart / $bruto), 2);
-                $totalTagihan = max(0.0, $totalTagihan - $diskonGoodwill);
+                $jasaServis = round($jasaServis - ($totalDiskon * $jasaServis / $bruto), 2);
+                $totalJualSparepart = round($totalJualSparepart - ($totalDiskon * $totalJualSparepart / $bruto), 2);
+                $totalTagihan = max(0.0, $totalTagihan - $totalDiskon);
             }
 
             if ($totalTagihan > 0 || ($garansiGratis && $totalHpp > 0)) {
@@ -2458,6 +2516,26 @@ class ServisService
                     // (idempoten). Teknisi bagi hasil sudah dikecualikan dari komisi
                     // (engine + legacy) supaya satu tiket tidak dibayar dua kali.
                     app(BagiHasilService::class)->accru($tiket);
+                }
+
+                // [Voucher goodwill] potong & tandai voucher yang dipakai di
+                // servis ini (redeem otomatis, sekali, tercatat).
+                if ($diskonVoucher > 0) {
+                    $voucher = Voucher::where('pelanggan_id', $tiket->pelanggan_id)
+                        ->where('status', 'aktif')
+                        ->where('sisa', '>', 0)
+                        ->where(fn ($q) => $q->whereNull('expired_at')->orWhere('expired_at', '>', now()))
+                        ->where(fn ($q) => $q->whereNull('tiket_servis_id')->orWhere('tiket_servis_id', '!=', $tiket->id))
+                        ->orderBy('expired_at')
+                        ->first();
+
+                    if ($voucher) {
+                        $voucher->sisa = max(0, round((float) $voucher->sisa - $diskonVoucher, 2));
+                        $voucher->status = $voucher->sisa <= 0 ? 'terpakai' : 'aktif';
+                        $voucher->used_at = now();
+                        $voucher->used_tiket_id = $tiket->id;
+                        $voucher->save();
+                    }
                 }
             }
         } catch (\Throwable $e) {
