@@ -44,19 +44,19 @@ def main():
     commits = log_out.strip().splitlines()
     num_commits = len(commits)
 
-    # 3. Get changed files and diff
-    _, diff_stat, _ = run_cmd("git diff origin/brem..origin/Unas --stat")
+    # 3. Get changed files and diff (use triple-dot ... to diff from merge-base)
+    _, diff_stat, _ = run_cmd("git diff origin/brem...origin/Unas --stat")
     if not diff_stat:
-        _, diff_stat, _ = run_cmd("git diff brem..origin/Unas --stat")
+        _, diff_stat, _ = run_cmd("git diff brem...origin/Unas --stat")
 
-    _, diff_files_raw, _ = run_cmd("git diff --name-only origin/brem..origin/Unas")
+    _, diff_files_raw, _ = run_cmd("git diff --name-only origin/brem...origin/Unas")
     if not diff_files_raw:
-        _, diff_files_raw, _ = run_cmd("git diff --name-only brem..origin/Unas")
+        _, diff_files_raw, _ = run_cmd("git diff --name-only brem...origin/Unas")
     changed_files = [f.strip() for f in diff_files_raw.splitlines() if f.strip()]
 
-    _, diff_full, _ = run_cmd("git diff -U3 origin/brem..origin/Unas")
+    _, diff_full, _ = run_cmd("git diff -U3 origin/brem...origin/Unas")
     if not diff_full:
-        _, diff_full, _ = run_cmd("git diff -U3 brem..origin/Unas")
+        _, diff_full, _ = run_cmd("git diff -U3 brem...origin/Unas")
 
     # 4. Security & Quality Audit Rules
     sensitive_patterns = [
