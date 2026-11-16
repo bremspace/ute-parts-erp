@@ -380,7 +380,7 @@ class ShopPage extends Component
 
     public function getBrandsProperty(): mixed
     {
-        return Cache::remember('shop.brands.list.v1', self::HP_LIST_CACHE_TTL, function () {
+        return Cache::remember('shop.brands.list.v2', self::HP_LIST_CACHE_TTL, function () {
             return Brand::where('is_active', true)->orderBy('nama')->pluck('nama')->filter()->values()->all();
         });
     }
