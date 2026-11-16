@@ -88,8 +88,19 @@
             this.wmsViewMode = mode;
             try { localStorage.setItem('ute-wms-view-mode', mode); } catch (e) {}
         },
+        previewImageUrl: null,
+        previewImageName: '',
+        openImagePreview(url, name = '') {
+            if (!url) return;
+            this.previewImageUrl = url;
+            this.previewImageName = name || 'Preview Gambar Produk';
+        },
+        closeImagePreview() {
+            this.previewImageUrl = null;
+            this.previewImageName = '';
+        },
         ...kameraProdukHandler()
-     }">
+     }" @keydown.escape.window="closeImagePreview()">
     <!-- TAB 1b: MASTER PRODUK -->
         <div class="space-y-4">
             <!-- Search & Filters -->
@@ -1480,12 +1491,31 @@
                         @endif
                         <td class="py-2.5 px-3 min-w-[220px]">
                             <div class="flex items-center gap-2.5">
-                                <div class="w-10 h-10 rounded-xl overflow-hidden bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 shrink-0 flex items-center justify-center relative">
+                                @php $previewUrl = $p->foto_utama ?: $p->thumbnail_url ?: $p->gambar; @endphp
+                                <div class="w-10 h-10 rounded-xl overflow-hidden bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 shrink-0 flex items-center justify-center relative group">
                                     @if($p->thumbnail_url)
                                         <img src="{{ $p->thumbnail_url }}" alt="{{ $p->nama }}" class="w-full h-full object-cover" loading="lazy"
                                              onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                                     @endif
-                                    <span class="text-base text-ink-500 items-center justify-center w-full h-full" style="{{ $p->thumbnail_url ? 'display:none;' : 'display:flex;' }}">📦</span>
+                                    <span class="items-center justify-center w-full h-full px-1 text-center" style="{{ $p->thumbnail_url ? 'display:none;' : 'display:flex;' }}">
+                                        <span class="flex flex-col items-center justify-center gap-0.5 leading-none">
+                                            <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <span class="text-[8px] font-medium text-ink-400 leading-tight">Belum ada<br>gambar</span>
+                                        </span>
+                                    </span>
+                                    @if($previewUrl)
+                                        <button type="button"
+                                                @click.stop="openImagePreview(@js($previewUrl), @js($p->nama))"
+                                                class="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
+                                                title="Preview gambar">
+                                            <svg class="w-4 h-4 text-white drop-shadow" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                        </button>
+                                    @endif
                                 </div>
                                 <div class="min-w-0">
                                     <span class="font-semibold text-ink-900 dark:text-white block text-xs leading-snug line-clamp-2" title="{{ $p->nama }}">{{ $p->nama }}</span>
@@ -5759,4 +5789,33 @@ Baterai iPhone 11	SKU-BAT-02	150000	Original	20	RAK-A1
             </div>
         </div>
     @endif
+
+    <!-- Preview Gambar Produk -->
+    <template x-teleport="body">
+        <div x-show="previewImageUrl"
+             x-cloak
+             x-transition:enter="transition ease-out duration-150"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-100"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm"
+             @click.self="closeImagePreview()">
+            <div class="relative w-full max-w-4xl max-h-[90vh] bg-ink-950/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden" @click.stop>
+                <div class="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-white/10">
+                    <div class="min-w-0">
+                        <p class="text-[11px] uppercase tracking-wider text-ink-400">Preview Gambar</p>
+                        <h3 class="text-sm font-semibold text-white truncate" x-text="previewImageName || 'Produk'"></h3>
+                    </div>
+                    <button type="button" @click="closeImagePreview()" class="shrink-0 p-2 rounded-xl text-ink-300 hover:text-white hover:bg-white/10 transition cursor-pointer" title="Tutup (Esc)">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="p-4 sm:p-6 flex items-center justify-center bg-gradient-to-b from-black/20 to-black/40">
+                    <img :src="previewImageUrl" :alt="previewImageName" class="max-h-[72vh] max-w-full w-auto h-auto object-contain rounded-xl shadow-lg">
+                </div>
+            </div>
+        </div>
+    </template>
 </div>

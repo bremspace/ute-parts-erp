@@ -90,10 +90,19 @@ $wrapperTag = $href ? 'a' : 'div';
     {{ $attributes->merge(['class' => "{$directionClass} {$conf['gap']} select-none group transition-opacity duration-150"]) }}
 >
     <!-- Brand / Prism Emblem Badge -->
-    <div class="{{ $conf['box'] }} bg-gradient-to-tr from-up-primary via-indigo-600 to-up-accent flex items-center justify-center shadow-lg shadow-up-primary/25 border border-white/20 flex-shrink-0 group-hover:shadow-up-primary/40 transition-shadow overflow-hidden">
-        @if(!empty($logoImage))
-            <img src="{{ $logoImage }}" alt="{{ $resolvedTitle }}" class="w-full h-full object-contain p-1 rounded-inherit">
-        @else
+    @if(!empty($logoImage))
+        @php
+            $imgBox = match ($size) {
+                'sm' => 'h-7 max-w-[100px]',
+                'lg' => 'h-12 sm:h-14 max-w-[200px]',
+                default => 'h-8 sm:h-9 max-w-[120px] sm:max-w-[160px]',
+            };
+        @endphp
+        <div class="{{ $imgBox }} flex items-center justify-center flex-shrink-0 min-w-0">
+            <img src="{{ $logoImage }}" alt="{{ $resolvedTitle }}" class="h-full w-auto max-w-full object-contain block">
+        </div>
+    @else
+        <div class="{{ $conf['box'] }} bg-gradient-to-tr from-up-primary via-indigo-600 to-up-accent flex items-center justify-center shadow-lg shadow-up-primary/25 border border-white/20 flex-shrink-0 group-hover:shadow-up-primary/40 transition-shadow overflow-hidden">
             <svg class="{{ $conf['icon'] }}" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
                     <linearGradient id="facet-top-{{ $id }}" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -125,8 +134,8 @@ $wrapperTag = $href ? 'a' : 'div';
                 <polygon points="50,38 60,48 50,58 40,48" fill="url(#facet-center-{{ $id }})" opacity="0.95" />
                 <circle cx="50" cy="48" r="2" fill="#FFFFFF" />
             </svg>
-        @endif
-    </div>
+        </div>
+    @endif
 
     @if($withText)
         <div class="min-w-0 {{ $textClass }}">
