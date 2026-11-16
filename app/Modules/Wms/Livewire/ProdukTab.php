@@ -108,6 +108,15 @@ class ProdukTab extends Component
     // Bulk Edit Modal
     public bool $showBulkEditModal = false;
 
+    // Find & Replace Modal
+    public bool $showFindReplaceModal = false;
+    public string $findReplaceField = 'nama';
+    public string $findText = '';
+    public string $replaceText = '';
+    public bool $findReplaceCaseSensitive = false;
+    public int $findReplacePreviewCount = 0;
+    public bool $findReplaceHasPreviewed = false;
+
     public array $bulkEditFields = [
         'kategori_id' => false,
         'brand_id' => false,
@@ -3649,6 +3658,91 @@ class ProdukTab extends Component
         }
     }
 
+    // ===== FIND & REPLACE NAMA PRODUK =====
+    public function openFindReplaceModal(): void
+    {
+        if (! $this->boleh('wms.create', 'Anda tidak memiliki izin mengedit produk secara masal.')) {
+            return;
+        }
+
+        $this->findReplaceField = 'nama';
+        $this->findText = '';
+        $this->replaceText = '';
+        $this->findReplaceCaseSensitive = false;
+        $this->findReplacePreviewCount = 0;
+        $this->findReplaceHasPreviewed = false;
+        $this->showFindReplaceModal = true;
+    }
+
+    public function closeFindReplaceModal(): void
+    {
+        $this->showFindReplaceModal = false;
+    }
+
+    public function previewFindReplace(): void
+    {
+        if (trim($this->findText) === '') {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Teks yang dicari tidak boleh kosong.']);
+            return;
+        }
+
+        $field = in_array($this->findReplaceField, ['nama', 'brand_kompatibel', 'model_kompatibel'], true)
+            ? $this->findReplaceField
+            : 'nama';
+
+        $query = \App\Modules\Wms\Models\Produk::query();
+        if ($this->findReplaceCaseSensitive) {
+            $query->where($field, 'like', '%'.$this->findText.'%');
+        } else {
+            $query->whereRaw('LOWER('.$field.') LIKE ?', ['%'.mb_strtolower($this->findText).'%']);
+        }
+
+        $this->findReplacePreviewCount = $query->count();
+        $this->findReplaceHasPreviewed = true;
+    }
+
+    public function executeFindReplace(): void
+    {
+        if (! $this->boleh('wms.create', 'Anda tidak memiliki izin mengedit produk secara masal.')) {
+            return;
+        }
+
+        if (trim($this->findText) === '') {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Teks yang dicari tidak boleh kosong.']);
+            return;
+        }
+
+        $field = in_array($this->findReplaceField, ['nama', 'brand_kompatibel', 'model_kompatibel'], true)
+            ? $this->findReplaceField
+            : 'nama';
+
+        $products = \App\Modules\Wms\Models\Produk::query();
+        if ($this->findReplaceCaseSensitive) {
+            $products->where($field, 'like', '%'.$this->findText.'%');
+        } else {
+            $products->whereRaw('LOWER('.$field.') LIKE ?', ['%'.mb_strtolower($this->findText).'%']);
+        }
+
+        $count = 0;
+        foreach ($products->get() as $produk) {
+            $original = (string) $produk->{$field};
+            if ($this->findReplaceCaseSensitive) {
+                $new = str_replace($this->findText, $this->replaceText, $original);
+            } else {
+                $new = str_ireplace($this->findText, $this->replaceText, $original);
+            }
+            if ($new !== $original) {
+                $produk->{$field} = $new;
+                $produk->save();
+                $count++;
+            }
+        }
+
+        $this->showFindReplaceModal = false;
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Find & Replace selesai: {$count} produk diperbarui."]);
+        $this->resetPage();
+    }
+
     public function openBulkEditModal(): void
     {
         if (! $this->boleh('wms.create', 'Anda tidak memiliki izin mengedit produk secara masal.')) {
@@ -4159,7 +4253,30 @@ class ProdukTab extends Component
             ->withSum([
                 'stokItems as total_stok' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId))),
             ], 'jumlah')
-            ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch));
+            ->when($this->produkSearch, function ($q) {
+                $term = trim($this->produkSearch);
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('produk.nama', 'like', "%{$term}%")
+                        ->orWhere('produk.brand_kompatibel', 'like', "%{$term}%")
+                        ->orWhere('produk.model_kompatibel', 'like', "%{$term}%")
+                        ->orWhere('produk.barcode', '=', $term)
+                        ->orWhere('produk.barcode_alt', 'like', "%{$term}%")
+                        ->orWhereExists(function ($ex) use ($term) {
+                            $ex->select(\Illuminate\Support\Facades\DB::raw(1))
+                                ->from('produk_barcodes')
+                                ->whereColumn('produk_barcodes.produk_id', 'produk.id')
+                                ->where('produk_barcodes.barcode', '=', $term);
+                        })
+                        ->orWhereIn('produk.id', \App\Modules\Wms\Models\SkuVariant::query()
+                            ->where('is_active', true)
+                            ->where(function ($sq) use ($term) {
+                                $sq->where('barcode', '=', $term)
+                                    ->orWhere('sku', '=', $term);
+                            })
+                            ->select('produk_id')
+                        );
+                });
+            });
 
         if (! empty($selectedKategoriIds)) {
             $query->where(function ($q) use ($selectedKategoriIds, $kategoriNama) {

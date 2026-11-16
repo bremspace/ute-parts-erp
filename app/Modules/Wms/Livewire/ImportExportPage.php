@@ -62,6 +62,9 @@ class ImportExportPage extends Component
 
     public array $columnMapping = [];
 
+    // Per-kolom overwrite untuk produk yang sudah ada (kosong = timpa semua)
+    public array $importOverwriteColumns = [];
+
     public ?int $defaultGudangId = null;
 
     public bool $paksaCustomMapping = false;
@@ -318,23 +321,8 @@ class ImportExportPage extends Component
 
         $mappedValues = array_filter(array_values($this->columnMapping), fn ($v) => $v !== '' && $v !== null && $v !== 'abaikan');
 
-        if (! in_array('nama', $mappedValues, true)) {
-            $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => 'Kolom "Nama Produk" wajib dipetakan untuk melanjutkan import master produk.',
-            ]);
-
-            return;
-        }
-
-        if (! in_array('harga_jual', $mappedValues, true)) {
-            $this->dispatch('alert', [
-                'type' => 'warning',
-                'message' => 'Kolom "Harga Jual" wajib dipetakan untuk melanjutkan import master produk.',
-            ]);
-
-            return;
-        }
+        // Nama & Harga Jual opsional: jika tidak dipetakan, produk existing tidak akan namanya/harganya berubah;
+        // produk baru akan default 'Produk {SKU}' / harga 0. SKU tetap wajib (patokan).
 
         try {
             $realPath = Storage::disk('local')->path($this->importFilePath);
@@ -798,7 +786,8 @@ class ImportExportPage extends Component
                         $this->resolusiBarcode,
                         $this->resolusiErrorBaris,
                         $columnMapping,
-                        $defaultGudangId
+                        $defaultGudangId,
+                        $this->importOverwriteColumns
                     );
                 } else {
                     ImportProdukExcelJob::dispatch(
@@ -815,7 +804,8 @@ class ImportExportPage extends Component
                         $this->resolusiBarcode,
                         $this->resolusiErrorBaris,
                         $columnMapping,
-                        $defaultGudangId
+                        $defaultGudangId,
+                        $this->importOverwriteColumns
                     );
                 }
             }
