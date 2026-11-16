@@ -58,9 +58,9 @@
 
             <!-- Preview Struk Kertas Thermal (Rendered via JS EscPos for exact 1:1 print parity) -->
             <div class="overflow-y-auto pr-1 flex-1 flex justify-center py-1">
-                <div class="thermal-receipt-container thermal-receipt-preview bg-white text-black p-3 rounded-xl font-mono text-[10px] shadow-md select-text transition-all duration-200 border border-gray-200"
+                <div class="thermal-receipt-container thermal-receipt-preview bg-white text-black p-2 rounded-xl font-mono text-[10px] shadow-md select-text transition-all duration-200 border border-gray-200"
                      id="thermalReceipt"
-                     :style="paperSize === '58' ? 'width: 210px; max-width: 100%; margin: 0 auto;' : 'width: 302px; max-width: 100%; margin: 0 auto;'"
+                     :style="paperSize === '58' ? 'width: 58mm; max-width: 100%; margin: 0 auto;' : 'width: 80mm; max-width: 100%; margin: 0 auto;'"
                      x-html="previewHtml">
                     <div class="thermal-receipt-body" style="width: 100%; padding: 10px 0; text-align: center; color: #6b7280; font-size: 9px;">Memuat pratinjau…</div>
                 </div>

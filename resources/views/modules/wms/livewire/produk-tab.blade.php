@@ -1748,7 +1748,7 @@
                                     <span class="text-up-mint font-semibold">Rp {{ number_format($tierInfo['harga'], 0, ',', '.') }}</span>
                                     @if($filterTierHarga !== 'retail')
                                         <span class="text-[9px] text-ink-500 line-through">({{ number_format($p->harga_jual_retail, 0, ',', '.') }})</span>
-                                    @elseif($p->margin_persen > 0)
+                                    @elseif($p->margin_persen > 0 && canSeeField('margin'))
                                         <span class="text-[9px] text-ink-400 font-mono" title="Margin {{ $p->margin_persen }}%">+{{ (float) $p->margin_persen }}%</span>
                                     @endif
                                 </div>
