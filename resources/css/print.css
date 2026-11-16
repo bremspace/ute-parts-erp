@@ -171,6 +171,15 @@
         page: struk58;
     }
 
+    .thermal-receipt-preview [style*="white-space: nowrap"],
+    .thermal-receipt-container [style*="white-space: nowrap"],
+    .thermal-receipt-preview .tabular-nums,
+    .thermal-receipt-container .tabular-nums {
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+        overflow-wrap: normal !important;
+    }
+
     /* Mode 80mm bila disetel via body[data-modal-print="80"] */
     body[data-modal-print="80"] .thermal-receipt-container {
         width: 72mm !important;

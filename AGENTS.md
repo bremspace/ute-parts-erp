@@ -150,6 +150,17 @@ npm run build
 - **Izin akses**: user memberi izin penuh semua akses sesi kerja (per 2026-09-20) — lanjut tanpa minta konfirmasi berulang untuk eksekusi kode/deploy/dev.
 - **Template checklist**: setiap implement-plan baru harus punya checkbox per task (format `- [ ] T-XX — ...` di Acceptance Criteria) yang dicentang hanya setelah verified.
 
+### Deteksi Akun GitHub & Routing Push Branch (Aturan Tetap)
+- **Setiap kali diminta commit dan push**:
+  1. **Cek akun GitHub aktif** via `ssh -T git@github.com` atau `gh api user`.
+  2. **Jika akun adalah `bremspace` (owner)**:
+     - Target branch push WAJIB ke branch **`brem`** (`git push origin brem`).
+     - Pastikan perubahan disinkronkan ke branch `brem`.
+  3. **Jika akun BUKAN `bremspace`** (misal collaborator `Unas`):
+     - Target branch push ke branch **`Unas`** (`git push origin Unas`).
+  4. **Proteksi `.gitignore` untuk AI Agent Setup**:
+     - Direktori `.agents/` dan `scripts/` DILARANG di-ignore. Pastikan konfigurasi skills, rules, plugins, dan MCP tetap terlacak di repositori.
+
 ### Aturan Git Kolaborasi (Permanen — Branch Unas)
 - Branch kerja eksklusif: **Unas**. Semua modifikasi kode, commit, dan push HANYA di branch Unas.
 - WAJIB sebelum mengedit kode apa pun di setiap sesi/task:

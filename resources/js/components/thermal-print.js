@@ -116,7 +116,14 @@ class EscPos {
   pad(left, right) {
     left = this.clean(left);
     right = this.clean(right);
-    const pad = Math.max(1, this.columns - left.length - right.length);
+    const totalLen = left.length + right.length;
+
+    if (totalLen >= this.columns) {
+      const padRight = Math.max(0, this.columns - right.length);
+      return left + '\n' + ' '.repeat(padRight) + right;
+    }
+
+    const pad = this.columns - totalLen;
     return left + ' '.repeat(pad) + right;
   }
 
@@ -285,11 +292,21 @@ class EscPos {
         const normal = this.money(hargaRetail);
         const disc = this.money(hargaJual);
         const prefix = qtySatuan + ' x ';
-        const gap = Math.max(1, this.columns - prefix.length - normal.length - 1 - disc.length - rightVal.length);
-        this.raw(prefix);
-        this.escB(true).raw(normal).escB(false);
-        this.raw(' ' + disc);
-        this.buf.push(...this.ascii(' '.repeat(gap) + rightVal), 0x0a);
+        const totalLineLen = prefix.length + normal.length + 1 + disc.length + rightVal.length;
+
+        if (totalLineLen >= this.columns) {
+          this.raw(prefix);
+          this.escB(true).raw(normal).escB(false);
+          this.raw(' ' + disc + '\n');
+          const padRight = Math.max(0, this.columns - rightVal.length);
+          this.buf.push(...this.ascii(' '.repeat(padRight) + rightVal), 0x0a);
+        } else {
+          const gap = this.columns - totalLineLen;
+          this.raw(prefix);
+          this.escB(true).raw(normal).escB(false);
+          this.raw(' ' + disc);
+          this.buf.push(...this.ascii(' '.repeat(gap) + rightVal), 0x0a);
+        }
       } else if (hargaRetail > hargaJual) {
         this.text(this.pad(`${qtySatuan} x (${this.money(hargaRetail)}) -> ${this.money(hargaJual)}`, rightVal));
       } else {
@@ -574,14 +591,14 @@ class EscPos {
       return `
         <div style="width: 100%; margin-bottom: 4px;">
           <div style="font-weight: 700; font-size: 9.5px; line-height: 1.25; word-break: break-word;">${esc(nama)}</div>
-          <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: 9px; margin-top: 1px;">
-            <span>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: ${widthNum === 80 ? '9.5px' : '9px'}; margin-top: 1px; gap: 4px;">
+            <span style="flex: 1; min-width: 0; word-break: break-word;">
               ${qtySatuan} x ${hargaRetail > hargaJual ? `
                 <span style="text-decoration: line-through; opacity: 0.75; margin-right: 2px;">${money(hargaRetail)}</span>
                 <span style="font-weight: 700;">${money(hargaJual)}</span>
               ` : `<span>${harga}</span>`}
             </span>
-            <span style="font-weight: 700; text-align: right; margin-left: 4px;">${subtotalItem}</span>
+            <span style="font-weight: 700; text-align: right; white-space: nowrap; flex-shrink: 0;" class="tabular-nums">${subtotalItem}</span>
           </div>
           ${item.catatan ? `<div style="font-size: 8px; color: #4b5563; font-style: italic; margin-top: 1px;">* ${esc(item.catatan)}</div>` : ''}
         </div>
@@ -592,115 +609,115 @@ class EscPos {
   <!-- SUBTOTAL BREAKDOWN & TOTALS (Directly follows items without extra dashed line) -->
   <div style="width: 100%; font-size: 9px; line-height: 1.35;">
     ${(show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0') && diskon_tier && Number(diskon_tier) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">Subtotal Retail:</span>
-        <span>${money(Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier)))}</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier)))}</span>
       </div>
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">${tier && tier !== 'Retail' ? 'Pot ' + esc(tier) + ':' : 'Pot Mitra:'}</span>
-        <span style="color: #dc2626;">-${money(diskon_tier)}</span>
+        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_tier)}</span>
       </div>
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">Subtotal:</span>
-        <span>${money(subtotal ?? total)}</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(subtotal ?? total)}</span>
       </div>
     ` : `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">Subtotal:</span>
-        <span>${money(subtotal ?? total)}</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(subtotal ?? total)}</span>
       </div>
     `}
 
     ${diskon_partai && Number(diskon_partai) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">Diskon Partai:</span>
-        <span style="color: #dc2626;">-${money(diskon_partai)}</span>
+        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_partai)}</span>
       </div>
     ` : ''}
     ${diskon_poin && Number(diskon_poin) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">Tukar Poin (${poin_ditukar || 0}pts):</span>
-        <span style="color: #dc2626;">-${money(diskon_poin)}</span>
+        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_poin)}</span>
       </div>
     ` : ''}
     ${diskon && Number(diskon) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">${esc(lblDiskon)}:</span>
-        <span style="color: #dc2626;">-${money(diskon)}</span>
+        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon)}</span>
       </div>
     ` : ''}
     ${pajak && Number(pajak) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">${esc(ppnLabel)}:</span>
-        <span>+${money(pajak)}</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">+${money(pajak)}</span>
       </div>
     ` : ''}
     ${ongkir && Number(ongkir) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">Ongkir:</span>
-        <span>+${money(ongkir)}</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">+${money(ongkir)}</span>
       </div>
     ` : ''}
 
-    <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: 13px; font-weight: 900; padding: 2px 0;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: 13px; font-weight: 900; padding: 2px 0; gap: 4px;">
       <span>TOTAL:</span>
-      <span>${money(total)}</span>
+      <span style="white-space: nowrap; flex-shrink: 0;">${money(total)}</span>
     </div>
 
     ${is_piutang ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #b45309;">
+      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #b45309; gap: 4px;">
         <span>Status:</span>
-        <span>BELUM LUNAS (PIUTANG)</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">BELUM LUNAS (PIUTANG)</span>
       </div>
       ${jatuh_tempo ? `
-        <div style="display: flex; justify-content: space-between; width: 100%;">
+        <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
           <span style="color: #4b5563;">Jatuh Tempo:</span>
-          <span>${esc(jatuh_tempo)}</span>
+          <span style="white-space: nowrap; flex-shrink: 0;">${esc(jatuh_tempo)}</span>
         </div>
       ` : ''}
-      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700;">
+      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; gap: 4px;">
         <span style="color: #4b5563;">Sisa Tag:</span>
-        <span>${money(sisa_piutang ?? total)}</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(sisa_piutang ?? total)}</span>
       </div>
     ` : `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">BAYAR (${esc(caraBayar)}):</span>
-        <span style="font-weight: 600;">${money(bayar || total)}</span>
+        <span style="font-weight: 600; white-space: nowrap; flex-shrink: 0;">${money(bayar || total)}</span>
       </div>
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">KEMBALI:</span>
-        <span style="font-weight: 600;">${money(kembali ?? 0)}</span>
+        <span style="font-weight: 600; white-space: nowrap; flex-shrink: 0;">${money(kembali ?? 0)}</span>
       </div>
     `}
 
     ${saldo_poin !== undefined ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">Sisa Saldo Poin:</span>
-        <span>${Number(saldo_poin).toLocaleString('id-ID')} pts</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${Number(saldo_poin).toLocaleString('id-ID')} pts</span>
       </div>
     ` : ''}
     ${hemat_total && Number(hemat_total) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #059669;">
+      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #059669; gap: 4px;">
         <span>HEMAT:</span>
-        <span>${money(hemat_total)}</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(hemat_total)}</span>
       </div>
     ` : ''}
     ${komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; color: #2563eb;">
+      <div style="display: flex; justify-content: space-between; width: 100%; color: #2563eb; gap: 4px;">
         <span style="color: #4b5563;">Komisi:</span>
-        <span>+${money(komisi_mitra_nominal)} (Saldo)</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">+${money(komisi_mitra_nominal)} (Saldo)</span>
       </div>
     ` : ''}
     ${goodwill ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669;">
+      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669; gap: 4px;">
         <span style="color: #4b5563;">Goodwill:</span>
-        <span>${esc(goodwill)}</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${esc(goodwill)}</span>
       </div>
     ` : ''}
     ${voucher ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669;">
+      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669; gap: 4px;">
         <span style="color: #4b5563;">Voucher:</span>
-        <span>${esc(voucher)}</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${esc(voucher)}</span>
       </div>
     ` : ''}
     ${komplain ? `

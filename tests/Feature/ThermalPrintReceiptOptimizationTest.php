@@ -367,4 +367,30 @@ class ThermalPrintReceiptOptimizationTest extends TestCase
         $this->assertStringContainsString('Voucher:', $output);
         $this->assertStringContainsString('Komplain pasca-servis', $output);
     }
+
+    public function test_escpos_writer_58mm_item_subtotal_does_not_split_numbers(): void
+    {
+        $writer = app(EscPosWriter::class);
+        $data = [
+            'paper_width' => 58,
+            'font_size' => 'normal', // 32 columns
+            'items' => [
+                [
+                    'nama' => 'Produk Panjang Sekali',
+                    'qty' => 10,
+                    'satuan' => 'KOTAK',
+                    'harga' => 100000,
+                    'subtotal' => 1000000,
+                ],
+            ],
+            'total' => 1000000,
+            'bayar' => 1000000,
+            'kembali' => 0,
+        ];
+
+        $output = $writer->receipt($data);
+
+        $this->assertStringContainsString('1.000.000', $output);
+        $this->assertStringContainsString('10 KOTAK x Rp 100.000', $output);
+    }
 }

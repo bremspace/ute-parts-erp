@@ -204,12 +204,21 @@ class EscPosWriter
                 $normal = $this->money($hargaRetail);
                 $disc = $this->money($hargaJual);
                 $prefix = "{$qtySatuan} x ";
-                $gap = max(1, $this->columns - strlen($prefix) - strlen($normal) - 1 - strlen($disc) - strlen($rightVal));
-                $this->raw($prefix);
-                $this->escB(true)->raw($normal)->escB(false);
-                $this->raw(' '.$disc);
-                $this->raw(str_repeat(' ', $gap).$rightVal);
-                $this->buf .= "\n";
+                $totalLineLen = strlen($prefix) + strlen($normal) + 1 + strlen($disc) + strlen($rightVal);
+
+                if ($totalLineLen >= $this->columns) {
+                    $this->raw($prefix);
+                    $this->escB(true)->raw($normal)->escB(false);
+                    $this->raw(' '.$disc."\n");
+                    $padRight = max(0, $this->columns - strlen($rightVal));
+                    $this->raw(str_repeat(' ', $padRight).$rightVal."\n");
+                } else {
+                    $gap = $this->columns - $totalLineLen;
+                    $this->raw($prefix);
+                    $this->escB(true)->raw($normal)->escB(false);
+                    $this->raw(' '.$disc);
+                    $this->raw(str_repeat(' ', $gap).$rightVal."\n");
+                }
             } elseif ($hargaRetail > $hargaJual) {
                 $this->text($this->pad("{$qtySatuan} x (".$this->money($hargaRetail).') -> '.$this->money($hargaJual), $rightVal));
             } else {
@@ -453,7 +462,15 @@ class EscPosWriter
     {
         $left = $this->ascii($left);
         $right = $this->ascii($right);
-        $pad = max(1, $this->columns - strlen($left) - strlen($right));
+        $totalLen = strlen($left) + strlen($right);
+
+        if ($totalLen >= $this->columns) {
+            $padRight = max(0, $this->columns - strlen($right));
+
+            return $left."\n".str_repeat(' ', $padRight).$right;
+        }
+
+        $pad = $this->columns - $totalLen;
 
         return $left.str_repeat(' ', $pad).$right;
     }
