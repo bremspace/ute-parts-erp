@@ -141,16 +141,17 @@ class EscPos {
   wrap(text) {
     const clean = this.clean(text);
     const lines = [];
-    let line = '';
-    for (const word of clean.split(' ')) {
-      if ((line + word).length > this.columns) {
-        if (line) lines.push(line);
-        line = word;
-      } else {
-        line += (line ? ' ' : '') + word;
+    let rest = clean;
+    while (rest.length > this.columns) {
+      // Cari pemisah terakhir (slash/koma/tanda kurung/spasi) pada batas kolom
+      let cut = this.columns;
+      for (let i = this.columns; i >= 1; i--) {
+        if ('/,-) '.includes(rest[i - 1])) { cut = i; break; }
       }
+      lines.push(rest.slice(0, cut).replace(/\s+$/, ''));
+      rest = rest.slice(cut);
     }
-    if (line) lines.push(line);
+    if (rest.trim()) lines.push(rest);
     return lines;
   }
 
@@ -546,7 +547,7 @@ class EscPos {
           <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: 9px; margin-top: 1px;">
             <span>
               ${qtySatuan} x ${hargaRetail > hargaJual ? `
-                <span style="text-decoration: line-through; opacity: 0.6; margin-right: 2px;">${money(hargaRetail)}</span>
+                <span style="text-decoration: line-through; opacity: 0.75; margin-right: 2px;">${money(hargaRetail)}</span>
                 <span style="font-weight: 700;">${money(hargaJual)}</span>
               ` : `<span>${harga}</span>`}
             </span>

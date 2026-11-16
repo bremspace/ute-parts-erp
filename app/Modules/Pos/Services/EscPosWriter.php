@@ -433,7 +433,26 @@ class EscPosWriter
 
     private function wrap(string $text): array
     {
-        return explode("\n", wordwrap($this->ascii($text), $this->columns));
+        $clean = $this->ascii($text);
+        $lines = [];
+        while (strlen($clean) > $this->columns) {
+            // Cari pemisah terakhir (slash/koma/tanda kurung/spasi) pada batas kolom
+            $cut = $this->columns;
+            for ($i = $this->columns; $i >= 1; $i--) {
+                if (str_contains('/,-) ', $clean[$i - 1])) {
+                    $cut = $i;
+
+                    break;
+                }
+            }
+            $lines[] = rtrim(substr($clean, 0, $cut), ' ');
+            $clean = substr($clean, $cut);
+        }
+        if (trim($clean) !== '') {
+            $lines[] = $clean;
+        }
+
+        return $lines;
     }
 
     private function money($v): string
