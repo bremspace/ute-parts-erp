@@ -4259,19 +4259,19 @@ class ProdukTab extends Component
                     $sub->where('produk.nama', 'like', "%{$term}%")
                         ->orWhere('produk.brand_kompatibel', 'like', "%{$term}%")
                         ->orWhere('produk.model_kompatibel', 'like', "%{$term}%")
-                        ->orWhere('produk.barcode', 'like', "%{$term}%")
+                        ->orWhere('produk.barcode', '=', $term)
                         ->orWhere('produk.barcode_alt', 'like', "%{$term}%")
                         ->orWhereExists(function ($ex) use ($term) {
                             $ex->select(\Illuminate\Support\Facades\DB::raw(1))
                                 ->from('produk_barcodes')
                                 ->whereColumn('produk_barcodes.produk_id', 'produk.id')
-                                ->where('produk_barcodes.barcode', 'like', "%{$term}%");
+                                ->where('produk_barcodes.barcode', '=', $term);
                         })
                         ->orWhereIn('produk.id', \App\Modules\Wms\Models\SkuVariant::query()
                             ->where('is_active', true)
                             ->where(function ($sq) use ($term) {
-                                $sq->where('barcode', 'like', "%{$term}%")
-                                    ->orWhere('sku', 'like', "%{$term}%");
+                                $sq->where('barcode', '=', $term)
+                                    ->orWhere('sku', '=', $term);
                             })
                             ->select('produk_id')
                         );
