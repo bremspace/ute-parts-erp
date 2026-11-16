@@ -6,43 +6,76 @@ import json
 import subprocess
 
 TARGET_HOME = os.environ.get("HOME", "/root")
+WORKSPACE_DIR = os.environ.get("WORKSPACE_DIR", "/var/www/ute-parts-erp")
 
-# Agent target files
+# Global & Workspace agent target files
 TARGETS = {
+    # Workspace Project Directives (High Precedence)
+    "ws_agents": {
+        "name": "Workspace AGENTS.md",
+        "file": os.path.join(WORKSPACE_DIR, "AGENTS.md"),
+        "type": "markdown"
+    },
+    "ws_claude": {
+        "name": "Workspace CLAUDE.md",
+        "file": os.path.join(WORKSPACE_DIR, "CLAUDE.md"),
+        "type": "markdown"
+    },
+    "ws_gemini": {
+        "name": "Workspace GEMINI.md",
+        "file": os.path.join(WORKSPACE_DIR, "GEMINI.md"),
+        "type": "markdown"
+    },
+    "ws_cursor": {
+        "name": "Workspace .cursorrules",
+        "file": os.path.join(WORKSPACE_DIR, ".cursorrules"),
+        "type": "markdown"
+    },
+    "ws_windsurf": {
+        "name": "Workspace .windsurfrules",
+        "file": os.path.join(WORKSPACE_DIR, ".windsurfrules"),
+        "type": "markdown"
+    },
+    "ws_cline": {
+        "name": "Workspace .clinerules",
+        "file": os.path.join(WORKSPACE_DIR, ".clinerules"),
+        "type": "markdown"
+    },
+    # Global User Configs
     "opencode": {
-        "name": "OpenCode (opencode)",
+        "name": "OpenCode Global",
         "file": os.path.join(TARGET_HOME, ".config/opencode/AGENTS.md"),
         "config": os.path.join(TARGET_HOME, ".config/opencode/opencode.jsonc"),
         "type": "opencode"
     },
     "hermes": {
-        "name": "Hermes Agent (hermes)",
+        "name": "Hermes Agent Global",
         "file": os.path.join(TARGET_HOME, ".hermes/SOUL.md"),
         "config": os.path.join(TARGET_HOME, ".hermes/config.yaml"),
         "type": "hermes"
     },
     "claude": {
-        "name": "Claude Code (claude)",
+        "name": "Claude Code Global",
         "file": os.path.join(TARGET_HOME, ".claude/CLAUDE.md"),
         "type": "markdown"
     },
     "codex": {
-        "name": "Codex CLI (codex)",
+        "name": "Codex CLI Global",
         "file": os.path.join(TARGET_HOME, ".codex/AGENTS.md"),
         "type": "markdown"
     },
     "cursor": {
-        "name": "Cursor IDE (cursor)",
+        "name": "Cursor IDE Global",
         "file": os.path.join(TARGET_HOME, ".cursorrules"),
         "type": "markdown"
     },
     "windsurf": {
-        "name": "Windsurf (windsurf)",
+        "name": "Windsurf Global",
         "file": os.path.join(TARGET_HOME, ".windsurfrules"),
         "type": "markdown"
     },
     "cline": {
-        "name": "Cline / Roo Code (cline)",
+        "name": "Cline / Roo Global",
         "file": os.path.join(TARGET_HOME, ".clinerules"),
         "type": "markdown"
     }
@@ -50,7 +83,6 @@ TARGETS = {
 
 AGY_BIN = "/root/.local/bin/agy"
 if not os.path.exists(AGY_BIN):
-    # Try finding in PATH
     which_res = subprocess.run(["which", "agy"], stdout=subprocess.PIPE, text=True)
     if which_res.returncode == 0:
         AGY_BIN = which_res.stdout.strip()
@@ -60,15 +92,16 @@ BLOCK_MARKER_END = "<!-- AUTO-OPTIMIZATION-TRIO-END -->"
 
 RULES_CONTENT = f"""{BLOCK_MARKER_START}
 # ==============================================================================
-# GLOBAL OPTIMIZATION DIRECTIVES: CAVEMAN + PONYTAIL + RTK
+# GLOBAL OPTIMIZATION DIRECTIVES: CAVEMAN + PONYTAIL + RTK (AUTOSTART ACTIVE)
 # ==============================================================================
 
 ## 1. CAVEMAN MODE (Token Compression & Zero Fluff)
 Respond terse like smart caveman. All technical substance stay. Only fluff die.
 - Answer first: Answer, then reason, then next step. Pattern: [thing] [action] [reason]. [next step].
-- Kill ceremony: No greeting, hedging, pleasantries, recap, or closer. No "Sure!", "I'd be happy to".
+- Kill ceremony: No greeting, hedging, pleasantries, recap, or closer. No "Sure!", "I'd be happy to", "Here is...", etc.
 - Short words: "fix" not "implement a solution for". Standard acronyms fine.
-- Articles optional, meaning never: Drop a/an/the when the sentence still reads in one pass.
+- Articles optional, meaning never: Drop a/an/the when sentence still reads in one pass.
+- One idea per sentence: 20 words max per sentence, active voice, imperative.
 - Payload verbatim: Code blocks, commands, paths, numbers, and errors exact. Never alter payload.
 - Safety / Irreversible: Use plain standard prose for security warnings, destructive actions, or user confusion.
 
@@ -93,7 +126,6 @@ def run_cmd(cmd, check=False):
 
 def update_file_block(filepath, add_block=True):
     if not os.path.exists(filepath):
-        # Create parent directory if needed
         os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
         content = ""
     else:
@@ -102,15 +134,16 @@ def update_file_block(filepath, add_block=True):
 
     # Remove existing block if present
     pattern = re.compile(rf"{re.escape(BLOCK_MARKER_START)}.*?{re.escape(BLOCK_MARKER_END)}\n*", re.DOTALL)
-    cleaned = pattern.sub("", content).rstrip()
+    cleaned = pattern.sub("", content).strip()
 
     # Also clean any old standalone caveman block in opencode AGENTS.md
-    cleaned = re.sub(r"<!-- caveman-begin -->.*?<!-- caveman-end -->\n*", "", cleaned, flags=re.DOTALL).rstrip()
+    cleaned = re.sub(r"<!-- caveman-begin -->.*?<!-- caveman-end -->\n*", "", cleaned, flags=re.DOTALL).strip()
 
     if add_block:
-        new_content = cleaned + ("\n\n" if cleaned else "") + RULES_CONTENT + "\n"
+        # Prepend to the very top so LLM reads directives first with highest priority
+        new_content = RULES_CONTENT + ("\n\n" + cleaned if cleaned else "\n")
     else:
-        new_content = cleaned + "\n"
+        new_content = (cleaned + "\n") if cleaned else ""
 
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(new_content)
@@ -167,18 +200,17 @@ def set_antigravity(enable=True):
 
 def enable_all():
     print("🚀 Mengaktifkan Trio Skills (Caveman + Ponytail + RTK) untuk SEMUA AI AGENT...")
-    # Antigravity
     set_antigravity(True)
     
-    # All agent targets
     for key, tgt in TARGETS.items():
         update_file_block(tgt["file"], True)
-        if tgt["type"] == "opencode":
+        if tgt.get("type") == "opencode":
             set_opencode_plugins(True)
-        elif tgt["type"] == "hermes":
+        elif tgt.get("type") == "hermes":
             set_hermes_rtk(True)
 
-    print("✅ SEMUA SKILLS AKTIF OTOMATIS untuk:")
+    print("✅ SEMUA SKILLS AKTIF OTOMATIS (Autostart) untuk:")
+    print("   • Workspace (AGENTS.md, CLAUDE.md, GEMINI.md, .cursorrules, .windsurfrules, .clinerules)")
     print("   • Antigravity CLI (agy / anti)")
     print("   • Claude Code (claude)")
     print("   • OpenCode (opencode)")
@@ -193,9 +225,9 @@ def disable_all():
     for key, tgt in TARGETS.items():
         if os.path.exists(tgt["file"]):
             update_file_block(tgt["file"], False)
-        if tgt["type"] == "opencode":
+        if tgt.get("type") == "opencode":
             set_opencode_plugins(False)
-        elif tgt["type"] == "hermes":
+        elif tgt.get("type") == "hermes":
             set_hermes_rtk(False)
 
     print("💤 SEMUA SKILLS DINONAKTIFKAN (Kembali ke Normal Mode) untuk semua agent.")
@@ -203,7 +235,6 @@ def disable_all():
 def show_status():
     print("📊 Status Trio Skills (Caveman, Ponytail, RTK) di Seluruh Agent:")
     
-    # Antigravity
     if os.path.exists(AGY_BIN):
         code, out, _ = run_cmd([AGY_BIN, "plugin", "list"])
         agy_cav = "caveman (enabled)" in out
@@ -214,7 +245,6 @@ def show_status():
     else:
         print("  • Antigravity CLI (agy / anti) : ⚪ Tidak terpasang")
 
-    # Other agents
     for key, tgt in TARGETS.items():
         parent_dir = os.path.dirname(tgt["file"])
         if os.path.exists(tgt["file"]) or os.path.exists(parent_dir):
@@ -223,9 +253,9 @@ def show_status():
                 with open(tgt["file"], "r", encoding="utf-8") as f:
                     has_block = BLOCK_MARKER_START in f.read()
             status_str = "🟢 AKTIF" if has_block else "🔴 NONAKTIF"
-            print(f"  • {tgt['name']:<28} : {status_str}")
+            print(f"  • {tgt['name']:<30} : {status_str}")
         else:
-            print(f"  • {tgt['name']:<28} : ⚪ Tidak terpasang")
+            print(f"  • {tgt['name']:<30} : ⚪ Tidak terpasang")
 
     print("\n💡 Perintah:")
     print("  agent-skills on      # Aktifkan semua agent")
