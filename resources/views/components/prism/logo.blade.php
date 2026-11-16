@@ -19,7 +19,15 @@ $resolvedTitle = $title ?: config('app.name', 'BREMSPACE');
 $logoImage = $image;
 if ($logoImage === null) {
     try {
-        $logoImage = app(\App\Modules\Crm\Services\KonfigurasiService::class)->getAppLogo();
+        $isMarketplace = request()->is('shop*') || request()->is('/') || request()->is('cart*') || request()->is('checkout*') || request()->is('panduan*') || request()->is('servis/booking*') || request()->is('estimasi*') || request()->is('akun*') || request()->routeIs('shop.*') || request()->routeIs('cart') || request()->routeIs('panduan.*') || request()->routeIs('servis.booking');
+        $webLogo = null;
+        if ($isMarketplace) {
+            $webLogo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->get('store_logo_url');
+            if (is_string($webLogo) && ($webLogo === '' || $webLogo === '/icons/icon.svg')) {
+                $webLogo = null;
+            }
+        }
+        $logoImage = $webLogo ?: app(\App\Modules\Crm\Services\KonfigurasiService::class)->getAppLogo();
     } catch (\Throwable) {
         $logoImage = null;
     }

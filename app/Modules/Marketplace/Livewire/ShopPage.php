@@ -6,6 +6,7 @@ use App\Modules\Marketplace\Models\WebReview;
 use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
@@ -331,7 +332,7 @@ class ShopPage extends Component
         return Cache::remember(
             'shop.hp.merk-list.v1',
             self::HP_LIST_CACHE_TTL,
-            fn (): array => $this->hpListValues('merk')
+            fn (): array => TipeHp::where('is_active', true)->distinct()->orderBy('merk')->pluck('merk')->filter()->values()->all()
         );
     }
 
@@ -379,8 +380,8 @@ class ShopPage extends Component
 
     public function getBrandsProperty(): mixed
     {
-        return Cache::remember('shop.brands.list.v1', self::HP_LIST_CACHE_TTL, function () {
-            return Produk::where('is_active', true)->distinct()->orderBy('brand_kompatibel')->pluck('brand_kompatibel')->filter()->values()->all();
+        return Cache::remember('shop.brands.list.v2', self::HP_LIST_CACHE_TTL, function () {
+            return Brand::where('is_active', true)->orderBy('nama')->pluck('nama')->filter()->values()->all();
         });
     }
 
@@ -406,6 +407,14 @@ class ShopPage extends Component
             'harga_max' => $this->hargaMax,
         ];
         $query->filterKatalog($filters);
+
+        // [CMS] Sembunyikan produk kosong (stok 0) jika diaktifkan di pengaturan web-konsumen
+        $hideOutOfStock = (bool) app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->get('hide_out_of_stock', false);
+        if ($hideOutOfStock) {
+            $query->whereHas('stokItems', function ($sq) {
+                $sq->where('jumlah', '>', 0);
+            });
+        }
 
         // Urutan: dropdown user > relevansi dgn keyword (default saat search aktif) > kompatibilitas HP > default (ready-stok & terlaris)
         if ($this->sort === 'termurah') {

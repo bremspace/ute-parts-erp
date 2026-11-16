@@ -79,6 +79,7 @@ class WebKonsumenSettings extends Component
         'show_sold_counter' => true,
         'show_tier_teaser' => true,
         'catalog_per_page' => 24,
+        'hide_out_of_stock' => false,
         'allowed_filters' => [
             'enabled' => true,
             'kategori' => true,
@@ -252,6 +253,7 @@ class WebKonsumenSettings extends Component
         $this->stockForm['show_sold_counter'] = (bool) ($settings['show_sold_counter'] ?? true);
         $this->stockForm['show_tier_teaser'] = (bool) ($settings['show_tier_teaser'] ?? true);
         $this->stockForm['catalog_per_page'] = (int) ($settings['catalog_per_page'] ?? 24);
+        $this->stockForm['hide_out_of_stock'] = (bool) ($settings['hide_out_of_stock'] ?? false);
         $allowedFilters = $asArray($settings['allowed_filters'] ?? null, []);
         if (! empty($allowedFilters)) {
             $this->stockForm['allowed_filters'] = array_merge($this->stockForm['allowed_filters'], $allowedFilters);
@@ -362,6 +364,7 @@ class WebKonsumenSettings extends Component
             // Catalog
             'show_tier_teaser' => $this->stockForm['show_tier_teaser'],
             'catalog_per_page' => $this->stockForm['catalog_per_page'],
+            'hide_out_of_stock' => (bool) $this->stockForm['hide_out_of_stock'],
             'allowed_filters' => $this->stockForm['allowed_filters'],
 
             // Contact & Popup
@@ -385,6 +388,7 @@ class WebKonsumenSettings extends Component
         $crmConfig = app(KonfigurasiService::class);
         $crmConfig->set('payment_mp_duitku_enabled', (bool) $this->paymentForm['payment_mp_duitku_enabled'], 'Aktivasi Gateway Duitku MP');
         $crmConfig->set('payment_mp_qris_toko_enabled', (bool) $this->paymentForm['payment_mp_qris_toko_enabled'], 'Aktivasi QRIS Dinamis Toko MP');
+        $crmConfig->set('hide_out_of_stock', (bool) $this->stockForm['hide_out_of_stock'], 'Sembunyikan produk kosong di katalog toko');
 
         // Catat Audit Log
         $after = $service->getAll();

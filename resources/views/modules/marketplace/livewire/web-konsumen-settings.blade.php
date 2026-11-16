@@ -628,6 +628,22 @@
                     </label>
                 </div>
 
+                <div class="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-4">
+                    <div>
+                        <div class="text-xs font-semibold text-white">Sembunyikan Produk Kosong</div>
+                        <div class="text-[11px] text-ink-400">Jika aktif, produk dengan stok 0 tidak ditampilkan di katalog toko publik.</div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <span class="text-[11px] font-semibold min-w-[56px] text-right {{ $stockForm['hide_out_of_stock'] ? 'text-up-primary' : 'text-ink-500' }}">
+                            {{ $stockForm['hide_out_of_stock'] ? 'Aktif' : 'Nonaktif' }}
+                        </span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" wire:model.live="stockForm.hide_out_of_stock" class="sr-only peer">
+                            <div class="w-11 h-6 bg-white/10 border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-primary peer-checked:border-up-primary/50"></div>
+                        </label>
+                    </div>
+                </div>
+
                 @if ($stockForm['stock_display_mode'] === 'threshold_only')
                 <div class="pt-3 border-t border-white/[0.06] flex items-center justify-between">
                     <div>
