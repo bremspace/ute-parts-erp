@@ -225,7 +225,7 @@
                     stroke-linecap="round"
                     stroke-linejoin="round"
                     filter="url(#android-glow)"
-                    class="transition-all"
+                    class="transition-[stroke,opacity] duration-150"
                 />
 
                 <!-- Live Drag line following finger -->
@@ -263,7 +263,7 @@
                             :fill="sequence.includes({{ $di }}) ? 'rgba(129, 140, 248, 0.22)' : 'transparent'"
                             :stroke="sequence.includes({{ $di }}) ? 'rgba(129, 140, 248, 0.7)' : 'transparent'"
                             stroke-width="2"
-                            class="transition-all duration-150"
+                            class="transition-[fill,stroke] duration-150"
                         />
 
                         <!-- Default Outer Ring Guide (Subtle Android Ring) -->
@@ -278,7 +278,7 @@
                         <circle
                             :r="sequence.includes({{ $di }}) ? 8 : 5.5"
                             :fill="sequence.includes({{ $di }}) ? 'url(#dot-active-grad)' : 'rgba(255, 255, 255, 0.75)'"
-                            class="transition-all duration-150"
+                            class="transition-[r,fill] duration-150"
                         />
 
                         <!-- Inner highlight for active dot -->

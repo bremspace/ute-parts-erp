@@ -54,6 +54,7 @@
                 <button
                     type="button"
                     @click.stop="remove(item.id)"
+                    aria-label="Hapus pilihan"
                     class="text-up-primary/70 hover:text-up-primary hover:font-bold ml-0.5 cursor-pointer"
                 >✕</button>
             </span>

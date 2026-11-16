@@ -4,12 +4,12 @@ namespace App\Modules\Hr\Services;
 
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Hr\Models\BagiHasil;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KaryawanKomponenGaji;
 use App\Modules\Hr\Models\PayrollKomisiDetail;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
-use App\Modules\Hr\Models\BagiHasil;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;

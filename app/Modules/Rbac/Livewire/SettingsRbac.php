@@ -31,7 +31,6 @@ use App\Modules\Wms\Services\ImportAtributService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Component;

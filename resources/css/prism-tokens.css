@@ -593,7 +593,7 @@ svg[stroke-width] {
     justify-content: center;
     gap: 0.375rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-    transition: all 120ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1), background-color 120ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 120ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .btn-erp-primary:hover {
     filter: brightness(1.08);
@@ -614,7 +614,7 @@ svg[stroke-width] {
     align-items: center;
     justify-content: center;
     gap: 0.375rem;
-    transition: all 120ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1), background-color 120ms cubic-bezier(0.23, 1, 0.32, 1), border-color 120ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .dark .btn-erp-secondary {
     background-color: rgba(94, 106, 210, 0.15);
@@ -640,7 +640,7 @@ svg[stroke-width] {
     white-space: nowrap !important;
     flex-shrink: 0 !important;
     cursor: pointer;
-    transition: all 120ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1), background-color 120ms cubic-bezier(0.23, 1, 0.32, 1), border-color 120ms cubic-bezier(0.23, 1, 0.32, 1), color 120ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .dark .btn-erp-ghost {
     color: #94A3B8;
@@ -656,8 +656,10 @@ svg[stroke-width] {
 }
 
 .btn-erp-icon {
-    width: 2rem;
-    height: 2rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -665,8 +667,16 @@ svg[stroke-width] {
     color: #64748B;
     border: 1px solid rgba(148, 163, 184, 0.2);
     background: transparent;
-    transition: all 120ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1), background-color 120ms cubic-bezier(0.23, 1, 0.32, 1), border-color 120ms cubic-bezier(0.23, 1, 0.32, 1), color 120ms cubic-bezier(0.23, 1, 0.32, 1);
     flex-shrink: 0;
+}
+@media (max-width: 767px) {
+    .btn-erp-icon {
+        width: 2.75rem;
+        height: 2.75rem;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
 }
 .dark .btn-erp-icon {
     color: #94A3B8;

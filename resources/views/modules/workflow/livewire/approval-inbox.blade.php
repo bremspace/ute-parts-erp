@@ -236,7 +236,8 @@
                     </div>
                     <button wire:click="closeApproveMemberModal" 
                             type="button" 
-                            class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white flex items-center justify-center transition cursor-pointer text-sm">
+                            aria-label="Tutup"
+                            class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer text-sm active:scale-[0.97]">
                         ✕
                     </button>
                 </div>
@@ -400,7 +401,8 @@
                     </div>
                     <button wire:click="closeApproveResetPasswordModal" 
                             type="button" 
-                            class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white flex items-center justify-center transition cursor-pointer text-sm">
+                            aria-label="Tutup"
+                            class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer text-sm active:scale-[0.97]">
                         ✕
                     </button>
                 </div>
@@ -482,7 +484,7 @@
                 <div class="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
                     <div>
                         <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <span>📦</span>
+                            <svg class="w-4 h-4 flex-shrink-0 text-up-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg>
                             <span>Persetujuan Penerimaan GRN: {{ $grnApprovalForm['no_grn'] }}</span>
                         </h3>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -491,7 +493,8 @@
                     </div>
                     <button wire:click="closeApproveGrnModal" 
                             type="button" 
-                            class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white flex items-center justify-center transition cursor-pointer text-sm">
+                            aria-label="Tutup"
+                            class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer text-sm active:scale-[0.97]">
                         ✕
                     </button>
                 </div>

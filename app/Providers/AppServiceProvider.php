@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
+use Spatie\Activitylog\Support\CauserResolver;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -41,7 +42,7 @@ class AppServiceProvider extends ServiceProvider
         // semua perubahan itu tercatat sebagai "sistem", sehingga jejak audit
         // kehilangan identitas pelaku. Prioritaskan guard customer, fallback
         // ke guard staf.
-        app(\Spatie\Activitylog\Support\CauserResolver::class)->resolveUsing(
+        app(CauserResolver::class)->resolveUsing(
             fn (): ?\Illuminate\Database\Eloquent\Model => auth('customer')->user() ?? auth()->user()
         );
 

@@ -119,10 +119,10 @@
 
                 <!-- Tombol Atur Widget: pojok kanan atas (mobile) -->
                 <button type="button" @click="showCustomizer = true"
-                    class="sm:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-ink-300 hover:text-white text-[11px] font-semibold border border-white/10 transition-all active:scale-[0.97] cursor-pointer"
+                    class="sm:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-ink-300 hover:text-white text-[11px] font-semibold border border-white/10 transition-[transform,background-color,border-color,color] duration-150 active:scale-[0.97] cursor-pointer"
                     title="Atur Tata Letak / Urutan Widget">
                     <svg class="w-3.5 h-3.5 text-up-mint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                     </svg>
                     <span>Atur Widget</span>
                 </button>
@@ -137,23 +137,23 @@
 
         <div class="flex items-center gap-2 w-full sm:w-auto pt-1 sm:pt-0">
             @canany(['pos.view', 'pos.view-own', 'pos.create'])
-                <a href="/app/pos" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-semibold shadow-md transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                <a href="/app/pos" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-semibold shadow-md transition-[transform,background-color,box-shadow] duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     Buka Kasir
                 </a>
             @endcanany
             @can('servis.create')
-                <a href="/app/servis" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-ink-200 hover:text-white text-xs font-semibold border border-white/10 transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
-                    <svg class="w-3.5 h-3.5 text-up-amber" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                <a href="/app/servis" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-ink-200 hover:text-white text-xs font-semibold border border-white/10 transition-[transform,background-color,border-color,color] duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
+                    <svg class="w-3.5 h-3.5 text-up-amber" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     Tiket Servis
                 </a>
             @endcan
 
             <!-- Tombol Atur Tata Letak / Urutan Widget (Desktop) -->
             <button type="button" @click="showCustomizer = true"
-                class="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-ink-300 hover:text-white text-xs font-semibold border border-white/10 transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px] cursor-pointer">
+                class="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-ink-300 hover:text-white text-xs font-semibold border border-white/10 transition-[transform,background-color,border-color,color] duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px] cursor-pointer">
                 <svg class="w-3.5 h-3.5 text-up-mint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                 </svg>
                 Atur Widget
             </button>

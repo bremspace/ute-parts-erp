@@ -426,6 +426,7 @@
                 x-show="search.length > 0"
                 type="button"
                 @click="search = ''; $refs.searchInput.focus()"
+                aria-label="Bersihkan pencarian"
                 class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-ink-600 dark:hover:text-ink-200 text-xs cursor-pointer"
             >✕</button>
         </div>

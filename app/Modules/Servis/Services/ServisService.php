@@ -3,11 +3,12 @@
 namespace App\Modules\Servis\Services;
 
 use App\Models\User;
-use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\JurnalHeader;
+use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
+use App\Modules\Hr\Services\BagiHasilService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\Transaksi;
@@ -16,7 +17,6 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Reseller\Services\KomisiService;
-use App\Modules\Hr\Services\BagiHasilService;
 use App\Modules\Servis\Models\Garansi;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\ServisSparepart;
@@ -37,6 +37,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ServisService
@@ -1639,7 +1640,7 @@ class ServisService
             }
 
             $path = 'servis/progress/'.$tiket->id.'/'.Str::uuid()->toString().'.jpg';
-            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $binary);
+            Storage::disk('public')->put($path, $binary);
 
             return $path;
         } catch (\Throwable $e) {
@@ -1688,7 +1689,7 @@ class ServisService
             'komplain_gratis_proposed_at' => $garansiBerlaku ? now() : null,
             'batas_waktu_menit' => $tiketLama->batas_waktu_menit ?? 4320,
             'auto_cancel_overdue' => false,
-            'token_approval' => \Illuminate\Support\Str::random(64),
+            'token_approval' => Str::random(64),
         ]);
 
         $this->logStatus(
@@ -1739,7 +1740,7 @@ class ServisService
                 'wa',
                 $teleponToko,
                 'Komplain Pasca-Servis Masuk',
-                "Komplain masuk {$tiket->no_tiket} ({$tiket->jenis_hp}) dari tiket {$tiketLama->no_tiket}".($garansiBerlaku ? ' — GARANSI berlaku' : '').".",
+                "Komplain masuk {$tiket->no_tiket} ({$tiket->jenis_hp}) dari tiket {$tiketLama->no_tiket}".($garansiBerlaku ? ' — GARANSI berlaku' : '').'.',
                 [
                     'tiket_id' => $tiket->id,
                     'cabang_id' => $tiket->cabang_id,
@@ -1929,7 +1930,7 @@ class ServisService
                 throw new \Exception('Voucher goodwill wajib tiket terikat pelanggan.');
             }
 
-            $kode = 'VCR-'.strtoupper(\Illuminate\Support\Str::random(10));
+            $kode = 'VCR-'.strtoupper(Str::random(10));
 
             Voucher::create([
                 'kode' => $kode,

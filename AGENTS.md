@@ -186,3 +186,23 @@ Project indexed as `var-www-test.uteparts.id-staging`. Use MCP tools for structu
 - `get_architecture` — high-level summary
 
 Prefer graph tools over grep/glob for code discovery. Fall back to grep for string literals, configs, non-code files.
+
+## Universal Agent Setup & Environment Sync ("pasang bre")
+Repository ini menyimpan konfigurasi lengkap seluruh ekosistem AI agent (bebas dari credential pribadi):
+- **Skills**: `.agents/skills/` (175+ specialized agent skills)
+- **Rules**: `.agents/rules/` (Caveman, Ponytail, RTK, Codebase Memory)
+- **Plugins**: `.agents/plugins/` (Caveman, Ponytail, RTK)
+- **MCP Configs**: `.agents/mcp/` (Codebase memory graph schemas & servers)
+- **Shortcuts & Switcher**: `scripts/anti.sh`, `scripts/agent-skills.py`, `scripts/pasang-bre.sh`
+
+### Perintah "pasang bre":
+Kapan pun user memberi instruksi **"pasang bre"**, **"pasang brem"**, atau **/pasang-bre**, AI agent WAJIB langsung menjalankan:
+```bash
+bash scripts/pasang-bre.sh
+```
+Script tersebut akan menginstal seluruh konfigurasi, menyambungkan path skills/plugins, menyiapkan shortcut `anti`, dan mengaktifkan Trio Optimization (Caveman + Ponytail + RTK) secara otomatis pada Antigravity CLI, OpenCode, dan Hermes Agent.
+
+Untuk mengontrol trio optimization secara global:
+- `agent-skills on` (aktifkan semua)
+- `agent-skills off` (matikan semua, kembali ke normal mode)
+- `agent-skills status` (cek status ketiga agent)

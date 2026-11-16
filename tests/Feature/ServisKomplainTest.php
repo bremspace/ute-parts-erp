@@ -3,13 +3,17 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Services\KpiService;
 use App\Modules\Servis\Models\Garansi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Models\Voucher;
 use App\Modules\Servis\Services\ServisService;
+use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\CabangSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,7 +35,7 @@ class ServisKomplainTest extends TestCase
         parent::setUp();
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->seed(CabangSeeder::class);
-        $this->seed(\Database\Seeders\AkunCoaSeeder::class);
+        $this->seed(AkunCoaSeeder::class);
 
         $this->admin = User::create([
             'name' => 'Admin Komplain',
@@ -193,7 +197,7 @@ class ServisKomplainTest extends TestCase
         // Tidak ada piutang untuk perbaikan garansi gratis
         $this->assertSame(
             0,
-            \App\Modules\Akunting\Models\Piutang::where('referensi_tipe', TiketServis::class)
+            Piutang::where('referensi_tipe', TiketServis::class)
                 ->where('referensi_id', $komplain->id)
                 ->count()
         );
@@ -266,7 +270,7 @@ class ServisKomplainTest extends TestCase
 
         $this->assertEquals(150000.0, (float) $jurnal->sum('debit'), 'Piutang = total bersih');
 
-        $idAkunJasa = \App\Modules\Akunting\Models\AkunCOA::where('kode', '420-01')->value('id');
+        $idAkunJasa = AkunCOA::where('kode', '420-01')->value('id');
         $this->assertEquals(
             150000.0,
             (float) $jurnal->where('akun_coa_id', $idAkunJasa)->sum('kredit'),
@@ -356,7 +360,7 @@ class ServisKomplainTest extends TestCase
     /** @test */
     public function test_goodwill_voucher_dipakai_servis_berikutnya(): void
     {
-        $pelanggan = \App\Modules\Crm\Models\Pelanggan::create([
+        $pelanggan = Pelanggan::create([
             'nama' => 'Pelanggan Voucher',
             'telepon' => '08123456789',
         ]);
@@ -391,7 +395,7 @@ class ServisKomplainTest extends TestCase
         $regulator->assignRole('super-admin');
         $service->setujuiGoodwill($tiket->fresh(), $regulator);
 
-        $voucher = \App\Modules\Servis\Models\Voucher::where('pelanggan_id', $pelanggan->id)->first();
+        $voucher = Voucher::where('pelanggan_id', $pelanggan->id)->first();
         $this->assertNotNull($voucher, 'Voucher harus terbit');
         $this->assertSame('aktif', $voucher->status);
         $this->assertSame(80000.0, (float) $voucher->sisa);

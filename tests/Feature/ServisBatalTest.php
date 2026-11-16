@@ -4,17 +4,19 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Akunting\Models\JurnalHeader;
-use App\Modules\Wms\Models\Gudang;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Services\ServisService;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\CabangSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -108,7 +110,7 @@ class ServisBatalTest extends TestCase
             'nama_item' => 'LCD iPhone 14',
         ]], $this->admin);
 
-        $stok = \App\Modules\Wms\Models\StokItem::where('produk_id', $lcd->id)
+        $stok = StokItem::where('produk_id', $lcd->id)
             ->where('gudang_id', $gudang->id)
             ->first();
         $this->assertEquals(4, (int) $stok->jumlah);
@@ -120,7 +122,7 @@ class ServisBatalTest extends TestCase
         $this->assertSame('batal', $tiket->status);
 
         // Stok kembali 5 (part dikembalikan ke gudang asal)
-        $stok = \App\Modules\Wms\Models\StokItem::where('produk_id', $lcd->id)
+        $stok = StokItem::where('produk_id', $lcd->id)
             ->where('gudang_id', $gudang->id)
             ->first();
         $this->assertEquals(5, (int) $stok->jumlah);
@@ -224,7 +226,7 @@ class ServisBatalTest extends TestCase
         );
 
         // Part sudah terpasang → stok TIDAK dikembalikan
-        $stok = \App\Modules\Wms\Models\StokItem::where('produk_id', $lcd->id)
+        $stok = StokItem::where('produk_id', $lcd->id)
             ->where('gudang_id', $gudang->id)
             ->first();
         $this->assertEquals(4, (int) $stok->jumlah, 'Stok part terpasang tidak dikembalikan setelah selesai');
@@ -236,7 +238,7 @@ class ServisBatalTest extends TestCase
         // Pembatalan hanya atas permintaan langsung konsumen di toko → jalur
         // online (tracking) dicabut total, bukan sekadar disembunyikan di UI.
         $this->assertFalse(
-            \Illuminate\Support\Facades\Route::has('servis.tracking.batal'),
+            Route::has('servis.tracking.batal'),
             'Jalur pembatalan online harus dicabut'
         );
 
@@ -247,7 +249,7 @@ class ServisBatalTest extends TestCase
         app(ServisService::class)->updateStatus($tiket->fresh(), 'disetujui', $this->admin);
         app(ServisService::class)->updateStatus($tiket->fresh(), 'dikerjakan', $this->admin);
 
-        $response = $this->get("/tracking/".$tiket->fresh()->token_approval);
+        $response = $this->get('/tracking/'.$tiket->fresh()->token_approval);
         $response->assertOk();
 
         $this->assertStringNotContainsString('Batalkan Servis Saya', $response->getContent());

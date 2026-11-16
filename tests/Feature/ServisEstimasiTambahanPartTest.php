@@ -7,7 +7,10 @@ use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Services\ServisService;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\CabangSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -352,7 +355,7 @@ class ServisEstimasiTambahanPartTest extends TestCase
     /** @test */
     public function test_part_estimasi_memotong_stok_saat_selesai(): void
     {
-        $gudang = \App\Modules\Wms\Models\Gudang::getDefault(1);
+        $gudang = Gudang::getDefault(1);
 
         $lcd = Produk::create([
             'nama' => 'LCD iPhone 14',
@@ -363,7 +366,7 @@ class ServisEstimasiTambahanPartTest extends TestCase
             'is_active' => true,
         ]);
 
-        app(\App\Modules\Wms\Services\ProdukService::class)->tambahStokPembelian(
+        app(ProdukService::class)->tambahStokPembelian(
             $lcd->id,
             null,
             $gudang->id,
@@ -388,7 +391,7 @@ class ServisEstimasiTambahanPartTest extends TestCase
         $tiket = $tiket->fresh();
         $this->assertTrue($tiket->stok_estimasi_diproses);
 
-        $stok = \App\Modules\Wms\Models\StokItem::where('produk_id', $lcd->id)
+        $stok = StokItem::where('produk_id', $lcd->id)
             ->where('gudang_id', $gudang->id)
             ->first();
 

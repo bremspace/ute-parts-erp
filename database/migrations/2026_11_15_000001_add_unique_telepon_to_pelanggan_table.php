@@ -28,7 +28,7 @@ return new class extends Migration
             ->all();
 
         if ($duplikat !== []) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Tidak dapat menambahkan unique index pelanggan.telepon: masih ada '.count($duplikat)
                 .' nomor duplikat ('.implode(', ', array_slice($duplikat, 0, 10)).'). '
                 .'Gabungkan/duplikat terlebih dahulu (mis. via SidMergePelangganDup) sebelum migrate.'

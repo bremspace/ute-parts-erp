@@ -110,11 +110,17 @@ class ProdukTab extends Component
 
     // Find & Replace Modal
     public bool $showFindReplaceModal = false;
+
     public string $findReplaceField = 'nama';
+
     public string $findText = '';
+
     public string $replaceText = '';
+
     public bool $findReplaceCaseSensitive = false;
+
     public int $findReplacePreviewCount = 0;
+
     public bool $findReplaceHasPreviewed = false;
 
     public array $bulkEditFields = [
@@ -3683,6 +3689,7 @@ class ProdukTab extends Component
     {
         if (trim($this->findText) === '') {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Teks yang dicari tidak boleh kosong.']);
+
             return;
         }
 
@@ -3690,7 +3697,7 @@ class ProdukTab extends Component
             ? $this->findReplaceField
             : 'nama';
 
-        $query = \App\Modules\Wms\Models\Produk::query();
+        $query = Produk::query();
         if ($this->findReplaceCaseSensitive) {
             $query->where($field, 'like', '%'.$this->findText.'%');
         } else {
@@ -3709,6 +3716,7 @@ class ProdukTab extends Component
 
         if (trim($this->findText) === '') {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Teks yang dicari tidak boleh kosong.']);
+
             return;
         }
 
@@ -3716,7 +3724,7 @@ class ProdukTab extends Component
             ? $this->findReplaceField
             : 'nama';
 
-        $products = \App\Modules\Wms\Models\Produk::query();
+        $products = Produk::query();
         if ($this->findReplaceCaseSensitive) {
             $products->where($field, 'like', '%'.$this->findText.'%');
         } else {
@@ -4262,12 +4270,12 @@ class ProdukTab extends Component
                         ->orWhere('produk.barcode', '=', $term)
                         ->orWhere('produk.barcode_alt', 'like', "%{$term}%")
                         ->orWhereExists(function ($ex) use ($term) {
-                            $ex->select(\Illuminate\Support\Facades\DB::raw(1))
+                            $ex->select(DB::raw(1))
                                 ->from('produk_barcodes')
                                 ->whereColumn('produk_barcodes.produk_id', 'produk.id')
                                 ->where('produk_barcodes.barcode', '=', $term);
                         })
-                        ->orWhereIn('produk.id', \App\Modules\Wms\Models\SkuVariant::query()
+                        ->orWhereIn('produk.id', SkuVariant::query()
                             ->where('is_active', true)
                             ->where(function ($sq) use ($term) {
                                 $sq->where('barcode', '=', $term)

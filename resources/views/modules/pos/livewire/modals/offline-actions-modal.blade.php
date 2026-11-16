@@ -19,7 +19,8 @@
                 <button
                     type="button"
                     @click="$store.posOffline.modalSaleOpen = false"
-                    class="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-ink-500 text-xs"
+                    aria-label="Tutup dialog"
+                    class="min-w-[36px] min-h-[36px] rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-ink-500 hover:text-ink-900 dark:hover:text-white text-xs flex items-center justify-center transition-colors active:scale-[0.97]"
                 >
                     ✕
                 </button>
@@ -174,7 +175,8 @@
                 <button
                     type="button"
                     @click="$store.posOffline.modalPickupOpen = false"
-                    class="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-ink-500 text-xs"
+                    aria-label="Tutup dialog"
+                    class="min-w-[36px] min-h-[36px] rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-ink-500 hover:text-ink-900 dark:hover:text-white text-xs flex items-center justify-center transition-colors active:scale-[0.97]"
                 >
                     ✕
                 </button>
@@ -281,7 +283,8 @@
                 <button
                     type="button"
                     @click="$store.posOffline.modalReturOpen = false"
-                    class="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-ink-500 text-xs"
+                    aria-label="Tutup dialog"
+                    class="min-w-[36px] min-h-[36px] rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-ink-500 hover:text-ink-900 dark:hover:text-white text-xs flex items-center justify-center transition-colors active:scale-[0.97]"
                 >
                     ✕
                 </button>
