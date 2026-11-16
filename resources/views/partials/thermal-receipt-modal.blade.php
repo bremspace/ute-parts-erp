@@ -35,7 +35,7 @@
             }
         }"
     >
-        <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-white/10 shadow-2xl relative my-auto max-h-[95vh] flex flex-col">
+        <div class="w-full max-w-sm glass-panel p-3 sm:p-5 rounded-3xl border border-white/10 shadow-2xl relative my-auto max-h-[95vh] flex flex-col">
             <!-- Header Modal -->
             <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10 flex-shrink-0">
                 <div class="flex items-center gap-2">
@@ -60,7 +60,7 @@
             <div class="overflow-y-auto pr-1 flex-1 flex justify-center py-1">
                 <div class="thermal-receipt-container thermal-receipt-preview bg-white text-black p-3 rounded-xl font-mono text-[10px] shadow-md select-text transition-all duration-200 border border-gray-200"
                      id="thermalReceipt"
-                     :style="paperSize === '58' ? 'width: 210px; max-width: 210px; margin: 0 auto;' : 'width: 302px; max-width: 302px; margin: 0 auto;'"
+                     :style="paperSize === '58' ? 'width: 210px; max-width: 100%; margin: 0 auto;' : 'width: 302px; max-width: 100%; margin: 0 auto;'"
                      x-html="previewHtml">
                     <div class="thermal-receipt-body" style="width: 100%; padding: 10px 0; text-align: center; color: #6b7280; font-size: 9px;">Memuat pratinjau…</div>
                 </div>
