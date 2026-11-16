@@ -5759,5 +5759,4 @@ Baterai iPhone 11	SKU-BAT-02	150000	Original	20	RAK-A1
             </div>
         </div>
     @endif
-    <script src="/js/wms-column-resize.js"></script>
 </div>
