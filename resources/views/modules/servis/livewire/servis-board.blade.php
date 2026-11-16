@@ -934,15 +934,27 @@
                             <input type="text" wire:model="terimaForm.telepon_pelanggan" placeholder="08xx-xxxx-xxxx" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                         </div>
                     </div>
+                    <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer select-none">
+                        <input type="checkbox" wire:model="terimaForm.tambah_pelanggan_baru" class="rounded text-up-primary focus:ring-up-primary" />
+                        <span>Tambah data pelanggan baru ke Data Pelanggan (retail / non-tier) jika belum terdaftar</span>
+                    </label>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jenis Servis</label>
-                            <select wire:model="terimaForm.jenis_servis_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                                @foreach($jenisServisList as $j)
-                                    <option value="{{ $j->id }}" class="bg-ink-900">{{ $j->nama }} ({{ $j->durasi_garansi_hari }} hari garansi)</option>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jenis Servis <span class="text-ink-500 font-normal">(opsional)</span></label>
+                            <input
+                                type="text"
+                                list="jenisServisList"
+                                wire:model="terimaForm.jenis_servis_nama"
+                                placeholder="Pilih dari daftar atau ketik manual (Ex: Ganti LCD, Service Ringan)"
+                                class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"
+                            />
+                            <datalist id="jenisServisList">
+                                @foreach(($jenisServisList ?? []) as $j)
+                                    <option value="{{ $j->nama }}"></option>
                                 @endforeach
-                            </select>
+                            </datalist>
+                            <p class="mt-1 text-[10px] text-ink-500">Opsional. Bisa pilih dari daftar atau ketik manual.</p>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jenis HP <span class="text-up-red">*</span></label>

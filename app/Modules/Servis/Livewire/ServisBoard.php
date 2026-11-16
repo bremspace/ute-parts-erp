@@ -105,6 +105,7 @@ class ServisBoard extends Component
         'nama_pelanggan' => '',
         'telepon_pelanggan' => '',
         'jenis_servis_id' => null,
+        'jenis_servis_nama' => '',
         'jenis_hp' => '',
         'seri_hp' => '',
         // [T-19] kunci gadget
@@ -113,9 +114,8 @@ class ServisBoard extends Component
         'keluhan' => '',
         'kondisi_fisik' => [],
         'foto_unit' => [], // BASE64 data URLs — [B-06] opsional (0-3 foto)
+        'tambah_pelanggan_baru' => false,
     ];
-
-    // Foto preview (base64)
     public array $fotoPreviews = [];
 
     public array $photoInputs = [];
@@ -981,6 +981,7 @@ class ServisBoard extends Component
             'nama_pelanggan' => '',
             'telepon_pelanggan' => '',
             'jenis_servis_id' => JenisServis::where('is_active', true)->first()?->id,
+            'jenis_servis_nama' => '',
             'jenis_hp' => '',
             'seri_hp' => '',
             'tipe_kunci' => null,
@@ -988,6 +989,7 @@ class ServisBoard extends Component
             'keluhan' => '',
             'kondisi_fisik' => [],
             'foto_unit' => [],
+            'tambah_pelanggan_baru' => false,
         ];
         $this->pelangganSearch = '';
         $this->photoInputs = [null, null, null];
@@ -1095,6 +1097,35 @@ class ServisBoard extends Component
         $data = $this->terimaForm;
         // [B-06] foto unit opsional — boleh 0, submit tidak bergantung pada foto
         $data['foto_unit'] = $foto ?: null;
+        // Resolve Jenis Servis manual
+        $namaJenisServis = trim((string) ($data['jenis_servis_nama'] ?? ''));
+        if ($namaJenisServis !== '') {
+            $jenis = JenisServis::whereRaw('LOWER(nama) = ?', [mb_strtolower($namaJenisServis)])->first();
+            if (! $jenis) {
+                $jenis = JenisServis::create([
+                    'nama' => $namaJenisServis,
+                    'is_active' => true,
+                    'batas_waktu_menit' => 120,
+                    'auto_cancel_jika_overdue' => false,
+                ]);
+            }
+            $data['jenis_servis_id'] = $jenis->id;
+        }
+
+        // Tambah pelanggan baru (retail/non-tier) jika dicentang
+        if (! empty($data['tambah_pelanggan_baru']) && empty($data['pelanggan_id']) && trim((string) ($data['nama_pelanggan'] ?? '')) !== '') {
+            try {
+                $pelanggan = app(\App\Modules\Crm\Services\PelangganService::class)->create([
+                    'nama' => $data['nama_pelanggan'],
+                    'telepon' => $data['telepon_pelanggan'] ?: null,
+                    'tipe_konsumen' => 'retail',
+                    'is_reseller' => false,
+                ]);
+                $data['pelanggan_id'] = $pelanggan->id;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Gagal tambah pelanggan baru dari terima servis: '.$e->getMessage());
+            }
+        }
 
         // [T-19] pola kunci → simpan urutan angka, bukan objek
         if (is_array($data['kunci_terenkripsi'])) {
