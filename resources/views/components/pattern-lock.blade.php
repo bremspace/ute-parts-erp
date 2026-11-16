@@ -243,17 +243,25 @@
                     />
                 </template>
 
-                <!-- 9 Android Pattern Dots -->
-                <template x-for="dot in dots" :key="dot.id">
-                    <g :transform="`translate(${dot.x}, ${dot.y})`" class="cursor-pointer" @click="clickDot(dot.id)">
+                <!-- 9 Android Pattern Dots (render statis agar tidak bergantung pada Alpine x-for pasca-Livewire morph) -->
+                @php
+                    $dotCoords = [
+                        1 => [45, 45], 2 => [135, 45], 3 => [225, 45],
+                        4 => [45, 135], 5 => [135, 135], 6 => [225, 135],
+                        7 => [45, 225], 8 => [135, 225], 9 => [225, 225],
+                    ];
+                @endphp
+                @for ($di = 1; $di <= 9; $di++)
+                    @php [$dx, $dy] = $dotCoords[$di]; @endphp
+                    <g transform="translate({{ $dx }}, {{ $dy }})" class="cursor-pointer" @click="clickDot({{ $di }})">
                         <!-- Outer Touch Area (Transparent Hit Target) -->
                         <circle r="36" fill="transparent" />
 
                         <!-- Active Outer Halo Ring (Android ripple style) -->
                         <circle
                             r="22"
-                            :fill="sequence.includes(dot.id) ? 'rgba(129, 140, 248, 0.22)' : 'transparent'"
-                            :stroke="sequence.includes(dot.id) ? 'rgba(129, 140, 248, 0.7)' : 'transparent'"
+                            :fill="sequence.includes({{ $di }}) ? 'rgba(129, 140, 248, 0.22)' : 'transparent'"
+                            :stroke="sequence.includes({{ $di }}) ? 'rgba(129, 140, 248, 0.7)' : 'transparent'"
                             stroke-width="2"
                             class="transition-all duration-150"
                         />
@@ -262,23 +270,35 @@
                         <circle
                             r="18"
                             fill="none"
-                            :stroke="sequence.includes(dot.id) ? 'transparent' : 'rgba(255, 255, 255, 0.12)'"
+                            :stroke="sequence.includes({{ $di }}) ? 'transparent' : 'rgba(255, 255, 255, 0.12)'"
                             stroke-width="1.5"
                         />
 
                         <!-- Center Dot (The iconic Android dot) -->
                         <circle
-                            :r="sequence.includes(dot.id) ? 8 : 5.5"
-                            :fill="sequence.includes(dot.id) ? 'url(#dot-active-grad)' : 'rgba(255, 255, 255, 0.75)'"
+                            :r="sequence.includes({{ $di }}) ? 8 : 5.5"
+                            :fill="sequence.includes({{ $di }}) ? 'url(#dot-active-grad)' : 'rgba(255, 255, 255, 0.75)'"
                             class="transition-all duration-150"
                         />
 
                         <!-- Inner highlight for active dot -->
-                        <template x-if="sequence.includes(dot.id)">
+                        <template x-if="sequence.includes({{ $di }})">
                             <circle r="3" fill="#FFFFFF" />
                         </template>
+
+                        <!-- Nomor titik (1-9) agar mudah dibaca/dikomunikasikan -->
+                        <text
+                            x="0"
+                            y="0"
+                            text-anchor="middle"
+                            dominant-baseline="central"
+                            font-size="11"
+                            font-weight="bold"
+                            pointer-events="none"
+                            :fill="sequence.includes({{ $di }}) ? '#FFFFFF' : '#0f172a'"
+                        >{{ $di }}</text>
                     </g>
-                </template>
+                @endfor
             </svg>
         </div>
 

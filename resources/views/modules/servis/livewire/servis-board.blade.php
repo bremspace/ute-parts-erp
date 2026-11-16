@@ -946,7 +946,19 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jenis HP <span class="text-up-red">*</span></label>
-                            <input type="text" wire:model="terimaForm.jenis_hp" placeholder="Ex: iPhone 13, Samsung A52" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input
+                                type="text"
+                                list="tipeHpKompatibelList"
+                                wire:model="terimaForm.jenis_hp"
+                                placeholder="Pilih dari daftar atau ketik manual (Ex: iPhone 13, Samsung A52)"
+                                class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"
+                            />
+                            <datalist id="tipeHpKompatibelList">
+                                @foreach(($tipeHpList ?? []) as $tipeHp)
+                                    <option value="{{ $tipeHp->nama_tampilan }}"></option>
+                                @endforeach
+                            </datalist>
+                            <p class="mt-1 text-[10px] text-ink-500">Bisa pilih dari daftar Tipe HP Kompatibel atau ketik manual.</p>
                         </div>
                     </div>
 
@@ -2944,10 +2956,16 @@
                             <label class="block text-xs font-semibold text-ink-300 mb-1">Merek & Model Aktual <span class="text-up-red">*</span></label>
                             <input
                                 type="text"
+                                list="tipeHpKompatibelListIntake"
                                 wire:model="intakeForm.jenis_hp"
                                 class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
-                                placeholder="Contoh: iPhone 13 Pro"
+                                placeholder="Pilih dari daftar atau ketik manual"
                             />
+                            <datalist id="tipeHpKompatibelListIntake">
+                                @foreach(($tipeHpList ?? []) as $tipeHp)
+                                    <option value="{{ $tipeHp->nama_tampilan }}"></option>
+                                @endforeach
+                            </datalist>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1">Seri / Warna / No. IMEI</label>

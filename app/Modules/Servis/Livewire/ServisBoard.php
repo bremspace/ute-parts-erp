@@ -15,6 +15,7 @@ use App\Modules\Servis\Services\ServisStateMachine;
 use App\Modules\Wms\Livewire\ProductSearchModal;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Traits\ParsesNominal;
 use Illuminate\Database\Eloquent\Builder;
@@ -2286,6 +2287,7 @@ class ServisBoard extends Component
 
         return view('modules.servis.livewire.servis-board', [
             'jenisServisList' => JenisServis::where('is_active', true)->get(['id', 'nama', 'batas_waktu_menit', 'auto_cancel_jika_overdue']),
+            'tipeHpList' => TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get(['id', 'merk', 'model', 'nama', 'kode_produk']),
             'pelangganList' => collect(),
             'teknisiList' => User::role(['teknisi', 'admin-toko', 'super-admin'])->get(['id', 'name']),
             'gudangList' => Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))->where('is_active', true)->get(['id', 'nama', 'kode']),
