@@ -321,6 +321,15 @@ class ImportExportPage extends Component
 
         $mappedValues = array_filter(array_values($this->columnMapping), fn ($v) => $v !== '' && $v !== null && $v !== 'abaikan');
 
+        if (! in_array('sku', $mappedValues, true)) {
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => 'Kolom "SKU" wajib dipetakan untuk melanjutkan import master produk.',
+            ]);
+
+            return;
+        }
+
         // Nama & Harga Jual opsional: jika tidak dipetakan, produk existing tidak akan namanya/harganya berubah;
         // produk baru akan default 'Produk {SKU}' / harga 0. SKU tetap wajib (patokan).
 

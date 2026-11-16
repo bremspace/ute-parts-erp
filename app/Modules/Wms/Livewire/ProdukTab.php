@@ -4282,7 +4282,8 @@ class ProdukTab extends Component
                                     ->orWhere('sku', '=', $term);
                             })
                             ->select('produk_id')
-                        );
+                        )
+                        ->orWhereHas('supplier', fn ($sq) => $sq->where('nama', 'like', "%{$term}%"));
                 });
             });
 
