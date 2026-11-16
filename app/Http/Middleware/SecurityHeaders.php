@@ -81,8 +81,8 @@ class SecurityHeaders
         $directives = [
             "default-src 'self'",
             "script-src 'self' 'nonce-{$nonce}' 'unsafe-eval'",
-            "style-src 'self' 'nonce-{$nonce}' https://fonts.googleapis.com",
-            "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com https://fonts.bunny.net",
             "img-src 'self' data: https:",
             "connect-src 'self'".($isLocal ? ' ws://localhost:5173 http://localhost:5173' : ''),
             "frame-src 'none'",
@@ -95,7 +95,7 @@ class SecurityHeaders
         // Add Vite dev server in local development
         if ($isLocal) {
             $directives[] = "script-src-elem 'self' 'nonce-{$nonce}' http://localhost:5173";
-            $directives[] = "style-src-elem 'self' 'nonce-{$nonce}' http://localhost:5173";
+            $directives[] = "style-src-elem 'self' 'unsafe-inline' https://fonts.bunny.net http://localhost:5173";
         }
 
         return implode('; ', $directives);

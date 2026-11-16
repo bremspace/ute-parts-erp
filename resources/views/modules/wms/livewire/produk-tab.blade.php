@@ -1826,7 +1826,7 @@
                                                  top = Math.min(window.innerHeight - menuHeight - 10, rect.bottom + 6);
                                              }
 
-                                             let left = rect.left;
+                                             let left = rect.right - menuWidth;
                                              if (left < 10) left = 10;
                                              if (left + menuWidth > window.innerWidth - 10) {
                                                  left = window.innerWidth - menuWidth - 10;
@@ -2144,7 +2144,7 @@
                                                  top = Math.min(window.innerHeight - menuHeight - 10, rect.bottom + 6);
                                              }
 
-                                             let left = rect.left;
+                                             let left = rect.right - menuWidth;
                                              if (left < 10) left = 10;
                                              if (left + menuWidth > window.innerWidth - 10) {
                                                  left = window.innerWidth - menuWidth - 10;
