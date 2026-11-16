@@ -2816,7 +2816,7 @@ class ImportProdukService
      * - branches:chunk dipakai karena RAM 1GB — satu file besar tidak boleh jadi
      *   satu transaksi raksasa yang menahan lock (/tmp) lama.
      */
-    public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiBarcode = [], array $resolusiErrorBaris = [], ?int $cabangId = null, array $columnMapping = [], ?int $defaultGudangId = null): array
+    public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiBarcode = [], array $resolusiErrorBaris = [], ?int $cabangId = null, array $columnMapping = [], ?int $defaultGudangId = null, array $importOverwriteColumns = []): array
     {
         $rows = $this->parseRows($filePath, $columnMapping);
         $totalBaris = count($rows);
@@ -2854,7 +2854,7 @@ class ImportProdukService
         foreach (array_chunk($rows, $chunkSize) as $indexChunk => $chunk) {
             $lastItemChunk = ['sku' => null, 'nama' => null, 'baris' => null];
 
-            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk, &$importedSkuToId, $aksiKemiripan, $resolusiDuplikat, $threshold, $chunkSize, &$lastItemChunk, $resolusiBarcode, $resolusiErrorBaris, $defaultGudangId) {
+            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk, &$importedSkuToId, $aksiKemiripan, $resolusiDuplikat, $threshold, $chunkSize, &$lastItemChunk, $resolusiBarcode, $resolusiErrorBaris, $defaultGudangId, $importOverwriteColumns) {
                 // Akumulator NILAI per chunk: jurnal di-post dalam transaksi yang
                 // SAMA dengan mutasi stok baris-baris chunk ini.
                 $nilaiChunk = 0.0;
@@ -2976,7 +2976,7 @@ class ImportProdukService
                         // chunk yang sama — nilai jurnal chunk tetap = mutasi utuh.
                         $result = DB::transaction(function () use ($row, $importLogId, $userId, $aksi, $aksiDup, &$importedSkuToId, $nomorBaris, $konteks, $threshold, $cabangId) {
                             if ($aksiDup === 'timpa_update') {
-                                return $this->prosesTimpaUpdateBaris($row, $importLogId, $userId, $nomorBaris, $cabangId);
+                                return $this->prosesTimpaUpdateBaris($row, $importLogId, $userId, $nomorBaris, $cabangId, $importOverwriteColumns);
                             }
 
                             if ($aksi === 'gabung') {
@@ -3402,7 +3402,45 @@ class ImportProdukService
     /**
      * Proses timpa/update produk eksisting ketika user memilih opsi timpa untuk duplikat database.
      */
-    protected function prosesTimpaUpdateBaris(array $row, int $importLogId, ?int $userId, int $nomorBaris, ?int $cabangId = null): array
+    /**
+     * Map kolom import (key) ke field DB produk yang boleh ditimpa.
+     */
+    protected function mapOverwriteColumnsToFields(array $columns): array
+    {
+        $map = [
+            'nama' => ['nama'],
+            'kategori' => ['kategori_id', 'kategori'],
+            'sub_kategori' => ['kategori_id', 'kategori'],
+            'brand' => ['brand_id', 'brand_kompatibel'],
+            'kualitas' => ['kualitas_id'],
+            'supplier' => ['supplier_id'],
+            'satuan' => ['satuan'],
+            'kondisi' => ['kondisi'],
+            'min_stock' => ['min_stock'],
+            'reorder_point' => ['reorder_point'],
+            'sn' => ['sn'],
+            'barcode' => ['barcode', 'barcode_alt'],
+            'barcode_1' => ['barcode', 'barcode_alt'],
+            'deskripsi' => ['deskripsi'],
+            'foto_url' => ['gambar'],
+            'harga_beli' => ['harga_beli'],
+            'harga_jual' => ['harga_jual_retail'],
+            'margin_persen' => ['margin_persen'],
+            'tipe_hp' => ['brand_kompatibel', 'model_kompatibel', 'kompatibilitas_hp'],
+            'kompatibilitas_hp' => ['brand_kompatibel', 'model_kompatibel', 'kompatibilitas_hp'],
+            'merk_hp' => ['brand_kompatibel', 'model_kompatibel', 'kompatibilitas_hp'],
+            'model_hp' => ['brand_kompatibel', 'model_kompatibel', 'kompatibilitas_hp'],
+        ];
+        $fields = [];
+        foreach ($columns as $col) {
+            foreach ($map[$col] ?? [] as $f) {
+                $fields[] = $f;
+            }
+        }
+        return array_values(array_unique($fields));
+    }
+
+    protected function prosesTimpaUpdateBaris(array $row, int $importLogId, ?int $userId, int $nomorBaris, ?int $cabangId = null, array $importOverwriteColumns = []): array
     {
         $sku = trim((string) ($row['sku'] ?? ''));
         $barcode = $this->normalizeBarcode($row['barcode_1'] ?? $row['barcode'] ?? null);
@@ -3543,22 +3581,32 @@ class ImportProdukService
             $produkUpdate['kompatibilitas_hp'] = $daftarTipe;
         }
 
+        // Filter kolom yang boleh ditimpa (jika importOverwriteColumns diisi)
+        if (! empty($importOverwriteColumns)) {
+            $allowedFields = $this->mapOverwriteColumnsToFields($importOverwriteColumns);
+            foreach (array_keys($produkUpdate) as $f) {
+                if (! in_array($f, $allowedFields, true)) {
+                    unset($produkUpdate[$f]);
+                }
+            }
+        }
+
         if (! empty($produkUpdate)) {
             $produk->update($produkUpdate);
         }
 
         // Update harga dan barcode jika ada
         $variantUpdate = [];
-        if ($hargaBeli > 0) {
+        if ($hargaBeli > 0 && (empty($importOverwriteColumns) || in_array('harga_beli', $importOverwriteColumns, true))) {
             $variantUpdate['harga_beli'] = $hargaBeli;
         }
-        if ($hargaJual > 0) {
+        if ($hargaJual > 0 && (empty($importOverwriteColumns) || in_array('harga_jual', $importOverwriteColumns, true))) {
             $variantUpdate['harga_jual_retail'] = $hargaJual;
         }
-        if ($barcode && ! $variant->barcode) {
+        if ($barcode && ! $variant->barcode && (empty($importOverwriteColumns) || in_array('barcode', $importOverwriteColumns, true) || in_array('barcode_1', $importOverwriteColumns, true))) {
             $variantUpdate['barcode'] = $barcode;
         }
-        if (isset($satuan)) {
+        if (isset($satuan) && (empty($importOverwriteColumns) || in_array('satuan', $importOverwriteColumns, true))) {
             $variantUpdate['satuan_kode'] = $satuan;
         }
         if (! empty($variantUpdate)) {

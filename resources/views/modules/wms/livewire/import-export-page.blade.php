@@ -1263,8 +1263,25 @@
                         @endif
                     </div>
 
+                    @if($isCustomMapping && ! empty($columnMapping))
+                        @php
+                            $mappedFields = array_values(array_unique(array_filter(array_values($columnMapping), fn ($v) => $v !== '' && $v !== null && $v !== 'abaikan')));
+                        @endphp
+                        <div class="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                            <div class="text-xs font-bold text-ink-300">Kolom yang ditimpa untuk produk yang sudah ada (opsional)</div>
+                            <p class="text-[10px] text-ink-400">Centang kolom yang ingin ditimpa saat produk (SKU/barcode) sudah ada. Kolom yang tidak dicentang akan dilewati (nilai lama dipertahankan). Kosongkan semua = timpa semua ( perilaku default ).</p>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                                @foreach($mappedFields as $field)
+                                    <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer select-none">
+                                        <input type="checkbox" value="{{ $field }}" wire:model="importOverwriteColumns" class="rounded text-up-primary focus:ring-up-primary" />
+                                        <span>{{ $field }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
                     <button type="button"
-                            x-data="{ submitting: false }"
                             x-on:click="if (submitting) return false; submitting = true;"
                             wire:click="commitImport"
                             wire:loading.attr="disabled"

@@ -62,6 +62,9 @@ class ImportExportPage extends Component
 
     public array $columnMapping = [];
 
+    // Per-kolom overwrite untuk produk yang sudah ada (kosong = timpa semua)
+    public array $importOverwriteColumns = [];
+
     public ?int $defaultGudangId = null;
 
     public bool $paksaCustomMapping = false;
@@ -798,7 +801,8 @@ class ImportExportPage extends Component
                         $this->resolusiBarcode,
                         $this->resolusiErrorBaris,
                         $columnMapping,
-                        $defaultGudangId
+                        $defaultGudangId,
+                        $this->importOverwriteColumns
                     );
                 } else {
                     ImportProdukExcelJob::dispatch(
@@ -815,7 +819,8 @@ class ImportExportPage extends Component
                         $this->resolusiBarcode,
                         $this->resolusiErrorBaris,
                         $columnMapping,
-                        $defaultGudangId
+                        $defaultGudangId,
+                        $this->importOverwriteColumns
                     );
                 }
             }
