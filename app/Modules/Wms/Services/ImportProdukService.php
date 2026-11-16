@@ -2309,9 +2309,7 @@ class ImportProdukService
                 $errors[] = "Barcode '{$barcode}' duplikat (sudah ada di file atau database)";
             }
         }
-        if (! $nama) {
-            $errors[] = 'Nama produk wajib diisi';
-        }
+        // Nama produk opsional: jika kosong, default 'Produk {SKU}' (prosesSatuBaris)
 
         $satuanRaw = trim((string) ($row['satuan'] ?? ''));
         if (! $satuanRaw || in_array(strtolower($satuanRaw), ['-', 'none', 'null', 'kosong'], true)) {
