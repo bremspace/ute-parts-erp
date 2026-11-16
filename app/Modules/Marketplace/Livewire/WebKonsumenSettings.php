@@ -388,6 +388,7 @@ class WebKonsumenSettings extends Component
         $crmConfig = app(KonfigurasiService::class);
         $crmConfig->set('payment_mp_duitku_enabled', (bool) $this->paymentForm['payment_mp_duitku_enabled'], 'Aktivasi Gateway Duitku MP');
         $crmConfig->set('payment_mp_qris_toko_enabled', (bool) $this->paymentForm['payment_mp_qris_toko_enabled'], 'Aktivasi QRIS Dinamis Toko MP');
+        $crmConfig->set('hide_out_of_stock', (bool) $this->stockForm['hide_out_of_stock'], 'Sembunyikan produk kosong di katalog toko');
 
         // Catat Audit Log
         $after = $service->getAll();
