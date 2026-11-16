@@ -535,6 +535,13 @@
                             <span>✏️ Bulk Edit ({{ count($selectedProdukIds) }})</span>
                         </button>
 
+                        <button type="button"
+                                wire:click="openFindReplaceModal"
+                                class="px-3 py-1.5 rounded-xl bg-up-accent hover:bg-up-accent/90 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                                title="Find & Replace nama/merk/model produk">
+                            <span>🔍 Find & Replace</span>
+                        </button>
+
                         <!-- Tombol Salin Data / Harga & Pengaturan Data yang Disalin -->
                         <div class="inline-flex rounded-xl bg-up-mint p-0.5 shadow-sm text-ink-950 font-bold text-xs">
                             <button type="button"
@@ -5706,4 +5713,50 @@ Baterai iPhone 11	SKU-BAT-02	150000	Original	20	RAK-A1
             }
         });
     </script>
+
+    <!-- MODAL: FIND & REPLACE -->
+    @if($showFindReplaceModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" x-cloak>
+            <div class="w-full max-w-lg glass-panel p-5 sm:p-6 rounded-3xl relative space-y-4 border border-white/10 shadow-2xl">
+                <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                    <h3 class="text-lg font-bold text-white">🔍 Find & Replace</h3>
+                    <button type="button" wire:click="closeFindReplaceModal" class="p-1.5 rounded-lg text-ink-400 hover:text-white hover:bg-white/5 transition cursor-pointer">✕</button>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Kolom target</label>
+                        <select wire:model="findReplaceField" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                            <option value="nama">Nama Produk</option>
+                            <option value="brand_kompatibel">Brand Kompatibel</option>
+                            <option value="model_kompatibel">Model Kompatibel</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Cari teks</label>
+                        <input type="text" wire:model="findText" placeholder="Teks yang dicari" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Ganti dengan</label>
+                        <input type="text" wire:model="replaceText" placeholder="Teks pengganti (kosong = hapus)" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white" />
+                    </div>
+                    <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer select-none">
+                        <input type="checkbox" wire:model="findReplaceCaseSensitive" class="rounded text-up-primary focus:ring-up-primary" />
+                        <span>Case sensitive</span>
+                    </label>
+
+                    @if($findReplaceHasPreviewed)
+                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 text-xs text-ink-300">
+                            Produk terpengaruh: <strong class="text-up-primary">{{ $findReplacePreviewCount }}</strong>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                    <button type="button" wire:click="previewFindReplace" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-bold text-xs cursor-pointer">Preview</button>
+                    <button type="button" wire:click="executeFindReplace" class="px-3 py-1.5 rounded-xl bg-up-accent hover:bg-up-accent/90 text-white font-bold text-xs cursor-pointer">Jalankan</button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
