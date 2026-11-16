@@ -2972,7 +2972,7 @@ class ImportProdukService
                         // [B-10f] Savepoint per baris (nested transaction): baris gagal
                         // tidak boleh meninggalkan produk/sku setengah tertulis di dalam
                         // chunk yang sama — nilai jurnal chunk tetap = mutasi utuh.
-                        $result = DB::transaction(function () use ($row, $importLogId, $userId, $aksi, $aksiDup, &$importedSkuToId, $nomorBaris, $konteks, $threshold, $cabangId) {
+                        $result = DB::transaction(function () use ($row, $importLogId, $userId, $aksi, $aksiDup, &$importedSkuToId, $nomorBaris, $konteks, $threshold, $cabangId, $importOverwriteColumns) {
                             if ($aksiDup === 'timpa_update') {
                                 return $this->prosesTimpaUpdateBaris($row, $importLogId, $userId, $nomorBaris, $cabangId, $importOverwriteColumns);
                             }
