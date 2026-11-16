@@ -98,6 +98,21 @@ class EscPos {
 
   money(v) { return 'Rp ' + Number(v || 0).toLocaleString('id-ID'); }
 
+  /** Angka mentah tanpa "Rp" — dipakai kolom kanan baris item (senilai contoh pengaturan). */
+  numberOnly(v) { return Number(v || 0).toLocaleString('id-ID'); }
+
+  /** Satuan singkat (pcs/box/set) ditampilkan UPPERCASE agar padan dengan contoh struk. */
+  unitLabel(satuan) {
+    const u = this.clean(satuan || 'PCS');
+    return u.length <= 4 ? u.toUpperCase() : u;
+  }
+
+  /** Raw text tanpa LF — untuk baris yang disusun dengan escape di tengah (ESC B). */
+  raw(str) { this.buf.push(...this.ascii(str)); return this; }
+
+  /** ESC B n — strikethrough on/off (Epson ESC/POS standar). */
+  escB(on) { this.buf.push(0x1b, 0x42, on ? 1 : 0); return this; }
+
   pad(left, right) {
     left = this.clean(left);
     right = this.clean(right);
@@ -142,7 +157,11 @@ class EscPos {
   // ============================================================
   // Full receipt builder — mirrors PHP EscPosWriter::receipt()
   // ============================================================
-  buildReceipt(data) {
+  /**
+   * @param data       payload struk (lihat EscPosWriter::receipt())
+   * @param paperWidthOverride  lebar kertas aktif (58|80) — menang atas data.paper_width
+   */
+  buildReceipt(data, paperWidthOverride = null) {
     const {
       items = [],
       total = 0, bayar = 0, kembali = 0,
@@ -155,21 +174,24 @@ class EscPos {
       garansi,
       footer_text, kebijakan_retur, catatan_kaki,
       nama_toko, slogan, alamat, telepon, website_medsos,
-      show_cabang, show_kasir = true, show_pelanggan = true, show_waktu,
+      show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
+      show_subtotal_breakdown = true,
       show_qr_retur = true, qr_caption, qr_size = 3, qr_url,
-      paper_width = 58,
       font_size = 'small',
-      strikethrough_mode = 'ascii',
+      strikethrough_mode = 'esc_b',
     } = data;
 
     // Re-init with correct paper width
-    this.paperWidth = Number(paper_width) === 80 ? 80 : 58;
+    this.paperWidth = Number(paperWidthOverride ?? data.paper_width) === 80 ? 80 : 58;
     this.compressed = font_size === 'small';
     this.columns = this.compressed
       ? (this.paperWidth === 80 ? 64 : 42)
       : (this.paperWidth === 80 ? 48 : 32);
     this.buf = [];
     this.init();
+
+    const qrShown = Boolean(show_qr_retur && no_transaksi && no_transaksi !== '-');
+    const tglVisible = Boolean(show_waktu && (tanggal || waktu));
 
     // ======== HEADER (Centered) ========
     this.alignCenter();
@@ -185,24 +207,19 @@ class EscPos {
     const tglStr = tanggal || waktu || '';
     const captionStr = qr_caption || 'Scan QR ini untuk retur & klaim garansi';
 
-    if (show_qr_retur && qrContent !== '-') {
+    if (qrShown) {
       this.alignCenter();
       this.qrcode(qrContent, qr_size || 3);
       this.bold(true).text(qrContent).bold(false);
       this.text(captionStr);
 
       this.alignLeft();
-      this.text('Web: ' + qrUrlDomain);
-      if (tglStr) this.text('Tgl: ' + tglStr);
-      if (garansi) this.text('Garansi: ' + garansi);
-      this.text('Scan QR ini untuk retur & klaim garansi');
     } else {
       this.alignLeft();
-      this.text('Web: ' + qrUrlDomain);
-      if (tglStr) this.text('Tgl: ' + tglStr);
-      if (garansi) this.text('Garansi: ' + garansi);
-      this.text('Scan QR ini untuk retur & klaim garansi');
     }
+    this.text('Web: ' + qrUrlDomain);
+    if (tglVisible) this.text('Tgl: ' + tglStr);
+    if (!qrShown) this.text(captionStr);
 
     this.rule();
 
@@ -249,32 +266,27 @@ class EscPos {
         this.bold(true).text(line).bold(false);
       }
 
-      const qtySatuan = (item.qty || 1) + (item.satuan ? ' ' + item.satuan : ' PCS');
+      const qtySatuan = (item.qty || 1) + ' ' + this.unitLabel(item.satuan);
       const harga = this.money(item.harga);
-      const subtotalItem = this.money(item.subtotal);
+      const rightVal = this.numberOnly(item.subtotal);
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
 
-      let leftPrice = '';
-      if (hargaRetail > hargaJual) {
+      if (hargaRetail > hargaJual && strikethrough_mode === 'esc_b') {
+        // Baris disusun manual: "1 PCS x " + [ESC B 1]harga normal[ESC B 0] + " harga final" + spasi + subtotal.
         const normal = this.money(hargaRetail);
         const disc = this.money(hargaJual);
-        if (strikethrough_mode === 'overprint') {
-          const prefix = qtySatuan + ' x ';
-          const padStrike = ' '.repeat(prefix.length) + '-'.repeat(normal.length);
-          this.buf.push(...padStrike.split('').map(c => c.charCodeAt(0)), 0x0d);
-          leftPrice = `${prefix}${normal} ${disc}`;
-        } else if (strikethrough_mode === 'combining') {
-          const striked = normal.split('').map(c => c + '\u0336').join('');
-          leftPrice = `${qtySatuan} x ${striked} ${disc}`;
-        } else {
-          leftPrice = `${qtySatuan} x (${normal}) -> ${disc}`;
-        }
+        const prefix = qtySatuan + ' x ';
+        const gap = Math.max(1, this.columns - prefix.length - normal.length - 1 - disc.length - rightVal.length);
+        this.raw(prefix);
+        this.escB(true).raw(normal).escB(false);
+        this.raw(' ' + disc);
+        this.buf.push(...this.ascii(' '.repeat(gap) + rightVal), 0x0a);
+      } else if (hargaRetail > hargaJual) {
+        this.text(this.pad(`${qtySatuan} x (${this.money(hargaRetail)}) -> ${this.money(hargaJual)}`, rightVal));
       } else {
-        leftPrice = `${qtySatuan} x ${harga}`;
+        this.text(this.pad(`${qtySatuan} x ${harga}`, rightVal));
       }
-
-      this.text(this.pad(leftPrice, subtotalItem));
 
       if (item.catatan) {
         for (const ln of this.wrap('  * ' + item.catatan)) {
@@ -284,7 +296,7 @@ class EscPos {
     }
 
     // ======== SUBTOTAL BREAKDOWN & TOTALS (Directly follows items) ========
-    if (diskon_tier && Number(diskon_tier) > 0) {
+    if (show_subtotal_breakdown !== false && diskon_tier && Number(diskon_tier) > 0) {
       const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
       this.text(this.pad('Subtotal Retail:', this.money(subRetail)));
 
@@ -331,7 +343,7 @@ class EscPos {
     }
 
     if (saldo_poin !== undefined) {
-      this.text(this.pad('Sisa Saldo Poin:', Number(saldo_poin).toLocaleString('id-ID') + ' pts'));
+      this.text(this.pad('Sisa Saldo Poin:', this.numberOnly(saldo_poin) + ' pts'));
     }
 
     if (hemat_total && Number(hemat_total) > 0) {
@@ -381,7 +393,7 @@ class EscPos {
   }
 
   /** Build HTML preview matching the exact paper layout */
-  buildPreviewHtml(data) {
+  buildPreviewHtml(data, paperWidthOverride = null) {
     const {
       items = [],
       total = 0, bayar = 0, kembali = 0,
@@ -394,19 +406,25 @@ class EscPos {
       garansi,
       footer_text, kebijakan_retur, catatan_kaki,
       nama_toko, slogan, alamat, telepon, website_medsos,
-      show_cabang, show_kasir = true, show_pelanggan = true,
+      show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
+      show_subtotal_breakdown = true,
       show_qr_retur = true, qr_caption, qr_url, qr_svg,
       paper_width = 58,
     } = data;
 
     const money = (v) => 'Rp ' + Number(v || 0).toLocaleString('id-ID');
+    const numberOnly = (v) => Number(v || 0).toLocaleString('id-ID');
+    const unitLabel = (satuan) => {
+      const u = String(satuan || 'PCS');
+      return u.length <= 4 ? u.toUpperCase() : u;
+    };
     const esc = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-    const widthNum = Number(paper_width) === 80 ? 80 : 58;
+    const widthNum = Number(paperWidthOverride ?? paper_width) === 80 ? 80 : 58;
     const paperClass = widthNum === 80 ? 'paper-80' : 'paper-58';
     const qrContent = no_transaksi || '-';
     const qrUrlDomain = qr_url || website_medsos || 'www.uteparts.id';
-    const tglStr = tanggal || waktu || '';
+    const tglStr = show_waktu ? (tanggal || waktu || '') : '';
     const caraBayar = String(metode_bayar || metode || 'TUNAI').toUpperCase();
 
     // Generate fallback QR svg if none provided
@@ -516,9 +534,9 @@ class EscPos {
   <div style="width: 100%; margin: 4px 0;">
     ${items.map(item => {
       const nama = item.nama || 'Item';
-      const qtySatuan = (item.qty || 1) + (item.satuan ? ' ' + item.satuan : ' PCS');
+      const qtySatuan = (item.qty || 1) + ' ' + unitLabel(item.satuan);
       const harga = money(item.harga);
-      const subtotalItem = Number(item.subtotal || 0).toLocaleString('id-ID');
+      const subtotalItem = numberOnly(item.subtotal);
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
 
@@ -542,7 +560,7 @@ class EscPos {
 
   <!-- SUBTOTAL BREAKDOWN & TOTALS (Directly follows items without extra dashed line) -->
   <div style="width: 100%; font-size: 9px; line-height: 1.35;">
-    ${diskon_tier && Number(diskon_tier) > 0 ? `
+    ${show_subtotal_breakdown !== false && diskon_tier && Number(diskon_tier) > 0 ? `
       <div style="display: flex; justify-content: space-between; width: 100%;">
         <span style="color: #4b5563;">Subtotal Retail:</span>
         <span>${money(Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier)))}</span>
@@ -897,6 +915,45 @@ window.EscPos = EscPos;
 window.ThermalPrinter = ThermalPrinter;
 
 /**
+ * Adapter cetak struk untuk POS offline (dipanggil pos-offline-engine.js).
+ * Menerima payload outbox (total_akhir, metode_bayar, ...) lalu mencetak
+ * lewat Web Bluetooth; fallback ke dialog cetak browser bila BLE tak tersedia.
+ */
+window.UteThermalPrint = {
+  async printReceipt(data = {}) {
+    const paperWidth = Number(localStorage.getItem('ute_pos_paper_size')) === 80 ? 80 : 58;
+    const payload = {
+      ...data,
+      total: data.total ?? data.total_akhir ?? 0,
+      bayar: data.bayar ?? data.total_akhir ?? data.total ?? 0,
+      kembali: data.kembali ?? 0,
+      paper_width: paperWidth,
+      font_size: 'small',
+    };
+
+    const esc = new EscPos(paperWidth);
+    const bytes = esc.buildReceipt(payload, paperWidth);
+
+    try {
+      const printer = new ThermalPrinter();
+      await printer.print(bytes);
+      return true;
+    } catch (e) {
+      console.warn('UteThermalPrint: BLE tidak tersedia, fallback browser print', e);
+      const win = window.open('', '_blank');
+      if (!win) return false;
+      win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Struk</title>
+        <style>@media print{@page{margin:0 size:${paperWidth}mm auto}body{margin:0;padding:1mm;background:#fff}}</style>
+        </head><body>${esc.buildPreviewHtml(payload, paperWidth)}</body></html>`);
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 250);
+      return true;
+    }
+  },
+};
+
+/**
  * Alpine component for thermal receipt modal.
  * Merges with parent component via spread operator: ...thermalPrinter(config)
  */
@@ -955,8 +1012,10 @@ function thermalPrinter(config = {}) {
 
       try {
         const paperWidth = Number(paperSize) === 80 ? 80 : 58;
+        // Selera kertas & mode font selalu eksplisit agar output == preview == backend job.
+        const payload = { ...this.data, paper_width: paperWidth, font_size: 'small' };
         const esc = new window.EscPos(paperWidth);
-        const bytes = esc.buildReceipt(this.data);
+        const bytes = esc.buildReceipt(payload, paperWidth);
 
         // 1. CUPS raw printing if configured
         if (savedCupsPrinter) {
@@ -1010,7 +1069,7 @@ function thermalPrinter(config = {}) {
 
       const paperWidth = Number(paperSize) === 80 ? 80 : 58;
       const esc = new window.EscPos(paperWidth);
-      const html = esc.buildPreviewHtml(this.data);
+      const html = esc.buildPreviewHtml({ ...this.data, paper_width: paperWidth, font_size: 'small' }, paperWidth);
 
       printWindow.document.write(`
         <!DOCTYPE html>

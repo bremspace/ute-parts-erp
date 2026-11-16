@@ -295,6 +295,6 @@ class ThermalPrintReceiptOptimizationTest extends TestCase
         $this->assertStringContainsString('[Part] LCD Original OLED', $output);
         // QR Code ESC/POS header Model 2
         $this->assertStringContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
-        $this->assertStringContainsString('Scan QR utk Retur/Garansi', $output);
+        $this->assertStringContainsString('Scan QR ini untuk retur & klaim garansi', $output);
     }
 }

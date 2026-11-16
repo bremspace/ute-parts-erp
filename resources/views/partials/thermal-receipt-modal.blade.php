@@ -17,21 +17,21 @@
     <div
         class="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
         x-data="{
-            ...thermalPrinter({{ \Illuminate\Support\Js::from(array_merge($strukConfig, $receiptData, ['qr_svg' => $qrSvg, 'qr_caption' => $qrCaption])) }}),
+            ...thermalPrinter({{ \Illuminate\Support\Js::from(array_merge($strukConfig, $receiptData, ['qr_svg' => $qrSvg, 'qr_caption' => $qrCaption, 'paper_width' => (int) ($defaultPaperSize === '80' ? 80 : 58), 'font_size' => 'small'])) }}),
             paperSize: localStorage.getItem('ute_pos_paper_size') || '{{ $defaultPaperSize }}',
             autoPrint: {{ $autoPrint ? 'true' : 'false' }},
+            get paperSizeNum() { return this.paperSize === '80' ? 80 : 58; },
             setPaperSize(size) {
                 this.paperSize = size;
                 localStorage.setItem('ute_pos_paper_size', size);
             },
             get previewHtml() {
                 if (!this.data) return '';
-                const paperWidth = this.paperSize === '80' ? 80 : 58;
-                if (typeof window.EscPos === 'function') {
-                    const esc = new window.EscPos(paperWidth);
-                    return esc.buildPreviewHtml(this.data);
+                if (typeof window.EscPos !== 'function') {
+                    return 'Memuat pratinjau…';
                 }
-                return '';
+                const esc = new window.EscPos(this.paperSizeNum);
+                return esc.buildPreviewHtml(this.data, this.paperSizeNum);
             }
         }"
     >
@@ -62,150 +62,7 @@
                      id="thermalReceipt"
                      :style="paperSize === '58' ? 'width: 210px; max-width: 210px; margin: 0 auto;' : 'width: 302px; max-width: 302px; margin: 0 auto;'"
                      x-html="previewHtml">
-                    <div class="thermal-receipt-body" style="width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 10px; line-height: 1.25; color: #000; background: #fff;">
-                        <!-- HEADER (Centered) -->
-                        <div style="text-align: center; padding-bottom: 2px;">
-                            <div style="font-size: 14px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase;">{{ $receiptData['nama_toko'] ?? $strukConfig['nama_toko'] ?? 'UTEParts' }}</div>
-                            <div style="font-size: 9px; font-weight: 600; text-transform: uppercase; margin-top: 2px;">{{ $receiptData['slogan'] ?? $strukConfig['slogan'] ?? 'SPAREPARTS/ACCESORIES/SERVICE' }}</div>
-                            @if(!empty($receiptData['alamat'] ?? $strukConfig['alamat'] ?? null))
-                                <div style="font-size: 8px; color: #374151; margin-top: 2px; line-height: 1.2;">{{ $receiptData['alamat'] ?? $strukConfig['alamat'] }}</div>
-                            @endif
-                            @if(!empty($receiptData['telepon'] ?? $strukConfig['telepon'] ?? null))
-                                <div style="font-size: 8.5px; color: #1f2937;">Telp/WA: {{ $receiptData['telepon'] ?? $strukConfig['telepon'] }}</div>
-                            @endif
-                        </div>
-
-                        <!-- 2-COL: QR (Left) + URL/Date/Warranty Note (Right) -->
-                        <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0;">
-                            @if($showQrRetur && !empty($qrSvg))
-                                <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-                                    {!! $qrSvg !!}
-                                </div>
-                            @endif
-                            <div style="flex: 1; text-align: left; font-size: 8.5px; line-height: 1.25;">
-                                <div style="font-weight: 600; color: #111827;">{{ $receiptData['qr_url'] ?? $strukConfig['qr_url'] ?? 'www.uteparts.id' }}</div>
-                                @if(!empty($receiptData['tanggal'] ?? $receiptData['waktu'] ?? null))
-                                    <div style="color: #374151;">{{ $receiptData['tanggal'] ?? $receiptData['waktu'] }}</div>
-                                @endif
-                                <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">{{ $qrCaption }}</div>
-                            </div>
-                        </div>
-
-                        <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
-
-                        <!-- TRANSACTION INFO (Left-Right) -->
-                        <div style="font-size: 9px; line-height: 1.3;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: #4b5563;">No. TRX:</span>
-                                <span style="font-weight: 700; color: #111827;">{{ $receiptData['no_transaksi'] ?? '-' }}</span>
-                            </div>
-                            @if(!empty($receiptData['sumber']) && !in_array(strtolower($receiptData['sumber']), ['pos', 'offline']))
-                                <div style="display: flex; justify-content: space-between;">
-                                    <span style="color: #4b5563;">Pesanan:</span>
-                                    <span>{{ strtoupper($receiptData['sumber']) }}</span>
-                                </div>
-                            @endif
-                            @if(!empty($receiptData['no_tiket']))
-                                <div style="display: flex; justify-content: space-between;">
-                                    <span style="color: #4b5563;">No. Tiket:</span>
-                                    <span style="font-weight: 700;">{{ $receiptData['no_tiket'] }}</span>
-                                </div>
-                            @endif
-                            @if(!empty($receiptData['jenis_hp']))
-                                <div style="display: flex; justify-content: space-between;">
-                                    <span style="color: #4b5563;">Unit:</span>
-                                    <span>{{ $receiptData['jenis_hp'] }}</span>
-                                </div>
-                            @endif
-                            @if(!empty($receiptData['kasir']))
-                                <div style="display: flex; justify-content: space-between;">
-                                    <span style="color: #4b5563;">Kasir:</span>
-                                    <span>{{ $receiptData['kasir'] }}</span>
-                                </div>
-                            @endif
-                            @if(!empty($receiptData['pelanggan']))
-                                <div style="display: flex; justify-content: space-between;">
-                                    <span style="color: #4b5563;">Pelanggan:</span>
-                                    <span>{{ $receiptData['pelanggan'] }}</span>
-                                </div>
-                            @endif
-                        </div>
-
-                        <!-- ITEMS -->
-                        <div style="margin: 4px 0;">
-                            @foreach($receiptData['items'] ?? [] as $item)
-                                @php
-                                    $qtySatuan = ($item['qty'] ?? 1) . (!empty($item['satuan']) ? ' ' . $item['satuan'] : ' PCS');
-                                    $hargaJual = (float)($item['harga'] ?? 0);
-                                    $hargaRetail = (float)($item['harga_retail'] ?? 0);
-                                @endphp
-                                <div style="margin-bottom: 4px;">
-                                    <div style="font-weight: 700; font-size: 9.5px; line-height: 1.2; word-break: break-word;">{{ $item['nama'] ?? 'Item' }}</div>
-                                    <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 9px; margin-top: 1px;">
-                                        <span>
-                                            {{ $qtySatuan }} x
-                                            @if($hargaRetail > $hargaJual)
-                                                <span style="text-decoration: line-through; opacity: 0.6; margin-right: 2px;">Rp {{ number_format($hargaRetail, 0, ',', '.') }}</span>
-                                                <span style="font-weight: 700;">Rp {{ number_format($hargaJual, 0, ',', '.') }}</span>
-                                            @else
-                                                <span>Rp {{ number_format($hargaJual, 0, ',', '.') }}</span>
-                                            @endif
-                                        </span>
-                                        <span style="font-weight: 600; text-align: right; margin-left: 4px;">{{ number_format((float)($item['subtotal'] ?? 0), 0, ',', '.') }}</span>
-                                    </div>
-                                    @if(!empty($item['catatan']))
-                                        <div style="font-size: 8px; color: #4b5563; font-style: italic; margin-top: 1px;">* {{ $item['catatan'] }}</div>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-
-                        <!-- TOTALS (Directly follows items) -->
-                        <div style="width: 100%; font-size: 9px; line-height: 1.35;">
-                            <div style="display: flex; justify-content: space-between; width: 100%;">
-                                <span style="color: #4b5563;">Subtotal:</span>
-                                <span>Rp {{ number_format((float)($receiptData['subtotal'] ?? $receiptData['total'] ?? 0), 0, ',', '.') }}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: 13px; font-weight: 900; padding: 2px 0;">
-                                <span>TOTAL:</span>
-                                <span>Rp {{ number_format((float)($receiptData['total'] ?? 0), 0, ',', '.') }}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; width: 100%;">
-                                <span style="color: #4b5563;">BAYAR ({{ strtoupper($receiptData['metode_bayar'] ?? $receiptData['metode'] ?? 'TUNAI') }}):</span>
-                                <span style="font-weight: 600;">Rp {{ number_format((float)($receiptData['bayar'] ?? $receiptData['total'] ?? 0), 0, ',', '.') }}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; width: 100%;">
-                                <span style="color: #4b5563;">KEMBALI:</span>
-                                <span style="font-weight: 600;">Rp {{ number_format((float)($receiptData['kembali'] ?? 0), 0, ',', '.') }}</span>
-                            </div>
-                            @if(isset($receiptData['saldo_poin']))
-                                <div style="display: flex; justify-content: space-between; width: 100%;">
-                                    <span style="color: #4b5563;">Sisa Saldo Poin:</span>
-                                    <span>{{ number_format((float)$receiptData['saldo_poin'], 0, ',', '.') }} pts</span>
-                                </div>
-                            @endif
-                        </div>
-
-                        <div style="border-top: 1px dashed #000; width: 100%; margin: 4px 0;"></div>
-
-                        <!-- FOOTER (Centered) -->
-                        <div style="text-align: center; width: 100%; font-size: 8.5px; color: #374151; line-height: 1.3; padding-top: 2px;">
-                            @if(!empty($receiptData['garansi']))
-                                <div style="font-weight: 700; color: #111827;">Garansi: {{ $receiptData['garansi'] }}</div>
-                            @endif
-                            @if(!empty($receiptData['komplain']))
-                                <div style="font-weight: 700; color: #b45309;">Komplain: {{ $receiptData['komplain'] }}</div>
-                            @endif
-                            @if(!empty($receiptData['goodwill']))
-                                <div style="font-weight: 700; color: #b45309;">{{ $receiptData['goodwill'] }}</div>
-                            @endif
-                            @if(!empty($receiptData['voucher']))
-                                <div style="font-weight: 700; color: #b45309;">{{ $receiptData['voucher'] }}</div>
-                            @endif
-                            <div>{{ $receiptData['footer_text'] ?? $strukConfig['footer_text'] ?? 'Terima kasih atas kunjungan Anda!' }}</div>
-                            <div style="font-size: 8px; color: #4b5563;">{{ $receiptData['kebijakan_retur'] ?? $strukConfig['kebijakan_retur'] ?? 'Segel toko wajib utuh & fisik barang tidak cacat.' }}</div>
-                        </div>
-                    </div>
+                    <div class="thermal-receipt-body" style="width: 100%; padding: 10px 0; text-align: center; color: #6b7280; font-size: 9px;">Memuat pratinjau…</div>
                 </div>
             </div>
 

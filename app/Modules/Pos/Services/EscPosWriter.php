@@ -105,9 +105,6 @@ class EscPosWriter
         if (! empty($data['telepon'])) {
             $this->text('Telp/WA: '.$data['telepon']);
         }
-        if (! empty($data['website_medsos']) && empty($data['show_qr_retur'])) {
-            $this->text($data['website_medsos']);
-        }
 
         if (($data['show_cabang'] ?? false) && ! empty($data['cabang'])) {
             $this->text($data['cabang']);
@@ -116,34 +113,26 @@ class EscPosWriter
         // ========== 2-COL: QR (Left) + URL/Date/Warranty (Right) ==========
         $noTrx = $data['no_transaksi'] ?? '-';
         $qrUrl = $data['qr_url'] ?? $data['website_medsos'] ?? 'www.uteparts.id';
-        $qrCaption = $data['qr_caption'] ?? 'Scan QR utk Retur/Garansi';
+        $qrCaption = $data['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi';
         $tglStr = $data['tanggal'] ?? $data['waktu'] ?? '';
+        $qrShown = ($data['show_qr_retur'] ?? true) && ! empty($noTrx) && $noTrx !== '-';
 
-        if (($data['show_qr_retur'] ?? true) && $noTrx !== '-') {
+        if ($qrShown) {
             $this->alignCenter();
             $this->qrcode($noTrx, $data['qr_size'] ?? 3);
             $this->bold(true)->text($noTrx)->bold(false);
             $this->text($qrCaption);
 
             $this->alignLeft();
-            $this->text('Web: '.$qrUrl);
-            if (! empty($tglStr)) {
-                $this->text('Tgl: '.$tglStr);
-            }
-            if (! empty($data['garansi'])) {
-                $this->text('Garansi: '.$data['garansi']);
-            }
-            $this->text('Scan QR ini untuk retur & klaim garansi');
         } else {
             $this->alignLeft();
-            $this->text('Web: '.$qrUrl);
-            if (! empty($tglStr)) {
-                $this->text('Tgl: '.$tglStr);
-            }
-            if (! empty($data['garansi'])) {
-                $this->text('Garansi: '.$data['garansi']);
-            }
-            $this->text('Scan QR ini untuk retur & klaim garansi');
+        }
+        $this->text('Web: '.$qrUrl);
+        if (($data['show_waktu'] ?? true) && ! empty($tglStr)) {
+            $this->text('Tgl: '.$tglStr);
+        }
+        if (! $qrShown) {
+            $this->text($qrCaption);
         }
 
         $this->rule();
@@ -185,44 +174,38 @@ class EscPosWriter
         }
 
         // ========== ITEMS ==========
+        $strikethroughMode = $data['strikethrough_mode'] ?? 'esc_b';
+
         foreach ($data['items'] ?? [] as $item) {
             $nama = $item['nama'] ?? 'Item';
             foreach ($this->wrap($nama) as $namaLine) {
                 $this->bold(true)->text($namaLine)->bold(false);
             }
 
-            $qtySatuan = ($item['qty'] ?? 1).(! empty($item['satuan']) ? ' '.$item['satuan'] : ' PCS');
+            $qtySatuan = ($item['qty'] ?? 1).' '.$this->unitLabel($item['satuan'] ?? null);
             $harga = $this->money($item['harga'] ?? 0);
-            $subtotal = $this->money($item['subtotal'] ?? 0);
+            $rightVal = $this->numberOnly($item['subtotal'] ?? 0);
 
             // Inline strikethrough: normal price next to final price without extra rows
             $hargaRetail = (float) ($item['harga_retail'] ?? 0);
             $hargaJual = (float) ($item['harga'] ?? 0);
 
-            if ($hargaRetail > $hargaJual) {
+            if ($hargaRetail > $hargaJual && $strikethroughMode === 'esc_b') {
+                // Baris disusun manual: "1 PCS x " + [ESC B 1]harga normal[ESC B 0] + " harga final" + spasi + subtotal.
                 $normal = $this->money($hargaRetail);
                 $disc = $this->money($hargaJual);
-                $mode = $data['strikethrough_mode'] ?? 'ascii';
-
-                if ($mode === 'overprint') {
-                    $prefix = "{$qtySatuan} x ";
-                    $padStrike = str_repeat(' ', strlen($prefix)).str_repeat('-', strlen($normal));
-                    $this->buf .= $padStrike."\r";
-                    $leftPrice = "{$prefix}{$normal} {$disc}";
-                } elseif ($mode === 'combining') {
-                    $striked = '';
-                    foreach (mb_str_split($normal) as $char) {
-                        $striked .= $char."\xcc\xb6";
-                    }
-                    $leftPrice = "{$qtySatuan} x {$striked} {$disc}";
-                } else {
-                    $leftPrice = "{$qtySatuan} x ({$normal}) -> {$disc}";
-                }
+                $prefix = "{$qtySatuan} x ";
+                $gap = max(1, $this->columns - strlen($prefix) - strlen($normal) - 1 - strlen($disc) - strlen($rightVal));
+                $this->raw($prefix);
+                $this->escB(true)->raw($normal)->escB(false);
+                $this->raw(' '.$disc);
+                $this->raw(str_repeat(' ', $gap).$rightVal);
+                $this->buf .= "\n";
+            } elseif ($hargaRetail > $hargaJual) {
+                $this->text($this->pad("{$qtySatuan} x (".$this->money($hargaRetail).') -> '.$this->money($hargaJual), $rightVal));
             } else {
-                $leftPrice = "{$qtySatuan} x {$harga}";
+                $this->text($this->pad("{$qtySatuan} x {$harga}", $rightVal));
             }
-
-            $this->text($this->pad($leftPrice, $subtotal));
 
             if (! empty($item['catatan'])) {
                 foreach ($this->wrap('  * '.$item['catatan']) as $catatanLine) {
@@ -288,7 +271,7 @@ class EscPosWriter
         }
 
         if (isset($data['saldo_poin'])) {
-            $this->text($this->pad('Sisa Saldo Poin:', number_format((float) $data['saldo_poin']).' pts'));
+            $this->text($this->pad('Sisa Saldo Poin:', $this->numberOnly($data['saldo_poin']).' pts'));
         }
 
         if (! empty($data['hemat_total']) && (float) $data['hemat_total'] > 0) {
@@ -306,8 +289,8 @@ class EscPosWriter
         if (! empty($data['garansi'])) {
             $this->text('Garansi: '.$data['garansi']);
         }
-        $this->text($data['footer_text'] ?? 'Terima kasih atas kunjungan Anda!');
-        $this->text($data['kebijakan_retur'] ?? 'Segel toko wajib utuh & fisik barang tidak cacat.');
+        $this->text(! empty($data['footer_text']) ? $data['footer_text'] : 'Terima kasih atas kunjungan Anda!');
+        $this->text(! empty($data['kebijakan_retur']) ? $data['kebijakan_retur'] : 'Segel toko wajib utuh & fisik barang tidak cacat.');
 
         if (! empty($data['catatan_kaki'])) {
             foreach ($this->wrap($data['catatan_kaki']) as $ln) {
@@ -456,6 +439,36 @@ class EscPosWriter
     private function money($v): string
     {
         return 'Rp '.number_format((float) $v, 0, ',', '.');
+    }
+
+    /** Angka mentah tanpa "Rp" — kolom kanan baris item (senilai contoh pengaturan). */
+    private function numberOnly($v): string
+    {
+        return number_format((float) $v, 0, ',', '.');
+    }
+
+    /** Satuan singkat (pcs/box/set) UPPERCASE agar padan dengan contoh struk. */
+    private function unitLabel(?string $satuan): string
+    {
+        $u = $this->ascii($satuan ?: 'PCS');
+
+        return strlen($u) <= 4 ? strtoupper($u) : $u;
+    }
+
+    /** Raw text tanpa LF — untuk baris yang disusun dengan escape di tengah (ESC B). */
+    private function raw(string $text): self
+    {
+        $this->buf .= $this->ascii($text);
+
+        return $this;
+    }
+
+    /** ESC B n — strikethrough on/off (Epson ESC/POS standar). */
+    private function escB(bool $on): self
+    {
+        $this->buf .= "\x1b\x42".chr($on ? 1 : 0);
+
+        return $this;
     }
 
     private function ascii(string $text): string
