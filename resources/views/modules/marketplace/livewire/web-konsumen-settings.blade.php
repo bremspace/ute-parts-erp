@@ -628,6 +628,18 @@
                     </label>
                 </div>
 
+                <div class="pt-3 border-t border-white/[0.06] flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-white">Sembunyikan Produk Kosong</div>
+                        <div class="text-[11px] text-ink-400">Jika aktif, produk dengan stok 0 tidak ditampilkan di katalog toko publik.</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" wire:model.live="stockForm.hide_out_of_stock" class="sr-only peer">
+                        <div class="w-9 h-5 bg-white/10 peer-checked:bg-up-primary rounded-full transition-colors"></div>
+                        <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
+                    </label>
+                </div>
+
                 @if ($stockForm['stock_display_mode'] === 'threshold_only')
                 <div class="pt-3 border-t border-white/[0.06] flex items-center justify-between">
                     <div>

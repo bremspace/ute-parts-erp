@@ -407,6 +407,14 @@ class ShopPage extends Component
         ];
         $query->filterKatalog($filters);
 
+        // [CMS] Sembunyikan produk kosong (stok 0) jika diaktifkan di pengaturan web-konsumen
+        $hideOutOfStock = (bool) app(\App\Modules\Crm\Services\KonfigurasiService::class)->get('hide_out_of_stock', false);
+        if ($hideOutOfStock) {
+            $query->whereHas('stokItems', function ($sq) {
+                $sq->where('jumlah', '>', 0);
+            });
+        }
+
         // Urutan: dropdown user > relevansi dgn keyword (default saat search aktif) > kompatibilitas HP > default (ready-stok & terlaris)
         if ($this->sort === 'termurah') {
             $query->orderBy('harga_jual_retail', 'asc');
