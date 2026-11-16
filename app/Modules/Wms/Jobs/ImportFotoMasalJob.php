@@ -50,12 +50,23 @@ class ImportFotoMasalJob implements ShouldQueue
             'total_baris' => $totalItems,
             'sukses' => 0,
             'gagal' => 0,
-            'detail' => null,
+            'detail' => [
+                'current_sku' => null,
+                'current_nama' => null,
+                'current_baris' => 0,
+                'total_baris' => $totalItems,
+                'sukses' => 0,
+                'gagal' => 0,
+                'skip' => 0,
+                'recent' => [],
+            ],
         ]);
 
         $sukses = 0;
         $gagal = 0;
+        $skip = 0;
         $detail = [];
+        $recentLog = [];
 
         try {
             foreach ($this->items as $idx => $item) {
@@ -70,27 +81,60 @@ class ImportFotoMasalJob implements ShouldQueue
                 // Resolusi error/skip dari input user
                 $resErr = $this->resolusiErrorFoto[$nomor] ?? ($this->resolusiErrorFoto[$filename] ?? null);
                 if ($resErr === 'skip') {
-                    $detail[] = [
+                    $skip++;
+                    $detailItem = [
                         'baris' => $nomor,
                         'file' => $filename,
+                        'filename' => $filename,
                         'sku' => $sku,
                         'nama' => $produkNama,
+                        'produk_nama' => $produkNama,
                         'status' => 'skip',
                         'catatan' => 'Dilewati oleh pengguna',
+                        'error' => null,
+                        'time' => date('H:i:s'),
                     ];
+                    $detail[] = $detailItem;
+                    $recentLog[] = [
+                        'nomor' => $nomor,
+                        'sku' => $sku,
+                        'file' => $filename,
+                        'nama' => Str::limit($produkNama, 35),
+                        'status' => 'skip',
+                        'catatan' => 'Dilewati oleh pengguna',
+                        'time' => date('H:i:s'),
+                    ];
+                    if (count($recentLog) > 8) {
+                        array_shift($recentLog);
+                    }
 
                     continue;
                 }
 
                 if (! $tempPath || ! file_exists($tempPath) || ! $produkId) {
                     $gagal++;
-                    $detail[] = [
+                    $errMsg = 'Berkas sementara tidak ditemukan atau ID produk tidak valid';
+                    $detailItem = [
                         'baris' => $nomor,
                         'file' => $filename,
+                        'filename' => $filename,
                         'sku' => $sku,
                         'nama' => $produkNama,
+                        'produk_nama' => $produkNama,
                         'status' => 'gagal',
-                        'error' => 'Berkas sementara tidak ditemukan atau ID produk tidak valid',
+                        'catatan' => null,
+                        'error' => $errMsg,
+                        'time' => date('H:i:s'),
+                    ];
+                    $detail[] = $detailItem;
+                    $recentLog[] = [
+                        'nomor' => $nomor,
+                        'sku' => $sku,
+                        'file' => $filename,
+                        'nama' => Str::limit($produkNama, 35),
+                        'status' => 'gagal',
+                        'catatan' => $errMsg,
+                        'time' => date('H:i:s'),
                     ];
                 } else {
                     try {
@@ -102,50 +146,116 @@ class ImportFotoMasalJob implements ShouldQueue
                         );
 
                         if (! empty($res['skipped'])) {
-                            $detail[] = [
+                            $skip++;
+                            $catatan = $res['message'] ?? 'Dilewati karena produk sudah memiliki foto';
+                            $detailItem = [
                                 'baris' => $nomor,
                                 'file' => $filename,
+                                'filename' => $filename,
                                 'sku' => $sku,
                                 'nama' => $produkNama,
+                                'produk_nama' => $produkNama,
                                 'status' => 'skip',
-                                'catatan' => $res['message'] ?? 'Dilewati karena produk sudah memiliki foto',
+                                'catatan' => $catatan,
+                                'error' => null,
+                                'time' => date('H:i:s'),
+                            ];
+                            $detail[] = $detailItem;
+                            $recentLog[] = [
+                                'nomor' => $nomor,
+                                'sku' => $sku,
+                                'file' => $filename,
+                                'nama' => Str::limit($produkNama, 35),
+                                'status' => 'skip',
+                                'catatan' => $catatan,
+                                'time' => date('H:i:s'),
                             ];
                         } elseif ($res['success']) {
                             $sukses++;
-                            $detail[] = [
+                            $catatan = $res['message'] ?? 'Foto berhasil dikompresi WebP & disimpan';
+                            $detailItem = [
                                 'baris' => $nomor,
                                 'file' => $filename,
+                                'filename' => $filename,
                                 'sku' => $sku,
                                 'nama' => $produkNama,
+                                'produk_nama' => $produkNama,
                                 'status' => 'ok',
-                                'catatan' => $res['message'] ?? 'Foto berhasil dikompresi WebP & disimpan',
+                                'catatan' => $catatan,
+                                'error' => null,
+                                'is_primary' => $isPrimary,
+                                'time' => date('H:i:s'),
+                            ];
+                            $detail[] = $detailItem;
+                            $recentLog[] = [
+                                'nomor' => $nomor,
+                                'sku' => $sku,
+                                'file' => $filename,
+                                'nama' => Str::limit($produkNama, 35),
+                                'status' => 'ok',
+                                'catatan' => $catatan,
+                                'time' => date('H:i:s'),
                             ];
                         } else {
                             $gagal++;
-                            $detail[] = [
+                            $errMsg = $res['message'] ?? 'Gagal memproses foto';
+                            $detailItem = [
                                 'baris' => $nomor,
                                 'file' => $filename,
+                                'filename' => $filename,
                                 'sku' => $sku,
                                 'nama' => $produkNama,
+                                'produk_nama' => $produkNama,
                                 'status' => 'gagal',
-                                'error' => $res['message'] ?? 'Gagal memproses foto',
+                                'catatan' => null,
+                                'error' => $errMsg,
+                                'time' => date('H:i:s'),
+                            ];
+                            $detail[] = $detailItem;
+                            $recentLog[] = [
+                                'nomor' => $nomor,
+                                'sku' => $sku,
+                                'file' => $filename,
+                                'nama' => Str::limit($produkNama, 35),
+                                'status' => 'gagal',
+                                'catatan' => $errMsg,
+                                'time' => date('H:i:s'),
                             ];
                         }
                     } catch (\Throwable $e) {
                         $gagal++;
-                        $detail[] = [
+                        $errMsg = $e->getMessage();
+                        $detailItem = [
                             'baris' => $nomor,
                             'file' => $filename,
+                            'filename' => $filename,
                             'sku' => $sku,
                             'nama' => $produkNama,
+                            'produk_nama' => $produkNama,
                             'status' => 'gagal',
-                            'error' => $e->getMessage(),
+                            'catatan' => null,
+                            'error' => $errMsg,
+                            'time' => date('H:i:s'),
+                        ];
+                        $detail[] = $detailItem;
+                        $recentLog[] = [
+                            'nomor' => $nomor,
+                            'sku' => $sku,
+                            'file' => $filename,
+                            'nama' => Str::limit($produkNama, 35),
+                            'status' => 'gagal',
+                            'catatan' => $errMsg,
+                            'time' => date('H:i:s'),
                         ];
                     }
                 }
 
+                if (count($recentLog) > 8) {
+                    array_shift($recentLog);
+                }
+
                 // Update ticker progress real-time per item / small batches
-                $updateInterval = $totalItems > 500 ? 10 : ($totalItems > 100 ? 5 : 2);
+                $updateInterval = $totalItems > 500 ? 10 : ($totalItems > 100 ? 5 : 1);
                 if ($nomor % $updateInterval === 0 || $nomor === $totalItems) {
                     $log->update([
                         'total_baris' => $totalItems,
@@ -156,6 +266,10 @@ class ImportFotoMasalJob implements ShouldQueue
                             'current_nama' => Str::limit($produkNama.' ('.$filename.')', 70),
                             'current_baris' => $nomor,
                             'total_baris' => $totalItems,
+                            'sukses' => $sukses,
+                            'gagal' => $gagal,
+                            'skip' => $skip,
+                            'recent' => $recentLog,
                         ],
                     ]);
                 }
@@ -165,8 +279,8 @@ class ImportFotoMasalJob implements ShouldQueue
                 }
             }
 
-            // Simpan detail hasil: jika lebih dari 300 item, ringkas log untuk efisiensi RAM/DB
-            $finalDetail = $totalItems > 300
+            // Simpan detail hasil: jika lebih dari 500 item, ringkas log untuk efisiensi RAM/DB
+            $finalDetail = $totalItems > 500
                 ? array_values(array_filter($detail, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['gagal', 'skip'], true)))
                 : $detail;
 

@@ -71,40 +71,41 @@ class ImportLog extends Model
         return is_array($this->detail) ? ($this->detail['current_baris'] ?? null) : null;
     }
 
-    public function getPeringatanListAttribute(): array
+    public function getDetailListAttribute(): array
     {
         if (! is_array($this->detail)) {
             return [];
         }
 
-        return array_values(array_filter($this->detail, fn ($d) => ! empty($d['warning'])));
+        if (isset($this->detail['items']) && is_array($this->detail['items'])) {
+            return $this->detail['items'];
+        }
+
+        if (isset($this->detail[0]) && is_array($this->detail[0])) {
+            return $this->detail;
+        }
+
+        return [];
+    }
+
+    public function getPeringatanListAttribute(): array
+    {
+        return array_values(array_filter($this->detail_list, fn ($d) => ! empty($d['warning'])));
     }
 
     public function getGagalListAttribute(): array
     {
-        if (! is_array($this->detail)) {
-            return [];
-        }
-
-        return array_values(array_filter($this->detail, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'gagal'));
+        return array_values(array_filter($this->detail_list, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'gagal'));
     }
 
     public function getSkipListAttribute(): array
     {
-        if (! is_array($this->detail)) {
-            return [];
-        }
-
-        return array_values(array_filter($this->detail, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'skip'));
+        return array_values(array_filter($this->detail_list, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'skip'));
     }
 
     public function getBermasalahListAttribute(): array
     {
-        if (! is_array($this->detail)) {
-            return [];
-        }
-
-        return array_values(array_filter($this->detail, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['gagal', 'skip'], true)));
+        return array_values(array_filter($this->detail_list, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['gagal', 'skip'], true)));
     }
 
     public function getGagalCountAttribute(): int
@@ -114,6 +115,14 @@ class ImportLog extends Model
 
     public function getSkipCountAttribute(): int
     {
+        if (isset($this->detail['summary']['skip'])) {
+            return (int) $this->detail['summary']['skip'];
+        }
+
+        if (isset($this->detail['skip'])) {
+            return (int) $this->detail['skip'];
+        }
+
         return count($this->skip_list);
     }
 }

@@ -92,9 +92,9 @@ class EscPosWriter
 
         // ========== HEADER (Centered) ==========
         $this->alignCenter();
-        $this->bold(true)->sizeDoubleWidth(true)->text($data['nama_toko'] ?? 'UTEParts')->sizeDoubleWidth(false)->bold(false);
+        $this->bold(true)->sizeDoubleWidth(true)->text($data['nama_toko'] ?? 'BREMSPACE')->sizeDoubleWidth(false)->bold(false);
 
-        $slogan = $data['slogan'] ?? 'SPAREPARTS/ACCESORIES/SERVICE';
+        $slogan = $data['slogan'] ?? 'Pusat Sparepart & Servis Gadget';
         if ($slogan) {
             $this->text($slogan);
         }
@@ -106,13 +106,13 @@ class EscPosWriter
             $this->text('Telp/WA: '.$data['telepon']);
         }
 
-        if (($data['show_cabang'] ?? false) && ! empty($data['cabang'])) {
+        if (! empty($data['show_cabang']) && ! empty($data['cabang'])) {
             $this->text($data['cabang']);
         }
 
         // ========== 2-COL: QR (Left) + URL/Date/Warranty (Right) ==========
         $noTrx = $data['no_transaksi'] ?? '-';
-        $qrUrl = $data['qr_url'] ?? $data['website_medsos'] ?? 'www.uteparts.id';
+        $qrUrl = $data['website_medsos'] ?? $data['qr_url'] ?? 'www.bremspace.com';
         $qrCaption = $data['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi';
         $tglStr = $data['tanggal'] ?? $data['waktu'] ?? '';
         $qrShown = ($data['show_qr_retur'] ?? true) && ! empty($noTrx) && $noTrx !== '-';
@@ -121,7 +121,9 @@ class EscPosWriter
             $this->alignCenter();
             $this->qrcode($noTrx, $data['qr_size'] ?? 3);
             $this->bold(true)->text($noTrx)->bold(false);
-            $this->text($qrCaption);
+            if (! empty($qrCaption)) {
+                $this->text($qrCaption);
+            }
 
             $this->alignLeft();
         } else {
@@ -131,15 +133,22 @@ class EscPosWriter
         if (($data['show_waktu'] ?? true) && ! empty($tglStr)) {
             $this->text('Tgl: '.$tglStr);
         }
-        if (! $qrShown) {
-            $this->text($qrCaption);
-        }
 
         $this->rule();
 
         // ========== TRANSACTION INFO (Left-Right aligned) ==========
         $this->alignLeft();
+        if (! empty($data['label_struk'])) {
+            $this->alignCenter();
+            $this->bold(true)->text($data['label_struk'])->bold(false);
+            $this->alignLeft();
+        }
+
         $this->text($this->pad('No. TRX:', $noTrx));
+
+        if (! empty($data['no_transaksi_asal']) && $data['no_transaksi_asal'] !== '-') {
+            $this->text($this->pad('Asal TRX:', $data['no_transaksi_asal']));
+        }
 
         if (! empty($data['sumber']) && ! in_array(strtolower($data['sumber']), ['pos', 'offline'], true)) {
             $this->text($this->pad('Pesanan:', strtoupper($data['sumber'])));
@@ -282,6 +291,20 @@ class EscPosWriter
             $this->text($this->pad('Komisi:', '+'.$this->money($data['komisi_mitra_nominal']).' (Saldo)'));
         }
 
+        if (! empty($data['goodwill'])) {
+            $this->text($this->pad('Goodwill:', (string) $data['goodwill']));
+        }
+
+        if (! empty($data['voucher'])) {
+            $this->text($this->pad('Voucher:', (string) $data['voucher']));
+        }
+
+        if (! empty($data['komplain'])) {
+            foreach ($this->wrap((string) $data['komplain']) as $ln) {
+                $this->text($ln);
+            }
+        }
+
         $this->rule();
 
         // ========== FOOTER (Centered) ==========
@@ -289,8 +312,12 @@ class EscPosWriter
         if (! empty($data['garansi'])) {
             $this->text('Garansi: '.$data['garansi']);
         }
-        $this->text(! empty($data['footer_text']) ? $data['footer_text'] : 'Terima kasih atas kunjungan Anda!');
-        $this->text(! empty($data['kebijakan_retur']) ? $data['kebijakan_retur'] : 'Segel toko wajib utuh & fisik barang tidak cacat.');
+        if (! empty($data['footer_text'])) {
+            $this->text($data['footer_text']);
+        }
+        if (! empty($data['kebijakan_retur'])) {
+            $this->text($data['kebijakan_retur']);
+        }
 
         if (! empty($data['catatan_kaki'])) {
             foreach ($this->wrap($data['catatan_kaki']) as $ln) {

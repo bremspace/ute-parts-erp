@@ -10,15 +10,51 @@
         $qrSvg = (!empty($receiptData['no_transaksi']) && $showQrRetur)
             ? app(\App\Modules\Wms\Services\QrCodeService::class)->generateSvg($receiptData['no_transaksi'], 68, 0)
             : '';
+
+        // Preserve pelanggan's phone/address before merging so template
+        // config (toko phone/address) is not overwritten by receipt data.
+        $receiptSafe = $receiptData;
+        if (isset($receiptSafe['telepon'])) {
+            $receiptSafe['telepon_pelanggan'] = $receiptSafe['telepon'];
+            unset($receiptSafe['telepon']);
+        }
+        if (isset($receiptSafe['alamat'])) {
+            $receiptSafe['alamat_pelanggan'] = $receiptSafe['alamat'];
+            unset($receiptSafe['alamat']);
+        }
+
+        // Merge order: strukConfig (template) first, then receipt transaction
+        // data (minus colliding keys), then explicit overrides.
+        // Template display keys that must always come from settings:
+        $templateKeys = ['nama_toko','slogan','alamat','telepon','website_medsos',
+            'show_cabang','show_kasir','show_pelanggan','show_waktu','show_subtotal_breakdown',
+            'show_qr_retur','qr_size','qr_caption','footer_text','kebijakan_retur','catatan_kaki',
+            'default_width','font_size','thermal_printer_name','thermal_bluetooth_mac','thermal_auto_print'];
+        // After merging receiptSafe on top, re-apply template keys so settings always win for display.
+        $mergedData = array_merge($strukConfig, $receiptSafe, ['qr_svg' => $qrSvg, 'paper_width' => (int) ($defaultPaperSize === '80' ? 80 : 58)]);
+        foreach ($templateKeys as $tk) {
+            if (array_key_exists($tk, $strukConfig)) {
+                $mergedData[$tk] = $strukConfig[$tk];
+            }
+        }
     @endphp
     <script id="pos-receipt-data" type="application/json">
-        {!! json_encode($receiptData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!}
+        {!! json_encode($mergedData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!}
     </script>
     <div
         class="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
         x-data="{
-            ...thermalPrinter({{ \Illuminate\Support\Js::from(array_merge($strukConfig, $receiptData, ['qr_svg' => $qrSvg, 'qr_caption' => $qrCaption, 'paper_width' => (int) ($defaultPaperSize === '80' ? 80 : 58), 'font_size' => 'small'])) }}),
-            paperSize: localStorage.getItem('ute_pos_paper_size') || '{{ $defaultPaperSize }}',
+            ...thermalPrinter({{ \Illuminate\Support\Js::from($mergedData) }}),
+            paperSize: (() => {
+                const templateDefault = '{{ $defaultPaperSize }}';
+                const lastTemplate = localStorage.getItem('ute_pos_template_width');
+                if (lastTemplate !== templateDefault) {
+                    localStorage.setItem('ute_pos_template_width', templateDefault);
+                    localStorage.setItem('ute_pos_paper_size', templateDefault);
+                    return templateDefault;
+                }
+                return localStorage.getItem('ute_pos_paper_size') || templateDefault;
+            })(),
             autoPrint: {{ $autoPrint ? 'true' : 'false' }},
             get paperSizeNum() { return this.paperSize === '80' ? 80 : 58; },
             setPaperSize(size) {
@@ -149,8 +185,8 @@
                 </div>
 
                 @php
-                    $waTelepon = $receiptData['telepon'] ?? $receiptData['telepon_pelanggan'] ?? null;
-                    $waDraft = \App\Support\WhatsAppHelper::draftStrukPos($receiptData);
+                    $waTelepon = $mergedData['telepon_pelanggan'] ?? $receiptData['telepon_pelanggan'] ?? $receiptData['telepon'] ?? null;
+                    $waDraft = \App\Support\WhatsAppHelper::draftStrukPos($mergedData);
                     $waLink = \App\Support\WhatsAppHelper::buatLink($waTelepon, $waDraft);
                 @endphp
 

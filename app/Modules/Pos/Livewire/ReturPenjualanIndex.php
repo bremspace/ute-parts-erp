@@ -1090,16 +1090,14 @@ class ReturPenjualanIndex extends Component
         $selisih = (float) $retur->selisih_nominal;
 
         $this->receiptData = [
-            'nama_toko' => $strukConfig['nama_toko'] ?? config('app.name', 'BREMSPACE'),
-            'slogan' => $strukConfig['slogan'] ?? null,
-            'alamat' => $strukConfig['alamat'] ?? null,
-            'telepon' => $strukConfig['telepon'] ?? null,
             'cabang' => $retur->cabang?->nama ?? 'Cabang Utama',
             'waktu' => now()->format('d/m/Y H:i'),
             'no_transaksi' => $retur->no_return,
             'no_transaksi_asal' => $retur->transaksi?->no_transaksi ?? '-',
             'kasir' => $retur->user?->name ?? auth()->user()?->name ?? 'Kasir',
-            'pelanggan' => $retur->pelanggan?->nama ?? 'Umum',
+            'pelanggan' => $retur->pelanggan?->nama ?? $retur->transaksi?->pelanggan?->nama ?? 'Umum',
+            'telepon_pelanggan' => $retur->pelanggan?->telepon ?? $retur->transaksi?->pelanggan?->telepon ?? null,
+            'alamat_pelanggan' => $retur->pelanggan?->alamat ?? $retur->transaksi?->pelanggan?->alamat ?? null,
             'label_struk' => $isTukar ? '*** STRUK RETUR & TUKAR BARANG ***' : '*** STRUK RETUR PENGEMBALIAN DANA ***',
             'is_retur' => true,
             'tipe_retur' => $retur->tipe_penyelesaian,

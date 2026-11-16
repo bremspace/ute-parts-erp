@@ -172,7 +172,7 @@ class EscPos {
       pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
       is_piutang, jatuh_tempo, sisa_piutang, komisi_mitra_nominal,
       no_tiket, jenis_hp, kurir, is_pickup, resi, sumber,
-      garansi,
+      garansi, label_struk, no_transaksi_asal, goodwill, voucher, komplain,
       footer_text, kebijakan_retur, catatan_kaki,
       nama_toko, slogan, alamat, telepon, website_medsos,
       show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
@@ -196,15 +196,15 @@ class EscPos {
 
     // ======== HEADER (Centered) ========
     this.alignCenter();
-    this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'UTEParts').sizeDoubleWidth(false).bold(false);
-    this.text(slogan || 'SPAREPARTS/ACCESORIES/SERVICE');
+    this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'BREMSPACE').sizeDoubleWidth(false).bold(false);
+    this.text(slogan || 'Pusat Sparepart & Servis Gadget');
     if (alamat) this.text(alamat);
     if (telepon) this.text('Telp/WA: ' + telepon);
-    if (show_cabang && cabang) this.text(cabang);
+    if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) this.text(cabang);
 
     // ======== 2-COL: QR (Left) + URL/Date/Warranty (Right) ========
     const qrContent = no_transaksi || '-';
-    const qrUrlDomain = qr_url || website_medsos || 'www.uteparts.id';
+    const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
     const tglStr = tanggal || waktu || '';
     const captionStr = qr_caption || 'Scan QR ini untuk retur & klaim garansi';
 
@@ -212,7 +212,7 @@ class EscPos {
       this.alignCenter();
       this.qrcode(qrContent, qr_size || 3);
       this.bold(true).text(qrContent).bold(false);
-      this.text(captionStr);
+      if (captionStr) this.text(captionStr);
 
       this.alignLeft();
     } else {
@@ -220,13 +220,20 @@ class EscPos {
     }
     this.text('Web: ' + qrUrlDomain);
     if (tglVisible) this.text('Tgl: ' + tglStr);
-    if (!qrShown) this.text(captionStr);
 
     this.rule();
 
     // ======== TRANSACTION INFO ========
     this.alignLeft();
+    if (label_struk) {
+      this.alignCenter();
+      this.bold(true).text(label_struk).bold(false);
+      this.alignLeft();
+    }
     this.text(this.pad('No. TRX:', qrContent));
+    if (no_transaksi_asal && no_transaksi_asal !== '-') {
+      this.text(this.pad('Asal TRX:', no_transaksi_asal));
+    }
 
     if (sumber && !['pos', 'offline'].includes(sumber.toLowerCase())) {
       this.text(this.pad('Pesanan:', sumber.toUpperCase()));
@@ -246,11 +253,11 @@ class EscPos {
       this.text(this.pad(kurirLbl, kurir + resiTeks));
     }
 
-    if (show_kasir && kasir) {
+    if (show_kasir !== false && show_kasir !== 0 && show_kasir !== '0' && kasir) {
       this.text(this.pad('Kasir:', kasir));
     }
 
-    if (show_pelanggan) {
+    if (show_pelanggan !== false && show_pelanggan !== 0 && show_pelanggan !== '0') {
       const pel = pelanggan || 'Umum';
       this.text(this.pad('Pelanggan:', pel));
 
@@ -297,7 +304,7 @@ class EscPos {
     }
 
     // ======== SUBTOTAL BREAKDOWN & TOTALS (Directly follows items) ========
-    if (show_subtotal_breakdown !== false && diskon_tier && Number(diskon_tier) > 0) {
+    if (show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0' && diskon_tier && Number(diskon_tier) > 0) {
       const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
       this.text(this.pad('Subtotal Retail:', this.money(subRetail)));
 
@@ -355,13 +362,25 @@ class EscPos {
       this.text(this.pad('Komisi:', '+' + this.money(komisi_mitra_nominal) + ' (Saldo)'));
     }
 
+    if (goodwill) {
+      this.text(this.pad('Goodwill:', String(goodwill)));
+    }
+    if (voucher) {
+      this.text(this.pad('Voucher:', String(voucher)));
+    }
+    if (komplain) {
+      for (const ln of this.wrap(String(komplain))) {
+        this.text(ln);
+      }
+    }
+
     this.rule();
 
     // ======== FOOTER (Centered) ========
     this.alignCenter();
     if (garansi) this.text('Garansi: ' + garansi);
-    this.text(footer_text || 'Terima kasih atas kunjungan Anda!');
-    this.text(kebijakan_retur || 'Segel toko wajib utuh & fisik barang tidak cacat.');
+    if (footer_text) this.text(footer_text);
+    if (kebijakan_retur) this.text(kebijakan_retur);
 
     if (catatan_kaki) {
       for (const ln of this.wrap(catatan_kaki)) {
@@ -404,7 +423,7 @@ class EscPos {
       pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
       is_piutang, jatuh_tempo, sisa_piutang, komisi_mitra_nominal,
       no_tiket, jenis_hp, kurir, is_pickup, resi, sumber,
-      garansi,
+      garansi, label_struk, no_transaksi_asal, goodwill, voucher, komplain,
       footer_text, kebijakan_retur, catatan_kaki,
       nama_toko, slogan, alamat, telepon, website_medsos,
       show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
@@ -424,8 +443,8 @@ class EscPos {
     const widthNum = Number(paperWidthOverride ?? paper_width) === 80 ? 80 : 58;
     const paperClass = widthNum === 80 ? 'paper-80' : 'paper-58';
     const qrContent = no_transaksi || '-';
-    const qrUrlDomain = qr_url || website_medsos || 'www.uteparts.id';
-    const tglStr = show_waktu ? (tanggal || waktu || '') : '';
+    const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
+    const tglStr = (show_waktu !== false && show_waktu !== 0 && show_waktu !== '0') ? (tanggal || waktu || '') : '';
     const caraBayar = String(metode_bayar || metode || 'TUNAI').toUpperCase();
 
     // Generate fallback QR svg if none provided
@@ -458,11 +477,11 @@ class EscPos {
 <div class="thermal-receipt-doc ${paperClass}" style="width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: ${widthNum === 80 ? '11px' : '10px'}; line-height: 1.25; color: #000; background: #fff;">
   <!-- HEADER (Centered) -->
   <div style="text-align: center; width: 100%; padding-bottom: 2px;">
-    <div style="font-size: 14px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; text-align: center;">${esc(nama_toko || 'UTEParts')}</div>
-    <div style="font-size: 9px; font-weight: 600; text-transform: uppercase; margin-top: 2px; text-align: center;">${esc(slogan || 'SPAREPARTS/ACCESORIES/SERVICE')}</div>
+    <div style="font-size: 14px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; text-align: center;">${esc(nama_toko || 'BREMSPACE')}</div>
+    <div style="font-size: 9px; font-weight: 600; text-transform: uppercase; margin-top: 2px; text-align: center;">${esc(slogan || 'Pusat Sparepart & Servis Gadget')}</div>
     ${alamat ? `<div style="font-size: 8px; color: #374151; margin-top: 2px; line-height: 1.2; text-align: center;">${esc(alamat)}</div>` : ''}
     ${telepon ? `<div style="font-size: 8.5px; color: #1f2937; text-align: center;">Telp/WA: ${esc(telepon)}</div>` : ''}
-    ${show_cabang && cabang ? `<div style="font-size: 8.5px; font-weight: 600; text-align: center;">${esc(cabang)}</div>` : ''}
+    ${(show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) ? `<div style="font-size: 8.5px; font-weight: 600; text-align: center;">${esc(cabang)}</div>` : ''}
   </div>
 
   <!-- 2-COL: QR (Left) + URL/Date/Warranty Note (Right) -->
@@ -475,7 +494,7 @@ class EscPos {
     <div style="flex: 1; min-width: 0; text-align: left; font-size: 8.5px; line-height: 1.25;">
       <div style="font-weight: 600; color: #111827; word-break: break-all;">${esc(qrUrlDomain)}</div>
       ${tglStr ? `<div style="color: #374151;">${esc(tglStr)}</div>` : ''}
-      <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">${esc(qr_caption || 'Scan QR ini untuk retur & klaim garansi')}</div>
+      ${show_qr_retur ? `<div style="font-size: 8px; color: #4b5563; margin-top: 2px;">${esc(qr_caption || 'Scan QR ini untuk retur & klaim garansi')}</div>` : ''}
     </div>
   </div>
 
@@ -483,10 +502,21 @@ class EscPos {
 
   <!-- TRANSACTION INFO (Left-Right) -->
   <div style="width: 100%; font-size: 9px; line-height: 1.35;">
+    ${label_struk ? `
+      <div style="text-align: center; font-weight: 800; font-size: 9.5px; padding: 2px 0; color: #111827; text-transform: uppercase;">
+        ${esc(label_struk)}
+      </div>
+    ` : ''}
     <div style="display: flex; justify-content: space-between; width: 100%;">
       <span style="color: #4b5563;">No. TRX:</span>
       <span style="font-weight: 700; color: #111827;">${esc(qrContent)}</span>
     </div>
+    ${no_transaksi_asal && no_transaksi_asal !== '-' ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Asal TRX:</span>
+        <span style="font-weight: 600;">${esc(no_transaksi_asal)}</span>
+      </div>
+    ` : ''}
     ${sumber && !['pos', 'offline'].includes(sumber.toLowerCase()) ? `
       <div style="display: flex; justify-content: space-between; width: 100%;">
         <span style="color: #4b5563;">Pesanan:</span>
@@ -511,13 +541,13 @@ class EscPos {
         <span>${esc(kurir + (resi && resi !== '-' ? ' (' + resi + ')' : ''))}</span>
       </div>
     ` : ''}
-    ${show_kasir && kasir ? `
+    ${(show_kasir !== false && show_kasir !== 0 && show_kasir !== '0' && kasir) ? `
       <div style="display: flex; justify-content: space-between; width: 100%;">
         <span style="color: #4b5563;">Kasir:</span>
         <span>${esc(kasir)}</span>
       </div>
     ` : ''}
-    ${show_pelanggan ? `
+    ${(show_pelanggan !== false && show_pelanggan !== 0 && show_pelanggan !== '0') ? `
       <div style="display: flex; justify-content: space-between; width: 100%;">
         <span style="color: #4b5563;">Pelanggan:</span>
         <span>${esc(pelanggan || 'Umum')}</span>
@@ -561,7 +591,7 @@ class EscPos {
 
   <!-- SUBTOTAL BREAKDOWN & TOTALS (Directly follows items without extra dashed line) -->
   <div style="width: 100%; font-size: 9px; line-height: 1.35;">
-    ${show_subtotal_breakdown !== false && diskon_tier && Number(diskon_tier) > 0 ? `
+    ${(show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0') && diskon_tier && Number(diskon_tier) > 0 ? `
       <div style="display: flex; justify-content: space-between; width: 100%;">
         <span style="color: #4b5563;">Subtotal Retail:</span>
         <span>${money(Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier)))}</span>
@@ -661,6 +691,21 @@ class EscPos {
         <span>+${money(komisi_mitra_nominal)} (Saldo)</span>
       </div>
     ` : ''}
+    ${goodwill ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669;">
+        <span style="color: #4b5563;">Goodwill:</span>
+        <span>${esc(goodwill)}</span>
+      </div>
+    ` : ''}
+    ${voucher ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669;">
+        <span style="color: #4b5563;">Voucher:</span>
+        <span>${esc(voucher)}</span>
+      </div>
+    ` : ''}
+    ${komplain ? `
+      <div style="font-size: 8px; color: #b45309; margin-top: 2px;">* ${esc(komplain)}</div>
+    ` : ''}
   </div>
 
   <div style="border-top: 1px dashed #000; width: 100%; margin: 4px 0;"></div>
@@ -668,8 +713,8 @@ class EscPos {
   <!-- FOOTER (Centered) -->
   <div style="text-align: center; width: 100%; font-size: 8.5px; color: #374151; line-height: 1.3; padding-top: 2px;">
     ${garansi ? `<div style="font-weight: 700; color: #111827; text-align: center;">Garansi: ${esc(garansi)}</div>` : ''}
-    <div style="text-align: center;">${esc(footer_text || 'Terima kasih atas kunjungan Anda!')}</div>
-    <div style="font-size: 8px; color: #4b5563; text-align: center;">${esc(kebijakan_retur || 'Segel toko wajib utuh & fisik barang tidak cacat.')}</div>
+    ${footer_text ? `<div style="text-align: center; font-weight: 500; color: #374151;">${esc(footer_text)}</div>` : ''}
+    ${kebijakan_retur ? `<div style="font-size: 8px; color: #4b5563; text-align: center;">${esc(kebijakan_retur)}</div>` : ''}
     ${catatan_kaki ? `<div style="font-size: 8px; color: #6b7280; margin-top: 2px; text-align: center;">${esc(catatan_kaki)}</div>` : ''}
     ${is_piutang ? `
       <div style="margin-top: 8px; border-top: 1px dotted #d1d5db; padding-top: 4px;">
@@ -983,8 +1028,15 @@ function thermalPrinter(config = {}) {
     printer: printer,
 
     init() {
-      this.paperSize = localStorage.getItem('ute_pos_paper_size') ||
-        (this.data.default_width?.includes('80') ? '80' : '58');
+      const templateDefault = this.data.default_width?.includes('80') ? '80' : '58';
+      const lastTemplate = localStorage.getItem('ute_pos_template_width');
+      if (lastTemplate !== templateDefault) {
+        localStorage.setItem('ute_pos_template_width', templateDefault);
+        localStorage.setItem('ute_pos_paper_size', templateDefault);
+        this.paperSize = templateDefault;
+      } else {
+        this.paperSize = localStorage.getItem('ute_pos_paper_size') || templateDefault;
+      }
 
       printer.onStatusChange = (status) => {
         if (status === 'connected') {
@@ -1014,7 +1066,7 @@ function thermalPrinter(config = {}) {
       try {
         const paperWidth = Number(paperSize) === 80 ? 80 : 58;
         // Selera kertas & mode font selalu eksplisit agar output == preview == backend job.
-        const payload = { ...this.data, paper_width: paperWidth, font_size: 'small' };
+        const payload = { ...this.data, paper_width: paperWidth, font_size: this.data.font_size || 'small' };
         const esc = new window.EscPos(paperWidth);
         const bytes = esc.buildReceipt(payload, paperWidth);
 
@@ -1070,14 +1122,16 @@ function thermalPrinter(config = {}) {
 
       const paperWidth = Number(paperSize) === 80 ? 80 : 58;
       const esc = new window.EscPos(paperWidth);
-      const html = esc.buildPreviewHtml({ ...this.data, paper_width: paperWidth, font_size: 'small' }, paperWidth);
+      const html = esc.buildPreviewHtml({ ...this.data, paper_width: paperWidth, font_size: this.data.font_size || 'small' }, paperWidth);
+
+      const storeName = this.data.nama_toko || 'Bremspace';
 
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
-          <title>Struk UTEParts</title>
+          <title>Struk ${esc(storeName)}</title>
           <style>
             @media print {
               @page { margin: 0; size: ${paperWidth}mm auto; }

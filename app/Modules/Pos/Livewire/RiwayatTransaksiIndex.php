@@ -1034,6 +1034,7 @@ class RiwayatTransaksiIndex extends Component
                 'cabang' => $tiket->cabang?->nama ?? (config('app.name', 'Bremspace').' Servis'),
             ];
 
+            $this->showReceiptModal = true;
         } elseif ($tipe === 'retur' || $tipe === 'retur_penjualan') {
             $retur = ReturnPenjualan::with(['items.produk', 'pelanggan', 'user', 'cabang'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))

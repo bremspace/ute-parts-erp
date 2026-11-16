@@ -302,4 +302,51 @@ class BulkFotoProdukFeatureTest extends TestCase
         $this->assertNotNull($produk->gambar);
         $this->assertStringEndsWith('.webp', $produk->gambar);
     }
+
+    public function test_export_foto_lengkap_csv_download(): void
+    {
+        $produk = Produk::create([
+            'nama' => 'Touchscreen Oppo A3s',
+            'slug' => 'tc-oppo-a3s-'.uniqid(),
+            'kategori' => 'Touchscreen',
+            'kondisi' => 'baru',
+            'satuan' => 'pcs',
+            'harga_beli' => 20000,
+            'harga_jual_retail' => 45000,
+            'is_active' => true,
+        ]);
+        SkuVariant::create([
+            'produk_id' => $produk->id,
+            'sku' => 'TC-OPPO-A3S',
+            'nama_varian' => 'Standar',
+            'is_active' => true,
+        ]);
+
+        $file = UploadedFile::fake()->image('TC-OPPO-A3S.jpg', 500, 500);
+
+        Livewire::test(ImportFotoPage::class)
+            ->set('activeTab', 'foto')
+            ->set('fotoSourceType', 'files')
+            ->set('fotoUploads', [$file])
+            ->call('scanUploadedFoto')
+            ->call('startFotoProcessing')
+            ->assertSet('fotoStep', 'completed')
+            ->call('exportFotoLengkap')
+            ->assertFileDownloaded();
+    }
+
+    public function test_filter_and_search_report_items(): void
+    {
+        $comp = Livewire::test(ImportFotoPage::class)
+            ->set('activeTab', 'foto')
+            ->set('fotoStep', 'completed')
+            ->call('setFotoErrorFilterTab', 'sukses')
+            ->assertSet('fotoErrorFilterTab', 'sukses')
+            ->call('setFotoErrorFilterTab', 'skip')
+            ->assertSet('fotoErrorFilterTab', 'skip')
+            ->call('setFotoErrorFilterTab', 'gagal')
+            ->assertSet('fotoErrorFilterTab', 'gagal')
+            ->set('fotoResultSearch', 'LCD-IP13')
+            ->assertSet('fotoResultSearch', 'LCD-IP13');
+    }
 }
