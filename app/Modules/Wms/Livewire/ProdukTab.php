@@ -4656,50 +4656,17 @@ class ProdukTab extends Component
             'label' => $p->nama,
         ])->all();
 
-        // 1. Merk HP Kompatibel (Semua brand smartphone aktif di sistem & relasinya) — cached 30 min
-        $brandKompatibelList = Cache::remember('wms_brand_kompatibel_list', 1800, function () {
-            $merekHpDariProduk = Produk::query()
-                ->whereNotNull('brand_kompatibel')
-                ->where('brand_kompatibel', '!=', '')
-                ->pluck('brand_kompatibel')
-                ->flatMap(fn ($b) => preg_split('/[,;\/]+/', (string) $b))
-                ->map(fn ($b) => trim($b))
-                ->filter();
-
-            $merekHpDariRelasi = TipeHp::query()
-                ->where('is_active', true)
-                ->distinct()
-                ->pluck('merk');
-
-            $merekHpJson = collect();
-            $kompatJsonList = Produk::query()
-                ->whereNotNull('kompatibilitas_hp')
-                ->pluck('kompatibilitas_hp');
-            foreach ($kompatJsonList as $kJson) {
-                if (is_array($kJson)) {
-                    foreach ($kJson as $item) {
-                        if (! empty($item['merk'])) {
-                            $merks = preg_split('/[,;\/]+/', (string) $item['merk']);
-                            foreach ($merks as $m) {
-                                $m = trim($m);
-                                if ($m !== '') {
-                                    $merekHpJson->push($m);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            return $merekHpDariProduk
-                ->merge($merekHpDariRelasi)
-                ->merge($merekHpJson)
-                ->filter()
-                ->unique()
-                ->sort()
-                ->values()
-                ->all();
-        });
+        // 1. Merk HP Kompatibel — hanya dari master TipeHp (atribut), bukan free-text produk
+        $brandKompatibelList = TipeHp::query()
+            ->where('is_active', true)
+            ->distinct()
+            ->orderBy('merk')
+            ->pluck('merk')
+            ->map(fn ($m) => trim((string) $m))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
         // 2. Tipe HP Kompatibel (Model smartphone aktif di sistem, cascading jika Merk HP dipilih)
         $selectedMerk = $this->filterBrandKompatibel;

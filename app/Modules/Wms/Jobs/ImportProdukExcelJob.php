@@ -41,7 +41,8 @@ class ImportProdukExcelJob implements ShouldQueue
         public array $resolusiBarcode = [],
         public array $resolusiErrorBaris = [],
         public array $columnMapping = [],
-        public ?int $defaultGudangId = null
+        public ?int $defaultGudangId = null,
+        public array $importOverwriteColumns = []
     ) {}
 
     public function handle(
@@ -93,7 +94,8 @@ class ImportProdukExcelJob implements ShouldQueue
                     $this->resolusiErrorBaris,
                     $cabangId,
                     $this->columnMapping,
-                    $this->defaultGudangId
+                    $this->defaultGudangId,
+                    $this->importOverwriteColumns
                 );
             });
 
