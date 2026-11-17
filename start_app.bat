@@ -147,17 +147,37 @@ if "%SERVER_ALREADY_RUNNING%"=="0" (
 )
 
 :: -----------------------------------------------------------------------------
-:: 7. Nyalakan Background Queue Worker
+:: 7. Nyalakan Background Queue Worker, Scheduler & Jalankan Sinkronisasi Awal
 :: -----------------------------------------------------------------------------
-tasklist | findstr /i "php.exe" | findstr /i "artisan" >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*queue:work*' })) { exit 1 }" >nul 2>nul
 if errorlevel 1 (
     if exist "%~dp0.env" (
         echo [INFO] Menyalakan Background Queue Worker...
-        wscript.exe "%~dp0scripts\run-command-background.vbs" "\"%PHP_BIN%\" \"%~dp0artisan\" queue:work --sleep=3 --tries=3"
+        wscript.exe "%~dp0scripts\run-command-background.vbs" "\"%PHP_BIN%\" \"%~dp0artisan\" queue:work --queue=sync,default --sleep=3 --tries=3"
         echo [OK] Queue Worker aktif di background.
     )
 ) else (
-    echo [OK] Queue Worker siap.
+    echo [OK] Queue Worker sudah aktif.
+)
+
+:: Jalankan background scheduler (cron runner) di Windows
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*schedule:work*' })) { exit 1 }" >nul 2>nul
+if errorlevel 1 (
+    if exist "%~dp0.env" (
+        echo [INFO] Menyalakan Background Scheduler (Schedule Work)...
+        wscript.exe "%~dp0scripts\run-command-background.vbs" "\"%PHP_BIN%\" \"%~dp0artisan\" schedule:work"
+        echo [OK] Background Scheduler aktif.
+    )
+) else (
+    echo [OK] Background Scheduler sudah aktif.
+)
+
+:: Sinkronisasi Awal saat Toko Buka (Tarik pesanan online tadi malam & kirim outbox tertunda)
+if exist "%~dp0.env" (
+    echo [INFO] Memeriksa data baru dari Cloud VPS (Catch-up sync)...
+    "%PHP_BIN%" "%~dp0artisan" sync:pull
+    "%PHP_BIN%" "%~dp0artisan" sync:flush
+    echo [OK] Sinkronisasi awal selesai.
 )
 
 :: -----------------------------------------------------------------------------
@@ -200,7 +220,14 @@ if exist "%~dp0.env" (
 )
 
 :: -----------------------------------------------------------------------------
-:: 10. Buka Browser Otomatis
+:: 10. Buat Shortcut di Desktop jika belum ada
+:: -----------------------------------------------------------------------------
+if not exist "%USERPROFILE%\Desktop\Bremspace ERP POS.lnk" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $desktop = [System.Environment]::GetFolderPath('Desktop'); $s = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP POS.lnk')); $s.TargetPath = '%~dp0start_app.bat'; $s.WorkingDirectory = '%~dp0'; if (Test-Path '%~dp0public\favicon.ico') { $s.IconLocation = '%~dp0public\favicon.ico' }; $s.Description = 'Bremspace ERP & POS System'; $s.Save()" >nul 2>nul
+)
+
+:: -----------------------------------------------------------------------------
+:: 11. Buka Browser Otomatis
 :: -----------------------------------------------------------------------------
 start "" "%LOCAL_URL%"
 
