@@ -499,6 +499,24 @@
                                 <span>Gudang & Rak</span>
                             </label>
 
+                            @if($visibleColumns['gudang'] ?? true)
+                            <div class="w-full mt-2 pt-2 border-t border-white/5">
+                                <span class="text-[10px] font-bold text-ink-400 block mb-1.5">Gudang yang ditampilkan di kolom:</span>
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach($gudangsCabang as $g)
+                                        <label class="inline-flex items-center gap-1 text-[10px] text-ink-300 cursor-pointer select-none">
+                                            <input type="checkbox"
+                                                   wire:click="toggleVisibleGudang({{ $g->id }})"
+                                                   @checked(empty($visibleGudangs) || in_array($g->id, $visibleGudangs, true))
+                                                   class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                            <span>{{ $g->nama }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                <button type="button" wire:click="showAllGudangs" class="mt-1.5 text-[10px] text-up-primary hover:underline cursor-pointer">Tampilkan semua gudang</button>
+                            </div>
+                            @endif
+
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
                                 <input type="checkbox" wire:key="pt-col-reorder-{{ ($visibleColumns['reorder'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('reorder')" @checked($visibleColumns['reorder'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Parameter Pengadaan (ROP/ABC)</span>
@@ -1773,6 +1791,9 @@
                             <td class="py-2.5 px-3 text-xs min-w-[130px]">
                                 @php
                                     $stokItemsTampil = $p->stokItems->filter(function ($si) use ($p) {
+                                        if (!empty($visibleGudangs) && !in_array($si->gudang_id, $visibleGudangs, true)) {
+                                            return false;
+                                        }
                                         if ((int) $si->jumlah === 0 && is_null($si->sku_variant_id)) {
                                             return ! $p->stokItems->contains(fn ($o) => $o->id !== $si->id && $o->gudang_id === $si->gudang_id);
                                         }
@@ -2119,6 +2140,9 @@
                                 </span>
                                 @php
                                     $stokItemsCardTampil = $p->stokItems->filter(function ($si) use ($p) {
+                                        if (!empty($visibleGudangs) && !in_array($si->gudang_id, $visibleGudangs, true)) {
+                                            return false;
+                                        }
                                         if ((int) $si->jumlah === 0 && is_null($si->sku_variant_id)) {
                                             return ! $p->stokItems->contains(fn ($o) => $o->id !== $si->id && $o->gudang_id === $si->gudang_id);
                                         }

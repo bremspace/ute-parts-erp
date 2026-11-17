@@ -228,6 +228,9 @@ class ProdukTab extends Component
         'aksi' => true,
     ];
 
+    // Gudang yang ditampilkan di kolom "Gudang & Rak" (kosong = semua)
+    public array $visibleGudangs = [];
+
     public bool $showColumnSettings = false;
 
     // Foto Uploads (Tambah Produk)
@@ -414,6 +417,10 @@ class ProdukTab extends Component
             if (is_array($prefCols)) {
                 $this->visibleColumns = array_merge($this->visibleColumns, $prefCols);
             }
+            $prefGudangs = UserPreference::getPref($userId, 'wms_produk_tab_visible_gudangs');
+            if (is_array($prefGudangs)) {
+                $this->visibleGudangs = $prefGudangs;
+            }
         }
     }
 
@@ -465,6 +472,39 @@ class ProdukTab extends Component
         if ($userId) {
             UserPreference::setPref($userId, 'wms_produk_tab_visible_columns', $this->visibleColumns);
         }
+    }
+
+    public function toggleVisibleGudang(int $gudangId): void
+    {
+        if (in_array($gudangId, $this->visibleGudangs, true)) {
+            $this->visibleGudangs = array_values(array_diff($this->visibleGudangs, [$gudangId]));
+        } else {
+            $this->visibleGudangs[] = $gudangId;
+        }
+        $this->simpanPreferensiGudang();
+    }
+
+    public function showAllGudangs(): void
+    {
+        $this->visibleGudangs = [];
+        $this->simpanPreferensiGudang();
+    }
+
+    protected function simpanPreferensiGudang(): void
+    {
+        $userId = auth()->id();
+        if ($userId) {
+            UserPreference::setPref($userId, 'wms_produk_tab_visible_gudangs', $this->visibleGudangs);
+        }
+    }
+
+    /**
+     * Helper: apakah gudang tertentu ditampilkan di kolom "Gudang & Rak".
+     * Kosong = tampilkan semua.
+     */
+    public function isGudangVisible(int $gudangId): bool
+    {
+        return empty($this->visibleGudangs) || in_array($gudangId, $this->visibleGudangs, true);
     }
 
     public function toggleFilter(string $key): void
@@ -4799,6 +4839,7 @@ class ProdukTab extends Component
             'selectedProduksPreview' => $selectedProduksPreview,
             'gudangs' => $gudangs,
             'gudangsCabang' => $gudangsCabang,
+            'visibleGudangs' => $this->visibleGudangs,
             'raks' => Rak::with('gudang')->get(),
             'produks' => $produks,
             'perPage' => $this->perPage,
