@@ -69,6 +69,8 @@
     }
 @endphp
 
+<div style="display: contents;">
+
 <div
     class="flex flex-col gap-2 min-w-0 flex-1 min-h-0 md:overflow-y-auto pb-2 md:pb-0"
     x-data="{
@@ -559,66 +561,51 @@
                                             </x-prism.status-pill>
                                             <span class="hidden">{{ $alasanTidakBisaDipilih }}</span>
                                         @else
-                                            <x-prism.stock-gauge :stok="$stokTotal" :min="5" />
-                                        @endif
-                                    </div>
-                                </div>
-
-                                <!-- Action Buttons & Multi-Satuan Quick-Add -->
-                                <div class="flex items-center justify-between gap-2 pt-2 border-t border-ink-100 dark:border-white/5 flex-wrap">
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        @if($satuanList->isNotEmpty())
-                                            <span class="text-[10px] font-semibold text-ink-400 uppercase tracking-wider hidden sm:inline">Pilihan Kemasan:</span>
-                                            @foreach($satuanList as $sk)
-                                                @php
-                                                    $fKonv = max(0.0001, (float) $sk->faktor_konversi);
-                                                    $hargaSk = $sk->harga_jual > 0 ? (float) $sk->harga_jual : round($baseHarga * $fKonv, 2);
-                                                @endphp
-                                                <span class="text-[10px] px-2 py-0.5 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 text-ink-600 dark:text-ink-300 tabular-nums">
-                                                    1 {{ strtoupper($sk->satuan_kode) }} ({{ $fKonv + 0 }} {{ $satuanDasar }}) • Rp {{ number_format($hargaSk, 0, ',', '.') }}
-                                                </span>
-                                            @endforeach
-                                        @endif
-                                    </div>
-
-                                    <!-- Quick Add Buttons with Apple Tactile Feedback -->
-                                    <div class="flex items-center gap-1.5 ml-auto">
-                                        @if($stokKosong)
-                                            <button
-                                                type="button"
-                                                disabled
-                                                title="{{ $alasanTidakBisaDipilih }}"
-                                                class="px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold bg-ink-200/50 dark:bg-white/5 text-ink-400 cursor-not-allowed select-none min-h-[42px] sm:min-h-[34px]"
-                                            >
-                                                Stok Habis
-                                            </button>
-                                        @else
-                                            <!-- Tombol Tambah Satuan Dasar -->
-                                            <button
-                                                type="button"
-                                                wire:click="addToCart({{ $prod->id }})"
-                                                @click="searchOpen = false"
-                                                title="Tambah 1 {{ $satuanDasar }}"
-                                                class="px-3 sm:px-3 py-2.5 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary hover:bg-up-primary-dark active:bg-indigo-700 text-white cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 shadow-sm shadow-up-primary/20 min-h-[42px] sm:min-h-[34px]"
-                                            >
-                                                <span>+ {{ $satuanDasar }}</span>
-                                            </button>
-
-                                            <!-- Tombol Tambah Tiap Multi-Satuan Konversi -->
-                                            @foreach($satuanList as $sk)
+                                            <div class="flex items-center gap-1.5 mt-1 flex-wrap justify-end">
+                                                <x-prism.stock-gauge :stok="$stokTotal" :min="5" />
+                                                <!-- Tombol Tambah Satuan Dasar -->
                                                 <button
                                                     type="button"
-                                                    wire:click="addToCart({{ $prod->id }}, null, '{{ $sk->satuan_kode }}')"
+                                                    wire:click="addToCart({{ $prod->id }})"
                                                     @click="searchOpen = false"
-                                                    title="Tambah 1 {{ strtoupper($sk->satuan_kode) }}"
-                                                    class="px-3 sm:px-3 py-2.5 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary/10 hover:bg-up-primary/20 active:bg-up-primary/30 text-up-primary border border-up-primary/30 cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 min-h-[42px] sm:min-h-[34px]"
+                                                    title="Tambah 1 {{ $satuanDasar }}"
+                                                    class="px-2 py-1 rounded-lg text-[10px] font-bold bg-up-primary hover:bg-up-primary-dark active:bg-indigo-700 text-white cursor-pointer transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-0.5 shadow-sm shadow-up-primary/20"
                                                 >
-                                                    <span>+ {{ strtoupper($sk->satuan_kode) }}</span>
+                                                    <span>+ {{ $satuanDasar }}</span>
                                                 </button>
-                                            @endforeach
+
+                                                <!-- Tombol Tambah Tiap Multi-Satuan Konversi -->
+                                                @foreach($satuanList as $sk)
+                                                    <button
+                                                        type="button"
+                                                        wire:click="addToCart({{ $prod->id }}, '{{ $sk->satuan_kode }}')"
+                                                        @click="searchOpen = false"
+                                                        title="Tambah 1 {{ strtoupper($sk->satuan_kode) }}"
+                                                        class="px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-500/10 hover:bg-indigo-500/20 active:bg-indigo-500/30 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 cursor-pointer transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-0.5"
+                                                    >
+                                                        <span>+ {{ strtoupper($sk->satuan_kode) }}</span>
+                                                    </button>
+                                                @endforeach
+                                            </div>
                                         @endif
                                     </div>
                                 </div>
+
+                                <!-- Pilihan Kemasan (kompak) -->
+                                @if($satuanList->isNotEmpty())
+                                    <div class="flex items-center gap-1.5 flex-wrap pt-1.5 border-t border-ink-100 dark:border-white/5">
+                                        <span class="text-[9px] font-semibold text-ink-400 uppercase tracking-wider hidden sm:inline">Kemasan:</span>
+                                        @foreach($satuanList as $sk)
+                                            @php
+                                                $fKonv = max(0.0001, (float) $sk->faktor_konversi);
+                                                $hargaSk = $sk->harga_jual > 0 ? (float) $sk->harga_jual : round($baseHarga * $fKonv, 2);
+                                            @endphp
+                                            <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 text-ink-600 dark:text-ink-300 tabular-nums">
+                                                1 {{ strtoupper($sk->satuan_kode) }} ({{ $fKonv + 0 }} {{ $satuanDasar }}) → Rp {{ number_format($hargaSk, 0, ',', '.') }}
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
                         @empty
                             <div class="py-12 text-center text-ink-400 text-xs">
@@ -2563,4 +2550,5 @@
     </div>
 
     @include('modules.pos.livewire.modals.offline-actions-modal')
+</div>
 </div>
