@@ -293,7 +293,7 @@
                     x-cloak
                 >
                     <!-- Dedicated Mobile Search Header (sm:hidden) -->
-                    <div class="sm:hidden p-3 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-xl border-b border-ink-200/80 dark:border-white/10 flex flex-col gap-2 shrink-0">
+                    <div class="sm:hidden p-2 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-xl border-b border-ink-200/80 dark:border-white/10 flex flex-col gap-1.5 shrink-0">
                         <div class="flex items-center gap-2">
                             <button
                                 type="button"
@@ -421,7 +421,7 @@
                     </div>
 
                     <div
-                        class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-1.5 sm:p-2 space-y-1 overscroll-contain flex-1 min-h-0"
+                        class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-1 sm:p-1.5 space-y-0.5 overscroll-contain flex-1 min-h-0"
                         @scroll.passive="if ($wire.adaLebihBanyak && !window._posLoadingMore && ($el.scrollHeight - $el.scrollTop - $el.clientHeight < 350)) { window._posLoadingMore = true; $wire.call('muatLebihBanyak').finally(() => { window._posLoadingMore = false; }); }"
                     >
                         @forelse($products as $prod)
@@ -444,12 +444,12 @@
                                     aria-disabled="true"
                                     title="{{ $alasanTidakBisaDipilih }}"
                                 @endif
-                                class="p-2 sm:p-2.5 rounded-xl border border-transparent transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] flex flex-col gap-1.5 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
+                                class="p-1.5 sm:p-2 rounded-lg border border-transparent transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] flex flex-col gap-1 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
                             >
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0 flex items-start gap-2 sm:gap-2.5 flex-1">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0 flex items-start gap-2 flex-1">
                                         <!-- Thumbnail with fallback icon -->
-                                        <div class="w-10 h-10 rounded-lg bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                        <div class="w-9 h-9 rounded-lg bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
                                             @if($prod->thumbnail_url ?: $prod->gambar)
                                                 <img src="{{ $prod->thumbnail_url ?: $prod->gambar }}" alt="{{ $prod->nama }}" class="w-full h-full object-cover rounded-xl" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
                                                 <div class="hidden w-full h-full items-center justify-center text-ink-400 dark:text-ink-500">
@@ -467,10 +467,10 @@
                                         <!-- Title, SKU, Chips & Apple-grade compatibility badge -->
                                         <div class="min-w-0 flex-1">
                                             <div class="flex items-center gap-1 flex-wrap mb-0.5">
-                                                <span class="font-mono text-[10px] sm:text-[11px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
+                                                <span class="font-mono text-[9px] sm:text-[10px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
                                                     {{ $prod->sku }}
                                                 </span>
-                                                <span class="text-[10px] uppercase font-semibold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded">
+                                                <span class="text-[9px] uppercase font-semibold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1 py-0.5 rounded">
                                                     {{ $prod->kategoriRelasi?->nama ?? $prod->kategori ?? 'Sparepart' }}
                                                 </span>
                                                 @if($prod->brand?->nama ?? $prod->brand)
@@ -545,9 +545,9 @@
                                                 @endif
                                             </div>
                                         @endif
-                                        <span class="text-xs sm:text-sm font-black text-up-mint tabular-nums">
+                                        <span class="text-xs font-black text-up-mint tabular-nums">
                                             Rp {{ number_format($baseHarga, 0, ',', '.') }}
-                                            <span class="text-[10px] font-normal text-ink-400">/{{ $satuanDasar }}</span>
+                                            <span class="text-[9px] font-normal text-ink-400">/{{ $satuanDasar }}</span>
                                         </span>
                                         @if(($pricing['diskon_nominal'] ?? 0) > 0)
                                             <span class="text-[9px] font-semibold text-emerald-500 tabular-nums">
@@ -1991,7 +1991,7 @@
         @endif
 
         <!-- BOTTOM CONTROL CENTER: Status Sesi Kas, Ditahan & Action Bayar (Sticky di Mobile agar Tombol Bayar Selalu Siap Tampil Tanpa Tertutup Apapun) -->
-        <div class="border-t border-ink-200/80 dark:border-white/10 pt-2.5 sm:pt-3 mt-2 flex-shrink-0 flex items-center justify-between gap-2.5 flex-wrap sticky bottom-0 z-30 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-md -mx-3 -mb-3 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] sm:mx-0 sm:mb-0 sm:px-0 sm:pb-0 sm:static shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] sm:shadow-none">
+        <div class="border-t border-ink-200/80 dark:border-white/10 pt-2 sm:pt-2.5 mt-1.5 flex-shrink-0 flex items-center justify-between gap-2 flex-wrap sticky bottom-0 z-30 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-md -mx-3 -mb-3 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:mx-0 sm:mb-0 sm:px-0 sm:pb-0 sm:static shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] sm:shadow-none">
             <!-- Left Info & Sesi Kas (Desktop only inline, Mobile via top action pill) -->
             <div class="hidden sm:flex items-center gap-2.5 flex-wrap">
                 <!-- Sesi Kas Indicator -->
