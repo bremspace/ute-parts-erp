@@ -474,16 +474,13 @@
                                                     {{ $prod->kategoriRelasi?->nama ?? $prod->kategori ?? 'Sparepart' }}
                                                 </span>
                                                 @if($prod->brand?->nama ?? $prod->brand)
-                                                    <span class="text-[10px] font-semibold text-ink-600 dark:text-ink-300 bg-ink-100/80 dark:bg-white/10 px-1.5 py-0.5 rounded">
+                                                    <span class="text-[9px] font-semibold text-ink-600 dark:text-ink-300 bg-ink-100/80 dark:bg-white/10 px-1 py-0.5 rounded">
                                                         {{ $prod->brand?->nama ?? $prod->brand }}
                                                     </span>
                                                 @endif
                                                 @if($prod->supplier?->nama)
-                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded" title="Suplier: {{ $prod->supplier->nama }}">
-                                                        <svg class="w-3 h-3 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                                                        </svg>
-                                                        <span>Suplier: {{ $prod->supplier->nama }}</span>
+                                                    <span class="text-[8px] font-medium text-amber-600 dark:text-amber-400/80" title="Suplier: {{ $prod->supplier->nama }}">
+                                                        {{ $prod->supplier->nama }}
                                                     </span>
                                                 @endif
                                                 @php
@@ -491,23 +488,17 @@
                                                     $posisiRak = !empty($rakPerProduk[$prod->id]) ? implode(', ', $rakPerProduk[$prod->id]) : null;
                                                 @endphp
                                                 @if($selectedGudangId && $namaGudangAktif)
-                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded" title="Gudang: {{ $namaGudangAktif }}">
-                                                        <svg class="w-3 h-3 text-sky-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                                                        </svg>
-                                                        <span>Gudang: {{ $namaGudangAktif }}</span>
+                                                    <span class="text-[8px] font-medium text-sky-600 dark:text-sky-400/80" title="Gudang: {{ $namaGudangAktif }}">
+                                                        {{ $namaGudangAktif }}
                                                     </span>
                                                 @endif
                                                 @if($posisiRak)
-                                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-500/10 border border-violet-500/25 px-1.5 py-0.5 rounded" title="Posisi Rak: {{ $posisiRak }}">
-                                                        <svg class="w-3 h-3 text-violet-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                                                        </svg>
-                                                        <span>Rak: {{ $posisiRak }}</span>
+                                                    <span class="text-[8px] font-medium text-violet-600 dark:text-violet-400/80" title="Posisi Rak: {{ $posisiRak }}">
+                                                        Rak: {{ $posisiRak }}
                                                     </span>
                                                 @endif
-                                                <span class="text-[10px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded uppercase">
-                                                    Satuan: {{ $satuanDasar }}
+                                                <span class="text-[8px] font-medium text-ink-500 dark:text-ink-400">
+                                                    {{ $satuanDasar }}
                                                 </span>
                                             </div>
 
@@ -520,7 +511,7 @@
                                             @endphp
                                             @if($thModels->isNotEmpty())
                                                 <div class="flex items-center gap-1 flex-wrap mt-1">
-                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-up-primary bg-up-primary/10 px-2 py-0.5 rounded-lg border border-up-primary/20 tracking-tight" title="{{ $thModels->join(', ') }}">
+                                                    <span class="inline-flex items-center gap-1 text-[8px] font-medium text-up-primary bg-up-primary/10 px-1.5 py-0.5 rounded tracking-tight" title="{{ $thModels->join(', ') }}">
                                                         <svg class="w-3 h-3 text-up-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                                         </svg>
@@ -547,7 +538,7 @@
                                         @endif
                                         <span class="text-xs font-black text-up-mint tabular-nums">
                                             Rp {{ number_format($baseHarga, 0, ',', '.') }}
-                                            <span class="text-[9px] font-normal text-ink-400">/{{ $satuanDasar }}</span>
+                                            <span class="text-[8px] font-normal text-ink-400">/{{ $satuanDasar }}</span>
                                         </span>
                                         @if(($pricing['diskon_nominal'] ?? 0) > 0)
                                             <span class="text-[9px] font-semibold text-emerald-500 tabular-nums">
@@ -600,8 +591,8 @@
                                                 $fKonv = max(0.0001, (float) $sk->faktor_konversi);
                                                 $hargaSk = $sk->harga_jual > 0 ? (float) $sk->harga_jual : round($baseHarga * $fKonv, 2);
                                             @endphp
-                                            <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 text-ink-600 dark:text-ink-300 tabular-nums">
-                                                1 {{ strtoupper($sk->satuan_kode) }} ({{ $fKonv + 0 }} {{ $satuanDasar }}) → Rp {{ number_format($hargaSk, 0, ',', '.') }}
+                                            <span class="text-[8px] px-1 py-0.5 rounded bg-ink-100 dark:bg-white/5 text-ink-600 dark:text-ink-300 tabular-nums">
+                                                {{ strtoupper($sk->satuan_kode) }} ({{ $fKonv + 0 }}) → Rp{{ number_format($hargaSk, 0, ',', '.') }}
                                             </span>
                                         @endforeach
                                     </div>
@@ -812,7 +803,7 @@
                 <button
                     type="button"
                     @click="mobileCrmOpen = true"
-                    class="sm:hidden px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[38px] shrink-0 whitespace-nowrap {{ $customer ? 'bg-up-primary/10 border-up-primary/30 text-up-primary font-bold' : 'bg-ink-100 dark:bg-white/5 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-200' }}"
+                    class="sm:hidden px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[32px] shrink-0 whitespace-nowrap {{ $customer ? 'bg-up-primary/10 border-up-primary/30 text-up-primary font-bold' : 'bg-ink-100 dark:bg-white/5 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-200' }}"
                     title="Pilih / Cari Pelanggan CRM"
                 >
                     <svg class="w-3.5 h-3.5 {{ $customer ? 'text-up-primary' : 'text-ink-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
