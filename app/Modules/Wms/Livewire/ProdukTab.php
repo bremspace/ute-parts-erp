@@ -228,8 +228,8 @@ class ProdukTab extends Component
         'aksi' => true,
     ];
 
-    // Gudang yang ditampilkan di kolom "Gudang & Rak" (kosong = semua)
-    public array $visibleGudangs = [];
+    // Gudang yang disembunyikan di kolom "Gudang & Rak" (kosong = tampilkan semua)
+    public array $hiddenGudangs = [];
 
     public bool $showColumnSettings = false;
 
@@ -417,9 +417,9 @@ class ProdukTab extends Component
             if (is_array($prefCols)) {
                 $this->visibleColumns = array_merge($this->visibleColumns, $prefCols);
             }
-            $prefGudangs = UserPreference::getPref($userId, 'wms_produk_tab_visible_gudangs');
+            $prefGudangs = UserPreference::getPref($userId, 'wms_produk_tab_hidden_gudangs');
             if (is_array($prefGudangs)) {
-                $this->visibleGudangs = $prefGudangs;
+                $this->hiddenGudangs = $prefGudangs;
             }
         }
     }
@@ -474,19 +474,19 @@ class ProdukTab extends Component
         }
     }
 
-    public function toggleVisibleGudang(int $gudangId): void
+    public function toggleHiddenGudang(int $gudangId): void
     {
-        if (in_array($gudangId, $this->visibleGudangs, true)) {
-            $this->visibleGudangs = array_values(array_diff($this->visibleGudangs, [$gudangId]));
+        if (in_array($gudangId, $this->hiddenGudangs, true)) {
+            $this->hiddenGudangs = array_values(array_diff($this->hiddenGudangs, [$gudangId]));
         } else {
-            $this->visibleGudangs[] = $gudangId;
+            $this->hiddenGudangs[] = $gudangId;
         }
         $this->simpanPreferensiGudang();
     }
 
     public function showAllGudangs(): void
     {
-        $this->visibleGudangs = [];
+        $this->hiddenGudangs = [];
         $this->simpanPreferensiGudang();
     }
 
@@ -494,7 +494,7 @@ class ProdukTab extends Component
     {
         $userId = auth()->id();
         if ($userId) {
-            UserPreference::setPref($userId, 'wms_produk_tab_visible_gudangs', $this->visibleGudangs);
+            UserPreference::setPref($userId, 'wms_produk_tab_hidden_gudangs', $this->hiddenGudangs);
         }
     }
 
@@ -504,7 +504,7 @@ class ProdukTab extends Component
      */
     public function isGudangVisible(int $gudangId): bool
     {
-        return empty($this->visibleGudangs) || in_array($gudangId, $this->visibleGudangs, true);
+        return ! in_array($gudangId, $this->hiddenGudangs, true);
     }
 
     public function toggleFilter(string $key): void
@@ -4839,7 +4839,7 @@ class ProdukTab extends Component
             'selectedProduksPreview' => $selectedProduksPreview,
             'gudangs' => $gudangs,
             'gudangsCabang' => $gudangsCabang,
-            'visibleGudangs' => $this->visibleGudangs,
+            'hiddenGudangs' => $this->hiddenGudangs,
             'raks' => Rak::with('gudang')->get(),
             'produks' => $produks,
             'perPage' => $this->perPage,

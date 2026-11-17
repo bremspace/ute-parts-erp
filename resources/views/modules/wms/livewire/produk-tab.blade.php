@@ -506,8 +506,8 @@
                                     @foreach($gudangsCabang as $g)
                                         <label class="inline-flex items-center gap-1 text-[10px] text-ink-300 cursor-pointer select-none">
                                             <input type="checkbox"
-                                                   wire:click="toggleVisibleGudang({{ $g->id }})"
-                                                   @checked(empty($visibleGudangs) || in_array($g->id, $visibleGudangs, true))
+                                                   wire:click="toggleHiddenGudang({{ $g->id }})"
+                                                   @checked(!in_array($g->id, $hiddenGudangs ?? [], true))
                                                    class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                             <span>{{ $g->nama }}</span>
                                         </label>
@@ -1790,8 +1790,8 @@
                         @if($visibleColumns['gudang'] ?? true)
                             <td class="py-2.5 px-3 text-xs min-w-[130px]">
                                 @php
-                                    $stokItemsTampil = $p->stokItems->filter(function ($si) use ($p) {
-                                        if (!empty($visibleGudangs) && !in_array($si->gudang_id, $visibleGudangs, true)) {
+                                    $stokItemsTampil = $p->stokItems->filter(function ($si) use ($p, $hiddenGudangs) {
+                                        if (!empty($hiddenGudangs) && in_array($si->gudang_id, $hiddenGudangs, true)) {
                                             return false;
                                         }
                                         if ((int) $si->jumlah === 0 && is_null($si->sku_variant_id)) {
@@ -2139,8 +2139,8 @@
                                     <span>📍</span> Lokasi Rak &amp; Gudang:
                                 </span>
                                 @php
-                                    $stokItemsCardTampil = $p->stokItems->filter(function ($si) use ($p) {
-                                        if (!empty($visibleGudangs) && !in_array($si->gudang_id, $visibleGudangs, true)) {
+                                    $stokItemsCardTampil = $p->stokItems->filter(function ($si) use ($p, $hiddenGudangs) {
+                                        if (!empty($hiddenGudangs) && in_array($si->gudang_id, $hiddenGudangs, true)) {
                                             return false;
                                         }
                                         if ((int) $si->jumlah === 0 && is_null($si->sku_variant_id)) {
