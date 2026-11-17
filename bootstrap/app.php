@@ -18,6 +18,7 @@ use App\Modules\Marketplace\Console\Commands\DuitkuRekonCommand;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
 use App\Modules\Rbac\Services\SessionManagementService;
 use App\Modules\Servis\Console\Commands\CekBatasWaktuServisCommand;
+use App\Modules\Sync\Middleware\VerifySyncSignature;
 use App\Modules\Wms\Jobs\CycleCountJob;
 use App\Modules\Wms\Jobs\ReorderOtomatisJob;
 use Illuminate\Console\Scheduling\Schedule;
@@ -77,6 +78,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // Penegakan sesi perangkat member (guard customer)
             'pelanggan.sesi' => EnsurePelangganSesiAktif::class,
+
+            // Hybrid Sync verification middleware
+            'verify.sync' => VerifySyncSignature::class,
         ]);
 
         // Arahkan guest sesuai zona: /app/* ke backoffice login, lainnya ke customer login

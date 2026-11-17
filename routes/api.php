@@ -16,6 +16,7 @@ use App\Modules\Rbac\Controllers\RbacController;
 use App\Modules\Rbac\Controllers\RbacFlexController;
 use App\Modules\Reseller\Controllers\ResellerController;
 use App\Modules\Servis\Controllers\ServisController;
+use App\Modules\Sync\Http\Controllers\SyncController;
 use App\Modules\Wms\Controllers\ProcurementController;
 use App\Modules\Wms\Controllers\ReturnPembelianController;
 use App\Modules\Wms\Controllers\WmsController;
@@ -292,3 +293,15 @@ Route::middleware(['throttle:60,1'])->group(function () {
     });
 
 }); // End global throttle:60,1 group (T-28)
+
+// ===== Asymmetric Hybrid Sync Internal Endpoints (Dedicated Throttle: 300/min & Secure Signature) =====
+Route::prefix('internal/sync')->middleware(['throttle:300,1'])->group(function () {
+    Route::post('/push', [SyncController::class, 'push'])
+        ->middleware('verify.sync');
+    Route::get('/pull', [SyncController::class, 'pull'])
+        ->middleware('verify.sync');
+    Route::post('/ack', [SyncController::class, 'ack'])
+        ->middleware('verify.sync');
+    Route::get('/health', [SyncController::class, 'health'])
+        ->middleware('verify.sync');
+});

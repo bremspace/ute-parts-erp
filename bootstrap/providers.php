@@ -34,4 +34,5 @@ return [
     WebhookServiceProvider::class,
     WmsServiceProvider::class,
     WorkflowServiceProvider::class,
+    \App\Modules\Sync\Providers\SyncServiceProvider::class,
 ];

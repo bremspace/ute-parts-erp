@@ -261,6 +261,14 @@ class SettingsRbac extends Component
         // Metode Pembayaran MP Toko
         'payment_mp_duitku_enabled' => true,
         'payment_mp_qris_toko_enabled' => true,
+
+        // Asymmetric Hybrid Sync
+        'sync_enabled' => false,
+        'sync_node_role' => 'primary_store',
+        'sync_node_id' => 'STORE-01',
+        'sync_remote_url' => '',
+        'sync_api_secret' => '',
+        'sync_pull_interval_seconds' => 30,
     ];
 
     public ?string $waTestStatus = null;
@@ -1082,6 +1090,24 @@ class SettingsRbac extends Component
         // Metode Pembayaran MP Toko
         $this->integrasiForm['payment_mp_duitku_enabled'] = (bool) $config->get('payment_mp_duitku_enabled', true);
         $this->integrasiForm['payment_mp_qris_toko_enabled'] = (bool) $config->get('payment_mp_qris_toko_enabled', true);
+
+        // Asymmetric Hybrid Sync
+        $savedSync = $config->get('hybrid_sync_config');
+        if (is_array($savedSync)) {
+            $this->integrasiForm['sync_enabled'] = (bool) ($savedSync['enabled'] ?? config('sync.enabled', false));
+            $this->integrasiForm['sync_node_role'] = (string) ($savedSync['node_role'] ?? config('sync.node_role', 'primary_store'));
+            $this->integrasiForm['sync_node_id'] = (string) ($savedSync['node_id'] ?? config('sync.node_id', 'STORE-01'));
+            $this->integrasiForm['sync_remote_url'] = (string) ($savedSync['remote_url'] ?? config('sync.remote_url', ''));
+            $this->integrasiForm['sync_api_secret'] = (string) ($savedSync['api_secret'] ?? config('sync.api_secret', ''));
+            $this->integrasiForm['sync_pull_interval_seconds'] = (int) ($savedSync['pull_interval_seconds'] ?? config('sync.pull_interval_seconds', 30));
+        } else {
+            $this->integrasiForm['sync_enabled'] = (bool) config('sync.enabled', false);
+            $this->integrasiForm['sync_node_role'] = (string) config('sync.node_role', 'primary_store');
+            $this->integrasiForm['sync_node_id'] = (string) config('sync.node_id', 'STORE-01');
+            $this->integrasiForm['sync_remote_url'] = (string) config('sync.remote_url', '');
+            $this->integrasiForm['sync_api_secret'] = (string) config('sync.api_secret', '');
+            $this->integrasiForm['sync_pull_interval_seconds'] = (int) config('sync.pull_interval_seconds', 30);
+        }
     }
 
     public function updatedIntegrasiFormWaProvider(): void
@@ -1147,6 +1173,16 @@ class SettingsRbac extends Component
         // 4. Pembayaran MP Toko
         $config->set('payment_mp_duitku_enabled', (bool) ($this->integrasiForm['payment_mp_duitku_enabled'] ?? true), 'Aktivasi Gateway Duitku MP');
         $config->set('payment_mp_qris_toko_enabled', (bool) ($this->integrasiForm['payment_mp_qris_toko_enabled'] ?? true), 'Aktivasi QRIS Dinamis Toko MP');
+
+        // 5. Asymmetric Hybrid Sync
+        $config->set('hybrid_sync_config', [
+            'enabled' => (bool) ($this->integrasiForm['sync_enabled'] ?? false),
+            'node_role' => $this->integrasiForm['sync_node_role'] ?? 'primary_store',
+            'node_id' => $this->integrasiForm['sync_node_id'] ?? 'STORE-01',
+            'remote_url' => $this->integrasiForm['sync_remote_url'] ?? '',
+            'api_secret' => $this->integrasiForm['sync_api_secret'] ?? '',
+            'pull_interval_seconds' => (int) ($this->integrasiForm['sync_pull_interval_seconds'] ?? 30),
+        ], 'Konfigurasi Asymmetric Hybrid Sync');
 
         app(AuditService::class)->catat(
             'Konfigurasi',

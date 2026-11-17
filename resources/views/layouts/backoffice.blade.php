@@ -688,6 +688,13 @@
                         <span class="hidden sm:inline text-[11px] font-semibold">DB Online</span>
                     </div>
 
+                    @if(config('sync.enabled'))
+                        <!-- Hybrid Sync Node Role Badge -->
+                        <div class="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider {{ config('sync.node_role') === 'primary_store' ? 'bg-up-primary/10 text-up-primary border-up-primary/30' : 'bg-sky-500/10 text-sky-400 border-sky-500/30' }}" title="Hybrid Sync Node: {{ config('sync.node_id') }} ({{ config('sync.node_role') }})">
+                            <span>{{ config('sync.node_role') === 'primary_store' ? '🏪 Toko Lokal' : '☁️ Cloud VPS' }}</span>
+                        </div>
+                    @endif
+
                     @can('pengaturan.manage')
                         <!-- Cek Update Quick Button -->
                         <a href="/app/pengaturan?tab=database&check_update=1"
