@@ -47,6 +47,8 @@ class ShopPage extends Component
     #[Url(as: 'kategori', except: '')]
     public string $filterKategori = '';
 
+    public string $filterKategoriSort = 'urutan';
+
     #[Url(as: 'kondisi', except: '')]
     public string $filterKondisi = '';
 
@@ -831,6 +833,7 @@ class ShopPage extends Component
             'webBanners' => $webService->getActiveBanners(),
             'activeCategoryName' => $this->activeCategoryName,
             'filterKategori' => $this->filterKategori,
+            'filterKategoriSort' => $this->filterKategoriSort,
             'filterHpModel' => $this->filterHpModel,
             'filterHpMerk' => $this->filterHpMerk,
             'filterBrand' => $this->filterBrand,

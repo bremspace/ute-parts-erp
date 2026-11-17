@@ -720,6 +720,9 @@
                     :options="$shopKategoriOptions"
                     placeholder="Semua Kategori"
                     searchPlaceholder="Cari kategori..."
+                    :sortable="true"
+                    :sort-mode="$filterKategoriSort ?? 'urutan'"
+                    sort-property="filterKategoriSort"
                 />
             </div>
             @endif
@@ -727,22 +730,12 @@
             @if($allowedFilters['kondisi'] ?? true)
             <!-- Kondisi -->
             <div class="relative min-w-0 w-full">
-                <select wire:model.live="filterKondisi"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Semua Kondisi</option>
-                    <option value="baru">Baru</option>
-                    <option value="oem">OEM Certified</option>
-                    <option value="compatible">Compatible Grade A</option>
-                </select>
-                @if(!empty($filterKondisi))
-                    <button type="button" wire:click="$set('filterKondisi', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Kondisi">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="filterKondisi"
+                    :options="[['value' => 'baru', 'label' => 'Baru'], ['value' => 'oem', 'label' => 'OEM Certified'], ['value' => 'compatible', 'label' => 'Compatible Grade A']]"
+                    placeholder="Semua Kondisi"
+                    searchPlaceholder="Cari kondisi..."
+                />
             </div>
             @endif
 
@@ -771,106 +764,48 @@
             @if($allowedFilters['brand'] ?? true)
             <!-- Brand Part -->
             <div class="relative min-w-0 w-full">
-                <select wire:model.live="filterBrand"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Semua Brand</option>
-                    @foreach($brands as $key => $val)
-                        @php
-                            if (is_array($val)) {
-                                $b = $val['nama'] ?? $val['name'] ?? null;
-                                $count = null;
-                            } elseif (is_object($val)) {
-                                $b = $val->nama ?? $val->name ?? null;
-                                $count = null;
-                            } else {
-                                $b = is_numeric($key) ? $val : $key;
-                                $count = is_numeric($key) ? null : (is_scalar($val) ? $val : null);
-                            }
-                        @endphp
-                        @if(is_scalar($b) && filled($b))
-                            <option value="{{ $b }}">{{ $b }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
-                        @endif
-                    @endforeach
-                </select>
-                @if(!empty($filterBrand))
-                    <button type="button" wire:click="$set('filterBrand', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Brand">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="filterBrand"
+                    :options="collect($brands)->map(fn($b) => ['value' => $b, 'label' => $b])"
+                    placeholder="Semua Brand"
+                    searchPlaceholder="Cari brand..."
+                />
             </div>
             @endif
 
             @if($allowedFilters['harga'] ?? true)
             <!-- Rentang Harga -->
             <div class="relative min-w-0 w-full">
-                <select wire:model.live="hargaMax"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Semua Harga</option>
-                    @foreach([100000, 250000, 500000, 1000000] as $hb)
-                        <option value="{{ $hb }}">≤ Rp {{ number_format($hb, 0, ',', '.') }}</option>
-                    @endforeach
-                </select>
-                @if(!empty($hargaMax))
-                    <button type="button" wire:click="$set('hargaMax', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Harga">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="hargaMax"
+                    :options="[['value' => '100000', 'label' => '≤ Rp 100.000'], ['value' => '250000', 'label' => '≤ Rp 250.000'], ['value' => '500000', 'label' => '≤ Rp 500.000'], ['value' => '1000000', 'label' => '≤ Rp 1.000.000']]"
+                    placeholder="Semua Harga"
+                    searchPlaceholder="Cari harga..."
+                />
             </div>
             @endif
 
             @if($allowedFilters['kualitas'] ?? true)
             <!-- Kualitas / Grade Part -->
             <div class="relative min-w-0 w-full">
-                <select wire:model.live="filterKualitas"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Semua Kualitas</option>
-                    @foreach($kualitasList as $k)
-                        @php
-                            $kId = $k['id'] ?? '';
-                            $kNama = $k['nama'] ?? '';
-                            $kCount = $k['count'] ?? null;
-                        @endphp
-                        <option value="{{ $kId }}">{{ $kNama }}{{ $kCount !== null ? ' (' . $kCount . ')' : '' }}</option>
-                    @endforeach
-                </select>
-                @if(!empty($filterKualitas))
-                    <button type="button" wire:click="$set('filterKualitas', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Kualitas">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="filterKualitas"
+                    :options="collect($kualitasList)->map(fn($k) => ['value' => $k['id'] ?? $k->id ?? '', 'label' => ($k['nama'] ?? $k->nama ?? '') . (isset($k['count']) || isset($k->count) ? ' (' . ($k['count'] ?? $k->count) . ')' : '')])"
+                    placeholder="Semua Kualitas"
+                    searchPlaceholder="Cari kualitas..."
+                />
             </div>
             @endif
 
             @if($allowedFilters['stok'] ?? true)
             <!-- Ketersediaan Stok (sinkron live dengan stok_items backoffice) -->
             <div class="relative min-w-0 w-full">
-                <select wire:model.live="filterStok"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Semua Stok</option>
-                    <option value="tersedia">Ready Stock</option>
-                    <option value="habis">Stok Habis</option>
-                </select>
-                @if(!empty($filterStok))
-                    <button type="button" wire:click="$set('filterStok', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Stok">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="filterStok"
+                    :options="[['value' => 'tersedia', 'label' => 'Ready Stock'], ['value' => 'habis', 'label' => 'Stok Habis']]"
+                    placeholder="Semua Stok"
+                    searchPlaceholder="Cari stok..."
+                />
             </div>
             @endif
 
