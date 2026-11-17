@@ -1541,60 +1541,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Bagian 6: Thermal Printer Hardware -->
-                                <div class="pt-4 border-t border-white/5 space-y-3">
-                                    <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                                        <span class="w-2 h-2 rounded-full bg-up-cyan"></span>
-                                        <span>Thermal Printer Hardware (CUPS / Bluetooth)</span>
-                                    </h4>
-                                    <p class="text-[11px] text-ink-400">Konfigurasi printer fisik untuk cetak otomatis. Gunakan nama printer CUPS (Linux) atau MAC Bluetooth (Web Bluetooth).</p>
-
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <label class="block text-xs font-semibold text-ink-300 mb-1">Nama Printer CUPS / Windows</label>
-                                            <div class="flex gap-2">
-                                                <select wire:model.live="strukForm.thermal_printer_name"
-                                                    class="flex-1 px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900/60 border border-white/10">
-                                                    <option value="">-- Pilih printer terdeteksi --</option>
-                                                    @foreach($detectedPrinters as $pName)
-                                                        <option value="{{ $pName }}" class="bg-ink-900 text-white">{{ $pName }}</option>
-                                                    @endforeach
-                                                </select>
-                                                <button type="button" wire:click="deteksiPrinter" wire:loading.attr="disabled"
-                                                    class="px-3 py-2 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white text-xs font-bold cursor-pointer transition active:scale-95 disabled:opacity-50 whitespace-nowrap">
-                                                    <span wire:loading.remove wire:target="deteksiPrinter">Deteksi</span>
-                                                    <span wire:loading wire:target="deteksiPrinter">...</span>
-                                                </button>
-                                            </div>
-                                            <p class="text-[10px] text-ink-400 mt-1">Klik "Deteksi" untuk scan printer terinstall. Atau ketik manual di bawah.</p>
-                                            <input type="text"
-                                                wire:model.live.debounce.300ms="strukForm.thermal_printer_name"
-                                                class="w-full mt-1.5 px-3 py-2 rounded-xl glass-input text-xs text-white"
-                                                placeholder="Atau ketik nama printer manual: POS-58, TM-T20II, ..."
-                                                title="Nama printer seperti yang terdaftar di sistem">
-                                            @error('strukForm.thermal_printer_name') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
-                                        </div>
-
-                                        <div>
-                                            <label class="block text-xs font-semibold text-ink-300 mb-1">MAC Address Bluetooth (Web Bluetooth)</label>
-                                            <input type="text"
-                                                wire:model.live.debounce.300ms="strukForm.thermal_bluetooth_mac"
-                                                class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white font-mono"
-                                                placeholder="Contoh: AA:BB:CC:DD:EE:FF"
-                                                title="Format: XX:XX:XX:XX:XX:XX atau XX-XX-XX-XX-XX-XX">
-                                            <p class="text-[10px] text-ink-400 mt-1">Dapatkan dari pengaturan Bluetooth printer atau halaman Pairing POS</p>
-                                            @error('strukForm.thermal_bluetooth_mac') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-center gap-2 p-2.5 rounded-xl border border-white/5 bg-white/[0.02]">
-                                        <input type="checkbox" wire:model.live="strukForm.thermal_auto_print" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30 w-4 h-4">
-                                        <label class="text-xs font-medium text-white cursor-pointer">
-                                            <strong>Auto-Print per Transaksi</strong> — Cetak struk otomatis setelah pembayaran berhasil
-                                        </label>
-                                    </div>
-                                    <p class="text-[10px] text-ink-400">Butuh <code class="bg-ink-900 px-1 rounded text-up-cyan">thermal_printer_name</code> (CUPS) atau <code class="bg-ink-900 px-1 rounded text-up-cyan">thermal_bluetooth_mac</code> (Bluetooth) terisi agar berfungsi.</p>
-                                </div>
+                                @include('partials.printer-hardware-section', ['form' => 'strukForm', 'label' => 'Struk & Faktur POS'])
 
                                 <div class="pt-4 border-t border-white/5 flex items-center justify-between">
                                     <button type="submit" class="px-6 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-mint/20">
@@ -1817,6 +1764,7 @@
                                     </button>
                                     <span class="text-[11px] text-ink-400">Preset: <strong class="text-white">{{ $printerForm['label_width'] }}mm × {{ $printerForm['label_height'] }}mm</strong></span>
                                 </div>
+                                @include('partials.printer-hardware-section', ['form' => 'printerForm', 'label' => 'Label Barcode & QR SKU'])
                             </form>
                         </x-prism.glass-card>
                     </div>
@@ -1946,6 +1894,7 @@
                                     </button>
                                     <span class="text-[11px] text-ink-400">Default: <strong class="text-white">A5 (Setengah A4) · Margin 8mm</strong></span>
                                 </div>
+                                @include('partials.printer-hardware-section', ['form' => 'wmsDocForm', 'label' => 'Dokumen WMS (PO & GRN)'])
                             </form>
                         </x-prism.glass-card>
                     </div>
@@ -2139,6 +2088,7 @@
                                         💾 Simpan Format Slip Gaji
                                     </x-prism.prism-button>
                                 </div>
+                                @include('partials.printer-hardware-section', ['form' => 'hrSlipForm', 'label' => 'Slip Gaji HR & Payroll'])
                             </form>
                         </x-prism.glass-card>
                     </div>
@@ -2289,6 +2239,7 @@
                                         💾 Simpan Format Laporan
                                     </x-prism.prism-button>
                                 </div>
+                                @include('partials.printer-hardware-section', ['form' => 'laporanDocForm', 'label' => 'Laporan Keuangan & Pajak'])
                             </form>
                         </x-prism.glass-card>
                     </div>
@@ -2417,6 +2368,7 @@
                                         💾 Simpan Format Label Pengiriman
                                     </x-prism.prism-button>
                                 </div>
+                                @include('partials.printer-hardware-section', ['form' => 'labelPengirimanForm', 'label' => 'Label Pengiriman Ekspedisi'])
                             </form>
                         </x-prism.glass-card>
                     </div>

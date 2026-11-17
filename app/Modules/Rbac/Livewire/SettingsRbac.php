@@ -170,6 +170,10 @@ class SettingsRbac extends Component
         'label_show_sku' => true,
         'struk_default_width' => '80mm',
         'struk_footer' => 'Terima kasih atas kunjungan Anda',
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $wmsDocForm = [
@@ -179,6 +183,10 @@ class SettingsRbac extends Component
         'font_size' => '10pt',
         'show_kop' => true,
         'show_ttd' => true,
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $hrSlipForm = [
@@ -191,6 +199,10 @@ class SettingsRbac extends Component
         'show_potongan' => true,
         'show_ttd' => true,
         'catatan_kaki' => 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP.',
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $laporanDocForm = [
@@ -204,6 +216,10 @@ class SettingsRbac extends Component
         'jabatan_pembuat' => 'Staf Akuntansi / Kasir',
         'jabatan_pemeriksa' => 'Kepala Cabang / Spv',
         'jabatan_penyetuju' => 'Owner / Direktur',
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $labelPengirimanForm = [
@@ -214,6 +230,10 @@ class SettingsRbac extends Component
         'show_qr_resi' => true,
         'show_fragile_warning' => true,
         'catatan_pengiriman' => 'FRAGILE: Barang Elektronik & Sparepart HP. Jangan dibanting / ditindih beban berat.',
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $strukForm = [
@@ -904,6 +924,9 @@ class SettingsRbac extends Component
         $strukData = array_merge($config->getStrukConfig(), [
             'default_width' => $this->printerForm['struk_default_width'],
             'footer_text' => $this->printerForm['struk_footer'],
+            'thermal_printer_name' => $this->printerForm['thermal_printer_name'],
+            'thermal_bluetooth_mac' => $this->printerForm['thermal_bluetooth_mac'],
+            'thermal_auto_print' => $this->printerForm['thermal_auto_print'],
         ]);
 
         $config->set('label_qr_config', $labelData, 'Ukuran dan margin cetak label QR produk');
@@ -912,6 +935,9 @@ class SettingsRbac extends Component
         // Sinkronkan ke strukForm
         $this->strukForm['default_width'] = $this->printerForm['struk_default_width'];
         $this->strukForm['footer_text'] = $this->printerForm['struk_footer'];
+        $this->strukForm['thermal_printer_name'] = $this->printerForm['thermal_printer_name'];
+        $this->strukForm['thermal_bluetooth_mac'] = $this->printerForm['thermal_bluetooth_mac'];
+        $this->strukForm['thermal_auto_print'] = $this->printerForm['thermal_auto_print'];
 
         app(AuditService::class)->catat(
             'Konfigurasi',

@@ -541,6 +541,10 @@ class KonfigurasiService
             'font_size' => '10pt',
             'show_kop' => true,
             'show_ttd' => true,
+            // Printer Hardware
+            'thermal_printer_name' => '',
+            'thermal_bluetooth_mac' => '',
+            'thermal_auto_print' => false,
         ];
 
         $cfg = $this->get('wms_doc_config');
@@ -580,6 +584,10 @@ class KonfigurasiService
             'show_potongan' => true,
             'show_ttd' => true,
             'catatan_kaki' => 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP.',
+            // Printer Hardware
+            'thermal_printer_name' => '',
+            'thermal_bluetooth_mac' => '',
+            'thermal_auto_print' => false,
         ];
 
         $cfg = $this->get('slip_gaji_config');
@@ -603,6 +611,10 @@ class KonfigurasiService
             'jabatan_pembuat' => 'Staf Akuntansi / Kasir',
             'jabatan_pemeriksa' => 'Kepala Cabang / Spv',
             'jabatan_penyetuju' => 'Owner / Direktur',
+            // Printer Hardware
+            'thermal_printer_name' => '',
+            'thermal_bluetooth_mac' => '',
+            'thermal_auto_print' => false,
         ];
 
         $cfg = $this->get('laporan_doc_config');
@@ -623,6 +635,10 @@ class KonfigurasiService
             'show_qr_resi' => true,
             'show_fragile_warning' => true,
             'catatan_pengiriman' => 'FRAGILE: Barang Elektronik & Sparepart HP. Jangan dibanting / ditindih beban berat.',
+            // Printer Hardware
+            'thermal_printer_name' => '',
+            'thermal_bluetooth_mac' => '',
+            'thermal_auto_print' => false,
         ];
 
         $cfg = $this->get('label_pengiriman_config');
