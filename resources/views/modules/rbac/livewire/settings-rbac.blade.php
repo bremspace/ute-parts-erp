@@ -2741,7 +2741,12 @@
                                     .map(r => parseInt(r.getAttribute('data-kategori-id'), 10))
                                     .filter(n => !isNaN(n));
                                 if (newOrder.length > 0 && window.Livewire) {
-                                    const comp = window.Livewire.find(document.querySelector('[wire\\:id]')?.getAttribute('wire:id'));
+                                    // Resolve THIS table's component by walking up to its own root
+                                    // element. The layout renders NotificationCenter before the
+                                    // slot, so a document-wide [wire:id] lookup picks the wrong one.
+                                    let rootEl = tbody;
+                                    while (rootEl && !rootEl.hasAttribute('wire:id')) rootEl = rootEl.parentElement;
+                                    const comp = rootEl ? window.Livewire.find(rootEl.getAttribute('wire:id')) : null;
                                     if (comp) comp.call('reorderKategori', newOrder);
                                 }
                             };
