@@ -152,6 +152,11 @@ class SettingsRbac extends Component
     #[Url(as: 'psub')]
     public string $printerSubTab = 'struk'; // 'struk' | 'label' | 'wms_doc' | 'hr_slip' | 'laporan' | 'pengiriman'
 
+    // Deteksi printer terinstall (untuk dropdown CUPS)
+    public array $detectedPrinters = [];
+
+    public bool $printerDetecting = false;
+
     public array $printerForm = [
         'label_preset' => '33x15',
         'label_width' => 33.0,
@@ -762,6 +767,68 @@ class SettingsRbac extends Component
             'thermal_bluetooth_mac' => (string) ($strukCfg['thermal_bluetooth_mac'] ?? ''),
             'thermal_auto_print' => (bool) ($strukCfg['thermal_auto_print'] ?? false),
         ];
+    }
+
+    /**
+     * Deteksi printer terinstall di sistem (Windows: Get-Printer, Linux: lpstat).
+     * Hasil disimpan di $detectedPrinters untuk dropdown.
+     */
+    public function deteksiPrinter(): void
+    {
+        $this->printerDetecting = true;
+        $printers = [];
+
+        if (stripos(PHP_OS, 'WIN') === 0) {
+            $output = [];
+            $exitCode = 0;
+            exec('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name" 2>&1', $output, $exitCode);
+            foreach ($output as $line) {
+                $line = trim($line);
+                if ($line !== '' && stripos($line, 'error') === false && stripos($line, 'exception') === false) {
+                    $printers[] = $line;
+                }
+            }
+            if (empty($printers)) {
+                $output2 = [];
+                $exitCode2 = 0;
+                exec('wmic printer get name 2>&1', $output2, $exitCode2);
+                foreach ($output2 as $line) {
+                    $line = trim($line);
+                    if ($line !== '' && strtolower($line) !== 'name') {
+                        $printers[] = $line;
+                    }
+                }
+            }
+        } else {
+            $output = [];
+            $exitCode = 0;
+            exec('lpstat -p 2>&1', $output, $exitCode);
+            foreach ($output as $line) {
+                if (preg_match('/^printer\s+(\S+)/i', trim($line), $m)) {
+                    $printers[] = $m[1];
+                }
+            }
+            if (empty($printers)) {
+                $output2 = [];
+                $exitCode2 = 0;
+                exec('lpstat -a 2>&1', $output2, $exitCode2);
+                foreach ($output2 as $line) {
+                    if (preg_match('/^(\S+)\s+accepting/i', trim($line), $m)) {
+                        $printers[] = $m[1];
+                    }
+                }
+            }
+        }
+
+        $this->detectedPrinters = array_values(array_unique(array_filter($printers)));
+        sort($this->detectedPrinters);
+        $this->printerDetecting = false;
+
+        if (count($this->detectedPrinters) > 0) {
+            $this->dispatch('alert', ['type' => 'success', 'message' => count($this->detectedPrinters) . ' printer terdeteksi.']);
+        } else {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tidak ada printer terdeteksi. Pastikan printer terinstall dan aktif.']);
+        }
     }
 
     public function updatedPrinterFormLabelPreset(string $preset): void

@@ -1551,13 +1551,27 @@
 
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <div>
-                                            <label class="block text-xs font-semibold text-ink-300 mb-1">Nama Printer CUPS (Linux)</label>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1">Nama Printer CUPS / Windows</label>
+                                            <div class="flex gap-2">
+                                                <select wire:model.live="strukForm.thermal_printer_name"
+                                                    class="flex-1 px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900/60 border border-white/10">
+                                                    <option value="">-- Pilih printer terdeteksi --</option>
+                                                    @foreach($detectedPrinters as $pName)
+                                                        <option value="{{ $pName }}" class="bg-ink-900 text-white">{{ $pName }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <button type="button" wire:click="deteksiPrinter" wire:loading.attr="disabled"
+                                                    class="px-3 py-2 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white text-xs font-bold cursor-pointer transition active:scale-95 disabled:opacity-50 whitespace-nowrap">
+                                                    <span wire:loading.remove wire:target="deteksiPrinter">Deteksi</span>
+                                                    <span wire:loading wire:target="deteksiPrinter">...</span>
+                                                </button>
+                                            </div>
+                                            <p class="text-[10px] text-ink-400 mt-1">Klik "Deteksi" untuk scan printer terinstall. Atau ketik manual di bawah.</p>
                                             <input type="text"
                                                 wire:model.live.debounce.300ms="strukForm.thermal_printer_name"
-                                                class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
-                                                placeholder="Contoh: POS-58, TM-T20II, EPSON-TM-T88V"
-                                                title="Nama printer seperti yang terdaftar di CUPS (lpstat -p)">
-                                            <p class="text-[10px] text-ink-400 mt-1">Kosongkan jika hanya pakai Web Bluetooth / Browser Print</p>
+                                                class="w-full mt-1.5 px-3 py-2 rounded-xl glass-input text-xs text-white"
+                                                placeholder="Atau ketik nama printer manual: POS-58, TM-T20II, ..."
+                                                title="Nama printer seperti yang terdaftar di sistem">
                                             @error('strukForm.thermal_printer_name') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
                                         </div>
 

@@ -601,6 +601,71 @@ class PosController extends Controller
     /**
      * Print raw ESC/POS bytes to CUPS printer from frontend
      */
+    /**
+     * Deteksi printer terinstall di sistem (Windows: Get-Printer, Linux: lpstat).
+     * Digunakan oleh halaman Pengaturan Printer untuk auto-detect.
+     */
+    public function listPrinters(Request $request): JsonResponse
+    {
+        $printers = [];
+
+        if (stripos(PHP_OS, 'WIN') === 0) {
+            // Windows: gunakan PowerShell Get-Printer
+            $output = [];
+            $exitCode = 0;
+            exec('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name" 2>&1', $output, $exitCode);
+            foreach ($output as $line) {
+                $line = trim($line);
+                if ($line !== '' && stripos($line, 'error') === false && stripos($line, 'exception') === false) {
+                    $printers[] = $line;
+                }
+            }
+            // Fallback: wmic
+            if (empty($printers)) {
+                $output2 = [];
+                $exitCode2 = 0;
+                exec('wmic printer get name 2>&1', $output2, $exitCode2);
+                foreach ($output2 as $line) {
+                    $line = trim($line);
+                    if ($line !== '' && strtolower($line) !== 'name') {
+                        $printers[] = $line;
+                    }
+                }
+            }
+        } else {
+            // Linux/macOS: gunakan lpstat
+            $output = [];
+            $exitCode = 0;
+            exec('lpstat -p 2>&1', $output, $exitCode);
+            foreach ($output as $line) {
+                // Format: "printer NAMA is idle.  enabled since ..."
+                if (preg_match('/^printer\s+(\S+)/i', trim($line), $m)) {
+                    $printers[] = $m[1];
+                }
+            }
+            // Fallback: lpstat -a
+            if (empty($printers)) {
+                $output2 = [];
+                $exitCode2 = 0;
+                exec('lpstat -a 2>&1', $output2, $exitCode2);
+                foreach ($output2 as $line) {
+                    if (preg_match('/^(\S+)\s+accepting/i', trim($line), $m)) {
+                        $printers[] = $m[1];
+                    }
+                }
+            }
+        }
+
+        $printers = array_values(array_unique(array_filter($printers)));
+        sort($printers);
+
+        return $this->success([
+            'printers' => $printers,
+            'os' => PHP_OS,
+            'count' => count($printers),
+        ], count($printers) > 0 ? 'Printer terdeteksi: ' . count($printers) : 'Tidak ada printer terdeteksi');
+    }
+
     public function printRaw(Request $request): JsonResponse
     {
         $validated = $request->validate([
