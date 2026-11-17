@@ -2319,13 +2319,22 @@ class SettingsRbac extends Component
             return;
         }
 
+        // Auto-assign urutan jika kosong/0: ambil max urutan sibling + 1
+        $urutan = (int) ($this->kategoriForm['urutan'] ?? 0);
+        if ($urutan <= 0) {
+            $maxUrutan = KategoriProduk::where('parent_id', $parentId)
+                ->when($id, fn ($q) => $q->where('id', '!=', $id))
+                ->max('urutan') ?? 0;
+            $urutan = $maxUrutan + 1;
+        }
+
         if ($this->kategoriForm['id']) {
             $kat = KategoriProduk::findOrFail($this->kategoriForm['id']);
             $kat->update([
                 'nama' => $this->kategoriForm['nama'],
                 'parent_id' => $this->kategoriForm['parent_id'] ?: null,
                 'icon' => $this->kategoriForm['icon'] ?: null,
-                'urutan' => (int) ($this->kategoriForm['urutan'] ?? 0),
+                'urutan' => $urutan,
                 'is_active' => (bool) $this->kategoriForm['is_active'],
             ]);
         } else {
@@ -2333,13 +2342,50 @@ class SettingsRbac extends Component
                 'nama' => $this->kategoriForm['nama'],
                 'parent_id' => $this->kategoriForm['parent_id'] ?: null,
                 'icon' => $this->kategoriForm['icon'] ?: null,
-                'urutan' => (int) ($this->kategoriForm['urutan'] ?? 0),
+                'urutan' => $urutan,
                 'is_active' => (bool) $this->kategoriForm['is_active'],
             ]);
         }
 
         $this->showKategoriModal = false;
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Kategori produk disimpan']);
+    }
+
+    /**
+     * Reorder kategori berdasarkan array ID berurutan (drag-and-drop / manual).
+     * Hanya mengubah urutan dalam satu level parent yang sama.
+     */
+    public function reorderKategori(array $orderedIds): void
+    {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengelola kategori produk.')) {
+            return;
+        }
+
+        $orderedIds = array_values(array_filter(array_map('intval', $orderedIds)));
+        if (empty($orderedIds)) {
+            return;
+        }
+
+        $kats = KategoriProduk::whereIn('id', $orderedIds)->get()->keyBy('id');
+
+        // Kelompokkan berdasarkan parent_id
+        $byParent = [];
+        foreach ($orderedIds as $id) {
+            if (! isset($kats[$id])) {
+                continue;
+            }
+            $parentId = $kats[$id]->parent_id ?? 0;
+            $byParent[$parentId][] = $id;
+        }
+
+        foreach ($byParent as $parentId => $ids) {
+            $i = 1;
+            foreach ($ids as $id) {
+                KategoriProduk::where('id', $id)->update(['urutan' => $i++]);
+            }
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Urutan kategori diperbarui']);
     }
 
     public function toggleKategoriStatus(int $id): void

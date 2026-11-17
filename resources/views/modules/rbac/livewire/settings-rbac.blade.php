@@ -2633,7 +2633,13 @@
                                 </thead>
                                 <tbody class="divide-y divide-white/5">
                                     @forelse($kategoriList as $k)
-                                        <tr class="hover:bg-white/[0.02] transition-colors {{ in_array($k->id, $selectedKategoriIds, true) ? 'bg-up-primary/10' : '' }}">
+                                        <tr draggable="true"
+                                            data-kategori-id="{{ $k->id }}"
+                                            class="hover:bg-white/[0.02] transition-colors cursor-move {{ in_array($k->id, $selectedKategoriIds, true) ? 'bg-up-primary/10' : '' }}"
+                                            ondragstart="window.__katDragStart(event, {{ $k->id }})"
+                                            ondragover="window.__katDragOver(event)"
+                                            ondrop="window.__katDrop(event, {{ $k->id }})"
+                                            ondragend="window.__katDragEnd(event)">
                                             <td class="py-2.5 px-3 text-center">
                                                 <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
                                                     <input type="checkbox"
@@ -2699,6 +2705,54 @@
                         </x-prism.dual-scroll>
                     </div>
                 </x-prism.glass-card>
+
+                    <script>
+                        (function () {
+                            let draggedId = null;
+                            let draggedRow = null;
+                            window.__katDragStart = function (e, id) {
+                                draggedId = id;
+                                draggedRow = e.currentTarget;
+                                e.dataTransfer.effectAllowed = 'move';
+                                e.dataTransfer.setData('text/plain', String(id));
+                                if (draggedRow) draggedRow.classList.add('opacity-50');
+                            };
+                            window.__katDragOver = function (e) {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                                const row = e.currentTarget;
+                                if (row && row !== draggedRow) {
+                                    row.classList.add('border-t-2', 'border-up-primary');
+                                }
+                            };
+                            window.__katDrop = function (e, targetId) {
+                                e.preventDefault();
+                                const row = e.currentTarget;
+                                if (row) row.classList.remove('border-t-2', 'border-up-primary');
+                                if (!draggedId || draggedId === targetId) return;
+                                const tbody = row.closest('tbody');
+                                if (!tbody) return;
+                                const draggedEl = tbody.querySelector('tr[data-kategori-id="' + draggedId + '"]');
+                                const targetEl = tbody.querySelector('tr[data-kategori-id="' + targetId + '"]');
+                                if (draggedEl && targetEl && draggedEl !== targetEl) {
+                                    tbody.insertBefore(draggedEl, targetEl);
+                                }
+                                const newOrder = Array.from(tbody.querySelectorAll('tr[data-kategori-id]'))
+                                    .map(r => parseInt(r.getAttribute('data-kategori-id'), 10))
+                                    .filter(n => !isNaN(n));
+                                if (newOrder.length > 0 && window.Livewire) {
+                                    const comp = window.Livewire.find(document.querySelector('[wire\\:id]')?.getAttribute('wire:id'));
+                                    if (comp) comp.call('reorderKategori', newOrder);
+                                }
+                            };
+                            window.__katDragEnd = function (e) {
+                                if (draggedRow) draggedRow.classList.remove('opacity-50');
+                                document.querySelectorAll('tr[data-kategori-id]').forEach(r => r.classList.remove('border-t-2', 'border-up-primary'));
+                                draggedId = null;
+                                draggedRow = null;
+                            };
+                        })();
+                    </script>
 
             <!-- SUB-TAB 2: BRAND PART -->
             @elseif($masterProdukSubTab === 'brand')
