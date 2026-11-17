@@ -578,7 +578,7 @@
                                                 @foreach($satuanList as $sk)
                                                     <button
                                                         type="button"
-                                                        wire:click="addToCart({{ $prod->id }}, '{{ $sk->satuan_kode }}')"
+                                                        wire:click="addToCart({{ $prod->id }}, null, '{{ $sk->satuan_kode }}')"
                                                         @click="searchOpen = false"
                                                         title="Tambah 1 {{ strtoupper($sk->satuan_kode) }}"
                                                         class="px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-500/10 hover:bg-indigo-500/20 active:bg-indigo-500/30 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 cursor-pointer transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-0.5"
