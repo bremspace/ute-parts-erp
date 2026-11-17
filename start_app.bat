@@ -121,6 +121,12 @@ if errorlevel 1 (
     net start MySQL >nul 2>nul
     net start MySQL80 >nul 2>nul
     net start MariaDB >nul 2>nul
+    if exist "%~dp0tools\mariadb\bin\mysqld.exe" (
+        start "" /b "%~dp0tools\mariadb\bin\mysqld.exe" --defaults-file="%~dp0tools\mariadb\my.ini" --standalone >nul 2>nul
+    )
+    if exist "%~dp0tools\mysql\bin\mysqld.exe" (
+        start "" /b "%~dp0tools\mysql\bin\mysqld.exe" --defaults-file="%~dp0tools\mysql\my.ini" --standalone >nul 2>nul
+    )
     for %%P in ("C:\laragon\bin\mysql" "D:\laragon\bin\mysql" "E:\laragon\bin\mysql") do (
         if exist "%%~P" (
             for /d %%D in ("%%~P\*") do (
