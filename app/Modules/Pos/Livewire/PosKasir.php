@@ -3891,20 +3891,14 @@ class PosKasir extends Component
 
         // Cache master filter data 5 menit untuk kecepatan render Livewire
         $brandKompatibelList = Cache::remember('pos_filter_brand_kompatibel', 300, function () {
+            // Samakan dengan WMS inventori: hanya dari master TipeHp (merk HP aktif)
             return TipeHp::where('is_active', true)
                 ->distinct()
+                ->orderBy('merk')
                 ->pluck('merk')
-                ->merge(Brand::where('is_active', true)->pluck('nama'))
-                ->merge(
-                    Produk::whereNotNull('brand_kompatibel')
-                        ->where('brand_kompatibel', '!=', '')
-                        ->pluck('brand_kompatibel')
-                        ->flatMap(fn ($b) => preg_split('/[,;\/]+/', (string) $b))
-                        ->map(fn ($b) => trim($b))
-                )
+                ->map(fn ($m) => trim((string) $m))
                 ->filter()
                 ->unique()
-                ->sort()
                 ->values()
                 ->all();
         });

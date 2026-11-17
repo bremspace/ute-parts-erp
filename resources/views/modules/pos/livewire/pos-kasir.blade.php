@@ -69,6 +69,8 @@
     }
 @endphp
 
+<div style="display: contents;">
+
 <div
     class="flex flex-col gap-2 min-w-0 flex-1 min-h-0 md:overflow-y-auto pb-2 md:pb-0"
     x-data="{
@@ -559,66 +561,51 @@
                                             </x-prism.status-pill>
                                             <span class="hidden">{{ $alasanTidakBisaDipilih }}</span>
                                         @else
-                                            <x-prism.stock-gauge :stok="$stokTotal" :min="5" />
-                                        @endif
-                                    </div>
-                                </div>
-
-                                <!-- Action Buttons & Multi-Satuan Quick-Add -->
-                                <div class="flex items-center justify-between gap-2 pt-2 border-t border-ink-100 dark:border-white/5 flex-wrap">
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        @if($satuanList->isNotEmpty())
-                                            <span class="text-[10px] font-semibold text-ink-400 uppercase tracking-wider hidden sm:inline">Pilihan Kemasan:</span>
-                                            @foreach($satuanList as $sk)
-                                                @php
-                                                    $fKonv = max(0.0001, (float) $sk->faktor_konversi);
-                                                    $hargaSk = $sk->harga_jual > 0 ? (float) $sk->harga_jual : round($baseHarga * $fKonv, 2);
-                                                @endphp
-                                                <span class="text-[10px] px-2 py-0.5 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 text-ink-600 dark:text-ink-300 tabular-nums">
-                                                    1 {{ strtoupper($sk->satuan_kode) }} ({{ $fKonv + 0 }} {{ $satuanDasar }}) • Rp {{ number_format($hargaSk, 0, ',', '.') }}
-                                                </span>
-                                            @endforeach
-                                        @endif
-                                    </div>
-
-                                    <!-- Quick Add Buttons with Apple Tactile Feedback -->
-                                    <div class="flex items-center gap-1.5 ml-auto">
-                                        @if($stokKosong)
-                                            <button
-                                                type="button"
-                                                disabled
-                                                title="{{ $alasanTidakBisaDipilih }}"
-                                                class="px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold bg-ink-200/50 dark:bg-white/5 text-ink-400 cursor-not-allowed select-none min-h-[42px] sm:min-h-[34px]"
-                                            >
-                                                Stok Habis
-                                            </button>
-                                        @else
-                                            <!-- Tombol Tambah Satuan Dasar -->
-                                            <button
-                                                type="button"
-                                                wire:click="addToCart({{ $prod->id }})"
-                                                @click="searchOpen = false"
-                                                title="Tambah 1 {{ $satuanDasar }}"
-                                                class="px-3 sm:px-3 py-2.5 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary hover:bg-up-primary-dark active:bg-indigo-700 text-white cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 shadow-sm shadow-up-primary/20 min-h-[42px] sm:min-h-[34px]"
-                                            >
-                                                <span>+ {{ $satuanDasar }}</span>
-                                            </button>
-
-                                            <!-- Tombol Tambah Tiap Multi-Satuan Konversi -->
-                                            @foreach($satuanList as $sk)
+                                            <div class="flex items-center gap-1.5 mt-1 flex-wrap justify-end">
+                                                <x-prism.stock-gauge :stok="$stokTotal" :min="5" />
+                                                <!-- Tombol Tambah Satuan Dasar -->
                                                 <button
                                                     type="button"
-                                                    wire:click="addToCart({{ $prod->id }}, null, '{{ $sk->satuan_kode }}')"
+                                                    wire:click="addToCart({{ $prod->id }})"
                                                     @click="searchOpen = false"
-                                                    title="Tambah 1 {{ strtoupper($sk->satuan_kode) }}"
-                                                    class="px-3 sm:px-3 py-2.5 sm:py-1.5 rounded-xl text-xs font-bold bg-up-primary/10 hover:bg-up-primary/20 active:bg-up-primary/30 text-up-primary border border-up-primary/30 cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] flex items-center justify-center gap-1 min-h-[42px] sm:min-h-[34px]"
+                                                    title="Tambah 1 {{ $satuanDasar }}"
+                                                    class="px-2 py-1 rounded-lg text-[10px] font-bold bg-up-primary hover:bg-up-primary-dark active:bg-indigo-700 text-white cursor-pointer transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-0.5 shadow-sm shadow-up-primary/20"
                                                 >
-                                                    <span>+ {{ strtoupper($sk->satuan_kode) }}</span>
+                                                    <span>+ {{ $satuanDasar }}</span>
                                                 </button>
-                                            @endforeach
+
+                                                <!-- Tombol Tambah Tiap Multi-Satuan Konversi -->
+                                                @foreach($satuanList as $sk)
+                                                    <button
+                                                        type="button"
+                                                        wire:click="addToCart({{ $prod->id }}, null, '{{ $sk->satuan_kode }}')"
+                                                        @click="searchOpen = false"
+                                                        title="Tambah 1 {{ strtoupper($sk->satuan_kode) }}"
+                                                        class="px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-500/10 hover:bg-indigo-500/20 active:bg-indigo-500/30 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 cursor-pointer transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-0.5"
+                                                    >
+                                                        <span>+ {{ strtoupper($sk->satuan_kode) }}</span>
+                                                    </button>
+                                                @endforeach
+                                            </div>
                                         @endif
                                     </div>
                                 </div>
+
+                                <!-- Pilihan Kemasan (kompak) -->
+                                @if($satuanList->isNotEmpty())
+                                    <div class="flex items-center gap-1.5 flex-wrap pt-1.5 border-t border-ink-100 dark:border-white/5">
+                                        <span class="text-[9px] font-semibold text-ink-400 uppercase tracking-wider hidden sm:inline">Kemasan:</span>
+                                        @foreach($satuanList as $sk)
+                                            @php
+                                                $fKonv = max(0.0001, (float) $sk->faktor_konversi);
+                                                $hargaSk = $sk->harga_jual > 0 ? (float) $sk->harga_jual : round($baseHarga * $fKonv, 2);
+                                            @endphp
+                                            <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 text-ink-600 dark:text-ink-300 tabular-nums">
+                                                1 {{ strtoupper($sk->satuan_kode) }} ({{ $fKonv + 0 }} {{ $satuanDasar }}) → Rp {{ number_format($hargaSk, 0, ',', '.') }}
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
                         @empty
                             <div class="py-12 text-center text-ink-400 text-xs">
@@ -1131,6 +1118,9 @@
                             :options="$posKategoriFilterOptions"
                             placeholder="Semua Kategori"
                             searchPlaceholder="Cari kategori..."
+                            :sortable="true"
+                            sort-mode="urutan"
+                            sort-property=""
                         />
                     </div>
                 @endif
@@ -1145,16 +1135,13 @@
                     </div>
                 @endif
                 @if($visibleFilters['kualitas'])
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterKualitasId" class="px-2.5 py-1.5 {{ $filterKualitasId ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Kualitas</option>
-                            @foreach($kualitasList as $k)
-                                <option value="{{ $k->id }}">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
-                            @endforeach
-                        </select>
-                        @if($filterKualitasId)
-                            <button type="button" wire:click="$set('filterKualitasId', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kualitas">✕</button>
-                        @endif
+                    <div class="min-w-[150px] sm:w-40">
+                        <x-prism.searchable-select
+                            model="filterKualitasId"
+                            :options="collect($kualitasList)->map(fn($k) => ['value' => $k->id, 'label' => $k->nama . ($k->brand_id ? ' (' . $k->brand?->nama . ')' : '')])"
+                            placeholder="Semua Kualitas"
+                            searchPlaceholder="Cari kualitas..."
+                        />
                     </div>
                 @endif
                 @if($visibleFilters['brand_kompatibel'])
@@ -1178,55 +1165,43 @@
                     </div>
                 @endif
                 @if($visibleFilters['kondisi'])
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterKondisi" class="px-2.5 py-1.5 {{ $filterKondisi ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Kondisi</option>
-                            @foreach($kondisiList as $kd)
-                                <option value="{{ is_array($kd) ? $kd['kode'] : $kd }}">{{ is_array($kd) ? $kd['nama'] : ucfirst($kd) }}</option>
-                            @endforeach
-                        </select>
-                        @if($filterKondisi)
-                            <button type="button" wire:click="$set('filterKondisi', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kondisi">✕</button>
-                        @endif
+                    <div class="min-w-[140px] sm:w-40">
+                        <x-prism.searchable-select
+                            model="filterKondisi"
+                            :options="collect($kondisiList)->map(fn($kd) => ['value' => is_array($kd) ? $kd['kode'] : $kd, 'label' => is_array($kd) ? $kd['nama'] : ucfirst($kd)])"
+                            placeholder="Semua Kondisi"
+                            searchPlaceholder="Cari kondisi..."
+                        />
                     </div>
                 @endif
                 @if($visibleFilters['satuan'])
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterSatuan" class="px-2.5 py-1.5 {{ $filterSatuan ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Satuan</option>
-                            @foreach($satuanList as $su)
-                                <option value="{{ is_object($su) ? $su->kode : $su }}">{{ is_object($su) ? ($su->nama . ' (' . $su->kode . ')') : strtoupper($su) }}</option>
-                            @endforeach
-                        </select>
-                        @if($filterSatuan)
-                            <button type="button" wire:click="$set('filterSatuan', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Satuan">✕</button>
-                        @endif
+                    <div class="min-w-[140px] sm:w-40">
+                        <x-prism.searchable-select
+                            model="filterSatuan"
+                            :options="collect($satuanList)->map(fn($su) => ['value' => is_object($su) ? $su->kode : $su, 'label' => is_object($su) ? ($su->nama . ' (' . $su->kode . ')') : strtoupper($su)])"
+                            placeholder="Semua Satuan"
+                            searchPlaceholder="Cari satuan..."
+                        />
                     </div>
                 @endif
                 @if($visibleFilters['abc_class'])
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterAbcClass" class="px-2.5 py-1.5 {{ $filterAbcClass ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
-                            <option value="">Semua Kelas ABC</option>
-                            <option value="A">Kelas A (Fast Moving)</option>
-                            <option value="B">Kelas B (Medium Moving)</option>
-                            <option value="C">Kelas C (Slow Moving)</option>
-                        </select>
-                        @if($filterAbcClass)
-                            <button type="button" wire:click="$set('filterAbcClass', null)" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kelas ABC">✕</button>
-                        @endif
+                    <div class="min-w-[160px] sm:w-44">
+                        <x-prism.searchable-select
+                            model="filterAbcClass"
+                            :options="[['value' => 'A', 'label' => 'Kelas A (Fast Moving)'], ['value' => 'B', 'label' => 'Kelas B (Medium Moving)'], ['value' => 'C', 'label' => 'Kelas C (Slow Moving)']]"
+                            placeholder="Semua Kelas ABC"
+                            searchPlaceholder="Cari kelas..."
+                        />
                     </div>
                 @endif
                 @if($visibleFilters['stok'])
-                    <div class="relative inline-flex items-center">
-                        <select wire:model.live="filterStokStatus" class="px-2.5 py-1.5 {{ $filterStokStatus !== 'semua' ? 'pr-7' : '' }} rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]" title="Ketersediaan Stok">
-                            <option value="semua">Semua Stok</option>
-                            <option value="ready">Ready Stok (> 0)</option>
-                            <option value="menipis">Stok Menipis (≤ Min)</option>
-                            <option value="habis">Stok Habis (0)</option>
-                        </select>
-                        @if($filterStokStatus !== 'semua')
-                            <button type="button" wire:click="$set('filterStokStatus', 'semua')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Stok">✕</button>
-                        @endif
+                    <div class="min-w-[160px] sm:w-44">
+                        <x-prism.searchable-select
+                            model="filterStokStatus"
+                            :options="[['value' => 'semua', 'label' => 'Semua Stok'], ['value' => 'ready', 'label' => 'Ready Stok (> 0)'], ['value' => 'menipis', 'label' => 'Stok Menipis (≤ Min)'], ['value' => 'habis', 'label' => 'Stok Habis (0)']]"
+                            placeholder="Semua Stok"
+                            searchPlaceholder="Cari stok..."
+                        />
                     </div>
                 @endif
             </div>
@@ -2273,6 +2248,9 @@
                             :options="$posKategoriFilterOptions"
                             placeholder="Semua Kategori"
                             searchPlaceholder="Cari kategori..."
+                            :sortable="true"
+                            sort-mode="urutan"
+                            sort-property=""
                         />
                     </div>
                 </div>
@@ -2572,4 +2550,5 @@
     </div>
 
     @include('modules.pos.livewire.modals.offline-actions-modal')
+</div>
 </div>
