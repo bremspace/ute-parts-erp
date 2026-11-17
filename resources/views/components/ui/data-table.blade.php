@@ -36,7 +36,7 @@
     <div class="{{ isset($mobile) ? 'hidden md:block' : 'block' }} w-full overflow-x-auto overflow-y-visible">
         <table class="w-full text-left text-xs sm:text-sm border-collapse min-w-full">
             @if(!empty($headers))
-                <thead class="{{ $stickyHeader ? 'sticky top-0 z-10' : '' }} bg-ink-50/90 dark:bg-ink-950/90 backdrop-blur-xs text-ink-600 dark:text-ink-400 font-semibold border-b border-ink-200/80 dark:border-white/[0.08] select-none text-[11px] uppercase tracking-wider">
+                <thead class="{{ $stickyHeader ? 'sticky top-0 z-10' : '' }} bg-ink-50 dark:bg-ink-950 text-ink-600 dark:text-ink-400 font-semibold border-b border-ink-200/80 dark:border-white/[0.08] select-none text-[11px] uppercase tracking-wider">
                     <tr>
                         @foreach($headers as $h)
                             @php

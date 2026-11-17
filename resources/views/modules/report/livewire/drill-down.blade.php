@@ -97,7 +97,7 @@
 
     <!-- [ISO 9001 Clause 7.5 / ISO 27001] ISO Controlled Document Header & Letterhead -->
     @if(!empty($isoMetadata))
-        <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-md shadow-sm">
+        <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 shadow-sm">
             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-3 border-b border-white/10">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-up-primary/20 border border-up-primary/40 flex items-center justify-center text-up-primary font-black text-sm">

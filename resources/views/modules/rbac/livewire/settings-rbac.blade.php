@@ -5605,7 +5605,7 @@
                 <div class="space-y-3.5">
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Label Kondisi *</label>
-                        <input type="text" wire:model.live="kondisiForm.nama" placeholder="cth: Baru, OEM, Copotan Original, Rusak Kanibal..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        <input type="text" wire:model="kondisiForm.nama" placeholder="cth: Baru, OEM, Copotan Original, Rusak Kanibal..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                         @error('kondisiForm.nama') <span class="text-up-red text-[10px] mt-1">{{ $message }}</span> @enderror
                     </div>
 
@@ -6055,7 +6055,7 @@
                         <!-- Preview Table -->
                         <div class="rounded-2xl border border-white/10 overflow-hidden max-h-60 overflow-y-auto">
                             <table class="w-full text-left text-xs text-ink-200 whitespace-nowrap">
-                                <thead class="text-ink-400 bg-white/5 uppercase text-[10px] sticky top-0 backdrop-blur-sm">
+                                <thead class="text-ink-400 bg-ink-950 uppercase text-[10px] sticky top-0 border-b border-white/10">
                                     <tr>
                                         <th class="py-2 px-3">Status</th>
                                         <th class="py-2 px-3">Nama / Kode</th>

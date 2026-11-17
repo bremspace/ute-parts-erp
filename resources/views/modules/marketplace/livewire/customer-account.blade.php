@@ -1,4 +1,4 @@
-<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8" wire:poll.8s>
+<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8" wire:poll.30s>
     {{-- [T-05] Factory alur pembayaran Duitku (PAY-01). Definisi di window supaya
          selalu tersedia walau tab Orders belum pernah dirender (morph Livewire
          tidak mengevaluasi ulang <script nonce="{{ request()->attributes->get('csp_nonce') }}"> biasa). Semua fetch pakai

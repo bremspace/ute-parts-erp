@@ -1758,7 +1758,7 @@
 
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jumlah Bayar (Rp) *</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model.live="bayarUtangJumlah" step="500" min="1" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live.debounce.300ms="bayarUtangJumlah" step="500" min="1" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
                         </div>
 
                         <div class="flex gap-2 flex-wrap">
@@ -1806,7 +1806,7 @@
 
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jumlah Diterima (Rp) *</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model.live="bayarPiutangJumlah" step="500" min="1" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live.debounce.300ms="bayarPiutangJumlah" step="500" min="1" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
                         </div>
 
                         <div class="flex gap-2 flex-wrap">
@@ -1904,7 +1904,7 @@
                         <!-- Input Saldo Fisik -->
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Total Uang Fisik Aktual (Rp) *</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model.live="saldoFisikKasInput" {{ $usePecahanMode ? 'readonly' : '' }}
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live.debounce.300ms="saldoFisikKasInput" {{ $usePecahanMode ? 'readonly' : '' }}
                                 class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums text-white {{ $usePecahanMode ? 'bg-white/5 opacity-80' : '' }}" />
                         </div>
 

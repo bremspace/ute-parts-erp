@@ -2385,7 +2385,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                     </svg>
                                 </button>
-                                <input type="text" wire:model.live="produkForm.barcode" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
+                                <input type="text" wire:model.live.debounce.300ms="produkForm.barcode" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
                             </div>
                             @error('produkForm.barcode') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
@@ -2798,7 +2798,7 @@
                                         <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-amber/20 text-up-amber font-bold">Tertinggi PO</span>
                                     @endif
                                 </div>
-                                <input type="text" inputmode="numeric" x-format-number wire:model.live="produkForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live.debounce.300ms="produkForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                                 <p class="text-[9px] text-ink-500 mt-1">
                                     @if(($produkForm['metode_harga_beli'] ?? 'manual') === 'average')
                                         Diperbarui otomatis saat terima PO (rata-rata tertimbang).
@@ -2832,7 +2832,7 @@
                                         <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-primary/20 text-up-primary font-bold">Otomatis %</span>
                                     @endif
                                 </div>
-                                <input type="text" inputmode="numeric" x-format-number wire:model.live="produkForm.harga_jual_retail" wire:change="produkHargaJualBerubah" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live.debounce.300ms="produkForm.harga_jual_retail" wire:change="produkHargaJualBerubah" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                                 <p class="text-[9px] text-ink-500 mt-1">Harga jual ke konsumen akhir (retail)</p>
 
                                 <!-- [MARGIN GUARD INDICATOR] -->
@@ -3443,7 +3443,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                     </svg>
                                 </button>
-                                <input type="text" wire:model.live="editProdukForm.barcode" wire:keydown.enter.prevent="" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
+                                <input type="text" wire:model.live.debounce.300ms="editProdukForm.barcode" wire:keydown.enter.prevent="" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
                             </div>
                             @error('editProdukForm.barcode') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
@@ -3860,7 +3860,7 @@
                                         <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-amber/20 text-up-amber font-bold">Tertinggi PO</span>
                                     @endif
                                 </div>
-                                <input type="text" inputmode="numeric" x-format-number wire:model.live="editProdukForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live.debounce.300ms="editProdukForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                                 @error('editProdukForm.harga_beli') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                                 <p class="text-[9px] text-ink-500 mt-1">
                                     @if(($editProdukForm['metode_harga_beli'] ?? 'manual') === 'average')
@@ -3895,7 +3895,7 @@
                                         <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-primary/20 text-up-primary font-bold">Otomatis %</span>
                                     @endif
                                 </div>
-                                <input type="text" inputmode="numeric" x-format-number wire:model.live="editProdukForm.harga_jual_retail" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live.debounce.300ms="editProdukForm.harga_jual_retail" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                                 @error('editProdukForm.harga_jual_retail') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                                 <p class="text-[9px] text-ink-500 mt-1">Harga jual ke konsumen akhir (retail)</p>
 
