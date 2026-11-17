@@ -83,7 +83,20 @@ if "%PHP_BIN%"=="" (
 echo [OK] PHP: %PHP_BIN%
 
 :: -----------------------------------------------------------------------------
-:: 2. Persiapan Direktori Storage, Database & Cache
+:: 2. Pengecekan Status Instalasi Sistem (Auto-Install jika Fresh PC)
+:: -----------------------------------------------------------------------------
+if not exist "%~dp0storage\installed.lock" (
+    if not exist "%~dp0.env" (
+        echo [INFO] Sistem belum terkonfigurasi di komputer ini.
+        echo [INFO] Menjalankan installer otomatis (install.bat)...
+        echo.
+        call "%~dp0install.bat"
+        exit /b %ERRORLEVEL%
+    )
+)
+
+:: -----------------------------------------------------------------------------
+:: 3. Persiapan Direktori Storage, Database & Cache
 :: -----------------------------------------------------------------------------
 if not exist "storage\framework\cache\data" mkdir "storage\framework\cache\data" 2>nul
 if not exist "storage\framework\sessions" mkdir "storage\framework\sessions" 2>nul
@@ -192,14 +205,9 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address" /c:"Al
 )
 
 :: -----------------------------------------------------------------------------
-:: 9. Tentukan Rute Tujuan (Default: /app/login jika terpasang, /install.php jika belum)
+:: 10. Tentukan Rute Tujuan (Default: /app/login)
 :: -----------------------------------------------------------------------------
 set "TARGET_PATH=/app/login"
-if not exist "%~dp0storage\installed.lock" (
-    if not exist "%~dp0.env" (
-        set "TARGET_PATH=/install.php"
-    )
-)
 
 set "LOCAL_URL=http://localhost:%PORT%!TARGET_PATH!"
 set "NETWORK_URL="

@@ -29,7 +29,7 @@ if errorlevel 1 (
 if exist "%~dp0scripts\install-docker.ps1" (
     "%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install-docker.ps1" %*
 ) else (
-    "%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install.ps1" %*
+    "%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\unas-setup.ps1" %*
 )
 
 set "EXIT_CODE=%ERRORLEVEL%"

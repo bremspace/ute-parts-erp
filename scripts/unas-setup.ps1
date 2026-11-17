@@ -703,10 +703,34 @@ if ($serverProc) {
 }
 
 # Jalankan Background Queue Worker
-$queueProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "queue:work", "--sleep=3", "--tries=3" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueLog -PassThru
+$queueProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "queue:work", "--queue=sync,default", "--sleep=3", "--tries=3" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueLog -PassThru
 if ($queueProc) {
     Set-Content -Path (Join-Path $projectRoot 'storage\framework\queue.pid') -Value $queueProc.Id -Encoding ASCII
 }
+
+# Jalankan Background Scheduler (Cron Runner)
+$schedLog = Join-Path $projectRoot 'storage\logs\scheduler.log'
+$schedProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "schedule:work" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $schedLog -RedirectStandardError $schedLog -PassThru -ErrorAction SilentlyContinue
+
+# Buat Shortcut Desktop Otomatis
+try {
+    $ws = New-Object -ComObject WScript.Shell
+    $desktop = [System.Environment]::GetFolderPath('Desktop')
+    $shortcut = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP POS.lnk'))
+    $shortcut.TargetPath = Join-Path $projectRoot 'start_app.bat'
+    $shortcut.WorkingDirectory = $projectRoot
+    $ico = Join-Path $projectRoot 'public\favicon.ico'
+    if (Test-Path $ico) { $shortcut.IconLocation = $ico }
+    $shortcut.Description = 'Bremspace ERP & POS System'
+    $shortcut.Save()
+
+    $shortcutStop = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP Stop.lnk'))
+    $shortcutStop.TargetPath = Join-Path $projectRoot 'stop-server.bat'
+    $shortcutStop.WorkingDirectory = $projectRoot
+    $shortcutStop.Description = 'Bremspace ERP & POS - Hentikan Server'
+    $shortcutStop.Save()
+    Write-Host " [OK] Shortcut Desktop berhasil dibuat di layar desktop Anda." -ForegroundColor Green
+} catch {}
 
 # Buka browser default langsung ke Backoffice Login
 $localLoginUrl = "http://localhost:$port/app/login"
