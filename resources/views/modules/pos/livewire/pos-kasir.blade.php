@@ -449,11 +449,11 @@
                                 <div class="flex items-start justify-between gap-2">
                                     <div class="min-w-0 flex items-start gap-2 flex-1">
                                         <!-- Thumbnail with fallback icon -->
-                                        <div class="w-9 h-9 rounded-lg bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                        <div class="w-8 h-8 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
                                             @if($prod->thumbnail_url ?: $prod->gambar)
                                                 <img src="{{ $prod->thumbnail_url ?: $prod->gambar }}" alt="{{ $prod->nama }}" class="w-full h-full object-cover rounded-xl" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
                                                 <div class="hidden w-full h-full items-center justify-center text-ink-400 dark:text-ink-500">
-                                                    <svg class="w-5 h-5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg class="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                                     </svg>
                                                 </div>
@@ -502,7 +502,7 @@
                                                 </span>
                                             </div>
 
-                                            <h4 class="font-bold text-xs sm:text-sm text-ink-900 dark:text-white leading-snug break-words">
+                                            <h4 class="font-bold text-xs text-ink-900 dark:text-white leading-snug break-words">
                                                 {{ $prod->nama }}
                                             </h4>
 
@@ -584,7 +584,7 @@
 
                                 <!-- Pilihan Kemasan (kompak) -->
                                 @if($satuanList->isNotEmpty())
-                                    <div class="flex items-center gap-1.5 flex-wrap pt-1.5 border-t border-ink-100 dark:border-white/5">
+                                    <div class="flex items-center gap-1 flex-wrap pt-1 border-t border-ink-100 dark:border-white/5">
                                         <span class="text-[9px] font-semibold text-ink-400 uppercase tracking-wider hidden sm:inline">Kemasan:</span>
                                         @foreach($satuanList as $sk)
                                             @php
@@ -601,7 +601,7 @@
                         @empty
                             <div class="py-12 text-center text-ink-400 text-xs">
                                 <div class="w-10 h-10 rounded-2xl bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 mx-auto mb-2 flex items-center justify-center text-ink-400">
-                                    <svg class="w-5 h-5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                     </svg>
                                 </div>
