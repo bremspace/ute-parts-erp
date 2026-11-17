@@ -56,6 +56,8 @@ class ProdukTab extends Component
 
     public ?int $filterKategoriId = null;
 
+    public string $filterKategoriSort = 'urutan'; // 'urutan' | 'nama'
+
     public ?int $filterBrandId = null;
 
     public ?int $filterKualitasId = null;

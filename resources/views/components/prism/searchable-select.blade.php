@@ -6,6 +6,9 @@
     'clearable' => true,
     'class' => '',
     'defaultCollapsed' => null, // null (auto), true, false
+    'sortable' => false, // tampilkan toggle urutkan di dalam dropdown
+    'sortMode' => 'urutan', // 'urutan' | 'nama'
+    'sortProperty' => '', // nama property Livewire yang di-toggle
 ])
 
 @php
@@ -141,6 +144,7 @@
         alignRight: false,
         search: '',
         options: @js($normalizedOptions),
+        originalOptions: @js($normalizedOptions),
         selected: $wire.entangle('{{ $model }}').live,
         clearable: @js($clearable),
         defaultCollapsedProp: @js($defaultCollapsed),
@@ -148,11 +152,16 @@
         collapsedGroups: {},
         hasHierarchy: false,
         hasGroups: false,
+        sortMode: @js($sortable ? $sortMode : ''),
+        sortable: @js($sortable),
 
         init() {
             this.hasHierarchy = this.options.some(o => o.level > 0 || o.is_parent);
             this.hasGroups = this.options.some(o => !!o.group);
             this.initCollapseState();
+
+            // Sync sort mode from server prop
+            this.sortMode = @js($sortMode);
 
             this.$watch('open', value => {
                 if (value) {
@@ -190,6 +199,61 @@
             this.collapsedGroups = cg;
             this.collapsedParents = cp;
             this.ensureSelectionExpanded();
+        },
+
+        toggleSort() {
+            if (!this.sortable) return;
+            this.sortMode = this.sortMode === 'urutan' ? 'nama' : 'urutan';
+            if (this.sortMode === 'nama') {
+                // Sort hierarkis: sort root, lalu anak, lalu cucu (masing-masing per kelompok parent)
+                // sehingga struktur induk-anak tetap terjaga
+                const cmp = (a, b) => {
+                    const la = (a.label || a.display_label || '').toString();
+                    const lb = (b.label || b.display_label || '').toString();
+                    return la.localeCompare(lb, undefined, { numeric: true, sensitivity: 'base' });
+                };
+                // Kelompokkan berdasarkan ancestors (parent chain)
+                const byParent = new Map();
+                for (const opt of this.options) {
+                    const key = (opt.ancestors && opt.ancestors.length > 0)
+                        ? opt.ancestors[opt.ancestors.length - 1]
+                        : '__root__';
+                    if (!byParent.has(key)) byParent.set(key, []);
+                    byParent.get(key).push(opt);
+                }
+                // Sort setiap kelompok, lalu gabungkan sesuai urutan root
+                const sortedRoots = [...byParent.get('__root__') || []].sort(cmp);
+                const result = [];
+                for (const root of sortedRoots) {
+                    result.push(root);
+                    // children of this root
+                    const children = (byParent.get(root.value) || []).sort(cmp);
+                    for (const child of children) {
+                        result.push(child);
+                        // grandchildren of this child
+                        const grandchildren = (byParent.get(child.value) || []).sort(cmp);
+                        for (const gc of grandchildren) {
+                            result.push(gc);
+                        }
+                    }
+                }
+                // Orphans (jika ada) di akhir
+                for (const [key, opts] of byParent) {
+                    if (key === '__root__') continue;
+                    if (!sortedRoots.some(r => r.value === key) && !result.some(r => r.value === key)) {
+                        result.push(...opts.sort(cmp));
+                    }
+                }
+                this.options = result;
+            } else {
+                // Restore original order (urutan)
+                this.options = [...this.originalOptions];
+            }
+            this.initCollapseState();
+            // Sync sort mode ke server di background (tanpa menutup dropdown)
+            if (this.sortProperty && typeof $wire !== 'undefined') {
+                try { $wire.set(this.sortProperty, this.sortMode); } catch (e) { /* ignore */ }
+            }
         },
 
         ensureSelectionExpanded() {
@@ -438,6 +502,17 @@
         >
             <span class="font-medium" x-text="summaryText"></span>
             <div class="flex items-center gap-2 font-semibold">
+                @if($sortable)
+                    <button
+                        type="button"
+                        @click="toggleSort()"
+                        class="hover:text-up-primary text-ink-600 dark:text-ink-300 transition-colors cursor-pointer px-1.5 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5"
+                        :title="sortMode === 'urutan' ? 'No. Urut (klik untuk A-Z)' : 'Nama A-Z (klik untuk No. Urut)'"
+                    >
+                        <span x-text="sortMode === 'urutan' ? '# Urut' : 'A-Z'"></span>
+                    </button>
+                    <span class="text-ink-300 dark:text-ink-600">·</span>
+                @endif
                 <button
                     type="button"
                     @click="expandAll()"
@@ -500,30 +575,6 @@
                                 ]"
                             >
                                 <div class="flex items-start gap-1.5 flex-1 min-w-0 mr-2 py-0.5">
-                                    <template x-if="opt.level === 1">
-                                        <span class="text-ink-400/80 select-none text-[11px] shrink-0 mt-0.5">↳</span>
-                                    </template>
-                                    <template x-if="opt.level >= 2">
-                                        <span class="text-ink-400/80 select-none text-[11px] shrink-0 mt-0.5">↳↳</span>
-                                    </template>
-                                    <template x-if="opt.is_parent && opt.children_count > 0">
-                                        <button
-                                            type="button"
-                                            @click.stop="toggleParent(opt.value)"
-                                            class="p-0.5 -my-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-ink-400 hover:text-ink-900 dark:hover:text-white transition-transform cursor-pointer shrink-0 flex items-center justify-center"
-                                            :title="isParentCollapsed(opt.value) ? 'Buka sub-kategori' : 'Tutup sub-kategori'"
-                                        >
-                                            <svg
-                                                class="w-3.5 h-3.5 transition-transform duration-150"
-                                                :class="{ '-rotate-90 text-ink-400': isParentCollapsed(opt.value), 'rotate-0 text-up-primary': !isParentCollapsed(opt.value) }"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        </button>
-                                    </template>
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center gap-1.5">
                                             <span
@@ -531,6 +582,30 @@
                                                 x-text="opt.label"
                                                 :title="opt.display_label || opt.label"
                                             ></span>
+                                            <template x-if="opt.is_parent && opt.children_count > 0">
+                                                <button
+                                                    type="button"
+                                                    @click.stop="toggleParent(opt.value)"
+                                                    class="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-ink-400 hover:text-ink-900 dark:hover:text-white transition-transform cursor-pointer shrink-0 flex items-center justify-center"
+                                                    :title="isParentCollapsed(opt.value) ? 'Buka sub-kategori' : 'Tutup sub-kategori'"
+                                                >
+                                                    <svg
+                                                        class="w-3.5 h-3.5 transition-transform duration-150"
+                                                        :class="{ '-rotate-90 text-ink-400': isParentCollapsed(opt.value), 'rotate-0 text-up-primary': !isParentCollapsed(opt.value) }"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </template>
+                                            <template x-if="opt.level === 1">
+                                                <span class="text-ink-400/80 select-none text-[11px] shrink-0 ml-1">&rsaquo;</span>
+                                            </template>
+                                            <template x-if="opt.level >= 2">
+                                                <span class="text-ink-400/80 select-none text-[11px] shrink-0 ml-1">&rsaquo;&rsaquo;</span>
+                                            </template>
                                             <span
                                                 x-show="opt.children_count > 0"
                                                 class="text-[9px] font-mono text-ink-400/80 shrink-0 px-1 py-0.2 rounded bg-black/5 dark:bg-white/5"
