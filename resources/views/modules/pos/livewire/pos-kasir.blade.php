@@ -421,7 +421,7 @@
                     </div>
 
                     <div
-                        class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1 min-h-0"
+                        class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-1.5 sm:p-2 space-y-1 overscroll-contain flex-1 min-h-0"
                         @scroll.passive="if ($wire.adaLebihBanyak && !window._posLoadingMore && ($el.scrollHeight - $el.scrollTop - $el.clientHeight < 350)) { window._posLoadingMore = true; $wire.call('muatLebihBanyak').finally(() => { window._posLoadingMore = false; }); }"
                     >
                         @forelse($products as $prod)
@@ -444,12 +444,12 @@
                                     aria-disabled="true"
                                     title="{{ $alasanTidakBisaDipilih }}"
                                 @endif
-                                class="p-3 sm:p-3 rounded-2xl border border-transparent transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] flex flex-col gap-2 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
+                                class="p-2 sm:p-2.5 rounded-xl border border-transparent transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] flex flex-col gap-1.5 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
                             >
                                 <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0 flex items-start gap-2.5 sm:gap-3 flex-1">
+                                    <div class="min-w-0 flex items-start gap-2 sm:gap-2.5 flex-1">
                                         <!-- Thumbnail with fallback icon -->
-                                        <div class="w-12 h-12 rounded-xl bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                        <div class="w-10 h-10 rounded-lg bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
                                             @if($prod->thumbnail_url ?: $prod->gambar)
                                                 <img src="{{ $prod->thumbnail_url ?: $prod->gambar }}" alt="{{ $prod->nama }}" class="w-full h-full object-cover rounded-xl" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
                                                 <div class="hidden w-full h-full items-center justify-center text-ink-400 dark:text-ink-500">
@@ -466,7 +466,7 @@
 
                                         <!-- Title, SKU, Chips & Apple-grade compatibility badge -->
                                         <div class="min-w-0 flex-1">
-                                            <div class="flex items-center gap-1.5 flex-wrap mb-1">
+                                            <div class="flex items-center gap-1 flex-wrap mb-0.5">
                                                 <span class="font-mono text-[10px] sm:text-[11px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
                                                     {{ $prod->sku }}
                                                 </span>
@@ -511,7 +511,7 @@
                                                 </span>
                                             </div>
 
-                                            <h4 class="font-bold text-xs sm:text-sm md:text-base text-ink-900 dark:text-white leading-snug break-words">
+                                            <h4 class="font-bold text-xs sm:text-sm text-ink-900 dark:text-white leading-snug break-words">
                                                 {{ $prod->nama }}
                                             </h4>
 
@@ -1629,7 +1629,7 @@
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', -1)"
-                                    class="w-8 h-8 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    class="w-9 h-9 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Kurangi"
                                 >-</button>
                                 <input
@@ -1644,7 +1644,7 @@
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', 1)"
-                                    class="w-8 h-8 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    class="w-9 h-9 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Tambah"
                                 >+</button>
                             </div>
