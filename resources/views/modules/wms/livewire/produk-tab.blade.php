@@ -186,7 +186,6 @@
                                     searchPlaceholder="Cari kualitas..."
                                 />
                             </div>
-                            </div>
                         @endif
 
                         @if(($visibleFilters['brand_kompatibel'] ?? false) || ($visibleFilters['merk_hp'] ?? false))
@@ -219,9 +218,6 @@
                                     placeholder="Semua Kondisi"
                                     searchPlaceholder="Cari kondisi..."
                                 />
-                                </select>
-                                @if($filterKondisi)
-                                @endif
                             </div>
                         @endif
 
@@ -233,9 +229,6 @@
                                     placeholder="Semua Satuan"
                                     searchPlaceholder="Cari satuan..."
                                 />
-                                </select>
-                                @if($filterSatuan)
-                                @endif
                             </div>
                         @endif
 
@@ -247,9 +240,6 @@
                                     placeholder="Kelas ABC"
                                     searchPlaceholder="Cari kelas..."
                                 />
-                                @if($filterAbcClass)
-                                    <button type="button" wire:click="$set('filterAbcClass', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kelas ABC">✕</button>
-                                @endif
                             </div>
                         @endif
 
@@ -1391,8 +1381,12 @@
                                             </div>
                                             <div class="space-y-2">
                                                 <select wire:model.live="filterKondisi" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Kondisi</option>
+                                                    @foreach($kondisiList as $kd) <option value="{{ $kd['kode'] }}">{{ $kd['nama'] }}</option> @endforeach
                                                 </select>
                                                 <select wire:model.live="filterSatuan" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Satuan</option>
+                                                    @foreach($satuanUnits as $su) <option value="{{ $su->kode }}">{{ $su->nama ?? $su->kode }}</option> @endforeach
                                                 </select>
                                             </div>
                                             <div class="pt-2 border-t border-white/10 flex justify-between">
