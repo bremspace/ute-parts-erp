@@ -1087,13 +1087,19 @@ function thermalPrinter(config = {}) {
         const esc = new window.EscPos(paperWidth);
         const bytes = esc.buildReceipt(payload, paperWidth);
 
-        // 1. CUPS raw printing if configured
+        // 1. CUPS raw printing if configured (hanya tersedia di Linux/macOS)
         if (savedCupsPrinter) {
-          await this.printViaCups(savedCupsPrinter, bytes);
-          this.showToast(`Struk dikirim ke printer CUPS: ${savedCupsPrinter}`);
+          try {
+            await this.printViaCups(savedCupsPrinter, bytes);
+            this.showToast(`Struk dikirim ke printer CUPS: ${savedCupsPrinter}`);
+            return;
+          } catch (cupsErr) {
+            console.warn('CUPS print gagal, fallback ke Bluetooth/Browser:', cupsErr);
+            // Fall through to Bluetooth or browser print
+          }
         }
         // 2. Web Bluetooth direct print
-        else if (this.printer.device || localStorage.getItem('thermal_printer_device')) {
+        if (this.printer.device || localStorage.getItem('thermal_printer_device')) {
           await this.printer.print(bytes);
           this.showToast('Struk berhasil dicetak via Bluetooth');
         }
@@ -1103,8 +1109,8 @@ function thermalPrinter(config = {}) {
         }
       } catch (e) {
         console.error('Print failed:', e);
-        // Fallback to browser print on BLE error if user desires
-        if (confirm('Gagal cetak via Bluetooth (' + e.message + '). Buka cetak browser?')) {
+        // Fallback to browser print
+        if (confirm('Gagal cetak (' + e.message + '). Buka cetak browser?')) {
           this.printViaBrowser(paperSize);
         }
       } finally {

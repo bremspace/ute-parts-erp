@@ -677,6 +677,11 @@ class PosController extends Controller
         $printer = $validated['printer'];
         $bytes = $validated['data'];
 
+        // CUPS (lp) hanya tersedia di Linux/macOS. Di Windows, kembalikan error jelas.
+        if (stripos(PHP_OS, 'WIN') === 0) {
+            return $this->error('CUPS tidak tersedia di Windows. Gunakan Web Bluetooth atau Browser Print.', 500);
+        }
+
         // Write to temporary file and send to CUPS
         $tmpFile = storage_path('app/tmp/print-'.uniqid().'.bin');
         @mkdir(dirname($tmpFile), 0755, true);
@@ -689,7 +694,11 @@ class PosController extends Controller
         @unlink($tmpFile);
 
         if ($exitCode !== 0) {
-            return $this->error('CUPS print gagal: '.implode("\n", $output), 500);
+            $errMsg = implode("\n", $output);
+            if (stripos($errMsg, 'not found') !== false || stripos($errMsg, 'command not found') !== false) {
+                return $this->error('Perintah CUPS (lp) tidak ditemukan. Pastikan CUPS terinstall dan berjalan.', 500);
+            }
+            return $this->error('CUPS print gagal: '.$errMsg, 500);
         }
 
         return $this->success(['job_id' => $output[0] ?? 'unknown'], 'Struk dikirim ke printer');
