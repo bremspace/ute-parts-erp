@@ -53,8 +53,11 @@ for /l %%P in (1741,1,1760) do (
     )
 )
 
-rem 3. Hentikan queue worker atau built-in server PHP aplikasi
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" 2>$null | Where-Object { $_.CommandLine -like '*queue:work*' -or $_.CommandLine -like '*-S 0.0.0.0:174*' -or $_.CommandLine -like '*-S 0.0.0.0:175*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Host ('[OK] Menghentikan background PHP worker PID: ' + $_.ProcessId) }" 2>nul
+rem 3. Hentikan queue worker, scheduler, atau built-in server PHP aplikasi
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" 2>$null | Where-Object { $_.CommandLine -like '*queue:work*' -or $_.CommandLine -like '*schedule:work*' -or $_.CommandLine -like '*-S 0.0.0.0:174*' -or $_.CommandLine -like '*-S 0.0.0.0:175*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Host ('[OK] Menghentikan background PHP worker PID: ' + $_.ProcessId) }" 2>nul
+
+rem 4. Hentikan MySQL/MariaDB portable jika berjalan dari folder tools
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process -Filter \"Name='mysqld.exe'\" 2>$null | Where-Object { $_.CommandLine -like '*tools\mariadb*' -or $_.CommandLine -like '*tools\mysql*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Host ('[OK] Menghentikan portable database server PID: ' + $_.ProcessId) }" 2>nul
 
 if "!STOPPED!"=="1" (
     echo.

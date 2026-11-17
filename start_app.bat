@@ -83,7 +83,20 @@ if "%PHP_BIN%"=="" (
 echo [OK] PHP: %PHP_BIN%
 
 :: -----------------------------------------------------------------------------
-:: 2. Persiapan Direktori Storage, Database & Cache
+:: 2. Pengecekan Status Instalasi Sistem (Auto-Install jika Fresh PC)
+:: -----------------------------------------------------------------------------
+if not exist "%~dp0storage\installed.lock" (
+    if not exist "%~dp0.env" (
+        echo [INFO] Sistem belum terkonfigurasi di komputer ini.
+        echo [INFO] Menjalankan installer otomatis (install.bat)...
+        echo.
+        call "%~dp0install.bat"
+        exit /b %ERRORLEVEL%
+    )
+)
+
+:: -----------------------------------------------------------------------------
+:: 3. Persiapan Direktori Storage, Database & Cache
 :: -----------------------------------------------------------------------------
 if not exist "storage\framework\cache\data" mkdir "storage\framework\cache\data" 2>nul
 if not exist "storage\framework\sessions" mkdir "storage\framework\sessions" 2>nul
@@ -108,6 +121,12 @@ if errorlevel 1 (
     net start MySQL >nul 2>nul
     net start MySQL80 >nul 2>nul
     net start MariaDB >nul 2>nul
+    if exist "%~dp0tools\mariadb\bin\mysqld.exe" (
+        start "" /b "%~dp0tools\mariadb\bin\mysqld.exe" --defaults-file="%~dp0tools\mariadb\my.ini" --standalone >nul 2>nul
+    )
+    if exist "%~dp0tools\mysql\bin\mysqld.exe" (
+        start "" /b "%~dp0tools\mysql\bin\mysqld.exe" --defaults-file="%~dp0tools\mysql\my.ini" --standalone >nul 2>nul
+    )
     for %%P in ("C:\laragon\bin\mysql" "D:\laragon\bin\mysql" "E:\laragon\bin\mysql") do (
         if exist "%%~P" (
             for /d %%D in ("%%~P\*") do (
@@ -147,17 +166,37 @@ if "%SERVER_ALREADY_RUNNING%"=="0" (
 )
 
 :: -----------------------------------------------------------------------------
-:: 7. Nyalakan Background Queue Worker
+:: 7. Nyalakan Background Queue Worker, Scheduler & Jalankan Sinkronisasi Awal
 :: -----------------------------------------------------------------------------
-tasklist | findstr /i "php.exe" | findstr /i "artisan" >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*queue:work*' })) { exit 1 }" >nul 2>nul
 if errorlevel 1 (
     if exist "%~dp0.env" (
         echo [INFO] Menyalakan Background Queue Worker...
-        wscript.exe "%~dp0scripts\run-command-background.vbs" "\"%PHP_BIN%\" \"%~dp0artisan\" queue:work --sleep=3 --tries=3"
+        wscript.exe "%~dp0scripts\run-command-background.vbs" "\"%PHP_BIN%\" \"%~dp0artisan\" queue:work --queue=sync,default --sleep=3 --tries=3"
         echo [OK] Queue Worker aktif di background.
     )
 ) else (
-    echo [OK] Queue Worker siap.
+    echo [OK] Queue Worker sudah aktif.
+)
+
+:: Jalankan background scheduler (cron runner) di Windows
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*schedule:work*' })) { exit 1 }" >nul 2>nul
+if errorlevel 1 (
+    if exist "%~dp0.env" (
+        echo [INFO] Menyalakan Background Scheduler (Schedule Work)...
+        wscript.exe "%~dp0scripts\run-command-background.vbs" "\"%PHP_BIN%\" \"%~dp0artisan\" schedule:work"
+        echo [OK] Background Scheduler aktif.
+    )
+) else (
+    echo [OK] Background Scheduler sudah aktif.
+)
+
+:: Sinkronisasi Awal saat Toko Buka (Tarik pesanan online tadi malam & kirim outbox tertunda)
+if exist "%~dp0.env" (
+    echo [INFO] Memeriksa data baru dari Cloud VPS (Catch-up sync)...
+    "%PHP_BIN%" "%~dp0artisan" sync:pull
+    "%PHP_BIN%" "%~dp0artisan" sync:flush
+    echo [OK] Sinkronisasi awal selesai.
 )
 
 :: -----------------------------------------------------------------------------
@@ -172,14 +211,9 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address" /c:"Al
 )
 
 :: -----------------------------------------------------------------------------
-:: 9. Tentukan Rute Tujuan (Default: /app/login jika terpasang, /install.php jika belum)
+:: 10. Tentukan Rute Tujuan (Default: /app/login)
 :: -----------------------------------------------------------------------------
 set "TARGET_PATH=/app/login"
-if not exist "%~dp0storage\installed.lock" (
-    if not exist "%~dp0.env" (
-        set "TARGET_PATH=/install.php"
-    )
-)
 
 set "LOCAL_URL=http://localhost:%PORT%!TARGET_PATH!"
 set "NETWORK_URL="
@@ -200,7 +234,14 @@ if exist "%~dp0.env" (
 )
 
 :: -----------------------------------------------------------------------------
-:: 10. Buka Browser Otomatis
+:: 10. Buat Shortcut di Desktop jika belum ada
+:: -----------------------------------------------------------------------------
+if not exist "%USERPROFILE%\Desktop\Bremspace ERP POS.lnk" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $desktop = [System.Environment]::GetFolderPath('Desktop'); $s = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP POS.lnk')); $s.TargetPath = '%~dp0start_app.bat'; $s.WorkingDirectory = '%~dp0'; if (Test-Path '%~dp0public\favicon.ico') { $s.IconLocation = '%~dp0public\favicon.ico' }; $s.Description = 'Bremspace ERP & POS System'; $s.Save()" >nul 2>nul
+)
+
+:: -----------------------------------------------------------------------------
+:: 11. Buka Browser Otomatis
 :: -----------------------------------------------------------------------------
 start "" "%LOCAL_URL%"
 

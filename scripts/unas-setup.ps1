@@ -455,6 +455,20 @@ if ($dbChoice -eq "2") {
         }
     }
 
+    # Cek database portable di tools\mariadb atau tools\mysql jika ada
+    if (-not $mysqlListening) {
+        $toolsMysqld = Get-Item -Path "$projectRoot\tools\mariadb\bin\mysqld.exe" -ErrorAction SilentlyContinue
+        if (-not $toolsMysqld) {
+            $toolsMysqld = Get-Item -Path "$projectRoot\tools\mysql\bin\mysqld.exe" -ErrorAction SilentlyContinue
+        }
+        if ($toolsMysqld) {
+            Write-Host " Menjalankan MySQL/MariaDB Portable dari tools di background..." -ForegroundColor Gray
+            Start-Process -FilePath $toolsMysqld.FullName -ArgumentList "--standalone" -WindowStyle Hidden
+            Start-Sleep -Seconds 2
+            $mysqlListening = Test-PortActive 3306
+        }
+    }
+
     # Cek direktori Laragon atau XAMPP jika service belum aktif
     if (-not $mysqlListening) {
         $laragonMysqld = Get-Item -Path "C:\laragon\bin\mysql\*\bin\mysqld.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -473,10 +487,41 @@ if ($dbChoice -eq "2") {
         }
     }
 
+    # Mitigasi jika tidak ada Laragon / XAMPP di PC kosongan
+    if (-not $mysqlListening) {
+        Write-Host " [PERINGATAN] Komputer ini belum memiliki MySQL / MariaDB terpasang." -ForegroundColor Yellow
+        Write-Host " Pilihan Solusi:" -ForegroundColor White
+        Write-Host "   [1] Pasang MariaDB Server resmi otomatis via winget (Windows Package Manager)" -ForegroundColor Green
+        Write-Host "   [2] Gunakan Remote MySQL / Komputer Server Toko Lain di Jaringan LAN / Wi-Fi" -ForegroundColor Cyan
+        Write-Host "   [3] Lewati dan masukkan konfigurasi manual" -ForegroundColor Gray
+        $mysqlFixChoice = Prompt-User "Pilihan Solusi [1/2/3]" "1"
+
+        if ($mysqlFixChoice -eq "1") {
+            $wingetCmd = Get-Command winget.exe -ErrorAction SilentlyContinue
+            if ($wingetCmd) {
+                Write-Host " [AUTO-INSTALL] Mengunduh & memasang MariaDB Server resmi via winget..." -ForegroundColor Cyan
+                try {
+                    & winget install --id MariaDB.Server -e --silent --accept-source-agreements --accept-package-agreements
+                    Start-Sleep -Seconds 4
+                    Start-Service MariaDB -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 2
+                    $mysqlListening = Test-PortActive 3306
+                    if ($mysqlListening) {
+                        Write-Host " [OK] MariaDB Server resmi berhasil dipasang & aktif di port 3306!" -ForegroundColor Green
+                    }
+                } catch {
+                    Write-Host " Gagal memasang otomatis via winget: $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+            } else {
+                Write-Host " [INFO] winget.exe tidak tersedia di sistem Windows ini." -ForegroundColor Yellow
+            }
+        }
+    }
+
     if ($mysqlListening) {
         Write-Host " [OK] Database Server aktif di port 3306." -ForegroundColor Green
     } else {
-        Write-Host " [PERINGATAN] Port 3306 belum terdeteksi aktif. Pastikan XAMPP/Laragon/MariaDB Anda menyala." -ForegroundColor Yellow
+        Write-Host " [INFO] Menggunakan mode konfigurasi koneksi manual / remote." -ForegroundColor Yellow
     }
 
     # 5b. Input Kredensial MySQL
@@ -703,10 +748,34 @@ if ($serverProc) {
 }
 
 # Jalankan Background Queue Worker
-$queueProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "queue:work", "--sleep=3", "--tries=3" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueLog -PassThru
+$queueProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "queue:work", "--queue=sync,default", "--sleep=3", "--tries=3" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueLog -PassThru
 if ($queueProc) {
     Set-Content -Path (Join-Path $projectRoot 'storage\framework\queue.pid') -Value $queueProc.Id -Encoding ASCII
 }
+
+# Jalankan Background Scheduler (Cron Runner)
+$schedLog = Join-Path $projectRoot 'storage\logs\scheduler.log'
+$schedProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "schedule:work" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $schedLog -RedirectStandardError $schedLog -PassThru -ErrorAction SilentlyContinue
+
+# Buat Shortcut Desktop Otomatis
+try {
+    $ws = New-Object -ComObject WScript.Shell
+    $desktop = [System.Environment]::GetFolderPath('Desktop')
+    $shortcut = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP POS.lnk'))
+    $shortcut.TargetPath = Join-Path $projectRoot 'start_app.bat'
+    $shortcut.WorkingDirectory = $projectRoot
+    $ico = Join-Path $projectRoot 'public\favicon.ico'
+    if (Test-Path $ico) { $shortcut.IconLocation = $ico }
+    $shortcut.Description = 'Bremspace ERP & POS System'
+    $shortcut.Save()
+
+    $shortcutStop = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP Stop.lnk'))
+    $shortcutStop.TargetPath = Join-Path $projectRoot 'stop-server.bat'
+    $shortcutStop.WorkingDirectory = $projectRoot
+    $shortcutStop.Description = 'Bremspace ERP & POS - Hentikan Server'
+    $shortcutStop.Save()
+    Write-Host " [OK] Shortcut Desktop berhasil dibuat di layar desktop Anda." -ForegroundColor Green
+} catch {}
 
 # Buka browser default langsung ke Backoffice Login
 $localLoginUrl = "http://localhost:$port/app/login"

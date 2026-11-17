@@ -46,7 +46,8 @@ class SyncPullCommand extends Command
         $endpoint = rtrim($remoteUrl, '/').'/api/internal/sync/pull?limit='.$limit;
 
         $apiSecret = config('sync.api_secret');
-        $signature = hash_hmac('sha256', '', $apiSecret);
+        $timestamp = time();
+        $signature = hash_hmac('sha256', $timestamp.'.', $apiSecret);
 
         $this->info("Menghubungi VPS: {$endpoint} ...");
 
@@ -55,6 +56,7 @@ class SyncPullCommand extends Command
                 ->withHeaders([
                     'X-Sync-Node' => config('sync.node_id'),
                     'X-Sync-Signature' => $signature,
+                    'X-Sync-Timestamp' => (string) $timestamp,
                     'Accept' => 'application/json',
                 ])
                 ->get($endpoint);
@@ -87,10 +89,12 @@ class SyncPullCommand extends Command
             // Kirim ACK ke VPS untuk item yang berhasil diproses agar tidak ditarik ulang
             if (! empty($processedUuids)) {
                 $ackPayload = json_encode(['sync_uuids' => $processedUuids]);
-                $ackSig = hash_hmac('sha256', $ackPayload, $apiSecret);
+                $ackTs = time();
+                $ackSig = hash_hmac('sha256', $ackTs.'.'.$ackPayload, $apiSecret);
                 Http::timeout(10)->withHeaders([
                     'X-Sync-Node' => config('sync.node_id'),
                     'X-Sync-Signature' => $ackSig,
+                    'X-Sync-Timestamp' => (string) $ackTs,
                     'Content-Type' => 'application/json',
                 ])->withBody($ackPayload, 'application/json')->post(rtrim($remoteUrl, '/').'/api/internal/sync/ack');
             }
