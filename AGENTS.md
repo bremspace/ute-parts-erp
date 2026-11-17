@@ -183,17 +183,29 @@ npm run build
   2. **Jika akun adalah `bremspace` (owner)**:
      - Target branch push WAJIB ke branch **`brem`** (`git push origin brem`).
      - Pastikan perubahan disinkronkan ke branch `brem`.
-  3. **Jika akun BUKAN `bremspace`** (misal collaborator `Unas`):
+  3. **Jika akun BUKAN `bremspace` (misal collaborator `Unas` atau akun non-bremspace lainnya)**:
+     - **WAJIB SINKRONISASI SEBELUM COMMIT & PUSH**:
+       Untuk mencegah conflict dan memastikan pembaruan terbaru terserap ke folder kerja, jalankan urutan wajib berikut:
+       ```sh
+       git fetch origin
+       # Tarik perubahan terbaru dari main dan brem
+       git pull origin main
+       git pull origin brem
+       # Tarik branch sendiri
+       git pull origin Unas
+       ```
      - Target branch push ke branch **`Unas`** (`git push origin Unas`).
   4. **Proteksi `.gitignore` untuk AI Agent Setup**:
      - Direktori `.agents/` dan `scripts/` DILARANG di-ignore. Pastikan konfigurasi skills, rules, plugins, dan MCP tetap terlacak di repositori.
 
-### Aturan Git Kolaborasi (Permanen — Branch Unas)
+### Aturan Git Kolaborasi (Permanen — Akun Non-Bremspace / Branch Unas)
 - Branch kerja eksklusif: **Unas**. Semua modifikasi kode, commit, dan push HANYA di branch Unas.
-- WAJIB sebelum mengedit kode apa pun di setiap sesi/task:
+- **WAJIB sebelum mengedit kode apa pun DAN sebelum commit/push di setiap sesi/task**:
+  Pastikan perubahan dari branch `brem` dan `main` tersedot penuh ke branch lokal agar tidak terjadi merge conflict:
   ```sh
   git fetch origin
   git pull origin main
+  git pull origin brem
   git pull origin Unas
   ```
 - DILARANG KERAS push atau merge langsung ke branch `main`.

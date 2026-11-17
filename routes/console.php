@@ -14,3 +14,7 @@ Schedule::command('duitku:rekon')->everyTenMinutes();
 
 // [F3-8b] Otomatis hitung KPI bulanan seluruh karyawan tiap tanggal 1 jam 01:00
 Schedule::job(new HitungKpiBulananJob)->monthlyOn(1, '01:00');
+
+// Asymmetric Hybrid Sync Scheduler
+Schedule::command('sync:flush')->everyMinute()->withoutOverlapping();
+Schedule::command('sync:pull')->everyMinute()->withoutOverlapping();

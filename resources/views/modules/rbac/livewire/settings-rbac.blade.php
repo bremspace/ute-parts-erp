@@ -4373,6 +4373,50 @@
                             </div>
                         </div>
                     </x-prism.glass-card>
+
+                    <!-- Asymmetric Hybrid Sync Card -->
+                    <x-prism.glass-card title="Asymmetric Hybrid Sync (Lokal <-> Cloud VPS)" subtitle="Sinkronisasi offline-first otomatis antara Server Toko Fisik dan Toko Online VPS">
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                                <div>
+                                    <p class="text-xs font-bold text-white">Status Sinkronisasi Hibrida</p>
+                                    <p class="text-[11px] text-ink-400">Aktifkan background sync via queue dan event observer</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" wire:model="integrasiForm.sync_enabled" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-mint"></div>
+                                </label>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Peran Node Mesin Ini (Node Role) *</label>
+                                    <select wire:model="integrasiForm.sync_node_role" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                        <option value="primary_store" class="bg-ink-900">🏪 Toko Lokal (Primary Store - POS, Servis, WMS)</option>
+                                        <option value="cloud_storefront" class="bg-ink-900">☁️ VPS Publik (Cloud Storefront - Marketplace &amp; PG)</option>
+                                    </select>
+                                    <p class="text-[10px] text-ink-400 mt-1">Gunakan 'primary_store' untuk komputer kasir toko, 'cloud_storefront' untuk server web publik.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Node ID Identifier *</label>
+                                    <input type="text" wire:model="integrasiForm.sync_node_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="STORE-01" />
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Remote Node Base URL</label>
+                                    <input type="url" wire:model="integrasiForm.sync_remote_url" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="https://uteparts.id" />
+                                    <p class="text-[10px] text-ink-400 mt-1">Alamat server cloud VPS tujuan pengiriman outbox.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Shared Secret Key (HMAC-SHA256) *</label>
+                                    <input type="password" wire:model="integrasiForm.sync_api_secret" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Kunci rahasia bersama" />
+                                    <p class="text-[10px] text-ink-400 mt-1">Wajib sama persis antara server lokal dan cloud VPS.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </x-prism.glass-card>
                 </div>
 
                 <!-- Sidebar Test & Status (Col Span 1) -->
