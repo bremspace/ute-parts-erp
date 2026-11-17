@@ -81,6 +81,7 @@ class SecurityHeaders
         $directives = [
             "default-src 'self'",
             "script-src 'self' 'nonce-{$nonce}' 'unsafe-eval' 'unsafe-inline'",
+            "script-src-attr 'unsafe-inline'",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com https://fonts.bunny.net",
             "img-src 'self' data: https:",

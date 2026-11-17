@@ -241,7 +241,7 @@
         <!-- Floating Toolbar (Hanya Tampil di Layar) -->
         <div class="toolbar no-print">
             <div style="display:flex; align-items:center; gap:10px;">
-                <button type="button" onclick="window.print()" class="btn btn-primary">
+                <button type="button" id="btn-print-label" onclick="window.print()" class="btn btn-primary" style="cursor:pointer; position:relative; z-index:9999;">
                     🖨️ Cetak Label ({{ $produks->count() }} Produk)
                 </button>
                 <a href="{{ url('/app/wms') }}" class="btn btn-secondary">
@@ -316,7 +316,7 @@
     </div>
 
     <script nonce="{{ request()->attributes->get('csp_nonce') }}">
-        document.getElementById('btn-print-label')?.addEventListener('click', () => window.print());
+        document.getElementById('btn-print-label')?.addEventListener('click', function() { setTimeout(function() { window.print(); }, 100); });
 
         function updateParam(key, value) {
             const url = new URL(window.location.href);
