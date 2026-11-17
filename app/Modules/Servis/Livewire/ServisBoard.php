@@ -20,6 +20,7 @@ use App\Modules\Wms\Services\NomorSeriService;
 use App\Traits\ParsesNominal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -116,6 +117,7 @@ class ServisBoard extends Component
         'foto_unit' => [], // BASE64 data URLs — [B-06] opsional (0-3 foto)
         'tambah_pelanggan_baru' => false,
     ];
+
     public array $fotoPreviews = [];
 
     public array $photoInputs = [];
@@ -1115,7 +1117,7 @@ class ServisBoard extends Component
         // Tambah pelanggan baru (retail/non-tier) jika dicentang
         if (! empty($data['tambah_pelanggan_baru']) && empty($data['pelanggan_id']) && trim((string) ($data['nama_pelanggan'] ?? '')) !== '') {
             try {
-                $pelanggan = app(\App\Modules\Crm\Services\PelangganService::class)->create([
+                $pelanggan = app(PelangganService::class)->create([
                     'nama' => $data['nama_pelanggan'],
                     'telepon' => $data['telepon_pelanggan'] ?: null,
                     'tipe_konsumen' => 'retail',
@@ -1123,7 +1125,7 @@ class ServisBoard extends Component
                 ]);
                 $data['pelanggan_id'] = $pelanggan->id;
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Gagal tambah pelanggan baru dari terima servis: '.$e->getMessage());
+                Log::warning('Gagal tambah pelanggan baru dari terima servis: '.$e->getMessage());
             }
         }
 
@@ -1938,21 +1940,21 @@ class ServisBoard extends Component
             'waktu' => ($tiket->tanggal_bayar ?? $tiket->tanggal_terima ?? now())->format('d/m/Y H:i'),
             'kasir' => auth()->user()?->name ?? 'Kasir / Staf',
             'pelanggan' => $tiket->nama_pelanggan ?? $tiket->pelanggan?->nama ?? 'Pelanggan Umum',
-            'telepon' => $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? null,
+            'telepon_pelanggan' => $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? null,
             'tier' => 'Servis HP ('.$tiket->jenis_hp.')',
             'items' => $rincian['items'],
             'subtotal_jasa' => $rincian['total_jasa'],
             'subtotal_part' => $rincian['total_part'],
             'subtotal' => $rincian['total'],
-            'diskon' => app(\App\Modules\Servis\Services\ServisService::class)->getGoodwillBerlaku($tiket)
-                + app(\App\Modules\Servis\Services\ServisService::class)->getDiskonVoucher($tiket),
+            'diskon' => app(ServisService::class)->getGoodwillBerlaku($tiket)
+                + app(ServisService::class)->getDiskonVoucher($tiket),
             'dpp' => $rincian['total'],
             'pajak' => 0,
             'ppn_persen' => 0,
-            'total' => app(\App\Modules\Servis\Services\ServisService::class)->getTotalTagihanBersih($tiket),
-            'bayar' => $isLunas ? app(\App\Modules\Servis\Services\ServisService::class)->getTotalTagihanBersih($tiket) : 0,
+            'total' => app(ServisService::class)->getTotalTagihanBersih($tiket),
+            'bayar' => $isLunas ? app(ServisService::class)->getTotalTagihanBersih($tiket) : 0,
             'kembali' => 0,
-            'sisa_tagihan' => $isLunas ? 0 : app(\App\Modules\Servis\Services\ServisService::class)->getTotalTagihanBersih($tiket),
+            'sisa_tagihan' => $isLunas ? 0 : app(ServisService::class)->getTotalTagihanBersih($tiket),
             'metode' => strtoupper($tiket->metode_pembayaran ?? 'TUNAI'),
             'status_pembayaran' => $tiket->status_pembayaran ?? 'belum_bayar',
             'is_lunas' => $isLunas,
@@ -1962,8 +1964,8 @@ class ServisBoard extends Component
             'garansi' => $tiket->garansi ? ($tiket->garansi->durasi_hari.' Hari (s/d '.$tiket->garansi->tanggal_berakhir?->format('d/m/Y').')') : null,
             'komplain' => $tiket->sumber === 'komplain' ? ('Komplain pasca-servis'.($tiket->tiketLama ? ' — asal '.$tiket->tiketLama->no_tiket : '').($tiket->garansi_berlaku ? ' (garansi)' : ' (di luar garansi)')) : null,
             'goodwill' => $tiket->goodwill_approved_at ? ('Goodwill: Rp '.number_format((float) $tiket->goodwill_amount, 0, ',', '.')) : null,
-            'voucher' => app(\App\Modules\Servis\Services\ServisService::class)->getDiskonVoucher($tiket) > 0
-                ? ('Voucher dipakai: Rp '.number_format(app(\App\Modules\Servis\Services\ServisService::class)->getDiskonVoucher($tiket), 0, ',', '.'))
+            'voucher' => app(ServisService::class)->getDiskonVoucher($tiket) > 0
+                ? ('Voucher dipakai: Rp '.number_format(app(ServisService::class)->getDiskonVoucher($tiket), 0, ',', '.'))
                 : null,
             'cabang' => $cabang?->nama ?? session('cabang_nama') ?? null,
         ];

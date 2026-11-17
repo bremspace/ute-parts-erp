@@ -113,7 +113,8 @@
                 <button
                     type="button"
                     wire:click="$set('showPaymentModal', false)"
-                    class="p-2 rounded-xl text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                    aria-label="Tutup Pembayaran"
+                    class="min-w-[44px] min-h-[44px] sm:min-w-[36px] sm:min-h-[36px] p-2 rounded-xl text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-ink-100 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-center justify-center active:scale-[0.97]"
                 >✕</button>
             </div>
 
@@ -132,7 +133,7 @@
                             <span class="text-up-mint font-semibold">Partai: -Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
                         @endif
                         @if($diskonPoin > 0)
-                            <span class="text-emerald-500 font-semibold">Poin ({{ number_format($poinDitukar) }} pts): -Rp {{ number_format($diskonPoin, 0, ',', '.') }}</span>
+                            <span class="text-emerald-500 font-semibold tabular-nums">Poin ({{ number_format($poinDitukar, 0, ',', '.') }} pts): -Rp {{ number_format($diskonPoin, 0, ',', '.') }}</span>
                         @endif
                         @if($diskonNominal > 0 || $diskonPersen > 0)
                             <button type="button" wire:click="openDiskonModal" class="text-up-amber font-semibold hover:underline cursor-pointer">
@@ -750,7 +751,8 @@
                 <button
                     type="button"
                     @click="showQrisZoom = false"
-                    class="absolute top-4 right-4 w-8 h-8 rounded-full bg-ink-100 hover:bg-ink-200 text-ink-600 font-bold text-xs flex items-center justify-center transition cursor-pointer"
+                    aria-label="Tutup QRIS"
+                    class="absolute top-4 right-4 min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] rounded-full bg-ink-100 hover:bg-ink-200 text-ink-600 font-bold text-xs flex items-center justify-center transition-colors cursor-pointer active:scale-[0.97]"
                 >
                     ✕
                 </button>

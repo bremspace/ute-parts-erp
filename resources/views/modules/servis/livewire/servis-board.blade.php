@@ -906,7 +906,7 @@
             <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative max-h-[90vh] flex flex-col">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10 flex-shrink-0">
                     <h3 class="text-lg font-bold text-white">Terima Unit Servis</h3>
-                    <button wire:click="$set('showTerimaModal', false)" class="text-ink-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-white/10" aria-label="Tutup">✕</button>
+                    <button type="button" wire:click="$set('showTerimaModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-white/10 flex items-center justify-center transition-colors active:scale-[0.97]" aria-label="Tutup dialog">✕</button>
                 </div>
 
                 <div class="overflow-y-auto pr-1 space-y-4 flex-1">
@@ -920,7 +920,7 @@
                             :results="$pelangganCariServis"
                         />
                         @if($terimaForm['pelanggan_id'])
-                            <button wire:click="setPelangganServis(null)" class="mt-1 text-[10px] text-up-red hover:underline cursor-pointer">✕ lepaskan pelanggan terpilih</button>
+                            <button type="button" wire:click="setPelangganServis(null)" class="mt-1 text-[10px] text-up-red hover:underline cursor-pointer">✕ lepaskan pelanggan terpilih</button>
                         @endif
                     </div>
 
@@ -1326,7 +1326,7 @@
             <div class="w-full max-w-lg glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative my-auto">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                     <h3 class="text-lg font-bold text-white">+ Pelanggan Baru Servis</h3>
-                    <button wire:click="$set('showPelangganBaruModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showPelangganBaruModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-3.5">
@@ -1380,8 +1380,8 @@
                 </div>
 
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
-                    <button wire:click="$set('showPelangganBaruModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="simpanPelangganBaruServis" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer min-h-[44px]">Simpan Pelanggan</button>
+                    <button type="button" wire:click="$set('showPelangganBaruModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                    <button type="button" wire:click="simpanPelangganBaruServis" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer min-h-[44px]">Simpan Pelanggan</button>
                 </div>
             </div>
         </div>
@@ -1396,7 +1396,7 @@
                         <h3 class="text-lg font-bold text-white">Input Rincian Estimasi Biaya</h3>
                         <p class="text-xs text-ink-400">Rincian item jasa & sparepart yang diajukan ke konsumen</p>
                     </div>
-                    <button wire:click="$set('showEstimasiModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showEstimasiModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="overflow-y-auto pr-1 flex-1 space-y-4">
@@ -1746,7 +1746,7 @@
             <div class="w-full max-w-md glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                     <h3 class="text-lg font-bold text-white">Approve / Tolak Estimasi</h3>
-                    <button wire:click="$set('showApproveModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showApproveModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-4">
@@ -2780,7 +2780,7 @@
                         <h3 class="text-lg font-bold text-white">Konfirmasi Bayar Online - #{{ $bayarTiketId }}</h3>
                         <p class="text-xs text-ink-400">Pencatatan pembayaran non-tunai / gateway online</p>
                     </div>
-                    <button wire:click="$set('showBayarModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showBayarModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-4">
@@ -2862,7 +2862,7 @@
                         <h3 class="text-base font-bold text-white">Cari Produk / Part</h3>
                         <p class="text-[11px] text-ink-400">Ketik nama produk, barcode, atau tipe HP kompatibel</p>
                     </div>
-                    <button wire:click="$set('showCariPartModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                    <button type="button" wire:click="$set('showCariPartModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <!-- Search Input -->
@@ -2945,7 +2945,7 @@
                         </div>
                         <p class="text-xs text-ink-400 mt-0.5">Verifikasi fisik unit saat diserahkan langsung oleh konsumen di gerai (Tiket: {{ $intakeForm['no_tiket'] }})</p>
                     </div>
-                    <button wire:click="$set('showIntakeBookingModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showIntakeBookingModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="overflow-y-auto pr-1 flex-1 space-y-4">
@@ -3135,7 +3135,7 @@
                         <h3 class="text-sm font-bold text-white">Batalkan Item Pekerjaan</h3>
                         <p class="text-xs text-ink-400 mt-0.5">Penghapusan item jasa atau sparepart dari tiket servis</p>
                     </div>
-                    <button wire:click="$set('showBatalItemModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showBatalItemModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-3.5">
@@ -3184,7 +3184,7 @@
                         <h3 class="text-base font-bold text-white">Batalkan Servis & Kembalikan Unit</h3>
                         <p class="text-xs text-ink-400 mt-0.5">Penyerahan kembali unit gadget kepada pelanggan tanpa perbaikan</p>
                     </div>
-                    <button wire:click="$set('showBatalReturModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showBatalReturModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-4">
@@ -3233,7 +3233,7 @@
                         <h3 class="text-sm font-bold text-white">Ajukan Goodwill</h3>
                         <p class="text-xs text-ink-400 mt-0.5">Diskon kompensasi untuk kasus ambigu — butuh persetujuan regulator</p>
                     </div>
-                    <button wire:click="$set('showGoodwillModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showGoodwillModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-3.5">
@@ -3276,7 +3276,7 @@
                         <h3 class="text-sm font-bold text-white">Komplain Pasca-Servis</h3>
                         <p class="text-xs text-ink-400 mt-0.5">Konsumen kembali ke toko dengan keluhan setelah servis selesai</p>
                     </div>
-                    <button wire:click="$set('showKomplainModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showKomplainModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-3.5">
@@ -3329,7 +3329,7 @@
                         <h3 class="text-sm font-bold text-white">Batalkan Servis</h3>
                         <p class="text-xs text-ink-400 mt-0.5">Unit akan diserahkan kembali kepada pelanggan tanpa biaya</p>
                     </div>
-                    <button wire:click="$set('showBatalModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showBatalModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-3.5">

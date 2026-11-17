@@ -21,9 +21,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnsurePelangganSesiAktif
 {
-    public function __construct(private readonly SessionManagementService $sessionService)
-    {
-    }
+    public function __construct(private readonly SessionManagementService $sessionService) {}
 
     public function handle(Request $request, Closure $next): Response
     {

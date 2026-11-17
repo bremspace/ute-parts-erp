@@ -237,8 +237,8 @@ class CustomImportMasterProdukTest extends TestCase
         $component->assertSet('isCustomMapping', true);
         $component->assertCount('customColumns', 5);
 
-        // Uji validasi jika kolom wajib (nama) dikosongkan
-        $component->set('columnMapping.col_1', '')
+        // Uji validasi jika kolom wajib (sku) dikosongkan
+        $component->set('columnMapping.col_0', '')
             ->call('applyCustomMappingAndPreview')
             ->assertSet('importStep', 'mapping'); // Tetap di mapping karena gagal validasi
 

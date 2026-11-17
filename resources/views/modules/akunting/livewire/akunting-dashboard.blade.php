@@ -1688,7 +1688,7 @@
             <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                     <h3 class="text-lg font-bold text-white">{{ ! empty($coaForm['id']) ? 'Edit Akun COA' : 'Tambah Akun COA' }}</h3>
-                    <button wire:click="$set('showCoaModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showCoaModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-4">
@@ -1726,8 +1726,8 @@
                 </div>
 
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
-                    <button wire:click="$set('showCoaModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="simpanCoa" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan Akun</button>
+                    <button type="button" wire:click="$set('showCoaModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                    <button type="button" wire:click="simpanCoa" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan Akun</button>
                 </div>
             </div>
         </div>
@@ -1739,7 +1739,7 @@
             <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                     <h3 class="text-lg font-bold text-white">Bayar Utang</h3>
-                    <button wire:click="$set('showBayarUtangModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showBayarUtangModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 @php $utangAktif = $utangs->firstWhere('id', $utangId); @endphp
@@ -1787,7 +1787,7 @@
             <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                     <h3 class="text-lg font-bold text-white">Terima Pembayaran Piutang</h3>
-                    <button wire:click="$set('showBayarPiutangModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button type="button" wire:click="$set('showBayarPiutangModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </div>
 
                 @php $piutangAktif = $piutangs->firstWhere('id', $piutangId); @endphp
@@ -1821,8 +1821,8 @@
                     </div>
 
                     <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
-                        <button wire:click="$set('showBayarPiutangModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                        <button wire:click="bayarPiutang" class="flex-1 py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">Catat Penerimaan</button>
+                        <button type="button" wire:click="$set('showBayarPiutangModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                        <button type="button" wire:click="bayarPiutang" class="flex-1 py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">Catat Penerimaan</button>
                     </div>
                 @endif
             </div>
@@ -1841,7 +1841,7 @@
                 class="w-full max-w-2xl max-h-[92vh] flex flex-col my-auto"
             >
                 <x-slot:action>
-                    <button wire:click="tutupFormMatching" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                    <button type="button" wire:click="tutupFormMatching" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </x-slot:action>
 
                 <div class="space-y-4 overflow-y-auto pr-1">
@@ -1943,7 +1943,7 @@
                 class="w-full max-w-2xl max-h-[92vh] flex flex-col my-auto"
             >
                 <x-slot:action>
-                    <button wire:click="$set('showTutupBukuModal', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                    <button type="button" wire:click="$set('showTutupBukuModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </x-slot:action>
 
                 <div class="space-y-4 overflow-y-auto pr-1">
@@ -2027,7 +2027,7 @@
                 class="w-full max-w-lg flex flex-col my-auto"
             >
                 <x-slot:action>
-                    <button wire:click="$set('showBukaBukuModal', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                    <button type="button" wire:click="$set('showBukaBukuModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </x-slot:action>
 
                 <div class="space-y-4">
@@ -2064,7 +2064,7 @@
                 class="w-full max-w-lg flex flex-col my-auto"
             >
                 <x-slot:action>
-                    <button wire:click="$set('showReversalModal', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                    <button type="button" wire:click="$set('showReversalModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </x-slot:action>
 
                 <div class="space-y-4">
@@ -2102,7 +2102,7 @@
                 class="w-full max-w-lg flex flex-col my-auto"
             >
                 <x-slot:action>
-                    <button wire:click="$set('showUploadRekonModal', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                    <button type="button" wire:click="$set('showUploadRekonModal', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </x-slot:action>
 
                 <div class="space-y-4">
@@ -2161,7 +2161,7 @@
                 class="w-full max-w-md flex flex-col my-auto"
             >
                 <x-slot:action>
-                    <button wire:click="$set('penyesuaianModalOpen', false)" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                    <button type="button" wire:click="$set('penyesuaianModalOpen', false)" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-ink-400 hover:text-white cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-white/10 active:scale-[0.97]" aria-label="Tutup">✕</button>
                 </x-slot:action>
 
                 <div class="space-y-4">

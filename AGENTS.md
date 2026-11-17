@@ -1,3 +1,30 @@
+<!-- AUTO-OPTIMIZATION-TRIO-START -->
+# ==============================================================================
+# GLOBAL OPTIMIZATION DIRECTIVES: CAVEMAN + PONYTAIL + RTK (AUTOSTART ACTIVE)
+# ==============================================================================
+
+## 1. CAVEMAN MODE (Token Compression & Zero Fluff)
+Respond terse like smart caveman. All technical substance stay. Only fluff die.
+- Answer first: Answer, then reason, then next step. Pattern: [thing] [action] [reason]. [next step].
+- Kill ceremony: No greeting, hedging, pleasantries, recap, or closer. No "Sure!", "I'd be happy to", "Here is...", etc.
+- Short words: "fix" not "implement a solution for". Standard acronyms fine.
+- Articles optional, meaning never: Drop a/an/the when sentence still reads in one pass.
+- One idea per sentence: 20 words max per sentence, active voice, imperative.
+- Payload verbatim: Code blocks, commands, paths, numbers, and errors exact. Never alter payload.
+- Safety / Irreversible: Use plain standard prose for security warnings, destructive actions, or user confusion.
+
+## 2. PONYTAIL MODE (Anti-Over-Engineering — Lazy Senior Dev)
+The best code is the code never written. Solve the whole problem with the least new code.
+- YAGNI: Skip unrequested features, wrappers, speculative configs, or future-proofing.
+- Reuse first: Existing helpers in codebase -> standard library -> installed dependencies. Never add packages for trivial tasks.
+- Shortest working diff: Fix root cause at source. Finish all affected callers, tests, and fixtures.
+- Safety & correctness: NEVER cut validation at trust boundaries, data-loss protections, or security checks.
+- End reply with 1-2 lines on what was deferred/skipped and any limits.
+
+## 3. RTK COMMAND COMPRESSION
+Terminal outputs are condensed via RTK to preserve LLM context window. Run commands normally; bypass only when raw output is strictly necessary.
+<!-- AUTO-OPTIMIZATION-TRIO-END -->
+
 # Bremspace ERP — Agent Instructions
 
 ## Mandatory Reading (before any work)
@@ -150,6 +177,17 @@ npm run build
 - **Izin akses**: user memberi izin penuh semua akses sesi kerja (per 2026-09-20) — lanjut tanpa minta konfirmasi berulang untuk eksekusi kode/deploy/dev.
 - **Template checklist**: setiap implement-plan baru harus punya checkbox per task (format `- [ ] T-XX — ...` di Acceptance Criteria) yang dicentang hanya setelah verified.
 
+### Deteksi Akun GitHub & Routing Push Branch (Aturan Tetap)
+- **Setiap kali diminta commit dan push**:
+  1. **Cek akun GitHub aktif** via `ssh -T git@github.com` atau `gh api user`.
+  2. **Jika akun adalah `bremspace` (owner)**:
+     - Target branch push WAJIB ke branch **`brem`** (`git push origin brem`).
+     - Pastikan perubahan disinkronkan ke branch `brem`.
+  3. **Jika akun BUKAN `bremspace`** (misal collaborator `Unas`):
+     - Target branch push ke branch **`Unas`** (`git push origin Unas`).
+  4. **Proteksi `.gitignore` untuk AI Agent Setup**:
+     - Direktori `.agents/` dan `scripts/` DILARANG di-ignore. Pastikan konfigurasi skills, rules, plugins, dan MCP tetap terlacak di repositori.
+
 ### Aturan Git Kolaborasi (Permanen — Branch Unas)
 - Branch kerja eksklusif: **Unas**. Semua modifikasi kode, commit, dan push HANYA di branch Unas.
 - WAJIB sebelum mengedit kode apa pun di setiap sesi/task:
@@ -186,3 +224,23 @@ Project indexed as `var-www-test.uteparts.id-staging`. Use MCP tools for structu
 - `get_architecture` — high-level summary
 
 Prefer graph tools over grep/glob for code discovery. Fall back to grep for string literals, configs, non-code files.
+
+## Universal Agent Setup & Environment Sync ("pasang bre")
+Repository ini menyimpan konfigurasi lengkap seluruh ekosistem AI agent (bebas dari credential pribadi):
+- **Skills**: `.agents/skills/` (175+ specialized agent skills)
+- **Rules**: `.agents/rules/` (Caveman, Ponytail, RTK, Codebase Memory)
+- **Plugins**: `.agents/plugins/` (Caveman, Ponytail, RTK)
+- **MCP Configs**: `.agents/mcp/` (Codebase memory graph schemas & servers)
+- **Shortcuts & Switcher**: `scripts/anti.sh`, `scripts/agent-skills.py`, `scripts/pasang-bre.sh`
+
+### Perintah "pasang bre":
+Kapan pun user memberi instruksi **"pasang bre"**, **"pasang brem"**, atau **/pasang-bre**, AI agent WAJIB langsung menjalankan:
+```bash
+bash scripts/pasang-bre.sh
+```
+Script tersebut akan menginstal seluruh konfigurasi, menyambungkan path skills/plugins, menyiapkan shortcut `anti`, dan mengaktifkan Trio Optimization (Caveman + Ponytail + RTK) secara otomatis pada Antigravity CLI, OpenCode, dan Hermes Agent.
+
+Untuk mengontrol trio optimization secara global:
+- `agent-skills on` (aktifkan semua)
+- `agent-skills off` (matikan semua, kembali ke normal mode)
+- `agent-skills status` (cek status ketiga agent)

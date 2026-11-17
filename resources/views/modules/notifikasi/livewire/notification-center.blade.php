@@ -14,7 +14,7 @@
         @click="open = !open"
         title="Pusat Notifikasi"
         aria-label="Pusat Notifikasi"
-        class="relative p-1.5 sm:p-2 rounded-xl text-ink-500 hover:text-ink-900 dark:text-ink-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-150 cursor-pointer flex items-center justify-center min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px]"
+        class="relative p-2 rounded-xl text-ink-500 hover:text-ink-900 dark:text-ink-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors duration-150 cursor-pointer flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-[40px] sm:min-h-[40px]"
         :class="{ 'bg-black/5 dark:bg-white/10 text-ink-900 dark:text-white': open }"
     >
         <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5 transition-transform duration-150 active:scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24">

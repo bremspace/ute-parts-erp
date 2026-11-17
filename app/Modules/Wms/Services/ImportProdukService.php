@@ -3435,6 +3435,7 @@ class ImportProdukService
                 $fields[] = $f;
             }
         }
+
         return array_values(array_unique($fields));
     }
 

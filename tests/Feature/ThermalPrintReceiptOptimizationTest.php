@@ -297,4 +297,100 @@ class ThermalPrintReceiptOptimizationTest extends TestCase
         $this->assertStringContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
         $this->assertStringContainsString('Scan QR ini untuk retur & klaim garansi', $output);
     }
+
+    public function test_escpos_writer_respects_custom_template_struk_settings(): void
+    {
+        $writer = app(EscPosWriter::class);
+        $data = [
+            'nama_toko' => 'TOKO SPAREPART BERKAH',
+            'slogan' => 'Cepat & Terpercaya',
+            'alamat' => 'Jl. Cempaka No. 88',
+            'telepon' => '0877-1234-5678',
+            'website_medsos' => 'www.tokoberkah.com',
+            'show_cabang' => true,
+            'cabang' => 'Cabang Sukabumi',
+            'show_qr_retur' => false, // Nonaktifkan QR
+            'qr_caption' => 'Scan QR ini untuk retur & klaim garansi',
+            'footer_text' => 'Barang yang dibeli tidak dapat ditukar kecuali bergaransi',
+            'kebijakan_retur' => 'Maksimal 3 hari kerja',
+            'catatan_kaki' => 'Wajib bawa nota fisik',
+            'no_transaksi' => 'TRX-TEST-0099',
+            'items' => [
+                ['nama' => 'Baterai Hippo', 'qty' => 1, 'harga' => 100000, 'subtotal' => 100000],
+            ],
+            'total' => 100000,
+            'bayar' => 100000,
+            'kembali' => 0,
+            'metode_bayar' => 'TUNAI',
+        ];
+
+        $output = $writer->receipt($data);
+
+        $this->assertStringContainsString('TOKO SPAREPART BERKAH', $output);
+        $this->assertStringContainsString('Cepat & Terpercaya', $output);
+        $this->assertStringContainsString('Jl. Cempaka No. 88', $output);
+        $this->assertStringContainsString('Telp/WA: 0877-1234-5678', $output);
+        $this->assertStringContainsString('Cabang Sukabumi', $output);
+        $this->assertStringContainsString('Web: www.tokoberkah.com', $output);
+        $this->assertStringContainsString('Barang yang dibeli tidak dapat ditukar', $output);
+        $this->assertStringContainsString('Maksimal 3 hari kerja', $output);
+        $this->assertStringContainsString('Wajib bawa nota fisik', $output);
+        // Karena show_qr_retur = false, QR bytes dan caption QR tidak boleh dicetak
+        $this->assertStringNotContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
+        $this->assertStringNotContainsString('Scan QR ini untuk retur', $output);
+    }
+
+    public function test_escpos_writer_renders_special_labels_and_service_fields(): void
+    {
+        $writer = app(EscPosWriter::class);
+        $data = [
+            'label_struk' => '*** STRUK RETUR & TUKAR BARANG ***',
+            'no_transaksi' => 'RET-001',
+            'no_transaksi_asal' => 'TRX-999',
+            'goodwill' => 'Goodwill: Rp 50.000',
+            'voucher' => 'Voucher dipakai: Rp 20.000',
+            'komplain' => 'Komplain pasca-servis (garansi)',
+            'items' => [
+                ['nama' => 'Part Pengganti', 'qty' => 1, 'harga' => 50000, 'subtotal' => 50000],
+            ],
+            'total' => 50000,
+            'bayar' => 50000,
+            'kembali' => 0,
+        ];
+
+        $output = $writer->receipt($data);
+
+        $this->assertStringContainsString('*** STRUK RETUR & TUKAR BARANG ***', $output);
+        $this->assertStringContainsString('Asal TRX:', $output);
+        $this->assertStringContainsString('TRX-999', $output);
+        $this->assertStringContainsString('Goodwill:', $output);
+        $this->assertStringContainsString('Voucher:', $output);
+        $this->assertStringContainsString('Komplain pasca-servis', $output);
+    }
+
+    public function test_escpos_writer_58mm_item_subtotal_does_not_split_numbers(): void
+    {
+        $writer = app(EscPosWriter::class);
+        $data = [
+            'paper_width' => 58,
+            'font_size' => 'normal', // 32 columns
+            'items' => [
+                [
+                    'nama' => 'Produk Panjang Sekali',
+                    'qty' => 10,
+                    'satuan' => 'KOTAK',
+                    'harga' => 100000,
+                    'subtotal' => 1000000,
+                ],
+            ],
+            'total' => 1000000,
+            'bayar' => 1000000,
+            'kembali' => 0,
+        ];
+
+        $output = $writer->receipt($data);
+
+        $this->assertStringContainsString('1.000.000', $output);
+        $this->assertStringContainsString('10 KOTAK x Rp 100.000', $output);
+    }
 }

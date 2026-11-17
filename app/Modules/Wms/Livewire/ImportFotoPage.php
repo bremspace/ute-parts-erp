@@ -56,6 +56,10 @@ class ImportFotoPage extends Component
 
     public int $fotoErrorDisplayLimit = 50;
 
+    public string $fotoResultSearch = '';
+
+    public array $fotoRecentStream = [];
+
     public function mount(): void
     {
         $runningFotoLog = ImportLog::where('user_id', auth()->id())
@@ -287,20 +291,29 @@ class ImportFotoPage extends Component
             $totalBaris = (int) $log->total_baris;
             $sukses = (int) $log->sukses;
             $gagal = (int) $log->gagal;
-            $selesai = $sukses + $gagal;
-            $persen = $totalBaris > 0 ? (int) min(100, round(($selesai / $totalBaris) * 100)) : 0;
 
-            $detailList = is_array($log->detail) ? $log->detail : [];
+            $detailRaw = is_array($log->detail) ? $log->detail : [];
+            $detailList = isset($detailRaw['items']) && is_array($detailRaw['items'])
+                ? $detailRaw['items']
+                : (isset($detailRaw[0]) && is_array($detailRaw[0]) ? $detailRaw : []);
+
             $gagalRows = array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'gagal'));
             $skipRows = array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'skip'));
+            $okRows = array_values(array_filter($detailList, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['ok', 'success'], true)));
 
-            $trimmedDetail = count($detailList) > 100
-                ? array_slice(array_values(array_filter($detailList, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['gagal', 'skip'], true))), 0, 50)
-                : $detailList;
+            $skipCount = isset($detailRaw['summary']['skip'])
+                ? (int) $detailRaw['summary']['skip']
+                : (isset($detailRaw['skip']) ? (int) $detailRaw['skip'] : count($skipRows));
 
-            $currentSku = is_array($log->detail) ? ($log->detail['current_sku'] ?? null) : null;
-            $currentNama = is_array($log->detail) ? ($log->detail['current_nama'] ?? null) : null;
-            $currentBaris = is_array($log->detail) ? ($log->detail['current_baris'] ?? $selesai) : $selesai;
+            $currentBaris = isset($detailRaw['current_baris']) ? (int) $detailRaw['current_baris'] : ($sukses + $gagal + $skipCount);
+            $selesai = $log->status === 'selesai' ? $totalBaris : min($totalBaris, max($currentBaris, $sukses + $gagal + $skipCount));
+            $persen = $log->status === 'selesai'
+                ? 100
+                : ($totalBaris > 0 ? (int) min(99, max(0, round(($selesai / $totalBaris) * 100))) : 0);
+
+            $currentSku = $detailRaw['current_sku'] ?? null;
+            $currentNama = $detailRaw['current_nama'] ?? null;
+            $this->fotoRecentStream = $detailRaw['recent'] ?? [];
 
             $this->activeFotoImportLog = [
                 'id' => $log->id,
@@ -308,14 +321,17 @@ class ImportFotoPage extends Component
                 'total_baris' => $totalBaris,
                 'sukses' => $sukses,
                 'gagal' => $gagal,
-                'skip' => count($skipRows),
+                'skip' => $skipCount,
+                'selesai' => $selesai,
                 'persen' => $persen,
                 'current_sku' => $currentSku,
                 'current_nama' => $currentNama,
                 'current_baris' => $currentBaris,
-                'detail' => $trimmedDetail,
+                'detail' => $detailList,
                 'gagal_rows' => $gagalRows,
                 'skip_rows' => $skipRows,
+                'ok_rows' => $okRows,
+                'recent' => $this->fotoRecentStream,
                 'created_at' => $log->created_at?->format('d/m/Y H:i'),
             ];
 
@@ -363,13 +379,92 @@ class ImportFotoPage extends Component
 
     public function setFotoErrorFilterTab(string $tab): void
     {
-        $this->fotoErrorFilterTab = in_array($tab, ['semua', 'gagal', 'skip'], true) ? $tab : 'semua';
+        $this->fotoErrorFilterTab = in_array($tab, ['semua', 'sukses', 'gagal', 'skip'], true) ? $tab : 'semua';
         $this->fotoErrorDisplayLimit = 50;
     }
 
     public function loadMoreFotoErrors(): void
     {
         $this->fotoErrorDisplayLimit += 50;
+    }
+
+    public function exportFotoLengkap(?int $logId = null): mixed
+    {
+        $id = $logId ?: ($this->fotoImportLogId ?: ($this->activeFotoImportLog['id'] ?? null));
+        $log = $id ? ImportLog::find($id) : null;
+
+        $rows = [];
+        if ($log && is_array($log->detail)) {
+            $items = isset($log->detail['items']) && is_array($log->detail['items'])
+                ? $log->detail['items']
+                : (isset($log->detail[0]) && is_array($log->detail[0]) ? $log->detail : []);
+
+            foreach ($items as $idx => $d) {
+                if (is_array($d)) {
+                    $statusLabel = match ($d['status'] ?? '') {
+                        'ok', 'success' => 'Berhasil Disimpan',
+                        'skip' => 'Dilewati (Skip)',
+                        'gagal' => 'Gagal (Error)',
+                        default => $d['status'] ?? '-',
+                    };
+
+                    $rows[] = [
+                        'no' => $d['baris'] ?? ($idx + 1),
+                        'file' => $d['file'] ?? ($d['filename'] ?? '-'),
+                        'sku' => $d['sku'] ?? '-',
+                        'nama' => $d['nama'] ?? ($d['produk_nama'] ?? '-'),
+                        'status' => $statusLabel,
+                        'keterangan' => $d['catatan'] ?? ($d['error'] ?? 'Foto berhasil diproses'),
+                    ];
+                }
+            }
+        }
+
+        if (empty($rows)) {
+            $matched = $this->fotoScanResult['matched'] ?? [];
+            $skipped = $this->fotoScanResult['skipped'] ?? [];
+            foreach ($matched as $idx => $m) {
+                $rows[] = [
+                    'no' => $idx + 1,
+                    'file' => $m['filename'] ?? ($m['name'] ?? '-'),
+                    'sku' => $m['sku'] ?? '-',
+                    'nama' => $m['produk_nama'] ?? '-',
+                    'status' => 'Berhasil Disimpan',
+                    'keterangan' => 'Foto berhasil dikompresi WebP & disimpan ke master produk',
+                ];
+            }
+            $offset = count($matched);
+            foreach ($skipped as $idx => $sk) {
+                $rows[] = [
+                    'no' => $offset + $idx + 1,
+                    'file' => $sk['filename'] ?? ($sk['name'] ?? '-'),
+                    'sku' => $sk['sku'] ?? '-',
+                    'nama' => '-',
+                    'status' => 'Dilewati (Skip)',
+                    'keterangan' => $sk['reason'] ?? 'SKU tidak ditemukan di katalog produk',
+                ];
+            }
+        }
+
+        if (empty($rows)) {
+            $this->dispatch('alert', ['type' => 'info', 'message' => 'Tidak ada data hasil import untuk diekspor.']);
+
+            return null;
+        }
+
+        $filename = 'laporan-lengkap-import-foto-'.($id ?: date('Ymd-His')).'.csv';
+
+        return response()->streamDownload(function () use ($rows) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['No', 'Nama Berkas Foto', 'SKU Terdeteksi', 'Nama Produk Sistem', 'Status Hasil', 'Keterangan / Detail']);
+            foreach ($rows as $r) {
+                fputcsv($handle, [$r['no'], $r['file'], $r['sku'], $r['nama'], $r['status'], $r['keterangan']]);
+            }
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     public function exportFotoErrorRows(?int $logId = null): mixed
@@ -461,6 +556,8 @@ class ImportFotoPage extends Component
         $this->resolusiErrorFoto = [];
         $this->fotoErrorFilterTab = 'semua';
         $this->fotoErrorDisplayLimit = 50;
+        $this->fotoResultSearch = '';
+        $this->fotoRecentStream = [];
         $this->activeFotoImportLog = null;
         $this->fotoImportLogId = null;
         $this->fotoStep = 'upload';

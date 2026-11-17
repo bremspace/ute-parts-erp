@@ -141,14 +141,13 @@ class WmsImportVerifyTest extends TestCase
 
         $importSvc = app(ImportProdukService::class);
 
-        // Preview: 10 valid, 4 invalid, pesan error jelas
+        // Preview: 11 valid, 3 invalid (nama produk opsional sejak commit 0758857, kosong default 'Produk {SKU}')
         $preview = $importSvc->preview($path);
         $this->assertSame(14, $preview['total_baris']);
-        $this->assertSame(10, $preview['valid']);
-        $this->assertSame(4, $preview['invalid']);
+        $this->assertSame(11, $preview['valid']);
+        $this->assertSame(3, $preview['invalid']);
         $pesanSemua = collect($preview['error_rows'])->pluck('errors')->flatten()->implode(' ');
         $this->assertStringContainsString('duplikat', $pesanSemua);
-        $this->assertStringContainsString('Nama produk wajib diisi', $pesanSemua);
         $this->assertStringContainsString('tidak boleh negatif', $pesanSemua);
         $this->assertStringContainsString('gudang_id wajib diisi', $pesanSemua);
 
@@ -167,12 +166,12 @@ class WmsImportVerifyTest extends TestCase
         ImportProdukExcelJob::dispatch($logImp->id, $path, null);
         $logImp->refresh();
         $this->assertSame('selesai', $logImp->status);
-        $this->assertSame(10, $logImp->sukses);
-        $this->assertSame(4, $logImp->gagal);
+        $this->assertSame(11, $logImp->sukses);
+        $this->assertSame(3, $logImp->gagal);
 
         // Data lengkap: produk + sku_variant + harga_tier + tipe_hp pivot + stok
         $this->assertSame(10, Produk::where('nama', 'like', 'Produk Verifikasi%')->count());
-        $this->assertSame(10, SkuVariant::where('sku', 'like', 'VER-%')->count());
+        $this->assertSame(11, SkuVariant::where('sku', 'like', 'VER-%')->count());
         $this->assertSame(30, HargaTier::whereHas('produk', fn ($q) => $q->where('nama', 'like', 'Produk Verifikasi%'))->count()); // 10 × 3 tipe
         $p1 = Produk::where('nama', 'Produk Verifikasi 1')->first();
         $this->assertNotNull($p1);
@@ -200,8 +199,8 @@ class WmsImportVerifyTest extends TestCase
         // Notifikasi terkirim (jalur queue sync)
         $notif = NotifikasiKeluar::where('judul', 'Import Produk Selesai')->latest()->first();
         $this->assertNotNull($notif);
-        $this->assertSame(10, $notif->payload['sukses']);
-        $this->assertSame(4, $notif->payload['gagal']);
+        $this->assertSame(11, $notif->payload['sukses']);
+        $this->assertSame(3, $notif->payload['gagal']);
 
         // ===== Idempotensi: run ulang → 0 sukses, 14 gagal, tidak dobel =====
         $hasil2 = $importSvc->commit($pathUlang, 2, null);

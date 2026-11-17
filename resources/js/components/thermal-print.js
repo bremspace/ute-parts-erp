@@ -116,7 +116,14 @@ class EscPos {
   pad(left, right) {
     left = this.clean(left);
     right = this.clean(right);
-    const pad = Math.max(1, this.columns - left.length - right.length);
+    const totalLen = left.length + right.length;
+
+    if (totalLen >= this.columns) {
+      const padRight = Math.max(0, this.columns - right.length);
+      return left + '\n' + ' '.repeat(padRight) + right;
+    }
+
+    const pad = this.columns - totalLen;
     return left + ' '.repeat(pad) + right;
   }
 
@@ -172,7 +179,7 @@ class EscPos {
       pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
       is_piutang, jatuh_tempo, sisa_piutang, komisi_mitra_nominal,
       no_tiket, jenis_hp, kurir, is_pickup, resi, sumber,
-      garansi,
+      garansi, label_struk, no_transaksi_asal, goodwill, voucher, komplain,
       footer_text, kebijakan_retur, catatan_kaki,
       nama_toko, slogan, alamat, telepon, website_medsos,
       show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
@@ -196,15 +203,15 @@ class EscPos {
 
     // ======== HEADER (Centered) ========
     this.alignCenter();
-    this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'UTEParts').sizeDoubleWidth(false).bold(false);
-    this.text(slogan || 'SPAREPARTS/ACCESORIES/SERVICE');
+    this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'BREMSPACE').sizeDoubleWidth(false).bold(false);
+    this.text(slogan || 'Pusat Sparepart & Servis Gadget');
     if (alamat) this.text(alamat);
     if (telepon) this.text('Telp/WA: ' + telepon);
-    if (show_cabang && cabang) this.text(cabang);
+    if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) this.text(cabang);
 
-    // ======== QR / Web / Tanggal (urutan sama dengan preview) ========
+    // ======== 2-COL: QR (Left) + URL/Date/Warranty (Right) ========
     const qrContent = no_transaksi || '-';
-    const qrUrlDomain = qr_url || website_medsos || 'www.uteparts.id';
+    const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
     const tglStr = tanggal || waktu || '';
     const captionStr = qr_caption || 'Scan QR ini untuk retur & klaim garansi';
 
@@ -212,22 +219,28 @@ class EscPos {
       this.alignCenter();
       this.qrcode(qrContent, qr_size || 3);
       this.bold(true).text(qrContent).bold(false);
-      this.text(captionStr);
+      if (captionStr) this.text(captionStr);
+
       this.alignLeft();
-      this.text('Web: ' + qrUrlDomain);
-      if (tglVisible) this.text('Tgl: ' + tglStr);
     } else {
       this.alignLeft();
-      this.text('Web: ' + qrUrlDomain);
-      if (tglVisible) this.text('Tgl: ' + tglStr);
-      this.text(captionStr);
     }
+    this.text('Web: ' + qrUrlDomain);
+    if (tglVisible) this.text('Tgl: ' + tglStr);
 
     this.rule();
 
     // ======== TRANSACTION INFO ========
     this.alignLeft();
+    if (label_struk) {
+      this.alignCenter();
+      this.bold(true).text(label_struk).bold(false);
+      this.alignLeft();
+    }
     this.text(this.pad('No. TRX:', qrContent));
+    if (no_transaksi_asal && no_transaksi_asal !== '-') {
+      this.text(this.pad('Asal TRX:', no_transaksi_asal));
+    }
 
     if (sumber && !['pos', 'offline'].includes(sumber.toLowerCase())) {
       this.text(this.pad('Pesanan:', sumber.toUpperCase()));
@@ -247,11 +260,11 @@ class EscPos {
       this.text(this.pad(kurirLbl, kurir + resiTeks));
     }
 
-    if (show_kasir && kasir) {
+    if (show_kasir !== false && show_kasir !== 0 && show_kasir !== '0' && kasir) {
       this.text(this.pad('Kasir:', kasir));
     }
 
-    if (show_pelanggan) {
+    if (show_pelanggan !== false && show_pelanggan !== 0 && show_pelanggan !== '0') {
       const pel = pelanggan || 'Umum';
       this.text(this.pad('Pelanggan:', pel));
 
@@ -279,11 +292,21 @@ class EscPos {
         const normal = this.money(hargaRetail);
         const disc = this.money(hargaJual);
         const prefix = qtySatuan + ' x ';
-        const gap = Math.max(1, this.columns - prefix.length - normal.length - 1 - disc.length - rightVal.length);
-        this.raw(prefix);
-        this.escB(true).raw(normal).escB(false);
-        this.raw(' ' + disc);
-        this.buf.push(...this.ascii(' '.repeat(gap) + rightVal), 0x0a);
+        const totalLineLen = prefix.length + normal.length + 1 + disc.length + rightVal.length;
+
+        if (totalLineLen >= this.columns) {
+          this.raw(prefix);
+          this.escB(true).raw(normal).escB(false);
+          this.raw(' ' + disc + '\n');
+          const padRight = Math.max(0, this.columns - rightVal.length);
+          this.buf.push(...this.ascii(' '.repeat(padRight) + rightVal), 0x0a);
+        } else {
+          const gap = this.columns - totalLineLen;
+          this.raw(prefix);
+          this.escB(true).raw(normal).escB(false);
+          this.raw(' ' + disc);
+          this.buf.push(...this.ascii(' '.repeat(gap) + rightVal), 0x0a);
+        }
       } else if (hargaRetail > hargaJual) {
         this.text(this.pad(`${qtySatuan} x (${this.money(hargaRetail)}) -> ${this.money(hargaJual)}`, rightVal));
       } else {
@@ -298,7 +321,7 @@ class EscPos {
     }
 
     // ======== SUBTOTAL BREAKDOWN & TOTALS (Directly follows items) ========
-    if (show_subtotal_breakdown !== false && diskon_tier && Number(diskon_tier) > 0) {
+    if (show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0' && diskon_tier && Number(diskon_tier) > 0) {
       const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
       this.text(this.pad('Subtotal Retail:', this.money(subRetail)));
 
@@ -356,13 +379,25 @@ class EscPos {
       this.text(this.pad('Komisi:', '+' + this.money(komisi_mitra_nominal) + ' (Saldo)'));
     }
 
+    if (goodwill) {
+      this.text(this.pad('Goodwill:', String(goodwill)));
+    }
+    if (voucher) {
+      this.text(this.pad('Voucher:', String(voucher)));
+    }
+    if (komplain) {
+      for (const ln of this.wrap(String(komplain))) {
+        this.text(ln);
+      }
+    }
+
     this.rule();
 
     // ======== FOOTER (Centered) ========
     this.alignCenter();
     if (garansi) this.text('Garansi: ' + garansi);
-    this.text(footer_text || 'Terima kasih atas kunjungan Anda!');
-    this.text(kebijakan_retur || 'Segel toko wajib utuh & fisik barang tidak cacat.');
+    if (footer_text) this.text(footer_text);
+    if (kebijakan_retur) this.text(kebijakan_retur);
 
     if (catatan_kaki) {
       for (const ln of this.wrap(catatan_kaki)) {
@@ -394,7 +429,7 @@ class EscPos {
     return this.buildPreviewHtml(data);
   }
 
-  /** Build HTML preview aligned with ESC/POS receipt layout/flow */
+  /** Build HTML preview matching the exact paper layout */
   buildPreviewHtml(data, paperWidthOverride = null) {
     const {
       items = [],
@@ -405,13 +440,13 @@ class EscPos {
       pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
       is_piutang, jatuh_tempo, sisa_piutang, komisi_mitra_nominal,
       no_tiket, jenis_hp, kurir, is_pickup, resi, sumber,
-      garansi,
+      garansi, label_struk, no_transaksi_asal, goodwill, voucher, komplain,
       footer_text, kebijakan_retur, catatan_kaki,
       nama_toko, slogan, alamat, telepon, website_medsos,
       show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
       show_subtotal_breakdown = true,
       show_qr_retur = true, qr_caption, qr_url, qr_svg,
-      paper_width = 58, qr_size = 3,
+      paper_width = 58,
     } = data;
 
     const money = (v) => 'Rp ' + Number(v || 0).toLocaleString('id-ID');
@@ -425,20 +460,13 @@ class EscPos {
     const widthNum = Number(paperWidthOverride ?? paper_width) === 80 ? 80 : 58;
     const paperClass = widthNum === 80 ? 'paper-80' : 'paper-58';
     const qrContent = no_transaksi || '-';
-    const qrUrlDomain = qr_url || website_medsos || 'www.uteparts.id';
-    const tglStr = show_waktu ? (tanggal || waktu || '') : '';
+    const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
+    const tglStr = (show_waktu !== false && show_waktu !== 0 && show_waktu !== '0') ? (tanggal || waktu || '') : '';
     const caraBayar = String(metode_bayar || metode || 'TUNAI').toUpperCase();
-    const captionStr = qr_caption || 'Scan QR ini untuk retur & klaim garansi';
-    const qrShown = !!(show_qr_retur && qrContent !== '-');
-    const rule = '<div style="border-top:1px dashed #000; width:100%; margin:4px 0;"></div>';
-    const row = (left, right, opts = {}) => `
-      <div style="display:flex; justify-content:space-between; gap:8px; width:100%; ${opts.style || ''}">
-        <span style="${opts.leftStyle || ''}">${esc(left)}</span>
-        <span style="text-align:right; white-space:nowrap; ${opts.rightStyle || ''}">${esc(right)}</span>
-      </div>`;
 
+    // Generate fallback QR svg if none provided
     const renderedQr = qr_svg || `
-      <svg width="68" height="68" viewBox="0 0 100 100" style="background:#fff; border:1px solid #d1d5db; border-radius:4px; padding:2px;">
+      <svg width="68" height="68" viewBox="0 0 100 100" class="border border-gray-300 rounded p-0.5 bg-white">
         <rect width="100" height="100" fill="white"/>
         <rect x="10" y="10" width="25" height="25" fill="black"/>
         <rect x="15" y="15" width="15" height="15" fill="white"/>
@@ -450,134 +478,277 @@ class EscPos {
         <rect x="15" y="70" width="15" height="15" fill="white"/>
         <rect x="19" y="74" width="7" height="7" fill="black"/>
         <rect x="45" y="45" width="10" height="10" fill="black"/>
-      </svg>`;
+        <rect x="40" y="20" width="6" height="15" fill="black"/>
+        <rect x="60" y="45" width="8" height="8" fill="black"/>
+        <rect x="45" y="65" width="12" height="6" fill="black"/>
+        <rect x="65" y="65" width="10" height="15" fill="black"/>
+      </svg>
+    `;
 
-    // Items (follow ESC/POS flow)
-    const itemsHtml = items.map(item => {
+    const lblDiskon = (diskon_persen && Number(diskon_persen) > 0)
+      ? 'Diskon (' + diskon_persen + '%)'
+      : 'Diskon Kasir';
+    const ppnLabel = ppn_persen ? 'PPN (' + ppn_persen + '%)' : 'PPN';
+
+    return `
+<div class="thermal-receipt-doc ${paperClass}" style="width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: ${widthNum === 80 ? '11px' : '10px'}; line-height: 1.25; color: #000; background: #fff;">
+  <!-- HEADER (Centered) -->
+  <div style="text-align: center; width: 100%; padding-bottom: 2px;">
+    <div style="font-size: 14px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; text-align: center;">${esc(nama_toko || 'BREMSPACE')}</div>
+    <div style="font-size: 9px; font-weight: 600; text-transform: uppercase; margin-top: 2px; text-align: center;">${esc(slogan || 'Pusat Sparepart & Servis Gadget')}</div>
+    ${alamat ? `<div style="font-size: 8px; color: #374151; margin-top: 2px; line-height: 1.2; text-align: center;">${esc(alamat)}</div>` : ''}
+    ${telepon ? `<div style="font-size: 8.5px; color: #1f2937; text-align: center;">Telp/WA: ${esc(telepon)}</div>` : ''}
+    ${(show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) ? `<div style="font-size: 8.5px; font-weight: 600; text-align: center;">${esc(cabang)}</div>` : ''}
+  </div>
+
+  <!-- 2-COL: QR (Left) + URL/Date/Warranty Note (Right) -->
+  <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; gap: 8px; padding: 4px 0;">
+    ${show_qr_retur && qrContent !== '-' ? `
+      <div style="width: 68px; height: 68px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+        ${renderedQr}
+      </div>
+    ` : ''}
+    <div style="flex: 1; min-width: 0; text-align: left; font-size: 8.5px; line-height: 1.25;">
+      <div style="font-weight: 600; color: #111827; word-break: break-all;">${esc(qrUrlDomain)}</div>
+      ${tglStr ? `<div style="color: #374151;">${esc(tglStr)}</div>` : ''}
+      ${show_qr_retur ? `<div style="font-size: 8px; color: #4b5563; margin-top: 2px;">${esc(qr_caption || 'Scan QR ini untuk retur & klaim garansi')}</div>` : ''}
+    </div>
+  </div>
+
+  <div style="border-top: 1px dashed #000; width: 100%; margin: 4px 0;"></div>
+
+  <!-- TRANSACTION INFO (Left-Right) -->
+  <div style="width: 100%; font-size: 9px; line-height: 1.35;">
+    ${label_struk ? `
+      <div style="text-align: center; font-weight: 800; font-size: 9.5px; padding: 2px 0; color: #111827; text-transform: uppercase;">
+        ${esc(label_struk)}
+      </div>
+    ` : ''}
+    <div style="display: flex; justify-content: space-between; width: 100%;">
+      <span style="color: #4b5563;">No. TRX:</span>
+      <span style="font-weight: 700; color: #111827;">${esc(qrContent)}</span>
+    </div>
+    ${no_transaksi_asal && no_transaksi_asal !== '-' ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Asal TRX:</span>
+        <span style="font-weight: 600;">${esc(no_transaksi_asal)}</span>
+      </div>
+    ` : ''}
+    ${sumber && !['pos', 'offline'].includes(sumber.toLowerCase()) ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Pesanan:</span>
+        <span>${esc(sumber.toUpperCase())}</span>
+      </div>
+    ` : ''}
+    ${no_tiket ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">No. Tiket:</span>
+        <span style="font-weight: 700;">${esc(no_tiket)}</span>
+      </div>
+    ` : ''}
+    ${jenis_hp ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Unit:</span>
+        <span>${esc(jenis_hp)}</span>
+      </div>
+    ` : ''}
+    ${kurir ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">${is_pickup ? 'Ambil:' : 'Kurir:'}</span>
+        <span>${esc(kurir + (resi && resi !== '-' ? ' (' + resi + ')' : ''))}</span>
+      </div>
+    ` : ''}
+    ${(show_kasir !== false && show_kasir !== 0 && show_kasir !== '0' && kasir) ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Kasir:</span>
+        <span>${esc(kasir)}</span>
+      </div>
+    ` : ''}
+    ${(show_pelanggan !== false && show_pelanggan !== 0 && show_pelanggan !== '0') ? `
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <span style="color: #4b5563;">Pelanggan:</span>
+        <span>${esc(pelanggan || 'Umum')}</span>
+      </div>
+      ${tier && tier !== 'Retail' && tier !== 'Umum' ? `
+        <div style="display: flex; justify-content: space-between; width: 100%;">
+          <span style="color: #4b5563;">${['reseller', 'agen'].includes(tipe_konsumen) ? 'Mitra:' : 'Tier:'}</span>
+          <span style="font-weight: 700;">${esc(tier)}</span>
+        </div>
+      ` : ''}
+    ` : ''}
+  </div>
+
+  <!-- ITEMS -->
+  <div style="width: 100%; margin: 4px 0;">
+    ${items.map(item => {
       const nama = item.nama || 'Item';
       const qtySatuan = (item.qty || 1) + ' ' + unitLabel(item.satuan);
       const harga = money(item.harga);
-      const rightVal = numberOnly(item.subtotal);
+      const subtotalItem = numberOnly(item.subtotal);
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
-      const leftPrice = (hargaRetail > hargaJual)
-        ? `${qtySatuan} x <span style="text-decoration:line-through;opacity:.8">${esc(money(hargaRetail))}</span> ${esc(money(hargaJual))}`
-        : `${qtySatuan} x ${esc(harga)}`;
+
       return `
-        <div style="width:100%; margin-bottom:2px;">
-          <div style="font-weight:700; line-height:1.25; word-break:break-word;">${esc(nama)}</div>
-          <div style="display:flex; justify-content:space-between; gap:8px; width:100%; font-size:inherit;">
-            <span>${leftPrice}</span>
-            <span style="text-align:right; white-space:nowrap;">${esc(rightVal)}</span>
+        <div style="width: 100%; margin-bottom: 4px;">
+          <div style="font-weight: 700; font-size: 9.5px; line-height: 1.25; word-break: break-word;">${esc(nama)}</div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: ${widthNum === 80 ? '9.5px' : '9px'}; margin-top: 1px; gap: 4px;">
+            <span style="flex: 1; min-width: 0; word-break: break-word;">
+              ${qtySatuan} x ${hargaRetail > hargaJual ? `
+                <span style="text-decoration: line-through; opacity: 0.75; margin-right: 2px;">${money(hargaRetail)}</span>
+                <span style="font-weight: 700;">${money(hargaJual)}</span>
+              ` : `<span>${harga}</span>`}
+            </span>
+            <span style="font-weight: 700; text-align: right; white-space: nowrap; flex-shrink: 0;" class="tabular-nums">${subtotalItem}</span>
           </div>
-          ${item.catatan ? `<div style="font-size:0.9em; opacity:.85;">  * ${esc(item.catatan)}</div>` : ''}
-        </div>`;
-    }).join('');
+          ${item.catatan ? `<div style="font-size: 8px; color: #4b5563; font-style: italic; margin-top: 1px;">* ${esc(item.catatan)}</div>` : ''}
+        </div>
+      `;
+    }).join('')}
+  </div>
 
-    // Totals/breakdown (match buildReceipt conditions/order)
-    let totalsHtml = '';
-    if (show_subtotal_breakdown !== false && diskon_tier && Number(diskon_tier) > 0) {
-      const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
-      const tierLbl = (tier && tier !== 'Retail') ? `Pot ${tier}:` : (['reseller', 'agen'].includes(tipe_konsumen) ? 'Pot Mitra:' : 'Pot Tier:');
-      totalsHtml += row('Subtotal Retail:', money(subRetail));
-      totalsHtml += row(tierLbl, '-' + money(diskon_tier));
-      totalsHtml += row('Subtotal:', money(subtotal ?? total));
-    } else {
-      totalsHtml += row('Subtotal:', money(subtotal ?? total));
-    }
-    if (diskon_partai && Number(diskon_partai) > 0) totalsHtml += row('Diskon Partai:', '-' + money(diskon_partai));
-    if (diskon_poin && Number(diskon_poin) > 0) totalsHtml += row(`Tukar Poin (${poin_ditukar || 0}pts):`, '-' + money(diskon_poin));
-    if (diskon && Number(diskon) > 0) {
-      const lbl = (diskon_persen && Number(diskon_persen) > 0) ? `Diskon (${diskon_persen}%):` : 'Diskon Kasir:';
-      totalsHtml += row(lbl, '-' + money(diskon));
-    }
-    if (pajak && Number(pajak) > 0) totalsHtml += row(ppn_persen ? `PPN (${ppn_persen}%):` : 'PPN:', '+' + money(pajak));
-    if (ongkir && Number(ongkir) > 0) totalsHtml += row('Ongkir:', '+' + money(ongkir));
-
-    totalsHtml += `
-      <div style="display:flex; justify-content:space-between; gap:8px; width:100%; font-size:1.2em; font-weight:900; padding:2px 0;">
-        <span>TOTAL:</span><span style="text-align:right; white-space:nowrap;">${esc(money(total))}</span>
-      </div>`;
-
-    if (is_piutang) {
-      totalsHtml += row('Status:', 'BELUM LUNAS (PIUTANG)', { rightStyle: 'font-weight:700;' });
-      if (jatuh_tempo) totalsHtml += row('Jatuh Tempo:', jatuh_tempo);
-      totalsHtml += row('Sisa Tag:', money(sisa_piutang ?? total), { rightStyle: 'font-weight:700;' });
-    } else {
-      totalsHtml += row(`BAYAR (${caraBayar}):`, money(bayar || total), { rightStyle: 'font-weight:600;' });
-      totalsHtml += row('KEMBALI:', money(kembali ?? 0), { rightStyle: 'font-weight:600;' });
-    }
-    if (saldo_poin !== undefined) totalsHtml += row('Sisa Saldo Poin:', numberOnly(saldo_poin) + ' pts');
-    if (hemat_total && Number(hemat_total) > 0) totalsHtml += row('HEMAT:', money(hemat_total), { leftStyle: 'font-weight:700;', rightStyle: 'font-weight:700;' });
-    if (komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0) totalsHtml += row('Komisi:', '+' + money(komisi_mitra_nominal) + ' (Saldo)');
-
-    // Header/QR block (follow buildReceipt order)
-    const qrBlock = qrShown ? `
-      <div style="text-align:center; width:100%; margin:2px 0;">
-        <div style="display:inline-block;">${renderedQr}</div>
-        <div style="font-weight:700; margin-top:2px;">${esc(qrContent)}</div>
-        <div style="font-size:0.9em;">${esc(captionStr)}</div>
+  <!-- SUBTOTAL BREAKDOWN & TOTALS (Directly follows items without extra dashed line) -->
+  <div style="width: 100%; font-size: 9px; line-height: 1.35;">
+    ${(show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0') && diskon_tier && Number(diskon_tier) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">Subtotal Retail:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier)))}</span>
       </div>
-      <div style="text-align:left; width:100%;">
-        <div>Web: ${esc(qrUrlDomain)}</div>
-        ${tglStr ? `<div>Tgl: ${esc(tglStr)}</div>` : ''}
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">${tier && tier !== 'Retail' ? 'Pot ' + esc(tier) + ':' : 'Pot Mitra:'}</span>
+        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_tier)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">Subtotal:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(subtotal ?? total)}</span>
       </div>
     ` : `
-      <div style="text-align:left; width:100%;">
-        <div>Web: ${esc(qrUrlDomain)}</div>
-        ${tglStr ? `<div>Tgl: ${esc(tglStr)}</div>` : ''}
-        <div>${esc(captionStr)}</div>
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">Subtotal:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(subtotal ?? total)}</span>
       </div>
-    `;
+    `}
 
-    // Transaction info
-    let infoHtml = row('No. TRX:', qrContent, { rightStyle: 'font-weight:700;' });
-    if (sumber && !['pos', 'offline'].includes(String(sumber).toLowerCase())) infoHtml += row('Pesanan:', String(sumber).toUpperCase());
-    if (no_tiket) infoHtml += row('No. Tiket:', no_tiket, { leftStyle: 'font-weight:700;', rightStyle: 'font-weight:700;' });
-    if (jenis_hp) infoHtml += row('Unit:', jenis_hp);
-    if (kurir) infoHtml += row(is_pickup ? 'Ambil:' : 'Kurir:', kurir + (resi && resi !== '-' ? ' (' + resi + ')' : ''));
-    if (show_kasir && kasir) infoHtml += row('Kasir:', kasir);
-    if (show_pelanggan) {
-      infoHtml += row('Pelanggan:', pelanggan || 'Umum');
-      if (tier && tier !== 'Retail' && tier !== 'Umum') {
-        const lbl = ['reseller', 'agen'].includes(tipe_konsumen) ? 'Mitra:' : 'Tier:';
-        infoHtml += row(lbl, tier, { leftStyle: 'font-weight:700;', rightStyle: 'font-weight:700;' });
-      }
-    }
+    ${diskon_partai && Number(diskon_partai) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">Diskon Partai:</span>
+        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_partai)}</span>
+      </div>
+    ` : ''}
+    ${diskon_poin && Number(diskon_poin) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">Tukar Poin (${poin_ditukar || 0}pts):</span>
+        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_poin)}</span>
+      </div>
+    ` : ''}
+    ${diskon && Number(diskon) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">${esc(lblDiskon)}:</span>
+        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon)}</span>
+      </div>
+    ` : ''}
+    ${pajak && Number(pajak) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">${esc(ppnLabel)}:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">+${money(pajak)}</span>
+      </div>
+    ` : ''}
+    ${ongkir && Number(ongkir) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">Ongkir:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">+${money(ongkir)}</span>
+      </div>
+    ` : ''}
 
-    const footerPiutang = is_piutang ? `
-      <div style="margin-top:6px;">
-        <div style="font-style:italic; font-size:0.9em; text-align:center;">"Barang diterima &amp; berjanji melunasi sblm jatuh tempo"</div>
-        <div style="margin-top:6px; text-align:center;">Penerima,              Kasir,</div>
-        <div style="margin-top:14px; text-align:center;">(............)        (............)</div>
-      </div>` : '';
+    <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: 13px; font-weight: 900; padding: 2px 0; gap: 4px;">
+      <span>TOTAL:</span>
+      <span style="white-space: nowrap; flex-shrink: 0;">${money(total)}</span>
+    </div>
 
-    return `
-<div class="thermal-receipt-doc ${paperClass}" style="width:100%; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:${widthNum === 80 ? '11px' : '10px'}; line-height:1.3; color:#000; background:#fff;">
-  <div style="text-align:center; width:100%;">
-    <div style="font-size:1.4em; font-weight:900; letter-spacing:0.04em; text-transform:uppercase;">${esc(nama_toko || 'UTEParts')}</div>
-    <div style="font-size:0.9em; font-weight:600; text-transform:uppercase; margin-top:2px;">${esc(slogan || 'SPAREPARTS/ACCESORIES/SERVICE')}</div>
-    ${alamat ? `<div style="font-size:0.85em; margin-top:2px;">${esc(alamat)}</div>` : ''}
-    ${telepon ? `<div style="font-size:0.9em;">Telp/WA: ${esc(telepon)}</div>` : ''}
-    ${show_cabang && cabang ? `<div style="font-size:0.9em; font-weight:600;">${esc(cabang)}</div>` : ''}
+    ${is_piutang ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #b45309; gap: 4px;">
+        <span>Status:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">BELUM LUNAS (PIUTANG)</span>
+      </div>
+      ${jatuh_tempo ? `
+        <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+          <span style="color: #4b5563;">Jatuh Tempo:</span>
+          <span style="white-space: nowrap; flex-shrink: 0;">${esc(jatuh_tempo)}</span>
+        </div>
+      ` : ''}
+      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; gap: 4px;">
+        <span style="color: #4b5563;">Sisa Tag:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(sisa_piutang ?? total)}</span>
+      </div>
+    ` : `
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">BAYAR (${esc(caraBayar)}):</span>
+        <span style="font-weight: 600; white-space: nowrap; flex-shrink: 0;">${money(bayar || total)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">KEMBALI:</span>
+        <span style="font-weight: 600; white-space: nowrap; flex-shrink: 0;">${money(kembali ?? 0)}</span>
+      </div>
+    `}
+
+    ${saldo_poin !== undefined ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">Sisa Saldo Poin:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${Number(saldo_poin).toLocaleString('id-ID')} pts</span>
+      </div>
+    ` : ''}
+    ${hemat_total && Number(hemat_total) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #059669; gap: 4px;">
+        <span>HEMAT:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${money(hemat_total)}</span>
+      </div>
+    ` : ''}
+    ${komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; color: #2563eb; gap: 4px;">
+        <span style="color: #4b5563;">Komisi:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">+${money(komisi_mitra_nominal)} (Saldo)</span>
+      </div>
+    ` : ''}
+    ${goodwill ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669; gap: 4px;">
+        <span style="color: #4b5563;">Goodwill:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${esc(goodwill)}</span>
+      </div>
+    ` : ''}
+    ${voucher ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669; gap: 4px;">
+        <span style="color: #4b5563;">Voucher:</span>
+        <span style="white-space: nowrap; flex-shrink: 0;">${esc(voucher)}</span>
+      </div>
+    ` : ''}
+    ${komplain ? `
+      <div style="font-size: 8px; color: #b45309; margin-top: 2px;">* ${esc(komplain)}</div>
+    ` : ''}
   </div>
 
-  ${qrBlock}
-  ${rule}
+  <div style="border-top: 1px dashed #000; width: 100%; margin: 4px 0;"></div>
 
-  <div style="width:100%;">${infoHtml}</div>
-  <div style="width:100%; margin:4px 0;">${itemsHtml}</div>
-  <div style="width:100%;">${totalsHtml}</div>
-
-  ${rule}
-  <div style="text-align:center; width:100%; font-size:0.9em;">
-    ${garansi ? `<div style="font-weight:700;">Garansi: ${esc(garansi)}</div>` : ''}
-    <div>${esc(footer_text || 'Terima kasih atas kunjungan Anda!')}</div>
-    <div>${esc(kebijakan_retur || 'Segel toko wajib utuh & fisik barang tidak cacat.')}</div>
-    ${catatan_kaki ? `<div style="margin-top:2px;">${esc(catatan_kaki)}</div>` : ''}
-    ${footerPiutang}
+  <!-- FOOTER (Centered) -->
+  <div style="text-align: center; width: 100%; font-size: 8.5px; color: #374151; line-height: 1.3; padding-top: 2px;">
+    ${garansi ? `<div style="font-weight: 700; color: #111827; text-align: center;">Garansi: ${esc(garansi)}</div>` : ''}
+    ${footer_text ? `<div style="text-align: center; font-weight: 500; color: #374151;">${esc(footer_text)}</div>` : ''}
+    ${kebijakan_retur ? `<div style="font-size: 8px; color: #4b5563; text-align: center;">${esc(kebijakan_retur)}</div>` : ''}
+    ${catatan_kaki ? `<div style="font-size: 8px; color: #6b7280; margin-top: 2px; text-align: center;">${esc(catatan_kaki)}</div>` : ''}
+    ${is_piutang ? `
+      <div style="margin-top: 8px; border-top: 1px dotted #d1d5db; padding-top: 4px;">
+        <div style="font-style: italic; font-size: 7.5px; text-align: center;">"Barang diterima & berjanji melunasi sblm jatuh tempo"</div>
+        <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 8px; padding: 0 8px;">
+          <div>Penerima,</div>
+          <div>Kasir,</div>
+        </div>
+        <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 16px; padding: 0 8px;">
+          <div>(............)</div>
+          <div>(............)</div>
+        </div>
+      </div>
+    ` : ''}
   </div>
-</div>`;
+</div>
+`;
   }
 }
 
@@ -874,8 +1045,15 @@ function thermalPrinter(config = {}) {
     printer: printer,
 
     init() {
-      this.paperSize = localStorage.getItem('ute_pos_paper_size') ||
-        (this.data.default_width?.includes('80') ? '80' : '58');
+      const templateDefault = this.data.default_width?.includes('80') ? '80' : '58';
+      const lastTemplate = localStorage.getItem('ute_pos_template_width');
+      if (lastTemplate !== templateDefault) {
+        localStorage.setItem('ute_pos_template_width', templateDefault);
+        localStorage.setItem('ute_pos_paper_size', templateDefault);
+        this.paperSize = templateDefault;
+      } else {
+        this.paperSize = localStorage.getItem('ute_pos_paper_size') || templateDefault;
+      }
 
       printer.onStatusChange = (status) => {
         if (status === 'connected') {
@@ -905,7 +1083,7 @@ function thermalPrinter(config = {}) {
       try {
         const paperWidth = Number(paperSize) === 80 ? 80 : 58;
         // Selera kertas & mode font selalu eksplisit agar output == preview == backend job.
-        const payload = { ...this.data, paper_width: paperWidth, font_size: 'small' };
+        const payload = { ...this.data, paper_width: paperWidth, font_size: this.data.font_size || 'small' };
         const esc = new window.EscPos(paperWidth);
         const bytes = esc.buildReceipt(payload, paperWidth);
 
@@ -961,14 +1139,16 @@ function thermalPrinter(config = {}) {
 
       const paperWidth = Number(paperSize) === 80 ? 80 : 58;
       const esc = new window.EscPos(paperWidth);
-      const html = esc.buildPreviewHtml({ ...this.data, paper_width: paperWidth, font_size: 'small' }, paperWidth);
+      const html = esc.buildPreviewHtml({ ...this.data, paper_width: paperWidth, font_size: this.data.font_size || 'small' }, paperWidth);
+
+      const storeName = this.data.nama_toko || 'Bremspace';
 
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
-          <title>Struk UTEParts</title>
+          <title>Struk ${esc(storeName)}</title>
           <style>
             @media print {
               @page { margin: 0; size: ${paperWidth}mm auto; }

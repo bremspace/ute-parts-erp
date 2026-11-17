@@ -16,6 +16,7 @@ use App\Modules\Hr\Jobs\HitungKpiBulananJob;
 use App\Modules\Marketplace\Console\Commands\DuitkuHealthCommand;
 use App\Modules\Marketplace\Console\Commands\DuitkuRekonCommand;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
+use App\Modules\Rbac\Services\SessionManagementService;
 use App\Modules\Servis\Console\Commands\CekBatasWaktuServisCommand;
 use App\Modules\Wms\Jobs\CycleCountJob;
 use App\Modules\Wms\Jobs\ReorderOtomatisJob;
@@ -179,7 +180,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // [SES] Bersihkan sesi perangkat kedaluwarsa (staf & member) — jaga tabel
         // device session tetap kecil di server 1GB.
         $schedule->call(function () {
-            $service = app(\App\Modules\Rbac\Services\SessionManagementService::class);
+            $service = app(SessionManagementService::class);
             $service->cleanupExpired(30);
             $service->cleanupExpiredPelanggan(120);
         })->name('cleanup-device-sessions')->dailyAt('05:30')->withoutOverlapping();

@@ -409,7 +409,7 @@ class ShopPage extends Component
         $query->filterKatalog($filters);
 
         // [CMS] Sembunyikan produk kosong (stok 0) jika diaktifkan di pengaturan web-konsumen
-        $hideOutOfStock = (bool) app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->get('hide_out_of_stock', false);
+        $hideOutOfStock = (bool) app(WebKonsumenService::class)->get('hide_out_of_stock', false);
         if ($hideOutOfStock) {
             $query->whereHas('stokItems', function ($sq) {
                 $sq->where('jumlah', '>', 0);

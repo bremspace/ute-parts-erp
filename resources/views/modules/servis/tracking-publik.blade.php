@@ -414,7 +414,7 @@
                                                 </svg>
                                                 Tolak Estimasi Biaya
                                             </h4>
-                                            <button type="button" @click="showRejectModal = false" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+                                            <button type="button" @click="showRejectModal = false" aria-label="Tutup dialog" class="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] text-slate-400 hover:text-slate-600 text-sm flex items-center justify-center p-1 rounded-lg hover:bg-slate-100 transition-colors active:scale-[0.97]">✕</button>
                                         </div>
 
                                         <p class="text-xs text-slate-600">

@@ -1598,8 +1598,8 @@
                             <div class="flex flex-col items-center justify-center p-4 sm:p-6 bg-ink-950/40 rounded-2xl border border-white/5">
                                 <!-- Kertas Struk Simulasi -->
                                 <div
-                                    class="bg-white text-black p-3 rounded-xl font-mono text-[10px] shadow-2xl space-y-1.5 border border-gray-300 transition-all duration-200 select-text"
-                                    style="width: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '210px' : '302px' }}; max-width: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '210px' : '302px' }}; margin: 0 auto; line-height: 1.25;"
+                                    class="bg-white text-black rounded-xl font-mono text-[10px] shadow-2xl space-y-1.5 border border-gray-300 transition-all duration-200 select-text"
+                                    style="width: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '216px' : '302px' }}; max-width: 100%; padding: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '8px 10px' : '12px 14px' }}; margin: 0 auto; line-height: 1.25;"
                                 >
                                     <!-- Header Toko (Centered) -->
                                     <div class="text-center pb-0.5 space-y-0.5">
@@ -1658,50 +1658,50 @@
                                     <div class="space-y-1.5 my-1 text-[9px]">
                                         <div>
                                             <div class="font-bold text-gray-900 text-[9.5px] leading-snug break-words">LCD+TS VIVO (Y20/Y21/Y22/Y33S/Y35) BLACK OG SUPER</div>
-                                            <div class="flex justify-between items-baseline text-[9px] mt-0.5">
-                                                <span>
+                                            <div class="flex justify-between items-baseline text-[9px] mt-0.5 gap-1">
+                                                <span class="flex-1 min-w-0">
                                                     1 PCS x <span class="line-through text-gray-400 mr-1" style="text-decoration: line-through;">Rp 125.000</span>
                                                     <span class="font-bold text-gray-900">Rp 110.000</span>
                                                 </span>
-                                                <span class="font-bold text-gray-900 text-right">110.000</span>
+                                                <span class="font-bold text-gray-900 text-right whitespace-nowrap shrink-0 tabular-nums">110.000</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     @if($strukForm['show_subtotal_breakdown'] ?? false)
                                         <div class="text-[9px] space-y-0.5 text-gray-600">
-                                            <div class="flex justify-between">
+                                            <div class="flex justify-between gap-1">
                                                 <span>Subtotal Retail:</span>
-                                                <span>Rp 125.000</span>
+                                                <span class="whitespace-nowrap shrink-0">Rp 125.000</span>
                                             </div>
-                                            <div class="flex justify-between">
+                                            <div class="flex justify-between gap-1">
                                                 <span>Pot Mitra:</span>
-                                                <span class="text-red-600">-Rp 15.000</span>
+                                                <span class="text-red-600 whitespace-nowrap shrink-0">-Rp 15.000</span>
                                             </div>
                                         </div>
                                     @endif
 
                                     <!-- Total & Bayar -->
                                     <div class="space-y-0.5 text-[9px] leading-tight">
-                                        <div class="flex justify-between">
+                                        <div class="flex justify-between gap-1">
                                             <span class="text-gray-600">Subtotal:</span>
-                                            <span>Rp 110.000</span>
+                                            <span class="whitespace-nowrap shrink-0">Rp 110.000</span>
                                         </div>
-                                        <div class="flex justify-between items-baseline font-black text-xs text-gray-950 py-0.5">
+                                        <div class="flex justify-between items-baseline font-black text-xs text-gray-950 py-0.5 gap-1">
                                             <span>TOTAL:</span>
-                                            <span class="text-[13px]">Rp 110.000</span>
+                                            <span class="text-[13px] whitespace-nowrap shrink-0">Rp 110.000</span>
                                         </div>
-                                        <div class="flex justify-between text-gray-800">
+                                        <div class="flex justify-between text-gray-800 gap-1">
                                             <span class="text-gray-600">BAYAR (TUNAI):</span>
-                                            <span class="font-bold">Rp 110.000</span>
+                                            <span class="font-bold whitespace-nowrap shrink-0">Rp 110.000</span>
                                         </div>
-                                        <div class="flex justify-between text-gray-800">
+                                        <div class="flex justify-between text-gray-800 gap-1">
                                             <span class="text-gray-600">KEMBALI:</span>
-                                            <span class="font-bold">Rp 0</span>
+                                            <span class="font-bold whitespace-nowrap shrink-0">Rp 0</span>
                                         </div>
-                                        <div class="flex justify-between text-gray-600">
+                                        <div class="flex justify-between text-gray-600 gap-1">
                                             <span>Sisa Saldo Poin:</span>
-                                            <span>0 pts</span>
+                                            <span class="whitespace-nowrap shrink-0">0 pts</span>
                                         </div>
                                     </div>
 

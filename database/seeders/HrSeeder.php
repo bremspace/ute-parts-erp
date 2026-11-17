@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\BagiHasilRule;
+use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KpiMetric;
 use App\Modules\Hr\Models\Shift;
 use App\Modules\Rbac\Models\Cabang;

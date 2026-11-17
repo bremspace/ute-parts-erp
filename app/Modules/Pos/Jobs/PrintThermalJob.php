@@ -111,11 +111,11 @@ class PrintThermalJob implements ShouldQueue
 
         $data = [
             // Header info from struk config
-            'nama_toko' => $strukConfig['nama_toko'] ?? 'UTEPARTS',
-            'slogan' => $strukConfig['slogan'] ?? 'Sparepart & Aksesoris Gadget',
-            'alamat' => $strukConfig['alamat'] ?? 'Jl. Veteran No. 12, Cibolang Kaler, Sukabumi',
+            'nama_toko' => $strukConfig['nama_toko'] ?? config('app.name', 'BREMSPACE'),
+            'slogan' => $strukConfig['slogan'] ?? 'Pusat Sparepart & Servis Gadget',
+            'alamat' => $strukConfig['alamat'] ?? 'Jl. Veteran No. 12',
             'telepon' => $strukConfig['telepon'] ?? '0812-3456-7890',
-            'website_medsos' => $strukConfig['website_medsos'] ?? 'www.uteparts.id',
+            'website_medsos' => $strukConfig['website_medsos'] ?? 'www.bremspace.com',
 
             // Display options
             'show_cabang' => $strukConfig['show_cabang'] ?? true,
@@ -124,13 +124,13 @@ class PrintThermalJob implements ShouldQueue
             'show_waktu' => $strukConfig['show_waktu'] ?? true,
             'show_subtotal_breakdown' => $strukConfig['show_subtotal_breakdown'] ?? true,
             'show_qr_retur' => $strukConfig['show_qr_retur'] ?? true,
-            'qr_caption' => $strukConfig['qr_caption'] ?? 'Scan QR untuk Retur & Garansi',
-            'qr_size' => $strukConfig['qr_size'] ?? 4,
-            'qr_url' => $strukConfig['qr_url'] ?? 'www.uteparts.id',
+            'qr_caption' => $strukConfig['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi',
+            'qr_size' => (int) ($strukConfig['qr_size'] ?? 4),
+            'qr_url' => $strukConfig['website_medsos'] ?? 'www.bremspace.com',
 
-            // Paper & font settings (paper-saving: compressed/small)
-            'paper_width' => $strukConfig['default_width'] === '80mm' ? EscPosWriter::WIDTH_80MM : EscPosWriter::WIDTH_58MM,
-            'font_size' => 'small', // Always compressed for paper saving
+            // Paper & font settings
+            'paper_width' => str_contains($strukConfig['default_width'] ?? '', '80') ? EscPosWriter::WIDTH_80MM : EscPosWriter::WIDTH_58MM,
+            'font_size' => $strukConfig['font_size'] ?? 'small',
 
             // Transaction data
             'items' => $items,
@@ -179,7 +179,7 @@ class PrintThermalJob implements ShouldQueue
 
             // Garansi
             'garansi' => $transaksi->garansi_teks ?? '3 Hari Toko (Sesuai T&C Penyerahan)',
-            'footer_text' => $strukConfig['footer_text'] ?? 'Terima Kasih atas Kunjungan Anda!',
+            'footer_text' => $strukConfig['footer_text'] ?? 'Terima kasih atas kunjungan Anda!',
             'kebijakan_retur' => $strukConfig['kebijakan_retur'] ?? null,
             'catatan_kaki' => $strukConfig['catatan_kaki'] ?? null,
         ];

@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 #[Fillable([
     'tiket_servis_id',
@@ -52,7 +53,7 @@ class TiketServisProgress extends Model
         }
 
         try {
-            return \Illuminate\Support\Facades\Storage::disk('public')->url($value);
+            return Storage::disk('public')->url($value);
         } catch (\Throwable) {
             return $value;
         }
