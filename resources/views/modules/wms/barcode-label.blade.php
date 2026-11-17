@@ -241,7 +241,7 @@
         <!-- Floating Toolbar (Hanya Tampil di Layar) -->
         <div class="toolbar no-print">
             <div style="display:flex; align-items:center; gap:10px;">
-                <button type="button" id="btn-print-label" class="btn btn-primary">
+                <button type="button" onclick="window.print()" class="btn btn-primary">
                     🖨️ Cetak Label ({{ $produks->count() }} Produk)
                 </button>
                 <a href="{{ url('/app/wms') }}" class="btn btn-secondary">

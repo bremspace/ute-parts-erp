@@ -168,8 +168,8 @@
         <option value="80x100" {{ $paperSize === '80x100' ? 'selected' : '' }}>80 × 100 mm (Label Box)</option>
         <option value="80mm" {{ $paperSize === '80mm' ? 'selected' : '' }}>80 mm Roll Continuous</option>
     </select>
-    <button id="btn-print-label" class="btn btn-print">🖨️ Cetak Label</button>
-    <button id="btn-close-label" class="btn btn-close">✕ Tutup</button>
+    <button onclick="window.print()" class="btn btn-print">🖨️ Cetak Label</button>
+    <button onclick="window.close()" class="btn btn-close">✕ Tutup</button>
 </div>
 
 <div class="container">
