@@ -90,7 +90,7 @@
                         autofocus
                         autocomplete="username"
                         placeholder="nama@bremspace.id atau nama pengguna"
-                        class="w-full px-4 py-3 rounded-xl glass-input text-sm"
+                        class="w-full px-4 py-3 rounded-xl glass-input text-base sm:text-sm"
                         value="{{ old('email') }}"
                     />
                 </div>
@@ -107,7 +107,7 @@
                         required
                         autocomplete="current-password"
                         placeholder="••••••••"
-                        class="w-full px-4 py-3 rounded-xl glass-input text-sm"
+                        class="w-full px-4 py-3 rounded-xl glass-input text-base sm:text-sm"
                         value=""
                     />
                 </div>

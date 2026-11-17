@@ -69,11 +69,13 @@
                     </div>
                 </div>
             @empty
-                <div class="col-span-full text-center py-16 text-ink-400">
-                    <svg class="w-10 h-10 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9" />
-                    </svg>
-                    Belum ada channel terhubung. Hubungkan Shopee (MVP) untuk mulai sinkronisasi stok & order.
+                <div class="col-span-full py-16">
+                    <x-ui.empty-state
+                        size="sm"
+                        icon="globe"
+                        title="Belum Ada Channel Terhubung"
+                        description="Hubungkan Shopee (MVP) atau marketplace lain untuk mulai sinkronisasi stok dan pesanan."
+                    />
                 </div>
             @endforelse
         </div>
@@ -83,7 +85,7 @@
     @if($activeTab === 'mapping')
         <div class="space-y-4">
             <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-                <select wire:model.live="mappingChannelId" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium w-full sm:w-64 min-h-[44px]">
+                <select wire:model.live="mappingChannelId" class="px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium w-full sm:w-64 min-h-[44px]">
                     <option value="" class="bg-ink-900">Semua Channel</option>
                     @foreach($channels as $c)
                         <option value="{{ $c['id'] }}" class="bg-ink-900">{{ $c['nama'] }}</option>
@@ -113,8 +115,13 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="py-12 text-center text-ink-400">
-                            Belum ada mapping. Pilih channel & produk di bawah untuk memetakan produk lokal → SKU channel.
+                        <td colspan="6" class="py-12">
+                            <x-ui.empty-state
+                                size="sm"
+                                icon="link"
+                                title="Belum Ada Mapping SKU"
+                                description="Pilih channel dan produk untuk memetakan produk lokal ke SKU channel marketplace."
+                            />
                         </td>
                     </tr>
                 @endforelse
@@ -158,8 +165,13 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" class="py-12 text-center text-ink-400">
-                        Unified Inbox kosong — order dari channel eksternal akan muncul di sini via webhook/polling.
+                    <td colspan="6" class="py-12">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="inbox"
+                            title="Unified Inbox Kosong"
+                            description="Order dari channel eksternal akan muncul di sini secara otomatis melalui webhook dan polling sinkronisasi."
+                        />
                     </td>
                 </tr>
             @endforelse
@@ -217,8 +229,13 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="py-12 text-center text-ink-400">
-                            Tidak ada data pesanan marketplace.
+                        <td colspan="6" class="py-12">
+                            <x-ui.empty-state
+                                size="sm"
+                                icon="document"
+                                title="Tidak Ada Pesanan"
+                                description="Tidak ada data pesanan marketplace pada kriteria ini."
+                            />
                         </td>
                     </tr>
                 @endforelse

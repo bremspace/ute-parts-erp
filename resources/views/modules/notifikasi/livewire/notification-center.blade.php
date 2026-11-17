@@ -351,14 +351,13 @@
                     </div>
                 @empty
                     @if($pendingApprovals->isEmpty())
-                        <div class="py-12 px-4 text-center">
-                            <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-up-mint/10 text-up-mint flex items-center justify-center">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <p class="text-xs font-bold text-ink-900 dark:text-white">Semua Notifikasi Bersih</p>
-                            <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-1">Tidak ada notifikasi atau approval yang tertunda.</p>
+                        <div class="py-12 px-4">
+                            <x-ui.empty-state
+                                size="sm"
+                                icon="check"
+                                title="Semua Notifikasi Bersih"
+                                description="Tidak ada notifikasi atau approval yang tertunda."
+                            />
                         </div>
                     @endif
                 @endforelse

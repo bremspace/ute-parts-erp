@@ -53,7 +53,7 @@
                     <input type="text"
                            wire:model.live.debounce.300ms="gadgetModel"
                            placeholder="Ketik tipe atau seri gadget..."
-                           class="w-full px-4 py-3 rounded-2xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 text-xs sm:text-sm text-ink-900 dark:text-white focus:outline-none focus:border-up-primary">
+                           class="w-full px-4 py-3 rounded-2xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white focus:outline-none focus:border-up-primary">
                 </div>
 
                 @if($partCandidates->isNotEmpty())

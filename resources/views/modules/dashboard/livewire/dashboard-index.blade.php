@@ -619,11 +619,13 @@
                         </div>
                     </div>
                 @empty
-                    <div class="py-8 text-center">
-                        <div class="w-10 h-10 rounded-full bg-white/5 border border-white/10 text-ink-400 mx-auto flex items-center justify-center">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                        <p class="text-xs text-ink-400 font-medium mt-2">Belum ada perubahan harga beli dari penerimaan barang.</p>
+                    <div class="py-6">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="check"
+                            title="Belum Ada Perubahan Harga"
+                            description="Belum ada perubahan harga beli dari penerimaan barang."
+                        />
                     </div>
                 @endforelse
             </div>
@@ -679,8 +681,13 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="py-8 text-center text-ink-500">
-                                        Belum ada aktivitas transaksi hari ini.
+                                    <td colspan="6" class="py-6">
+                                        <x-ui.empty-state
+                                            size="sm"
+                                            icon="document"
+                                            title="Belum Ada Aktivitas"
+                                            description="Belum ada aktivitas transaksi pada periode hari ini."
+                                        />
                                     </td>
                                 </tr>
                             @endforelse
@@ -748,16 +755,16 @@
                     @if($periodePenjualan === 'custom')
                         <div class="flex items-center gap-1.5 bg-white/[0.02] border border-white/10 rounded-xl px-2 py-1 text-xs w-full sm:w-auto">
                             <input type="date" wire:model.live="penjualanCustomDari"
-                                class="bg-transparent text-white border-0 text-xs p-1 focus:ring-0 flex-1 sm:flex-initial">
+                                class="bg-transparent text-white border-0 text-base sm:text-xs p-1 focus:ring-0 flex-1 sm:flex-initial min-h-[44px] sm:min-h-0">
                             <span class="text-ink-500">s/d</span>
                             <input type="date" wire:model.live="penjualanCustomSampai"
-                                class="bg-transparent text-white border-0 text-xs p-1 focus:ring-0 flex-1 sm:flex-initial">
+                                class="bg-transparent text-white border-0 text-base sm:text-xs p-1 focus:ring-0 flex-1 sm:flex-initial min-h-[44px] sm:min-h-0">
                         </div>
                     @endif
 
                     <!-- Filter Sumber -->
                     <select wire:model.live="penjualanFilterSumber"
-                        class="flex-1 sm:flex-initial min-w-[120px] px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-primary focus:ring-0">
+                        class="flex-1 sm:flex-initial min-w-[120px] px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-base sm:text-xs text-white focus:border-up-primary focus:ring-0 min-h-[44px] sm:min-h-0">
                         <option value="" class="bg-gray-900 text-white">Semua Sumber</option>
                         <option value="pos" class="bg-gray-900 text-white">Kasir (POS)</option>
                         <option value="marketplace" class="bg-gray-900 text-white">Marketplace</option>
@@ -767,7 +774,7 @@
 
                     <!-- Filter Status -->
                     <select wire:model.live="penjualanFilterStatus"
-                        class="flex-1 sm:flex-initial min-w-[120px] px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-primary focus:ring-0">
+                        class="flex-1 sm:flex-initial min-w-[120px] px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-base sm:text-xs text-white focus:border-up-primary focus:ring-0 min-h-[44px] sm:min-h-0">
                         <option value="" class="bg-gray-900 text-white">Semua Status</option>
                         <option value="selesai" class="bg-gray-900 text-white">Selesai</option>
                         <option value="pending" class="bg-gray-900 text-white">Pending</option>
@@ -779,8 +786,8 @@
                     <div class="relative w-full sm:w-48">
                         <input type="text" wire:model.live.debounce.300ms="penjualanSearch"
                             placeholder="Cari no trx / pelanggan..."
-                            class="w-full pl-7 pr-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white placeholder-ink-500 focus:border-up-primary focus:ring-0">
-                        <svg class="w-3.5 h-3.5 absolute left-2 top-2 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            class="w-full pl-7 pr-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-base sm:text-xs text-white placeholder-ink-500 focus:border-up-primary focus:ring-0 min-h-[44px] sm:min-h-0">
+                        <svg class="w-3.5 h-3.5 absolute left-2 top-3 sm:top-2 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
                     </div>
@@ -943,8 +950,13 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="py-6 text-center text-ink-500">
-                                        Tidak ada transaksi yang cocok dengan filter.
+                                    <td colspan="9" class="py-6">
+                                        <x-ui.empty-state
+                                            size="sm"
+                                            icon="search"
+                                            title="Tidak Ditemukan"
+                                            description="Tidak ada transaksi yang cocok dengan filter atau kata kunci."
+                                        />
                                     </td>
                                 </tr>
                             @endforelse
@@ -1238,7 +1250,14 @@
                         </div>
                     </div>
                 @empty
-                    <p class="text-xs text-ink-500 py-4 text-center">Tidak ada PO pending.</p>
+                    <div class="py-4">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="check"
+                            title="Tidak Ada PO Pending"
+                            description="Semua purchase order telah diproses."
+                        />
+                    </div>
                 @endforelse
             </div>
         </x-prism.glass-card>

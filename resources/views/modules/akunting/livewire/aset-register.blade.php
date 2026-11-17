@@ -44,7 +44,7 @@
                 <select
                     id="aset-filter-status"
                     wire:model.live="filterStatus"
-                    class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-11"
+                    class="px-2.5 py-2 rounded-lg glass-input text-base sm:text-xs font-medium min-h-11"
                 >
                     @foreach($filterStatusOptions as $value => $label)
                         <option value="{{ $value }}">{{ $label }}</option>
@@ -61,7 +61,7 @@
                         type="month"
                         wire:model.live="periodeDepresiasi"
                         aria-describedby="aset-help-periode"
-                        @class(['glass-input rounded-lg px-2.5 py-2 text-xs font-medium min-h-11 tabular-nums', 'border-up-red/60' => $errors->has('periodeDepresiasi')])
+                        @class(['glass-input rounded-lg px-2.5 py-2 text-base sm:text-xs font-medium min-h-11 tabular-nums', 'border-up-red/60' => $errors->has('periodeDepresiasi')])
                     />
                     <x-prism.prism-button
                         wire:click="jalankanDepresiasi"
@@ -352,9 +352,14 @@
                         </div>
                     </div>
                 @empty
-                    <p class="py-8 text-center text-[11px] text-ink-400">
-                        {{ $rekap['jumlah'] > 0 ? 'Tidak ada aset yang cocok dengan filter ini.' : 'Belum ada aset tetap di cabang ini.' }}
-                    </p>
+                    <div class="py-6">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="document"
+                            :title="$rekap['jumlah'] > 0 ? 'Aset Tidak Ditemukan' : 'Belum Ada Aset'"
+                            :description="$rekap['jumlah'] > 0 ? 'Tidak ada aset yang cocok dengan filter ini.' : 'Belum ada aset tetap yang tercatat di cabang ini.'"
+                        />
+                    </div>
                 @endforelse
             @endslot
         </x-prism.data-table>
@@ -411,7 +416,7 @@
                             placeholder="Contoh: Laptop Kasir 01"
                             autocomplete="off"
                             aria-describedby="aset-error-nama"
-                            @class(['glass-input w-full rounded-xl px-3 py-3 text-xs font-medium', 'border-up-red/60' => $errors->has('form.nama')])
+                            @class(['glass-input w-full rounded-xl px-3 py-3 text-base sm:text-xs font-medium', 'border-up-red/60' => $errors->has('form.nama')])
                         />
                         @error('form.nama')
                             <p id="aset-error-nama" class="mt-1.5 text-[11px] font-medium text-up-red" role="alert">{{ $message }}</p>
@@ -425,7 +430,7 @@
                                 id="aset-kategori"
                                 wire:model="form.kategori"
                                 aria-describedby="aset-help-kategori"
-                                @class(['glass-input w-full rounded-xl px-3 py-3 text-xs font-medium', 'border-up-red/60' => $errors->has('form.kategori')])
+                                @class(['glass-input w-full rounded-xl px-3 py-3 text-base sm:text-xs font-medium', 'border-up-red/60' => $errors->has('form.kategori')])
                             >
                                 @foreach($kategoriOptions as $value => $label)
                                     <option value="{{ $value }}" class="bg-ink-900">{{ $label }}</option>
@@ -447,7 +452,7 @@
                                 wire:model="form.harga_perolehan"
                                 placeholder="0"
                                 aria-describedby="aset-error-harga"
-                                @class(['glass-input w-full rounded-xl px-3 py-3 text-sm font-bold tabular-nums text-white', 'border-up-red/60' => $errors->has('form.harga_perolehan')])
+                                @class(['glass-input w-full rounded-xl px-3 py-3 text-base sm:text-sm font-bold tabular-nums text-white', 'border-up-red/60' => $errors->has('form.harga_perolehan')])
                             />
                             @error('form.harga_perolehan')
                                 <p id="aset-error-harga" class="mt-1.5 text-[11px] font-medium text-up-red" role="alert">{{ $message }}</p>
@@ -461,7 +466,7 @@
                                 type="date"
                                 wire:model="form.tanggal_perolehan"
                                 aria-describedby="aset-error-tanggal"
-                                @class(['glass-input w-full rounded-xl px-3 py-3 text-xs font-medium tabular-nums', 'border-up-red/60' => $errors->has('form.tanggal_perolehan')])
+                                @class(['glass-input w-full rounded-xl px-3 py-3 text-base sm:text-xs font-medium tabular-nums', 'border-up-red/60' => $errors->has('form.tanggal_perolehan')])
                             />
                             @error('form.tanggal_perolehan')
                                 <p id="aset-error-tanggal" class="mt-1.5 text-[11px] font-medium text-up-red" role="alert">{{ $message }}</p>

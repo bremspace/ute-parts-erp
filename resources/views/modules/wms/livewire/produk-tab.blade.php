@@ -1976,7 +1976,12 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ count(array_filter($visibleColumns)) ?: 7 }}" class="py-12 text-center text-ink-400">Belum ada produk. Klik "Tambah Produk" untuk menambahkan master produk baru (tersinkron jurnal akunting).</td>
+                        <td colspan="{{ count(array_filter($visibleColumns)) ?: 7 }}" class="py-12 text-center text-ink-400">
+                            <x-ui.empty-state
+                                title="Belum Ada Produk"
+                                description="Belum ada master produk yang sesuai dengan filter. Klik 'Tambah Produk' untuk mendaftarkan SKU baru."
+                            />
+                        </td>
                     </tr>
                 @endforelse
 
@@ -2283,7 +2288,12 @@
                         </div>
                     </div>
                 @empty
-                    <div class="col-span-full py-12 text-center text-ink-400">Belum ada produk.</div>
+                    <div class="col-span-full py-12">
+                        <x-ui.empty-state
+                            title="Belum Ada Produk"
+                            description="Belum ada master produk yang sesuai dengan filter. Klik 'Tambah Produk' untuk mendaftarkan SKU baru."
+                        />
+                    </div>
                 @endforelse
             </div>
 

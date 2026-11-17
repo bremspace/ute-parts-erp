@@ -212,8 +212,13 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-12 text-center text-sm text-ink-500">
-                                    Belum ada data slip pada periode ini. Klik <strong>"Hitung Draft"</strong> untuk memproses kalkulasi gaji otomatis seluruh karyawan.
+                                <td colspan="9" class="px-6 py-12">
+                                    <x-ui.empty-state
+                                        size="sm"
+                                        icon="document"
+                                        title="Belum Ada Slip Gaji"
+                                        description="Belum ada data slip pada periode ini. Klik 'Hitung Draft' untuk memproses kalkulasi gaji otomatis."
+                                    />
                                 </td>
                             </tr>
                         @endforelse
@@ -307,8 +312,13 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="px-6 py-12 text-center text-sm text-ink-500">
-                                        Tidak ada data karyawan yang cocok dengan pencarian.
+                                    <td colspan="8" class="px-6 py-12">
+                                        <x-ui.empty-state
+                                            size="sm"
+                                            icon="search"
+                                            title="Karyawan Tidak Ditemukan"
+                                            description="Tidak ada data master karyawan yang cocok dengan kriteria pencarian."
+                                        />
                                     </td>
                                 </tr>
                             @endforelse

@@ -581,9 +581,18 @@
                         </div>
                     </div>
                 @empty
-                    <div class="text-center py-14 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
-                        <p class="font-semibold text-ink-700 dark:text-ink-300">Belum ada pesanan</p>
-                        <a href="{{ url('/') }}" class="inline-block mt-4 px-5 py-2.5 rounded-2xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors min-h-[44px]">Mulai Belanja</a>
+                    <div class="py-12 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
+                        <x-ui.empty-state
+                            icon="inbox"
+                            title="Belum Ada Pesanan"
+                            description="Anda belum memiliki riwayat pemesanan suku cadang."
+                        >
+                            <x-slot:action>
+                                <x-ui.button href="{{ url('/') }}" variant="primary">
+                                    Mulai Belanja
+                                </x-ui.button>
+                            </x-slot:action>
+                        </x-ui.empty-state>
                     </div>
                 @endforelse
 
@@ -1076,9 +1085,13 @@
                         </div>
                     </div>
                 @empty
-                    <div class="text-center py-14 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
-                        <p class="font-semibold text-ink-700 dark:text-ink-300">Belum ada pemberitahuan</p>
-                        <p class="text-xs text-ink-400 mt-1">Status pesanan dan servis Anda akan ditampilkan di sini.</p>
+                    <div class="py-12 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="bell"
+                            title="Belum Ada Pemberitahuan"
+                            description="Status pesanan dan servis Anda akan ditampilkan di sini."
+                        />
                     </div>
                 @endforelse
             </div>
@@ -1121,8 +1134,13 @@
                         </div>
                     </div>
                 @empty
-                    <div class="text-center py-14 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
-                        <p class="font-semibold text-ink-700 dark:text-ink-300">Belum ada servis</p>
+                    <div class="py-12 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="document"
+                            title="Belum Ada Tiket Servis"
+                            description="Riwayat perbaikan dan klaim garansi gadget Anda akan tercatat di sini."
+                        />
                     </div>
                 @endforelse
             </div>
@@ -1450,7 +1468,7 @@
                             <div>
                                 <label for="nama" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Nama Lengkap</label>
                                 <input type="text" id="nama" wire:model="nama" required
-                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white" />
                                 @error('nama') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                             </div>
 
@@ -1463,7 +1481,7 @@
                                 <div class="relative">
                                     <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-ink-400 font-mono text-sm">@</span>
                                     <input type="text" id="username" wire:model="username" placeholder="budi_parts"
-                                           class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400 font-mono" />
+                                           class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400 font-mono" />
                                 </div>
                                 @error('username') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                             </div>
@@ -1475,7 +1493,7 @@
                                     <span class="text-[10px] text-ink-400">Dipakai untuk login</span>
                                 </div>
                                 <input type="text" id="telepon" wire:model="telepon" placeholder="08xx-xxxx-xxxx"
-                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white font-mono" />
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white font-mono" />
                                 @error('telepon') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                                 <p class="text-[10px] text-ink-400 mt-1">Nomor ini dipakai sebagai identitas login akun Anda.</p>
                             </div>
@@ -1484,7 +1502,7 @@
                             <div>
                                 <label for="email" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Email (Opsional)</label>
                                 <input type="email" id="email" wire:model="email" placeholder="budi@contoh.com"
-                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400" />
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400" />
                                 @error('email') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                             </div>
 
@@ -1492,7 +1510,7 @@
                             <div>
                                 <label for="tanggalLahir" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Tanggal Lahir (Opsional)</label>
                                 <input type="date" id="tanggalLahir" wire:model="tanggalLahir"
-                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white" />
                                 @error('tanggalLahir') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                             </div>
                         </div>
@@ -1501,7 +1519,7 @@
                         <div>
                             <label for="alamat" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Alamat Lengkap</label>
                             <textarea id="alamat" wire:model="alamat" rows="2" placeholder="Nama jalan, nomor rumah, RT/RW, kelurahan, kecamatan, kota..."
-                                      class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400"></textarea>
+                                      class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400"></textarea>
                             @error('alamat') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                         </div>
 
@@ -1509,7 +1527,7 @@
                         <div>
                             <label for="identitasPassword" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Kata Sandi Saat Ini</label>
                             <input type="password" id="identitasPassword" wire:model="identitasPassword" placeholder="Wajib bila mengubah nomor HP / email"
-                                   class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                                   class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white" />
                             <p class="text-[10px] text-ink-400 mt-1">Dipakai untuk verifikasi ulang saat mengganti nomor HP atau email (identitas login).</p>
                             @error('identitasPassword') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                         </div>
@@ -1535,7 +1553,7 @@
                         <div>
                             <label for="currentPassword" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Kata Sandi Saat Ini</label>
                             <input type="password" id="currentPassword" wire:model="currentPassword" required placeholder="••••••••"
-                                   class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                                   class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white" />
                             @error('currentPassword') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                         </div>
 
@@ -1543,14 +1561,14 @@
                             <div>
                                 <label for="newPassword" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Kata Sandi Baru</label>
                                 <input type="password" id="newPassword" wire:model="newPassword" required placeholder="Minimal 6 karakter"
-                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white" />
                                 @error('newPassword') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                             </div>
 
                             <div>
                                 <label for="newPassword_confirmation" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Konfirmasi Kata Sandi Baru</label>
                                 <input type="password" id="newPassword_confirmation" wire:model="newPassword_confirmation" required placeholder="Ulangi kata sandi baru"
-                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white" />
                             </div>
                         </div>
 

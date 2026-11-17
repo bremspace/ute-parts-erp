@@ -14,7 +14,7 @@
             <input wire:model.live.debounce.300ms="search" 
                    type="text" 
                    placeholder="Cari entity, jumlah, nomor PO..." 
-                   class="w-full px-4 py-2.5 pl-10 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm min-h-[44px]">
+                   class="w-full px-4 py-2.5 pl-10 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm min-h-[44px]">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -24,14 +24,13 @@
     </div>
 
     @if($requests->isEmpty())
-        <div class="text-center py-12">
-            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
-                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-            </div>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Tidak ada permintaan approval</h3>
-            <p class="text-gray-500 dark:text-gray-400 mt-1">Semua permintaan telah diproses</p>
+        <div class="py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <x-ui.empty-state
+                size="sm"
+                icon="check"
+                title="Tidak Ada Permintaan Approval"
+                description="Semua permohonan persetujuan telah selesai diproses."
+            />
         </div>
     @else
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -527,7 +526,7 @@
                                 </label>
                                 <span class="text-[10px] text-gray-500 font-mono">Dibutuhkan: Rp {{ number_format($grnApprovalForm['amount'], 0, ',', '.') }}</span>
                             </div>
-                            <select wire:model.live="grnApprovalForm.akun_kas_bank" class="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs font-medium min-h-[44px]">
+                            <select wire:model.live="grnApprovalForm.akun_kas_bank" class="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base sm:text-xs font-medium min-h-[44px]">
                                 @forelse($kasCukupList ?? [] as $ak)
                                     <option value="{{ $ak->kode }}" class="bg-gray-900 text-white">
                                         [{{ $ak->kode }}] {{ $ak->nama }} ({{ ucfirst($ak->kelompok) }}) — Saldo: Rp {{ number_format($ak->saldo_aktual ?? 0, 0, ',', '.') }}

@@ -144,7 +144,7 @@
             </div>
 
             <div class="flex items-center gap-2 w-full sm:w-auto">
-                <select wire:model.live="filterMitra" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
+                <select wire:model.live="filterMitra" class="px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px] w-full sm:w-auto">
                     <option value="" class="bg-ink-900">Semua Tipe Mitra (Reseller & Agen)</option>
                     <option value="agen" class="bg-ink-900">Khusus Agen B2B</option>
                     <option value="reseller" class="bg-ink-900">Khusus Reseller</option>
@@ -232,11 +232,13 @@
                     </div>
                 </div>
             @empty
-                <div class="col-span-full text-center py-16 text-ink-400">
-                    <svg class="w-10 h-10 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
-                    </svg>
-                    Belum ada mitra reseller atau agen yang cocok dengan filter. Tambahkan atau tandai pelanggan sebagai agen/reseller di modul CRM.
+                <div class="col-span-full py-16">
+                    <x-ui.empty-state
+                        size="sm"
+                        icon="users"
+                        title="Mitra Tidak Ditemukan"
+                        description="Belum ada mitra reseller atau agen yang cocok dengan filter. Tambahkan mitra di modul CRM."
+                    />
                 </div>
             @endforelse
         </div>
@@ -248,14 +250,14 @@
         <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-3 sm:p-3.5 rounded-2xl mb-4">
             <!-- Filter Status & Aktor -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full xl:w-auto">
-                <select wire:model.live="filterStatus" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full">
+                <select wire:model.live="filterStatus" class="px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px] w-full">
                     <option value="" class="bg-ink-900">Semua Status Komisi</option>
                     <option value="pending" class="bg-ink-900">Pending</option>
                     <option value="disetujui" class="bg-ink-900">Disetujui</option>
                     <option value="cair" class="bg-ink-900">Sudah Cair</option>
                     <option value="ditolak" class="bg-ink-900">Ditolak</option>
                 </select>
-                <select wire:model.live="filterAktor" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full">
+                <select wire:model.live="filterAktor" class="px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px] w-full">
                     <option value="" class="bg-ink-900">Semua Aktor Komisi</option>
                     <option value="reseller" class="bg-ink-900">Reseller (Mitra)</option>
                     <option value="agen" class="bg-ink-900">Agen B2B (Referral)</option>
@@ -321,11 +323,13 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9" class="py-12 text-center text-ink-400">
-                        <svg class="w-10 h-10 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                        </svg>
-                        Tidak ada data komisi.
+                    <td colspan="9" class="py-12">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="currency"
+                            title="Tidak Ada Data Komisi"
+                            description="Tidak ada data pencairan atau riwayat komisi pada filter ini."
+                        />
                     </td>
                 </tr>
             @endforelse

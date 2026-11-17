@@ -8,9 +8,9 @@
 
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap -mx-1 px-1 sm:mx-0 sm:px-0">
             <label class="text-[11px] text-ink-500 dark:text-ink-400 font-medium whitespace-nowrap">Periode</label>
-            <input type="date" wire:model.live="periodeDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
+            <input type="date" wire:model.live="periodeDari" class="px-2.5 py-2 rounded-lg glass-input text-base sm:text-xs font-medium min-h-[44px]" />
             <span class="text-ink-400 text-xs">—</span>
-            <input type="date" wire:model.live="periodeSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
+            <input type="date" wire:model.live="periodeSampai" class="px-2.5 py-2 rounded-lg glass-input text-base sm:text-xs font-medium min-h-[44px]" />
             <a href="{{ route('laporan.pajak.print', ['dari' => $periodeDari, 'sampai' => $periodeSampai]) }}" target="_blank" class="px-3.5 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-xs inline-flex items-center gap-1.5 transition whitespace-nowrap min-h-[44px]">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                 <span>Cetak Laporan</span>
@@ -68,7 +68,14 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" class="py-6 text-center text-[11px] text-ink-500">Belum ada transaksi ber-PPN pada periode ini.</td>
+                    <td colspan="5" class="py-8">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="document"
+                            title="Tidak Ada Transaksi PPN"
+                            description="Belum ada transaksi ber-PPN pada periode ini."
+                        />
+                    </td>
                 </tr>
             @endforelse
             @slot('mobileCards')
@@ -84,7 +91,14 @@
                         </div>
                     </div>
                 @empty
-                    <p class="text-[11px] text-ink-500 text-center py-4">Belum ada transaksi ber-PPN.</p>
+                    <div class="py-6">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="document"
+                            title="Tidak Ada Transaksi"
+                            description="Belum ada transaksi ber-PPN."
+                        />
+                    </div>
                 @endforelse
             @endslot
         </x-prism.data-table>

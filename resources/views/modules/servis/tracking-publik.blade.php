@@ -454,7 +454,7 @@
                                                     required
                                                     x-model="alasanCustom"
                                                     placeholder="Tuliskan catatan alasan penolakan..."
-                                                    class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
+                                                    class="w-full text-base sm:text-xs rounded-xl border border-slate-300 p-2.5 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
                                                 ></textarea>
                                             </div>
 
@@ -714,7 +714,7 @@
                             placeholder="Contoh: SRV-2026-0001 atau token"
                             required
                             autofocus
-                            class="w-full px-4 py-2.5 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-ink-900 text-ink-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-up-primary focus:bg-white dark:focus:bg-ink-950"
+                            class="w-full px-4 py-2.5 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-ink-900 text-ink-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-up-primary focus:bg-white dark:focus:bg-ink-950"
                         />
                     </div>
 
@@ -736,7 +736,7 @@
                             maxlength="5"
                             value="{{ old('no_hp') }}"
                             placeholder="Contoh: 56789 (opsional jika sudah login)"
-                            class="w-full px-4 py-2.5 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-ink-900 text-ink-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-up-primary focus:bg-white dark:focus:bg-ink-950"
+                            class="w-full px-4 py-2.5 rounded-xl border border-ink-200 dark:border-white/10 bg-ink-50 dark:bg-ink-900 text-ink-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-up-primary focus:bg-white dark:focus:bg-ink-950"
                         />
                     </div>
 

@@ -108,18 +108,18 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <div>
                                             <label class="block text-[11px] font-bold text-ink-600 dark:text-ink-400 mb-1">Nama Penerima</label>
-                                            <input type="text" wire:model="namaPenerima" placeholder="Nama lengkap penerima" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-semibold text-ink-900 dark:text-white outline-none focus:border-up-primary" />
+                                            <input type="text" wire:model="namaPenerima" placeholder="Nama lengkap penerima" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-base sm:text-xs font-semibold text-ink-900 dark:text-white outline-none focus:border-up-primary" />
                                             @error('namaPenerima') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror
                                         </div>
                                         <div>
                                             <label class="block text-[11px] font-bold text-ink-600 dark:text-ink-400 mb-1">Nomor WhatsApp / HP</label>
-                                            <input type="text" wire:model="teleponPenerima" placeholder="08xxxxxxxxxx" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-semibold text-ink-900 dark:text-white outline-none focus:border-up-primary font-mono" />
+                                            <input type="text" wire:model="teleponPenerima" placeholder="08xxxxxxxxxx" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-base sm:text-xs font-semibold text-ink-900 dark:text-white outline-none focus:border-up-primary font-mono" />
                                             @error('teleponPenerima') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror
                                         </div>
                                     </div>
                                     <div>
                                         <label class="block text-[11px] font-bold text-ink-600 dark:text-ink-400 mb-1">Alamat Lengkap <span class="text-up-red">*</span></label>
-                                        <textarea wire:model="alamatPengiriman" rows="2" placeholder="Jalan, nomor rumah, RT/RW, kelurahan, kecamatan, kota, kode pos" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs text-ink-900 dark:text-white outline-none focus:border-up-primary"></textarea>
+                                        <textarea wire:model="alamatPengiriman" rows="2" placeholder="Jalan, nomor rumah, RT/RW, kelurahan, kecamatan, kota, kode pos" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-base sm:text-xs text-ink-900 dark:text-white outline-none focus:border-up-primary"></textarea>
                                         @error('alamatPengiriman') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror
                                     </div>
                                 </div>
@@ -310,22 +310,18 @@
             </div>
 
             @if(count($cart) === 0)
-                <div class="text-center py-20 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-8 space-y-4">
-                    <div class="w-16 h-16 mx-auto rounded-3xl bg-ink-100 dark:bg-white/5 flex items-center justify-center text-ink-400">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                        </svg>
-                    </div>
-                    <div class="space-y-1">
-                        <h2 class="text-base font-bold text-ink-900 dark:text-white">Keranjang Anda Masih Kosong</h2>
-                        <p class="text-xs text-ink-500 dark:text-ink-400">
-                            Cari layar LCD, baterai pengganti, atau pesan jasa servis teknisi profesional.
-                        </p>
-                    </div>
-                    <a href="{{ url('/') }}"
-                       class="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-[background-color,transform] duration-140 min-h-[44px] active:scale-[0.97]">
-                        <span>Jelajahi Katalog Sparepart</span>
-                    </a>
+                <div class="py-12 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-8">
+                    <x-ui.empty-state
+                        icon="inbox"
+                        title="Keranjang Anda Masih Kosong"
+                        description="Cari layar LCD, baterai pengganti, atau pesan jasa servis teknisi profesional."
+                    >
+                        <x-slot:action>
+                            <x-ui.button href="{{ url('/') }}" variant="primary">
+                                Jelajahi Katalog Sparepart
+                            </x-ui.button>
+                        </x-slot:action>
+                    </x-ui.empty-state>
                 </div>
             @else
                 <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-5 sm:p-7 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-4">

@@ -424,6 +424,11 @@
                         class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1 min-h-0"
                         @scroll.passive="if ($wire.adaLebihBanyak && !window._posLoadingMore && ($el.scrollHeight - $el.scrollTop - $el.clientHeight < 350)) { window._posLoadingMore = true; $wire.call('muatLebihBanyak').finally(() => { window._posLoadingMore = false; }); }"
                     >
+                        <div wire:loading.delay wire:target="search" class="p-3 space-y-2">
+                            <x-ui.skeleton variant="card" />
+                            <x-ui.skeleton variant="card" />
+                        </div>
+
                         @forelse($products as $prod)
                             @php
                                 $stokTotal = $stokPerProduk[$prod->id] ?? (\App\Modules\Pos\Livewire\PosKasir::STOK_TANPA_GUDANG);
@@ -608,13 +613,11 @@
                                 @endif
                             </div>
                         @empty
-                            <div class="py-12 text-center text-ink-400 text-xs">
-                                <div class="w-10 h-10 rounded-2xl bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 mx-auto mb-2 flex items-center justify-center text-ink-400">
-                                    <svg class="w-5 h-5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                </div>
-                                <p>Tidak ada produk ditemukan untuk pencarian "<span class="text-ink-900 dark:text-white font-semibold">{{ $search }}</span>"</p>
+                            <div class="py-8">
+                                <x-ui.empty-state
+                                    title="Tidak ada produk ditemukan"
+                                    description="Tidak ada item yang cocok dengan pencarian '{{ $search }}'. Coba gunakan kata kunci atau SKU lain."
+                                />
                             </div>
                         @endforelse
 
@@ -1498,14 +1501,11 @@
                     @include('modules.pos.livewire.partials.sn-control', ['itemKey' => $key, 'item' => $item])
                 </div>
             @empty
-                <div class="py-6 sm:py-12 text-center text-ink-400">
-                    <div class="w-12 h-12 rounded-2xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary mx-auto mb-2">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                    </div>
-                    <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white">Keranjang Masih Kosong</h3>
-                    <p class="text-[11px] sm:text-xs text-ink-500 mt-0.5">Scan barcode atau ketik nama barang di atas.</p>
+                <div class="py-6 sm:py-10">
+                    <x-ui.empty-state
+                        title="Keranjang Masih Kosong"
+                        description="Scan barcode atau ketik nama barang di kolom pencarian di atas."
+                    />
                 </div>
             @endforelse
         </div>
@@ -1659,8 +1659,11 @@
                     @include('modules.pos.livewire.partials.sn-control', ['itemKey' => $key, 'item' => $item])
                 </div>
             @empty
-                <div class="py-12 text-center text-ink-400">
-                    <p class="text-xs font-semibold text-ink-700 dark:text-ink-300">Keranjang masih kosong</p>
+                <div class="py-8">
+                    <x-ui.empty-state
+                        title="Keranjang Masih Kosong"
+                        description="Belum ada barang di keranjang belanja."
+                    />
                 </div>
             @endforelse
         </div>
@@ -1892,22 +1895,18 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center py-16 sm:py-20">
-                                <div class="max-w-md mx-auto flex flex-col items-center">
-                                    <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary mb-3">
-                                        <svg class="w-7 h-7 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                        </svg>
-                                    </div>
-                                    <h3 class="text-sm sm:text-base font-bold text-ink-900 dark:text-white">Kasir Siap Melayani Transaksi</h3>
-                                    <p class="text-xs text-ink-500 mt-1">Scan barcode barang dengan scanner atau tekan F2 untuk mencari produk.</p>
-                                    <div class="flex items-center gap-2 mt-4 flex-wrap justify-center text-[11px] text-ink-400 font-mono">
+                            <td colspan="8" class="text-center py-12 sm:py-16">
+                                <x-ui.empty-state
+                                    title="Kasir Siap Melayani Transaksi"
+                                    description="Scan barcode barang dengan scanner atau tekan F2 untuk mencari produk."
+                                >
+                                    <div class="flex items-center gap-2 mt-2 flex-wrap justify-center text-[11px] text-ink-400 font-mono">
                                         <span class="px-2.5 py-1 rounded-lg bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/5"><kbd class="text-up-primary font-bold">F2</kbd> Cari/Scan</span>
                                         <span class="px-2.5 py-1 rounded-lg bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/5"><kbd class="text-up-mint font-bold">F4</kbd> Bayar</span>
                                         <span class="px-2.5 py-1 rounded-lg bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/5"><kbd class="text-up-amber font-bold">F6</kbd> Tahan</span>
                                         <span class="px-2.5 py-1 rounded-lg bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/5"><kbd class="text-up-red font-bold">ESC</kbd> Batal</span>
                                     </div>
-                                </div>
+                                </x-ui.empty-state>
                             </td>
                         </tr>
                     @endforelse

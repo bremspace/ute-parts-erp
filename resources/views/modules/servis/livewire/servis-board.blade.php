@@ -8,7 +8,7 @@
         </div>
 
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
-            <select wire:model.live="filterStatus" class="flex-1 sm:flex-initial px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+            <select wire:model.live="filterStatus" class="flex-1 sm:flex-initial px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px]">
                 <option value="" class="bg-ink-900">Semua Status</option>
                 @foreach($stateMachineColumns as $kode => $col)
                     <option value="{{ $kode }}" class="bg-ink-900">{{ $col['label'] }}</option>
@@ -16,7 +16,7 @@
             </select>
 
             <!-- [Kanban Histori] Filter Periode Transaksi Diambil -->
-            <select wire:model.live="periodeHistori" class="flex-1 sm:flex-initial px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]" title="Filter Periode Histori Transaksi Diambil">
+            <select wire:model.live="periodeHistori" class="flex-1 sm:flex-initial px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px]" title="Filter Periode Histori Transaksi Diambil">
                 <option value="7_hari" class="bg-ink-900">Histori: 7 Hari Terakhir</option>
                 <option value="hari_ini" class="bg-ink-900">Histori: Hari Ini</option>
                 <option value="30_hari" class="bg-ink-900">Histori: 30 Hari Terakhir</option>
@@ -196,12 +196,13 @@
 
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
                 @if($listTikets->isEmpty())
-                    <!-- Empty state (gaya sama dgn kolom Kanban) -->
-                    <div class="text-center py-12 px-4 text-[10px] text-ink-500">
-                        <svg class="w-6 h-6 mx-auto mb-1.5 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                        <p>Kosong — belum ada tiket pada filter ini<br><span class="text-ink-400">Terima unit baru atau ubah filter status / periode</span></p>
+                    <div class="py-12 px-4">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="inbox"
+                            title="Belum Ada Tiket"
+                            description="Belum ada tiket servis pada filter ini. Terima unit baru atau sesuaikan filter status."
+                        />
                     </div>
                 @else
                     <!-- ===== Desktop (md+): tabel horizontal-scrollable — DataTable pattern Ute Prism ===== -->
@@ -927,11 +928,11 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Pelanggan <span class="text-up-red">*</span></label>
-                            <input type="text" wire:model="terimaForm.nama_pelanggan" placeholder="Nama pemilik unit" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="text" wire:model="terimaForm.nama_pelanggan" placeholder="Nama pemilik unit" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">No. Telepon</label>
-                            <input type="text" wire:model="terimaForm.telepon_pelanggan" placeholder="08xx-xxxx-xxxx" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="text" wire:model="terimaForm.telepon_pelanggan" placeholder="08xx-xxxx-xxxx" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                         </div>
                     </div>
                     <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer select-none">
@@ -947,7 +948,7 @@
                                 list="jenisServisList"
                                 wire:model="terimaForm.jenis_servis_nama"
                                 placeholder="Pilih dari daftar atau ketik manual (Ex: Ganti LCD, Service Ringan)"
-                                class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"
+                                class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium"
                             />
                             <datalist id="jenisServisList">
                                 @foreach(($jenisServisList ?? []) as $j)
@@ -963,7 +964,7 @@
                                 list="tipeHpKompatibelList"
                                 wire:model="terimaForm.jenis_hp"
                                 placeholder="Pilih dari daftar atau ketik manual (Ex: iPhone 13, Samsung A52)"
-                                class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"
+                                class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium"
                             />
                             <datalist id="tipeHpKompatibelList">
                                 @foreach(($tipeHpList ?? []) as $tipeHp)
@@ -976,13 +977,13 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Seri / IMEI</label>
-                        <input type="text" wire:model="terimaForm.seri_hp" placeholder="Nomor seri / IMEI (opsional)" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        <input type="text" wire:model="terimaForm.seri_hp" placeholder="Nomor seri / IMEI (opsional)" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                     </div>
 
                     <!-- [T-19] Kunci Gadget (terenkripsi) -->
                     <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kunci Gadget <span class="text-ink-500 font-normal">(opsional, terenkripsi — terlihat oleh semua staf yang berhak membuka tiket servis)</span></label>
-                        <select wire:model.live="terimaForm.tipe_kunci" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                        <select wire:model.live="terimaForm.tipe_kunci" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium">
                             <option value="" class="bg-ink-900">— Tidak ada / default —</option>
                             <option value="pola" class="bg-ink-900">Pola (Swipe / Geser Pola)</option>
                             <option value="pin" class="bg-ink-900">PIN (4-6 digit)</option>
@@ -1333,12 +1334,12 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama <span class="text-up-red">*</span></label>
-                            <input type="text" wire:model="pelangganBaruForm.nama" placeholder="Nama pelanggan" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="text" wire:model="pelangganBaruForm.nama" placeholder="Nama pelanggan" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                             @error('pelangganBaruForm.nama') <span class="text-[10px] text-up-red mt-1 block">{{ $message }}</span> @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon <span class="text-up-red">*</span></label>
-                            <input type="text" wire:model="pelangganBaruForm.telepon" placeholder="08xx / +62xx" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="text" wire:model="pelangganBaruForm.telepon" placeholder="08xx / +62xx" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                             @error('pelangganBaruForm.telepon') <span class="text-[10px] text-up-red mt-1 block">{{ $message }}</span> @enderror
                         </div>
                     </div>
@@ -1346,12 +1347,12 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Email (opsional)</label>
-                            <input type="email" wire:model="pelangganBaruForm.email" placeholder="email@contoh.com" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="email" wire:model="pelangganBaruForm.email" placeholder="email@contoh.com" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                             @error('pelangganBaruForm.email') <span class="text-[10px] text-up-red mt-1 block">{{ $message }}</span> @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tipe Konsumen</label>
-                            <select wire:model.live="pelangganBaruForm.tipe_konsumen" class="w-full px-3 py-2.5 rounded-xl bg-ink-900 border border-white/10 text-xs text-white">
+                            <select wire:model.live="pelangganBaruForm.tipe_konsumen" class="w-full px-3 py-2.5 rounded-xl bg-ink-900 border border-white/10 text-base sm:text-xs text-white">
                                 <option value="retail">Retail / Konsumen Akhir</option>
                                 <option value="reseller">Reseller</option>
                                 <option value="agen">Mitra Agen B2B</option>
@@ -1362,13 +1363,13 @@
                     @if(($pelangganBaruForm['tipe_konsumen'] ?? '') === 'agen')
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Agen (Opsional)</label>
-                            <input type="text" wire:model="pelangganBaruForm.kode_agen" placeholder="Otomatis AGN-XXXX jika kosong" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium uppercase" />
+                            <input type="text" wire:model="pelangganBaruForm.kode_agen" placeholder="Otomatis AGN-XXXX jika kosong" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium uppercase" />
                         </div>
                     @endif
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Referral (opsional)</label>
-                        <input type="text" wire:model="pelangganBaruForm.referral_kode" placeholder="Kode referral pengajak" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium uppercase" />
+                        <input type="text" wire:model="pelangganBaruForm.referral_kode" placeholder="Kode referral pengajak" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium uppercase" />
                     </div>
 
                     <div>
@@ -1656,13 +1657,13 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Judul Tahapan / Progres <span class="text-up-red">*</span></label>
-                        <input type="text" wire:model="progressJudul" placeholder="Contoh: Pembongkaran unit & tes modul LCD baru..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" autofocus />
+                        <input type="text" wire:model="progressJudul" placeholder="Contoh: Pembongkaran unit & tes modul LCD baru..." class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" autofocus />
                         @error('progressJudul') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Deskripsi / Catatan Pengerjaan</label>
-                        <textarea wire:model="progressDeskripsi" rows="2" placeholder="Catatan teknis hasil pengecekan..." class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"></textarea>
+                        <textarea wire:model="progressDeskripsi" rows="2" placeholder="Catatan teknis hasil pengecekan..." class="w-full px-3 py-2 rounded-xl glass-input text-base sm:text-xs font-medium"></textarea>
                     </div>
 
                     <!-- Upload Foto Progress -->
@@ -2907,17 +2908,13 @@
                             </div>
                         </button>
                     @empty
-                        <div class="text-center py-8">
-                            <svg class="mx-auto h-10 w-10 text-ink-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                            </svg>
-                            <p class="mt-2 text-xs text-ink-400">
-                                @if(strlen($cariPartQuery) < 2)
-                                    Ketik minimal 2 karakter untuk mulai mencari...
-                                @else
-                                    Tidak ada produk ditemukan untuk "{{ $cariPartQuery }}"
-                                @endif
-                            </p>
+                        <div class="py-8">
+                            <x-ui.empty-state
+                                size="sm"
+                                icon="search"
+                                title="Part Tidak Ditemukan"
+                                :description="strlen($cariPartQuery) < 2 ? 'Ketik minimal 2 karakter untuk mencari sparepart.' : 'Tidak ada produk sparepart ditemukan untuk pencarian ini.'"
+                            />
                         </div>
                     @endforelse
                 </div>
@@ -2994,7 +2991,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1">Kategori Layanan Servis</label>
-                            <select wire:model="intakeForm.jenis_servis_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white">
+                            <select wire:model="intakeForm.jenis_servis_id" class="w-full px-3 py-2 rounded-xl glass-input text-base sm:text-xs text-white">
                                 <option value="" class="bg-ink-900">-- Pilih Kategori --</option>
                                 @foreach($jenisServisList as $js)
                                     <option value="{{ $js->id }}" class="bg-ink-900">{{ $js->nama }}</option>
@@ -3003,7 +3000,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1">Teknisi Penerima / Ditugaskan</label>
-                            <select wire:model="intakeForm.teknisi_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white">
+                            <select wire:model="intakeForm.teknisi_id" class="w-full px-3 py-2 rounded-xl glass-input text-base sm:text-xs text-white">
                                 <option value="" class="bg-ink-900">-- Pilih Teknisi --</option>
                                 @foreach($teknisiList as $tek)
                                     <option value="{{ $tek->id }}" class="bg-ink-900">{{ $tek->name }}</option>
@@ -3015,7 +3012,7 @@
                     <!-- Kunci Layar Gadget & Uji Pola Langsung -->
                     <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2">
                         <label class="block text-xs font-semibold text-ink-300">Kunci Layar Gadget</label>
-                        <select wire:model.live="intakeForm.tipe_kunci" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white">
+                        <select wire:model.live="intakeForm.tipe_kunci" class="w-full px-3 py-2 rounded-xl glass-input text-base sm:text-xs text-white">
                             <option value="" class="bg-ink-900">— Tidak ada / default —</option>
                             <option value="pola" class="bg-ink-900">Pola (Swipe / Geser Titik)</option>
                             <option value="pin" class="bg-ink-900">PIN Angka</option>

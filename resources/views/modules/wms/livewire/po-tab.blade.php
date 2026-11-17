@@ -120,7 +120,14 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="py-12 text-center text-ink-400">Belum ada PO. Klik "+ Buat PO" untuk input pembelian ke supplier.</td></tr>
+                    <tr>
+                        <td colspan="9" class="py-12 text-center text-ink-400">
+                            <x-ui.empty-state
+                                title="Belum Ada Purchase Order"
+                                description="Belum ada transaksi pengadaan ke supplier. Klik '+ Buat PO' untuk membuat pesanan pembelian baru."
+                            />
+                        </td>
+                    </tr>
                 @endforelse
                 @if($poList->hasPages())
                     <x-slot:pagination>

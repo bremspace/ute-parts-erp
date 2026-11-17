@@ -585,7 +585,16 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="py-12 text-center text-ink-400">Belum ada user.</td></tr>
+                <tr>
+                    <td colspan="7" class="py-12">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="users"
+                            title="Belum Ada User"
+                            description="Belum ada user staf yang terdaftar."
+                        />
+                    </td>
+                </tr>
             @endforelse
 
             <x-slot:pagination>{{ $users->links() }}</x-slot:pagination>
@@ -675,7 +684,16 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="3" class="py-12 text-center text-ink-400">Belum ada role.</td></tr>
+                    <tr>
+                        <td colspan="3" class="py-12">
+                            <x-ui.empty-state
+                                size="sm"
+                                icon="check"
+                                title="Belum Ada Role"
+                                description="Belum ada peran kustom yang dibuat."
+                            />
+                        </td>
+                    </tr>
                 @endforelse
             </x-prism.data-table>
         </div>
