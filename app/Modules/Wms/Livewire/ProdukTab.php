@@ -56,6 +56,8 @@ class ProdukTab extends Component
 
     public ?int $filterKategoriId = null;
 
+    public string $filterKategoriSort = 'urutan'; // 'urutan' | 'nama'
+
     public ?int $filterBrandId = null;
 
     public ?int $filterKualitasId = null;
@@ -225,6 +227,9 @@ class ProdukTab extends Component
         'status' => false,
         'aksi' => true,
     ];
+
+    // Gudang yang disembunyikan di kolom "Gudang & Rak" (kosong = tampilkan semua)
+    public array $hiddenGudangs = [];
 
     public bool $showColumnSettings = false;
 
@@ -412,6 +417,10 @@ class ProdukTab extends Component
             if (is_array($prefCols)) {
                 $this->visibleColumns = array_merge($this->visibleColumns, $prefCols);
             }
+            $prefGudangs = UserPreference::getPref($userId, 'wms_produk_tab_hidden_gudangs');
+            if (is_array($prefGudangs)) {
+                $this->hiddenGudangs = $prefGudangs;
+            }
         }
     }
 
@@ -463,6 +472,39 @@ class ProdukTab extends Component
         if ($userId) {
             UserPreference::setPref($userId, 'wms_produk_tab_visible_columns', $this->visibleColumns);
         }
+    }
+
+    public function toggleHiddenGudang(int $gudangId): void
+    {
+        if (in_array($gudangId, $this->hiddenGudangs, true)) {
+            $this->hiddenGudangs = array_values(array_diff($this->hiddenGudangs, [$gudangId]));
+        } else {
+            $this->hiddenGudangs[] = $gudangId;
+        }
+        $this->simpanPreferensiGudang();
+    }
+
+    public function showAllGudangs(): void
+    {
+        $this->hiddenGudangs = [];
+        $this->simpanPreferensiGudang();
+    }
+
+    protected function simpanPreferensiGudang(): void
+    {
+        $userId = auth()->id();
+        if ($userId) {
+            UserPreference::setPref($userId, 'wms_produk_tab_hidden_gudangs', $this->hiddenGudangs);
+        }
+    }
+
+    /**
+     * Helper: apakah gudang tertentu ditampilkan di kolom "Gudang & Rak".
+     * Kosong = tampilkan semua.
+     */
+    public function isGudangVisible(int $gudangId): bool
+    {
+        return ! in_array($gudangId, $this->hiddenGudangs, true);
     }
 
     public function toggleFilter(string $key): void
@@ -4797,6 +4839,7 @@ class ProdukTab extends Component
             'selectedProduksPreview' => $selectedProduksPreview,
             'gudangs' => $gudangs,
             'gudangsCabang' => $gudangsCabang,
+            'hiddenGudangs' => $this->hiddenGudangs,
             'raks' => Rak::with('gudang')->get(),
             'produks' => $produks,
             'perPage' => $this->perPage,

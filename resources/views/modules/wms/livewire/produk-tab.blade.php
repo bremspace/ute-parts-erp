@@ -8,8 +8,13 @@
     ];
 
     // Opsi Kategori untuk searchable-select (hirarki natural 3 tingkat)
+    // Urutan: default berdasarkan no urut (urutan), opsi toggle ke nama A-Z
+    $kategoriTreeSorted = $kategoriTree;
+    if (($filterKategoriSort ?? 'urutan') === 'nama') {
+        $kategoriTreeSorted = $kategoriTree->sortBy('nama', SORT_NATURAL | SORT_FLAG_CASE)->values();
+    }
     $kategoriFilterOptions = [];
-    foreach ($kategoriTree as $parent) {
+    foreach ($kategoriTreeSorted as $parent) {
         $kategoriFilterOptions[] = [
             'value' => (string) $parent->id,
             'label' => $parent->nama,
@@ -17,7 +22,10 @@
             'level' => 0,
             'is_parent' => true,
         ];
-        foreach ($parent->children as $child) {
+        $childrenSorted = ($filterKategoriSort ?? 'urutan') === 'nama'
+            ? $parent->children->sortBy('nama', SORT_NATURAL | SORT_FLAG_CASE)->values()
+            : $parent->children;
+        foreach ($childrenSorted as $child) {
             $hasSub = !empty($child->children) && $child->children->isNotEmpty();
             $kategoriFilterOptions[] = [
                 'value' => (string) $child->id,
@@ -28,7 +36,10 @@
                 'is_parent' => $hasSub,
             ];
             if ($hasSub) {
-                foreach ($child->children as $grandchild) {
+                $grandchildrenSorted = ($filterKategoriSort ?? 'urutan') === 'nama'
+                    ? $child->children->sortBy('nama', SORT_NATURAL | SORT_FLAG_CASE)->values()
+                    : $child->children;
+                foreach ($grandchildrenSorted as $grandchild) {
                     $kategoriFilterOptions[] = [
                         'value' => (string) $grandchild->id,
                         'label' => $grandchild->nama,
@@ -148,6 +159,9 @@
                                     :options="$kategoriFilterOptions"
                                     placeholder="Semua Kategori"
                                     searchPlaceholder="Cari kategori..."
+                                    :sortable="true"
+                                    :sort-mode="$filterKategoriSort"
+                                    sort-property="filterKategoriSort"
                                 />
                             </div>
                         @endif
@@ -164,16 +178,13 @@
                         @endif
 
                         @if($visibleFilters['kualitas'] ?? false)
-                            <div class="relative inline-flex items-center">
-                                <select wire:model.live="filterKualitasId" class="px-3 py-2 {{ $filterKualitasId ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kualitas</option>
-                                    @foreach($kualitasList as $k)
-                                        <option value="{{ $k->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
-                                    @endforeach
-                                </select>
-                                @if($filterKualitasId)
-                                    <button type="button" wire:click="$set('filterKualitasId', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kualitas">✕</button>
-                                @endif
+                            <div class="min-w-[160px] sm:w-44">
+                                <x-prism.searchable-select
+                                    model="filterKualitasId"
+                                    :options="$kualitasList"
+                                    placeholder="Semua Kualitas"
+                                    searchPlaceholder="Cari kualitas..."
+                                />
                             </div>
                         @endif
 
@@ -200,44 +211,35 @@
                         @endif
 
                         @if($visibleFilters['kondisi'] ?? false)
-                            <div class="relative inline-flex items-center">
-                                <select wire:model.live="filterKondisi" class="px-3 py-2 {{ $filterKondisi ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kondisi</option>
-                                    @foreach($kondisiList as $kd)
-                                        <option value="{{ $kd['kode'] }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $kd['nama'] }}</option>
-                                    @endforeach
-                                </select>
-                                @if($filterKondisi)
-                                    <button type="button" wire:click="$set('filterKondisi', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kondisi">✕</button>
-                                @endif
+                            <div class="min-w-[140px] sm:w-40">
+                                <x-prism.searchable-select
+                                    model="filterKondisi"
+                                    :options="collect($kondisiList)->map(fn($kd) => ['value' => $kd['kode'], 'label' => $kd['nama']])"
+                                    placeholder="Semua Kondisi"
+                                    searchPlaceholder="Cari kondisi..."
+                                />
                             </div>
                         @endif
 
                         @if($visibleFilters['satuan'] ?? false)
-                            <div class="relative inline-flex items-center">
-                                <select wire:model.live="filterSatuan" class="px-3 py-2 {{ $filterSatuan ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Satuan</option>
-                                    @foreach($satuanUnits as $su)
-                                        <option value="{{ $su->kode }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $su->nama }} ({{ $su->kode }})</option>
-                                    @endforeach
-                                </select>
-                                @if($filterSatuan)
-                                    <button type="button" wire:click="$set('filterSatuan', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Satuan">✕</button>
-                                @endif
+                            <div class="min-w-[140px] sm:w-40">
+                                <x-prism.searchable-select
+                                    model="filterSatuan"
+                                    :options="collect($satuanUnits)->map(fn($su) => ['value' => $su->kode, 'label' => $su->nama . ' (' . $su->kode . ')'])"
+                                    placeholder="Semua Satuan"
+                                    searchPlaceholder="Cari satuan..."
+                                />
                             </div>
                         @endif
 
                         @if($visibleFilters['abc_class'] ?? false)
-                            <div class="relative inline-flex items-center">
-                                <select wire:model.live="filterAbcClass" class="px-3 py-2 {{ $filterAbcClass ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas ABC</option>
-                                    <option value="A" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas A</option>
-                                    <option value="B" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas B</option>
-                                    <option value="C" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas C</option>
-                                </select>
-                                @if($filterAbcClass)
-                                    <button type="button" wire:click="$set('filterAbcClass', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kelas ABC">✕</button>
-                                @endif
+                            <div class="min-w-[120px] sm:w-36">
+                                <x-prism.searchable-select
+                                    model="filterAbcClass"
+                                    :options="[['value' => 'A', 'label' => 'Kelas A'], ['value' => 'B', 'label' => 'Kelas B'], ['value' => 'C', 'label' => 'Kelas C']]"
+                                    placeholder="Kelas ABC"
+                                    searchPlaceholder="Cari kelas..."
+                                />
                             </div>
                         @endif
 
@@ -486,6 +488,24 @@
                                 <input type="checkbox" wire:key="pt-col-gudang-{{ ($visibleColumns['gudang'] ?? true) ? '1' : '0' }}" wire:click="toggleColumn('gudang')" @checked($visibleColumns['gudang'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Gudang & Rak</span>
                             </label>
+
+                            @if($visibleColumns['gudang'] ?? true)
+                            <div class="w-full mt-2 pt-2 border-t border-white/5">
+                                <span class="text-[10px] font-bold text-ink-400 block mb-1.5">Gudang yang ditampilkan di kolom:</span>
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach($gudangsCabang as $g)
+                                        <label class="inline-flex items-center gap-1 text-[10px] text-ink-300 cursor-pointer select-none">
+                                            <input type="checkbox"
+                                                   wire:click="toggleHiddenGudang({{ $g->id }})"
+                                                   @checked(!in_array($g->id, $hiddenGudangs ?? [], true))
+                                                   class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                            <span>{{ $g->nama }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                <button type="button" wire:click="showAllGudangs" class="mt-1.5 text-[10px] text-up-primary hover:underline cursor-pointer">Tampilkan semua gudang</button>
+                            </div>
+                            @endif
 
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
                                 <input type="checkbox" wire:key="pt-col-reorder-{{ ($visibleColumns['reorder'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('reorder')" @checked($visibleColumns['reorder'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
@@ -1764,7 +1784,10 @@
                         @if($visibleColumns['gudang'] ?? true)
                             <td class="py-2.5 px-3 text-xs min-w-[130px]">
                                 @php
-                                    $stokItemsTampil = $p->stokItems->filter(function ($si) use ($p) {
+                                    $stokItemsTampil = $p->stokItems->filter(function ($si) use ($p, $hiddenGudangs) {
+                                        if (!empty($hiddenGudangs) && in_array($si->gudang_id, $hiddenGudangs, true)) {
+                                            return false;
+                                        }
                                         if ((int) $si->jumlah === 0 && is_null($si->sku_variant_id)) {
                                             return ! $p->stokItems->contains(fn ($o) => $o->id !== $si->id && $o->gudang_id === $si->gudang_id);
                                         }
@@ -2110,7 +2133,10 @@
                                     <span>📍</span> Lokasi Rak &amp; Gudang:
                                 </span>
                                 @php
-                                    $stokItemsCardTampil = $p->stokItems->filter(function ($si) use ($p) {
+                                    $stokItemsCardTampil = $p->stokItems->filter(function ($si) use ($p, $hiddenGudangs) {
+                                        if (!empty($hiddenGudangs) && in_array($si->gudang_id, $hiddenGudangs, true)) {
+                                            return false;
+                                        }
                                         if ((int) $si->jumlah === 0 && is_null($si->sku_variant_id)) {
                                             return ! $p->stokItems->contains(fn ($o) => $o->id !== $si->id && $o->gudang_id === $si->gudang_id);
                                         }
