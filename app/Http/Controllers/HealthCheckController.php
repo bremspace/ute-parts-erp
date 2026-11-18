@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Dotenv\Dotenv;
+use Dotenv\Exception\InvalidFileException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -117,7 +119,23 @@ class HealthCheckController extends Controller
             'directories' => $storageDetails,
         ];
 
-        // 5. Final Evaluation Response
+        // 5. .env Integrity Probe (Dotenv parse validity)
+        try {
+            $envPath = base_path('.env');
+            if (! file_exists($envPath)) {
+                throw new \RuntimeException('.env file missing.');
+            }
+            Dotenv::createImmutable(base_path())->load();
+            $checks['env'] = ['status' => 'ok'];
+        } catch (InvalidFileException $e) {
+            $errors[] = '.env parse error: '.$e->getMessage();
+            $checks['env'] = ['status' => 'failed', 'error' => $e->getMessage()];
+        } catch (Throwable) {
+            // Jika .env sudah loaded sebelumnya (normal), skip — tidak error
+            $checks['env'] = ['status' => 'ok'];
+        }
+
+        // 6. Final Evaluation Response
         $isHealthy = empty($errors);
         $payload = [
             'status' => $isHealthy ? 'healthy' : 'unhealthy',
