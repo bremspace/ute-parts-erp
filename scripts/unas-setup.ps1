@@ -21,9 +21,9 @@ $projectRoot = Split-Path -Parent $scriptDir
 # Helper: Prompt input dengan nilai default
 function Prompt-User([string]$promptText, [string]$defaultValue) {
     if ($defaultValue -ne "") {
-        Write-Host "$promptText [$defaultValue]: " -NoNewline -ForegroundColor Yellow
+        Write-Host "$($promptText) [$defaultValue]: " -NoNewline -ForegroundColor Yellow
     } else {
-        Write-Host "$promptText: " -NoNewline -ForegroundColor Yellow
+        Write-Host "$($promptText): " -NoNewline -ForegroundColor Yellow
     }
     $inputVal = Read-Host
     if ([string]::IsNullOrWhiteSpace($inputVal)) {
