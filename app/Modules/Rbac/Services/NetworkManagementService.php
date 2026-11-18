@@ -74,7 +74,15 @@ class NetworkManagementService
         ];
 
         if ($method === 'cloudflare' && ! empty($tunnelToken)) {
-            $envUpdates['CLOUDFLARE_TUNNEL_TOKEN'] = trim($tunnelToken);
+            $cleanToken = trim($tunnelToken);
+            // Validasi format token Cloudflare Tunnel (hanya karakter base64 yang sah)
+            if (! preg_match('/^[A-Za-z0-9_\-\+\/=]+$/', $cleanToken)) {
+                return [
+                    'success' => false,
+                    'message' => 'Token Cloudflare Tunnel tidak valid. Token hanya boleh berisi karakter base64.',
+                ];
+            }
+            $envUpdates['CLOUDFLARE_TUNNEL_TOKEN'] = $cleanToken;
         }
 
         $saved = $this->updateService->updateEnv($envUpdates);
@@ -489,11 +497,12 @@ class NetworkManagementService
      */
     protected function applyCloudflaredService(string $token): string
     {
+        $escapedToken = escapeshellarg($token);
         if (PHP_OS_FAMILY === 'Windows') {
             try {
                 $cf = $this->checkCloudflared();
                 $bin = ! empty($cf['path']) ? "\"{$cf['path']}\"" : 'cloudflared';
-                $proc = Process::fromShellCommandline("{$bin} service install {$token}");
+                $proc = Process::fromShellCommandline("{$bin} service install {$escapedToken}");
                 $proc->run();
                 $startProc = Process::fromShellCommandline('net start cloudflared');
                 $startProc->run();
@@ -504,7 +513,7 @@ class NetworkManagementService
         } else {
             try {
                 // Jika memiliki hak sudo / root
-                $proc = Process::fromShellCommandline("sudo cloudflared service install {$token} 2>/dev/null || cloudflared service install {$token} 2>/dev/null");
+                $proc = Process::fromShellCommandline("sudo cloudflared service install {$escapedToken} 2>/dev/null || cloudflared service install {$escapedToken} 2>/dev/null");
                 $proc->run();
                 if ($proc->isSuccessful()) {
                     $startProc = Process::fromShellCommandline('sudo systemctl start cloudflared 2>/dev/null || systemctl start cloudflared 2>/dev/null');

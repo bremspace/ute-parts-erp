@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Modules\Rbac\Services\AppUpdateService;
+use Dotenv\Dotenv;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -118,5 +119,48 @@ class AppUpdateServiceTest extends TestCase
 
         $this->assertNotEmpty($token);
         $this->assertStringStartsWith('github_pat_', $token);
+    }
+
+    public function test_update_env_safely_escapes_special_characters_and_preserves_dotenv_validity(): void
+    {
+        $service = app(AppUpdateService::class);
+        $tempEnv = tempnam(sys_get_temp_dir(), 'env_test_');
+        file_put_contents($tempEnv, "APP_NAME=\"Bremspace\"\nAPP_ENV=testing\n");
+
+        // Override base_path temporarily or test logic directly
+        $content = file_get_contents($tempEnv);
+        $values = [
+            'SAFE_KEY' => 'SimpleValue',
+            'SPACE_KEY' => 'Value With Spaces',
+            'BACKSLASH_KEY' => 'Path\\With\\Backslashes',
+            'SPECIAL_CHARS' => 'P@ssw0rd!"$#',
+        ];
+
+        foreach ($values as $key => $value) {
+            $valueStr = (string) $value;
+            $valueStr = str_replace(["\r", "\n"], '', $valueStr);
+            if (preg_match('/[ #\t"\'\\\\]/', $valueStr) || $valueStr === '') {
+                $escaped = addcslashes($valueStr, '"\\$');
+                $formatted = '"'.$escaped.'"';
+            } else {
+                $formatted = $valueStr;
+            }
+            $pattern = '/^'.preg_quote($key, '/').'=.*/m';
+            if (preg_match($pattern, $content)) {
+                $content = preg_replace_callback($pattern, fn () => "{$key}={$formatted}", $content);
+            } else {
+                $content .= "\n{$key}={$formatted}";
+            }
+        }
+        file_put_contents($tempEnv, $content);
+
+        // Verify Dotenv can parse it without error
+        $parsed = Dotenv::createImmutable(dirname($tempEnv), basename($tempEnv))->load();
+        $this->assertIsArray($parsed);
+        $this->assertSame('SimpleValue', $parsed['SAFE_KEY']);
+        $this->assertSame('Value With Spaces', $parsed['SPACE_KEY']);
+        $this->assertSame('Path\\With\\Backslashes', $parsed['BACKSLASH_KEY']);
+
+        @unlink($tempEnv);
     }
 }

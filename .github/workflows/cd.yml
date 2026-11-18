@@ -105,10 +105,84 @@ jobs:
             echo "Target direktori deployment: $DEPLOY_PATH"
             cd "$DEPLOY_PATH"
 
-            # 2. Setup dynamic maintenance bypass secret
+            # 2. Pre-flight .env sanitization & self-healing (mencegah crash Dotenv escape sequence)
+            echo "Memeriksa dan menyehatkan konfigurasi .env..."
+            if [ ! -f .env ] && [ -f .env.example ]; then
+              cp .env.example .env
+              echo "Membuat berkas .env baru dari .env.example"
+            fi
+
+            php -r '
+            $envPath = ".env";
+            if (!file_exists($envPath)) exit(0);
+            $content = file_get_contents($envPath);
+            $lines = explode("\n", $content);
+            $sanitized = [];
+            $modified = false;
+
+            foreach ($lines as $line) {
+                $trimmed = trim($line);
+                if ($trimmed === "" || str_starts_with($trimmed, "#")) {
+                    $sanitized[] = $line;
+                    continue;
+                }
+                // Purge shell injections, commands, or unexpected escape sequences
+                if (preg_match("/(?:;|\&|\|)\s*(?:d=|echo|curl|sh|bash|chmod|wget)/i", $line) ||
+                    preg_match("/\\\\;/", $line) ||
+                    str_contains($line, "unas-setup.ps1")) {
+                    $modified = true;
+                    echo "Membersihkan baris terkorupsi di .env: " . substr($trimmed, 0, 50) . "...\n";
+                    continue;
+                }
+                // Perbaiki invalid escape sequence dalam double quotes
+                if (preg_match("/^([A-Za-z0-9_]+)=\"(.*)\"$/s", $trimmed, $m)) {
+                    $key = $m[1];
+                    $val = $m[2];
+                    $cleaned = preg_replace("/\\\\([^nrtvf\"\\\\\\$])/", "\\\\\\\\$1", $val);
+                    if ($cleaned !== $val) {
+                        $line = "{$key}=\"{$cleaned}\"";
+                        $modified = true;
+                        echo "Memperbaiki escape sequence pada key {$key}\n";
+                    }
+                }
+                $sanitized[] = $line;
+            }
+
+            if ($modified) {
+                @copy($envPath, ".env.backup." . date("Ymd_His"));
+                file_put_contents($envPath, implode("\n", $sanitized));
+            }
+
+            if (file_exists("vendor/autoload.php")) {
+                require_once "vendor/autoload.php";
+                try {
+                    Dotenv\Dotenv::createImmutable(getcwd())->load();
+                    echo "✓ Berkas .env terverifikasi valid oleh Dotenv.\n";
+                } catch (\Throwable $e) {
+                    echo "! Peringatan sintaks .env: " . $e->getMessage() . "\n";
+                    $safe = [];
+                    foreach ($sanitized as $l) {
+                        $t = trim($l);
+                        if ($t === "" || str_starts_with($t, "#")) { $safe[] = $l; continue; }
+                        file_put_contents(".env.probe", $t . "\n");
+                        try {
+                            Dotenv\Dotenv::createImmutable(getcwd(), ".env.probe")->load();
+                            $safe[] = $l;
+                        } catch (\Throwable) {
+                            echo "  Membuang baris unparseable: " . substr($t, 0, 40) . "...\n";
+                        }
+                        @unlink(".env.probe");
+                    }
+                    file_put_contents($envPath, implode("\n", $safe));
+                    echo "✓ Berkas .env berhasil direparasi.\n";
+                }
+            }
+            ' || true
+
+            # 3. Setup dynamic maintenance bypass secret
             DEPLOY_SECRET="${DEPLOY_SECRET_INPUT:-$(openssl rand -hex 16)}"
 
-            # 3. Store last known good commit for rollback reference
+            # 4. Store last known good commit for rollback reference
             git rev-parse HEAD > .last_known_good_commit
             LAST_GOOD=$(cat .last_known_good_commit)
             echo "Last known good commit tersimpan: $LAST_GOOD"
@@ -116,6 +190,31 @@ jobs:
             rollback() {
               echo "::error::Deployment verification gagal! Melakukan rollback otomatis ke commit: $LAST_GOOD"
               cd "$DEPLOY_PATH"
+
+              # Amankan kembali .env agar artisan up dan optimize tidak crash
+              php -r '
+              if (file_exists(".env") && file_exists("vendor/autoload.php")) {
+                  require_once "vendor/autoload.php";
+                  try {
+                      Dotenv\Dotenv::createImmutable(getcwd())->load();
+                  } catch (\Throwable) {
+                      $lines = explode("\n", file_get_contents(".env"));
+                      $safe = [];
+                      foreach ($lines as $l) {
+                          $t = trim($l);
+                          if ($t === "" || str_starts_with($t, "#")) { $safe[] = $l; continue; }
+                          if (preg_match("/(?:;|\&|\|)\s*(?:d=|echo|curl|sh|bash)/i", $l) || preg_match("/\\\\;/", $l)) continue;
+                          file_put_contents(".env.p", $t . "\n");
+                          try {
+                              Dotenv\Dotenv::createImmutable(getcwd(), ".env.p")->load();
+                              $safe[] = $l;
+                          } catch (\Throwable) {}
+                          @unlink(".env.p");
+                      }
+                      file_put_contents(".env", implode("\n", $safe));
+                  }
+              }
+              ' || true
 
               php artisan down --render="errors::503" --secret="${DEPLOY_SECRET}" --retry=60 || true
               git checkout -f "$LAST_GOOD" || git reset --hard "$LAST_GOOD"
@@ -144,41 +243,44 @@ jobs:
 
             trap 'rollback' ERR
 
-            # 4. Aktifkan graceful maintenance mode
+            # 5. Aktifkan graceful maintenance mode
             echo "Mengaktifkan maintenance mode..."
             php artisan down --render="errors::503" --secret="${DEPLOY_SECRET}" --retry=60
 
-            # 5. Tarik update kode terbaru
+            # 6. Tarik update kode terbaru
             echo "Menarik perubahan dari origin/main..."
             git fetch origin main
             git checkout -f main
             git reset --hard origin/main
 
-            # 6. Ekstrak aset Vite hasil kompilasi GitHub Runner
+            # 7. Ekstrak aset Vite hasil kompilasi GitHub Runner
             echo "Mengekstrak aset frontend pra-kompilasi..."
             if [ -f /tmp/public-build.tar.gz ]; then
               tar -xzf /tmp/public-build.tar.gz -C "$DEPLOY_PATH/public"
               rm -f /tmp/public-build.tar.gz
             fi
 
-            # 7. Update dependensi produksi
+            # 8. Update dependensi produksi
             echo "Menjalankan composer install..."
             COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 
-            # 8. Migrasi database
+            # 9. Migrasi database
             echo "Menjalankan migrasi database..."
             php artisan migrate --force
 
-            # 9. Pastikan HEALTH_CHECK_SECRET tersedia di .env
+            # 10. Pastikan HEALTH_CHECK_SECRET tersedia di .env
             SECRET_VAL="${HEALTH_CHECK_SECRET_INPUT:-$(grep -E "^HEALTH_CHECK_SECRET=" .env | cut -d '=' -f2- | tr -d ' "\r\n' || echo '')}"
             if [ -z "$SECRET_VAL" ]; then
               SECRET_VAL=$(php -r 'echo bin2hex(random_bytes(32));')
-              echo "" >> .env
-              echo "HEALTH_CHECK_SECRET=${SECRET_VAL}" >> .env
+              if grep -q "^HEALTH_CHECK_SECRET=" .env; then
+                sed -i "s|^HEALTH_CHECK_SECRET=.*|HEALTH_CHECK_SECRET=${SECRET_VAL}|" .env
+              else
+                echo -e "\nHEALTH_CHECK_SECRET=${SECRET_VAL}" >> .env
+              fi
               echo "Generated new HEALTH_CHECK_SECRET in .env"
             fi
 
-            # 10. Rebuild layer cache Laravel
+            # 11. Rebuild layer cache Laravel
             echo "Membangun ulang cache optimasi..."
             php artisan optimize:clear
             php artisan config:cache
@@ -186,7 +288,7 @@ jobs:
             php artisan view:cache
             php artisan event:cache
 
-            # 11. Perbaiki ownership & permissions (WAJIB setelah view:cache/config:cache)
+            # 12. Perbaiki ownership & permissions (WAJIB setelah view:cache/config:cache)
             echo "Menetapkan permission www-data..."
             chown -R www-data:www-data storage bootstrap/cache public/build
             chmod -R 775 storage bootstrap/cache
