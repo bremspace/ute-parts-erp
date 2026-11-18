@@ -65,7 +65,10 @@
                 @empty
                     <tr>
                         <td colspan="7" class="py-12 text-center text-ink-400">
-                            Belum ada riwayat stock opname
+                            <x-ui.empty-state
+                                title="Belum Ada Riwayat Stock Opname"
+                                description="Belum ada audit rekonsiliasi stok fisik di gudang. Klik '+ Mulai Stock Opname' untuk membuat sesi opname baru."
+                            />
                         </td>
                     </tr>
                 @endforelse

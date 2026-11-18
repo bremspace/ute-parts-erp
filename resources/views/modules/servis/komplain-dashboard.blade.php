@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <div class="flex flex-wrap items-center gap-2">
-        <select wire:model.live="rentang" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+        <select wire:model.live="rentang" class="px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px]">
             <option value="7_hari">7 Hari Terakhir</option>
             <option value="30_hari">30 Hari Terakhir</option>
             <option value="90_hari">90 Hari Terakhir</option>
@@ -109,7 +109,14 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-6 text-center text-ink-400">Belum ada komplain pasca-servis.</td>
+                            <td colspan="7" class="px-4 py-8">
+                                <x-ui.empty-state
+                                    size="sm"
+                                    icon="document"
+                                    title="Belum Ada Komplain"
+                                    description="Tidak ada komplain pasca-servis pada rentang waktu yang dipilih."
+                                />
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

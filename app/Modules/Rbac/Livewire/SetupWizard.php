@@ -10,6 +10,7 @@ use App\Modules\Marketplace\Models\WebKonsumenSetting;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Models\QrisCabang;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\AppUpdateService;
 use App\Modules\Wms\Exports\ImportProdukTemplateExport;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Gudang;
@@ -386,19 +387,8 @@ class SetupWizard extends Component
 
     private function updateEnvKey(string $key, string $value): void
     {
-        $envPath = base_path('.env');
-        if (! file_exists($envPath) || ! is_writable($envPath)) {
-            return;
-        }
-
-        $content = file_get_contents($envPath);
-        if (preg_match("/^{$key}=.*/m", $content)) {
-            $content = preg_replace("/^{$key}=.*/m", "{$key}={$value}", $content);
-        } else {
-            $content .= "\n{$key}={$value}\n";
-        }
-
-        @file_put_contents($envPath, $content);
+        // Delegasi ke AppUpdateService agar escaping aman (hindari crash phpdotenv)
+        app(AppUpdateService::class)->updateEnv([$key => $value]);
     }
 
     public function nextStep(): void

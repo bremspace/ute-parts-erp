@@ -260,8 +260,13 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="py-8 text-center text-ink-400 text-sm">
-                                    Belum ada absensi tercatat hari ini. Klik "Buka Mesin Absensi QR Toko" untuk memunculkan scanner presensi.
+                                <td colspan="6" class="py-8">
+                                    <x-ui.empty-state
+                                        size="sm"
+                                        icon="clock"
+                                        title="Belum Ada Absensi Hari Ini"
+                                        description="Belum ada presensi tercatat hari ini. Gunakan mesin scanner QR toko atau presensi mandiri."
+                                    />
                                 </td>
                             </tr>
                         @endforelse
@@ -365,7 +370,16 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="6" class="px-3 py-8 text-center text-ink-400 dark:text-ink-500">Belum ada log absensi pada periode ini.</td></tr>
+                                    <tr>
+                                        <td colspan="6" class="py-8">
+                                            <x-ui.empty-state
+                                                size="sm"
+                                                icon="calendar"
+                                                title="Tidak Ada Log Absensi"
+                                                description="Belum ada riwayat absensi pada filter dan periode ini."
+                                            />
+                                        </td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -448,7 +462,16 @@
                                     <td class="px-3 py-2.5 text-right text-xs text-ink-400 dark:text-ink-500 font-mono">#{{ $s->id }}</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="5" class="px-3 py-8 text-center text-ink-400 dark:text-ink-500">Belum ada shift. Tambahkan di form sebelah kiri.</td></tr>
+                                <tr>
+                                    <td colspan="5" class="py-8">
+                                        <x-ui.empty-state
+                                            size="sm"
+                                            icon="clock"
+                                            title="Belum Ada Shift"
+                                            description="Belum ada data shift kerja. Tambahkan shift baru melalui form di samping."
+                                        />
+                                    </td>
+                                </tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -578,7 +601,16 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-3 py-8 text-center text-ink-400 dark:text-ink-500">Belum ada hasil KPI. Klik "Hitung KPI".</td></tr>
+                        <tr>
+                            <td colspan="5" class="py-8">
+                                <x-ui.empty-state
+                                    size="sm"
+                                    icon="chart"
+                                    title="Belum Ada Hasil KPI"
+                                    description="Belum ada kalkulasi KPI pada periode ini. Klik 'Hitung KPI' untuk memproses."
+                                />
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
             </table>

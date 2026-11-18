@@ -35,7 +35,7 @@
                         x-model="$store.posOffline.saleSearchTerm"
                         @input.debounce.300ms="$store.posOffline.searchSaleProducts()"
                         placeholder="Ketik nama produk, SKU, barcode..."
-                        class="w-full px-3.5 py-2 text-xs rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                        class="w-full px-3.5 py-2 text-base sm:text-xs rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white focus:ring-2 focus:ring-amber-500 min-h-[44px] sm:min-h-[38px]"
                     />
                 </div>
 
@@ -115,7 +115,7 @@
                             type="number"
                             x-model.number="$store.posOffline.cashReceived"
                             placeholder="0"
-                            class="w-36 px-3 py-1.5 text-right font-bold rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white"
+                            class="w-36 px-3 py-1.5 text-right font-bold rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white text-base sm:text-xs min-h-[44px] sm:min-h-[36px]"
                         />
                     </div>
                     <div class="flex justify-between items-center text-xs font-semibold pt-1 border-t border-ink-200/50 dark:border-white/5">
@@ -190,7 +190,7 @@
                         x-model="$store.posOffline.pickupSearchTerm"
                         @input.debounce.300ms="$store.posOffline.searchPickupTickets()"
                         placeholder="No Tiket, Nama Pelanggan, No WA..."
-                        class="w-full px-3.5 py-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white"
+                        class="w-full px-3.5 py-2 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white text-base sm:text-xs min-h-[44px] sm:min-h-[36px]"
                     />
                 </div>
 
@@ -229,7 +229,7 @@
                             <input
                                 type="text"
                                 x-model="$store.posOffline.pickupNamaPengambil"
-                                class="w-full px-3 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white"
+                                class="w-full px-3 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white text-base sm:text-xs min-h-[44px] sm:min-h-[36px]"
                             />
                         </div>
                         <div>
@@ -237,7 +237,7 @@
                             <input
                                 type="number"
                                 x-model.number="$store.posOffline.pickupNominalBayar"
-                                class="w-full px-3 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white font-bold"
+                                class="w-full px-3 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white font-bold text-base sm:text-xs min-h-[44px] sm:min-h-[36px]"
                             />
                         </div>
                     </div>
@@ -301,7 +301,7 @@
                         type="text"
                         x-model="$store.posOffline.returNotaAsal"
                         placeholder="Contoh: TRX-C01-20261110-0001"
-                        class="w-full px-3 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white"
+                        class="w-full px-3 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white text-base sm:text-xs min-h-[44px] sm:min-h-[36px]"
                     />
                 </div>
 
@@ -310,7 +310,7 @@
                     <input
                         type="text"
                         x-model="$store.posOffline.returAlasan"
-                        class="w-full px-3 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white"
+                        class="w-full px-3 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-ink-900 dark:text-white text-base sm:text-xs min-h-[44px] sm:min-h-[36px]"
                     />
                 </div>
 
@@ -322,7 +322,7 @@
                         x-model="$store.posOffline.returItemSearchTerm"
                         @input.debounce.300ms="$store.posOffline.searchReturItem()"
                         placeholder="Cari produk rusak di katalog lokal..."
-                        class="w-full px-2.5 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800"
+                        class="w-full px-2.5 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-base sm:text-xs min-h-[44px] sm:min-h-[36px]"
                     />
                     <div class="max-h-24 overflow-y-auto divide-y divide-ink-100 dark:divide-white/5 border border-ink-100 dark:border-white/5 rounded-lg">
                         <template x-for="p in $store.posOffline.returItemResults" :key="p.id">
@@ -346,7 +346,7 @@
                         x-model="$store.posOffline.returSwapSearchTerm"
                         @input.debounce.300ms="$store.posOffline.searchSwapItem()"
                         placeholder="Cari unit pengganti di katalog lokal..."
-                        class="w-full px-2.5 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800"
+                        class="w-full px-2.5 py-1.5 rounded-lg border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-800 text-base sm:text-xs min-h-[44px] sm:min-h-[36px]"
                     />
                     <div class="max-h-24 overflow-y-auto divide-y divide-ink-100 dark:divide-white/5 border border-ink-100 dark:border-white/5 rounded-lg">
                         <template x-for="p in $store.posOffline.returSwapResults" :key="p.id">

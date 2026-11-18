@@ -7,7 +7,7 @@
         <!-- Mode Desktop: Wide Table -->
         <x-prism.dual-scroll class="hidden md:block">
             <table class="w-full text-left text-sm text-ink-800 dark:text-ink-100 border-collapse min-w-[480px]">
-                <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-500 dark:text-ink-400 sticky top-0 z-10 backdrop-blur-md">
+                <thead class="bg-slate-100 dark:bg-ink-950 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-500 dark:text-ink-400 sticky top-0 z-10">
                     @isset($thead)
                         {{ $thead }}
                     @else
@@ -32,7 +32,7 @@
         <!-- Responsive Horizontal Scroll Table -->
         <x-prism.dual-scroll class="-mx-1 sm:mx-0">
             <table class="w-full text-left text-sm text-ink-800 dark:text-ink-100 border-collapse min-w-[540px]">
-                <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-500 dark:text-ink-400 sticky top-0 z-10 backdrop-blur-md">
+                <thead class="bg-slate-100 dark:bg-ink-950 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-500 dark:text-ink-400 sticky top-0 z-10">
                     @isset($thead)
                         {{ $thead }}
                     @else

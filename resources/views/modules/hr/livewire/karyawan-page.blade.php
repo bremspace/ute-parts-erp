@@ -77,19 +77,19 @@
                         type="text"
                         wire:model.live.debounce.300ms="search"
                         placeholder="Cari nama, NIK, email, atau telepon..."
-                        class="w-full pl-9 pr-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[42px]"
+                        class="w-full pl-9 pr-3 py-2 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px]"
                     />
                 </div>
 
                 <!-- Filter Status Ketenagakerjaan -->
-                <select wire:model.live="filterStatus" class="px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[42px]">
+                <select wire:model.live="filterStatus" class="px-3 py-2 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px]">
                     <option value="semua">Semua Status</option>
                     <option value="aktif">Hanya Aktif</option>
                     <option value="nonaktif">Hanya Nonaktif (Diberhentikan)</option>
                 </select>
 
                 <!-- Filter Jabatan -->
-                <select wire:model.live="filterJabatan" class="px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[42px]">
+                <select wire:model.live="filterJabatan" class="px-3 py-2 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px]">
                     <option value="">Semua Jabatan</option>
                     <option value="teknisi">Teknisi</option>
                     <option value="kasir">Kasir</option>
@@ -102,7 +102,7 @@
 
                 <!-- Filter Cabang (Super Admin / Owner) -->
                 @if($isSuperAdmin)
-                    <select wire:model.live="filterCabangId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[42px]">
+                    <select wire:model.live="filterCabangId" class="px-3 py-2 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px]">
                         <option value="">Semua Cabang</option>
                         @foreach($daftarCabang as $cb)
                             <option value="{{ $cb->id }}">{{ $cb->nama }}</option>
@@ -271,8 +271,13 @@
             </tr>
         @empty
             <tr>
-                <td colspan="7" class="py-12 text-center text-ink-400">
-                    Tidak ditemukan data karyawan yang sesuai dengan kriteria filter.
+                <td colspan="7" class="py-12">
+                    <x-ui.empty-state
+                        size="sm"
+                        icon="search"
+                        title="Karyawan Tidak Ditemukan"
+                        description="Tidak ditemukan data karyawan yang sesuai dengan kriteria filter atau pencarian."
+                    />
                 </td>
             </tr>
         @endforelse

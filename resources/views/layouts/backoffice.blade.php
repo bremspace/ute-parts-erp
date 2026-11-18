@@ -90,10 +90,10 @@
         <!-- [T-46] Sidebar: drawer (<768) + collapsible icon-rail (>=768) -->
         <aside
             id="sidebar"
-            class="bg-[var(--up-bg-surface)] backdrop-blur-xl border-r border-[var(--up-border-subtle)] flex flex-col flex-shrink-0
-                   fixed inset-y-0 left-0 z-50 transform-gpu shadow-xl md:shadow-none
+            class="bg-[var(--up-bg-surface)] border-r border-[var(--up-border-subtle)] flex flex-col flex-shrink-0
+                   fixed inset-y-0 left-0 z-50 shadow-xl md:shadow-none
                    transition-[width,transform] duration-200 ease-out
-                   md:static md:top-0 md:h-screen md:max-h-screen md:inset-auto md:z-30 md:translate-x-0 md:transform-none"
+                   md:static md:top-0 md:h-screen md:max-h-screen md:inset-auto md:z-30 md:translate-x-0"
             :class="[isMobile ? (sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64') : (sidebarCollapsed ? 'sidebar-collapsed w-[4.75rem]' : 'w-64')]">
             <!-- Brand -->
             <div class="sidebar-brand h-16 flex items-center justify-between px-5 border-b border-[var(--up-border-subtle)]">
@@ -604,7 +604,7 @@
         <!-- Main Content Area -->
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-[var(--up-bg-root)]">
             <!-- Top App Bar -->
-            <header class="h-14 sm:h-16 border-b border-[var(--up-border-subtle)] bg-[var(--up-bg-surface)]/90 backdrop-blur-md px-2.5 sm:px-4 lg:px-6 flex items-center justify-between z-20">
+            <header class="h-14 sm:h-16 border-b border-[var(--up-border-subtle)] bg-[var(--up-bg-surface)] px-2.5 sm:px-4 lg:px-6 flex items-center justify-between z-20">
                 <div class="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1 sm:flex-initial mr-1 sm:mr-0">
                     <!-- Menu Button: <768 toggle drawer · >=768 toggle collapse icon-rail (persist) -->
                     <button @click="toggleSidebar()"
@@ -814,7 +814,7 @@
             @if(!request()->is('app/pos*'))
             <div class="md:hidden fixed bottom-3 inset-x-0 w-full flex justify-center px-4 z-40 pointer-events-none"
                  style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.25rem);">
-                <nav class="pointer-events-auto bg-white/90 dark:bg-ink-950/90 backdrop-blur-2xl border border-ink-200/90 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] rounded-full px-2 py-1 flex items-center justify-between gap-0.5 sm:gap-1 max-w-sm w-full mx-auto">
+                <nav class="pointer-events-auto bg-white dark:bg-ink-950 border border-ink-200/90 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] rounded-full px-2 py-1 flex items-center justify-between gap-0.5 sm:gap-1 max-w-sm w-full mx-auto">
                     <a href="/app/dashboard"
                        class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('app/dashboard') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                         <div class="relative flex items-center justify-center">

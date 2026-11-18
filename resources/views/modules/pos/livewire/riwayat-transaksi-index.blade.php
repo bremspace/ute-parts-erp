@@ -619,8 +619,11 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="py-12 text-center text-ink-400 text-xs">
-                                        Tidak ada riwayat transaksi ditemukan untuk tanggal dan filter ini.
+                                    <td colspan="9" class="py-12 text-center text-ink-400">
+                                        <x-ui.empty-state
+                                            title="Tidak Ada Riwayat Transaksi"
+                                            description="Tidak ada transaksi yang cocok untuk rentang tanggal dan filter terpilih."
+                                        />
                                     </td>
                                 </tr>
                             @endforelse
@@ -845,8 +848,11 @@
                             </div>
                         </div>
                     @empty
-                        <div class="py-12 text-center text-ink-400 text-xs col-span-full">
-                            Tidak ada riwayat transaksi ditemukan untuk tanggal dan filter ini.
+                        <div class="py-12 text-center text-ink-400 col-span-full">
+                            <x-ui.empty-state
+                                title="Tidak Ada Riwayat Transaksi"
+                                description="Tidak ada transaksi yang cocok untuk rentang tanggal dan filter terpilih."
+                            />
                         </div>
                     @endforelse
                 </div>

@@ -41,16 +41,27 @@ class AppUpdateService
         $content = File::get($envPath);
 
         foreach ($values as $key => $value) {
+            if (! preg_match('/^[A-Z0-9_]+$/', (string) $key)) {
+                continue;
+            }
+
             $valueStr = (string) $value;
-            if (str_contains($valueStr, ' ') && ! str_starts_with($valueStr, '"')) {
-                $valueStr = '"'.$valueStr.'"';
+            // Cegah CRLF injection
+            $valueStr = str_replace(["\r", "\n"], '', $valueStr);
+
+            // Sanitasi nilai: jika mengandung spasi, kutip, atau backslash, bungkus & escape secara aman
+            if (preg_match('/[ #\t"\'\\\\]/', $valueStr) || $valueStr === '') {
+                $escaped = addcslashes($valueStr, '"\\$');
+                $formatted = '"'.$escaped.'"';
+            } else {
+                $formatted = $valueStr;
             }
 
             $pattern = '/^'.preg_quote($key, '/').'=.*/m';
             if (preg_match($pattern, $content)) {
-                $content = preg_replace($pattern, "{$key}={$valueStr}", $content);
+                $content = preg_replace_callback($pattern, fn () => "{$key}={$formatted}", $content);
             } else {
-                $content .= "\n{$key}={$valueStr}";
+                $content .= "\n{$key}={$formatted}";
             }
         }
 

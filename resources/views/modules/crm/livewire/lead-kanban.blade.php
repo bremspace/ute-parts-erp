@@ -74,13 +74,13 @@
                 <x-prism.barcode-scan-input placeholder="Cari nama, telepon, atau email lead..." model="search" />
             </div>
             <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
-                <select wire:model.live="filterSumber" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
+                <select wire:model.live="filterSumber" class="px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px] w-full sm:w-auto">
                     <option value="" class="bg-ink-900">Semua Sumber</option>
                     @foreach($sumberOptions as $key => $label)
                         <option value="{{ $key }}" class="bg-ink-900">{{ $label }}</option>
                     @endforeach
                 </select>
-                <select wire:model.live="filterAssignedTo" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
+                <select wire:model.live="filterAssignedTo" class="px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px] w-full sm:w-auto">
                     <option value="" class="bg-ink-900">Semua Penanggung Jawab</option>
                     @foreach($salesUsers as $u)
                         <option value="{{ $u->id }}" class="bg-ink-900">{{ $u->name }}</option>
@@ -310,24 +310,24 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama <span class="text-up-red">*</span></label>
-                            <input type="text" wire:model="createForm.nama" placeholder="Nama lead / calon pelanggan" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="text" wire:model="createForm.nama" placeholder="Nama lead / calon pelanggan" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                             @error('createForm.nama')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon</label>
-                            <input type="text" wire:model="createForm.telepon" placeholder="08xx-xxxx-xxxx" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="text" wire:model="createForm.telepon" placeholder="08xx-xxxx-xxxx" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                             @error('createForm.telepon')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Email</label>
-                            <input type="email" wire:model="createForm.email" placeholder="lead@email.com" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="email" wire:model="createForm.email" placeholder="lead@email.com" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                             @error('createForm.email')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Sumber</label>
-                            <select wire:model="createForm.sumber" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model="createForm.sumber" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium">
                                 @foreach($sumberOptions as $key => $label)
                                     <option value="{{ $key }}" class="bg-ink-900">{{ $label }}</option>
                                 @endforeach
@@ -337,12 +337,12 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nilai Estimasi (Rp)</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model="createForm.nilai_estimasi" placeholder="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model="createForm.nilai_estimasi" placeholder="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-bold tabular-nums" />
                             @error('createForm.nilai_estimasi')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Penanggung Jawab</label>
-                            <select wire:model="createForm.assigned_to" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model="createForm.assigned_to" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Belum ditugaskan —</option>
                                 @foreach($salesUsers as $u)
                                     <option value="{{ $u->id }}" class="bg-ink-900">{{ $u->name }}</option>
@@ -353,7 +353,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tahap Awal</label>
-                        <select wire:model="createForm.stage" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                        <select wire:model="createForm.stage" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium">
                             @foreach($stages as $stageKey => $stageMeta)
                                 <option value="{{ $stageKey }}" class="bg-ink-900">{{ $stageMeta['label'] }}</option>
                             @endforeach
@@ -396,24 +396,24 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama <span class="text-up-red">*</span></label>
-                            <input type="text" wire:model="editForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="text" wire:model="editForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                             @error('editForm.nama')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon</label>
-                            <input type="text" wire:model="editForm.telepon" placeholder="08xx-xxxx-xxxx" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="text" wire:model="editForm.telepon" placeholder="08xx-xxxx-xxxx" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                             @error('editForm.telepon')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Email</label>
-                            <input type="email" wire:model="editForm.email" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <input type="email" wire:model="editForm.email" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium" />
                             @error('editForm.email')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Sumber</label>
-                            <select wire:model="editForm.sumber" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model="editForm.sumber" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium">
                                 @foreach($sumberOptions as $key => $label)
                                     <option value="{{ $key }}" class="bg-ink-900">{{ $label }}</option>
                                 @endforeach
@@ -423,7 +423,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tahap (Stage)</label>
-                            <select wire:model.live="editForm.stage" @change="pendingStage = null" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model.live="editForm.stage" @change="pendingStage = null" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium">
                                 @foreach($stages as $stageKey => $stageMeta)
                                     <option value="{{ $stageKey }}" class="bg-ink-900">{{ $stageMeta['label'] }}</option>
                                 @endforeach
@@ -431,7 +431,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nilai Estimasi (Rp)</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model="editForm.nilai_estimasi" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model="editForm.nilai_estimasi" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-bold tabular-nums" />
                             @error('editForm.nilai_estimasi')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                     </div>
@@ -439,7 +439,7 @@
                     @if(($editForm['stage'] ?? '') === 'lost')
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alasan Kalah</label>
-                            <select wire:model="editForm.lost_reason" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model="editForm.lost_reason" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Pilih alasan —</option>
                                 @foreach($lostReasonOptions as $key => $label)
                                     <option value="{{ $key }}" class="bg-ink-900">{{ $label }}</option>
@@ -451,7 +451,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Penanggung Jawab</label>
-                            <select wire:model="editForm.assigned_to" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model="editForm.assigned_to" class="w-full px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Belum ditugaskan —</option>
                                 @foreach($salesUsers as $u)
                                     <option value="{{ $u->id }}" class="bg-ink-900">{{ $u->name }}</option>

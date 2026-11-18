@@ -452,7 +452,7 @@
                 <!-- Tabel Riwayat Pembelian Produk -->
                 <div class="overflow-y-auto flex-1 rounded-2xl border border-white/5 max-h-[45vh]">
                     <table class="w-full text-left border-collapse text-xs">
-                        <thead class="sticky top-0 bg-ink-950/95 backdrop-blur-sm z-10 border-b border-white/10">
+                        <thead class="sticky top-0 bg-ink-950 z-10 border-b border-white/10">
                             <tr class="text-ink-400 font-semibold text-[11px] uppercase tracking-wider">
                                 <th class="py-3 px-3.5">Tanggal</th>
                                 <th class="py-3 px-3">No. PO</th>
@@ -571,7 +571,7 @@
                 <!-- Daftar Item PO -->
                 <div class="overflow-y-auto flex-1 rounded-2xl border border-white/5 max-h-[45vh]">
                     <table class="w-full text-left border-collapse text-xs">
-                        <thead class="sticky top-0 bg-ink-950/95 backdrop-blur-sm z-10 border-b border-white/10">
+                        <thead class="sticky top-0 bg-ink-950 z-10 border-b border-white/10">
                             <tr class="text-ink-400 font-semibold text-[11px] uppercase tracking-wider">
                                 <th class="py-2.5 px-3">Produk</th>
                                 <th class="py-2.5 px-3 text-right">Qty</th>

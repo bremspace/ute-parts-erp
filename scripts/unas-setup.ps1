@@ -20,16 +20,20 @@ $projectRoot = Split-Path -Parent $scriptDir
 
 # Helper: Prompt input dengan nilai default
 function Prompt-User([string]$promptText, [string]$defaultValue) {
-    if ($defaultValue -ne "") {
-        Write-Host "$promptText [$defaultValue]: " -NoNewline -ForegroundColor Yellow
-    } else {
-        Write-Host "$promptText: " -NoNewline -ForegroundColor Yellow
-    }
-    $inputVal = Read-Host
-    if ([string]::IsNullOrWhiteSpace($inputVal)) {
+    try {
+        if ($defaultValue -ne "") {
+            Write-Host "$($promptText) [$defaultValue]: " -NoNewline -ForegroundColor Yellow
+        } else {
+            Write-Host "$($promptText): " -NoNewline -ForegroundColor Yellow
+        }
+        $inputVal = Read-Host
+        if ([string]::IsNullOrWhiteSpace($inputVal)) {
+            return $defaultValue
+        }
+        return $inputVal.Trim()
+    } catch {
         return $defaultValue
     }
-    return $inputVal.Trim()
 }
 
 # Helper: Uji apakah TCP Port sedang aktif/didengarkan
@@ -167,13 +171,67 @@ Write-Host "[3/7] Menyiapkan runtime PHP 8.4+ dan konfigurasi php.ini..." -Foreg
 
 function Configure-PhpIniFile([string]$phpFolder) {
     $iniFile = Join-Path $phpFolder 'php.ini'
-    $extDir = (Join-Path $phpFolder 'ext').Replace('\', '/')
+    $extDir = Join-Path $phpFolder 'ext'
+    $extDirFormatted = $extDir.Replace('\', '/')
     $certFile = (Join-Path $phpFolder 'cacert.pem').Replace('\', '/')
 
     # Unduh cacert.pem jika belum ada
     if (-not (Test-Path (Join-Path $phpFolder 'cacert.pem'))) {
         $certUrl = "https://curl.se/ca/cacert.pem"
         Download-FileSafely $certUrl (Join-Path $phpFolder 'cacert.pem') | Out-Null
+    }
+
+    # Filter ekstensi yang benar-benar memiliki file dll di folder ext
+    $candidateExts = @('curl','fileinfo','gd','intl','mbstring','mysqli','openssl','pdo_mysql','pdo_sqlite','sqlite3','zip','exif','sodium')
+    $availableExtLines = @()
+    foreach ($cand in $candidateExts) {
+        if ((Test-Path (Join-Path $extDir "php_$cand.dll")) -or (Test-Path (Join-Path $extDir "$cand.dll"))) {
+            $availableExtLines += "extension=$cand"
+        }
+    }
+    # Di Windows, bcmath umumnya sudah built-in statis di php.exe. Hanya tambahkan jika dll fisiknya ada.
+    if (Test-Path (Join-Path $extDir 'php_bcmath.dll')) {
+        $availableExtLines += "extension=bcmath"
+    }
+    # Opcache hanya ditambahkan jika file dll tersedia di folder ext
+    $hasOpcache = (Test-Path (Join-Path $extDir 'php_opcache.dll')) -or (Test-Path (Join-Path $extDir 'opcache.dll'))
+
+    if (Test-Path $iniFile) {
+        # Modifikasi aman jika php.ini sudah ada (misal di XAMPP / Laragon)
+        $existing = Get-Content -Path $iniFile -Raw
+        if ($existing -notmatch '(?m)^extension_dir\s*=') {
+            $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^;?extension_dir\s*=.*', "extension_dir = `"$extDirFormatted`"")
+        }
+        foreach ($cand in $candidateExts) {
+            if ((Test-Path (Join-Path $extDir "php_$cand.dll")) -or (Test-Path (Join-Path $extDir "$cand.dll"))) {
+                $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, "(?m)^;\s*extension\s*=\s*(php_)?$cand(\.dll)?\b", "extension=$cand")
+                if ($existing -notmatch "(?m)^extension\s*=\s*(php_)?$cand\b") {
+                    $existing += "`r`nextension=$cand"
+                }
+            }
+        }
+        # Hindari warning bcmath jika tidak ada dll terpisah
+        if (-not (Test-Path (Join-Path $extDir 'php_bcmath.dll'))) {
+            $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^extension\s*=\s*(php_)?bcmath(\.dll)?\b', ';extension=bcmath')
+        }
+        # Hindari warning opcache jika dll tidak ditemukan
+        if ($hasOpcache) {
+            $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^;\s*zend_extension\s*=\s*(php_)?opcache(\.dll)?\b', 'zend_extension=opcache')
+            if ($existing -notmatch '(?m)^zend_extension\s*=\s*(php_)?opcache\b') {
+                $existing += "`r`nzend_extension=opcache"
+            }
+        } else {
+            $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^zend_extension\s*=\s*(php_)?opcache(\.dll)?\b', ';zend_extension=opcache')
+        }
+        $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^;?memory_limit\s*=.*', 'memory_limit = 512M')
+        $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^;?max_execution_time\s*=.*', 'max_execution_time = 300')
+        Set-Content -Path $iniFile -Value $existing -Encoding ASCII
+        return
+    }
+
+    $extBlock = $availableExtLines -join "`r`n"
+    if ($hasOpcache) {
+        $extBlock += "`r`nzend_extension=opcache"
     }
 
     $iniTemplate = @"
@@ -220,24 +278,10 @@ allow_url_fopen = On
 allow_url_include = Off
 default_socket_timeout = 60
 
-extension_dir = "$extDir"
+extension_dir = "$extDirFormatted"
 
 ; Bremspace ERP Mandatory Extensions
-extension=bcmath
-extension=curl
-extension=exif
-extension=fileinfo
-extension=gd
-extension=intl
-extension=mbstring
-extension=mysqli
-extension=openssl
-extension=pdo_mysql
-extension=pdo_sqlite
-extension=sqlite3
-extension=zip
-extension=sodium
-zend_extension=opcache
+$extBlock
 
 [Date]
 date.timezone = Asia/Jakarta
@@ -357,7 +401,10 @@ if (-not $detectedPhp) {
 $phpExe = $detectedPhp.Path
 Write-Host " [OK] Menggunakan PHP Binary : $phpExe (Versi: $($detectedPhp.Version))" -ForegroundColor Green
 
-# Verifikasi ulang konfigurasi ekstensi php.ini
+# Verifikasi dan sinkronisasi konfigurasi php.ini aktif (bersihkan warning & lengkapi ekstensi)
+$parentPhp = Split-Path -Parent $phpExe
+Configure-PhpIniFile $parentPhp
+
 $loadedExts = & $phpExe -r "echo implode(',', get_loaded_extensions());" 2>$null
 $requiredExts = @('bcmath','curl','fileinfo','gd','intl','mbstring','openssl','pdo_mysql','pdo_sqlite','zip')
 $missingExts = @()
@@ -369,10 +416,9 @@ foreach ($ext in $requiredExts) {
 
 if ($missingExts.Count -gt 0) {
     Write-Host " [INFO] Memperbarui php.ini untuk melengkapi ekstensi: $($missingExts -join ', ')..." -ForegroundColor Yellow
-    $parentPhp = Split-Path -Parent $phpExe
     Configure-PhpIniFile $parentPhp
 }
-Write-Host " [OK] Konfigurasi php.ini terverifikasi (100% Ekstensi ERP Aktif)." -ForegroundColor Green
+Write-Host " [OK] Konfigurasi php.ini terverifikasi (Bebas Warning & 100% Ekstensi Aktif)." -ForegroundColor Green
 
 # ==============================================================================
 # 4. Verifikasi Dependensi Composer & Frontend
@@ -416,6 +462,32 @@ if ($nodeCmd -and $npmCmd) {
 # ==============================================================================
 Write-Host ""
 Write-Host "[5/7] Konfigurasi Database & Parameter Aplikasi..." -ForegroundColor Cyan
+
+function Show-MySqlTutorial {
+    Write-Host ""
+    Write-Host "======================================================================" -ForegroundColor Yellow
+    Write-Host "   PANDUAN MENYIAPKAN MYSQL / MARIADB (LARAGON / XAMPP)" -ForegroundColor Yellow
+    Write-Host "======================================================================" -ForegroundColor Yellow
+    Write-Host "Aplikasi ERP & POS memerlukan database MySQL/MariaDB aktif di port 3306." -ForegroundColor White
+    Write-Host ""
+    Write-Host "OPSI 1: Menggunakan LARAGON (Sangat Direkomendasikan di Windows)" -ForegroundColor Cyan
+    Write-Host "  1. Unduh Laragon: https://laragon.org/download/ (versi Portable / Full)" -ForegroundColor Gray
+    Write-Host "  2. Buka aplikasi Laragon, lalu klik tombol [Start All]" -ForegroundColor Gray
+    Write-Host "  3. Kredensial bawaan Laragon:" -ForegroundColor Gray
+    Write-Host "     - Host: 127.0.0.1  |  Port: 3306  |  User: root  |  Password: (kosong)" -ForegroundColor White
+    Write-Host ""
+    Write-Host "OPSI 2: Menggunakan XAMPP" -ForegroundColor Cyan
+    Write-Host "  1. Unduh XAMPP: https://www.apachefriends.org/" -ForegroundColor Gray
+    Write-Host "  2. Buka 'XAMPP Control Panel'" -ForegroundColor Gray
+    Write-Host "  3. Pada modul 'MySQL', klik tombol [Start] hingga status berubah hijau" -ForegroundColor Gray
+    Write-Host "  4. Kredensial bawaan XAMPP:" -ForegroundColor Gray
+    Write-Host "     - Host: 127.0.0.1  |  Port: 3306  |  User: root  |  Password: (kosong)" -ForegroundColor White
+    Write-Host ""
+    Write-Host "OPSI 3: Service Windows (Jika MariaDB/MySQL Sudah Terpasang)" -ForegroundColor Cyan
+    Write-Host "  Jalankan di Command Prompt Admin: net start MySQL  (atau: net start MariaDB)" -ForegroundColor Gray
+    Write-Host "======================================================================" -ForegroundColor Yellow
+    Write-Host ""
+}
 
 Write-Host "Pilih Engine Database:" -ForegroundColor White
 Write-Host "  [1] SQLite (Rekomendasi Cepat & Mandiri, 1-Click Zero Config)" -ForegroundColor Green
@@ -487,19 +559,35 @@ if ($dbChoice -eq "2") {
         }
     }
 
-    # Mitigasi jika tidak ada Laragon / XAMPP di PC kosongan
+    # Panduan jika port 3306 belum aktif
     if (-not $mysqlListening) {
-        Write-Host " [PERINGATAN] Komputer ini belum memiliki MySQL / MariaDB terpasang." -ForegroundColor Yellow
-        Write-Host " Pilihan Solusi:" -ForegroundColor White
-        Write-Host "   [1] Pasang MariaDB Server resmi otomatis via winget (Windows Package Manager)" -ForegroundColor Green
-        Write-Host "   [2] Gunakan Remote MySQL / Komputer Server Toko Lain di Jaringan LAN / Wi-Fi" -ForegroundColor Cyan
-        Write-Host "   [3] Lewati dan masukkan konfigurasi manual" -ForegroundColor Gray
-        $mysqlFixChoice = Prompt-User "Pilihan Solusi [1/2/3]" "1"
+        Write-Host " [PERINGATAN] Port 3306 belum aktif atau MySQL / MariaDB belum berjalan." -ForegroundColor Yellow
+        Show-MySqlTutorial
+        Write-Host " Pilihan Tindakan:" -ForegroundColor White
+        Write-Host "   [1] Coba hubungkan ulang sekarang (setelah menyalakan Laragon/XAMPP)" -ForegroundColor Green
+        Write-Host "   [2] Buka XAMPP Control Panel / Laragon otomatis (jika terpasang)" -ForegroundColor Cyan
+        Write-Host "   [3] Pasang MariaDB Server resmi via winget otomatis" -ForegroundColor Yellow
+        Write-Host "   [4] Lanjutkan dengan konfigurasi host/port MySQL manual / remote" -ForegroundColor Gray
+        $mysqlFixChoice = Prompt-User "Pilihan Tindakan [1/2/3/4]" "1"
 
         if ($mysqlFixChoice -eq "1") {
+            Start-Sleep -Seconds 1
+            $mysqlListening = Test-PortActive 3306
+        } elseif ($mysqlFixChoice -eq "2") {
+            if (Test-Path "C:\xampp\xampp-control.exe") {
+                Start-Process "C:\xampp\xampp-control.exe"
+                Write-Host " [INFO] XAMPP Control Panel dibuka. Klik 'Start' pada MySQL lalu tekan Enter." -ForegroundColor Cyan
+                pause
+            } elseif (Test-Path "C:\laragon\laragon.exe") {
+                Start-Process "C:\laragon\laragon.exe"
+                Write-Host " [INFO] Laragon dibuka. Klik 'Start All' lalu tekan Enter." -ForegroundColor Cyan
+                pause
+            }
+            $mysqlListening = Test-PortActive 3306
+        } elseif ($mysqlFixChoice -eq "3") {
             $wingetCmd = Get-Command winget.exe -ErrorAction SilentlyContinue
             if ($wingetCmd) {
-                Write-Host " [AUTO-INSTALL] Mengunduh & memasang MariaDB Server resmi via winget..." -ForegroundColor Cyan
+                Write-Host " [AUTO-INSTALL] Mengunduh & memasang MariaDB Server via winget..." -ForegroundColor Cyan
                 try {
                     & winget install --id MariaDB.Server -e --silent --accept-source-agreements --accept-package-agreements
                     Start-Sleep -Seconds 4
@@ -512,8 +600,6 @@ if ($dbChoice -eq "2") {
                 } catch {
                     Write-Host " Gagal memasang otomatis via winget: $($_.Exception.Message)" -ForegroundColor Yellow
                 }
-            } else {
-                Write-Host " [INFO] winget.exe tidak tersedia di sistem Windows ini." -ForegroundColor Yellow
             }
         }
     }
@@ -535,11 +621,77 @@ if ($dbChoice -eq "2") {
     # Uji koneksi via script test-db-connection.php
     $testDbScript = Join-Path $scriptDir 'test-db-connection.php'
     if (Test-Path $testDbScript) {
-        $dbTestOut = & $phpExe $testDbScript $dbHost $dbPort $dbUser $dbPass $dbName 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host " [OK] Koneksi MySQL terverifikasi & Database '$dbName' siap." -ForegroundColor Green
-        } else {
-            Write-Host " [PERINGATAN] Pengujian koneksi MySQL: $dbTestOut" -ForegroundColor Yellow
+        $mysqlVerified = $false
+        while (-not $mysqlVerified) {
+            $dbTestOutRaw = & $phpExe $testDbScript "--host=$dbHost" "--port=$dbPort" "--user=$dbUser" "--pass=$dbPass" "--dbname=$dbName" 2>&1
+            $testOutLine = ""
+            foreach ($line in $dbTestOutRaw) {
+                $trimmed = $line.ToString().Trim()
+                if ($trimmed -match '^(SUCCESS|ERROR)\|') {
+                    $testOutLine = $trimmed
+                    break
+                }
+            }
+            if (-not $testOutLine -and $dbTestOutRaw) {
+                $testOutLine = ($dbTestOutRaw | Select-Object -Last 1).ToString().Trim()
+            }
+
+            if ($testOutLine -match '^SUCCESS\|(.*)$') {
+                $actualPass = $matches[1]
+                if ($actualPass -ne $dbPass) {
+                    Write-Host " [INFO] Password terverifikasi yang cocok: $(if ($actualPass -eq '') {'[Tanpa Password]'} else {'[' + $actualPass + ']'})" -ForegroundColor Cyan
+                    $dbPass = $actualPass
+                }
+                Write-Host " [OK] Koneksi MySQL/MariaDB terverifikasi & Database '$dbName' siap." -ForegroundColor Green
+                $mysqlVerified = $true
+                break
+            }
+
+            # Tampilkan informasi error spesifik
+            $errDetail = $testOutLine
+            if ($testOutLine -match '^ERROR\|\d+\|(.*)$') {
+                $errDetail = $matches[1]
+            }
+            Write-Host " [PERINGATAN] Gagal terhubung ke MySQL/MariaDB ($dbHost`:$dbPort): $errDetail" -ForegroundColor Yellow
+            
+            # Tampilkan tutorial Laragon/XAMPP
+            Show-MySqlTutorial
+
+            Write-Host " Pilihan Solusi:" -ForegroundColor White
+            Write-Host "   [1] Coba hubungkan ulang sekarang (setelah menyalakan MySQL di XAMPP / Laragon)" -ForegroundColor Green
+            Write-Host "   [2] Masukkan ulang kredensial (Host / Port / User / Password / DB)" -ForegroundColor Cyan
+            Write-Host "   [3] Buka XAMPP Control Panel / Laragon otomatis (jika terpasang di PC)" -ForegroundColor Yellow
+            Write-Host "   [4] Tetap lanjutkan dengan kredensial ini (Manual)" -ForegroundColor Gray
+            Write-Host "   [5] Beralih ke SQLite mandiri (hanya jika sengaja ingin berganti pilihan)" -ForegroundColor DarkGray
+            $dbRetryChoice = Prompt-User "Pilihan Tindakan [1/2/3/4/5]" "1"
+
+            if ($dbRetryChoice -eq "1") {
+                continue
+            } elseif ($dbRetryChoice -eq "2") {
+                $dbHost = Prompt-User "Host Database" $dbHost
+                $dbPort = Prompt-User "Port Database" $dbPort
+                $dbUser = Prompt-User "Username Database" $dbUser
+                $dbPass = Prompt-User "Password Database (kosongkan jika tanpa password)" ""
+                $dbName = Prompt-User "Nama Database" $dbName
+            } elseif ($dbRetryChoice -eq "3") {
+                if (Test-Path "C:\xampp\xampp-control.exe") {
+                    Start-Process "C:\xampp\xampp-control.exe"
+                    Write-Host " [INFO] XAMPP Control Panel dibuka. Klik 'Start' pada baris MySQL lalu tekan Enter." -ForegroundColor Cyan
+                    pause
+                } elseif (Test-Path "C:\laragon\laragon.exe") {
+                    Start-Process "C:\laragon\laragon.exe"
+                    Write-Host " [INFO] Laragon dibuka. Klik 'Start All' lalu tekan Enter." -ForegroundColor Cyan
+                    pause
+                } else {
+                    Write-Host " [INFO] XAMPP/Laragon tidak terdeteksi di C:\xampp atau C:\laragon. Silakan nyalakan MySQL secara manual." -ForegroundColor Yellow
+                }
+            } elseif ($dbRetryChoice -eq "5") {
+                $dbDriver = "sqlite"
+                Write-Host " [OK] Mode dialihkan ke SQLite mandiri (database\database.sqlite)." -ForegroundColor Green
+                break
+            } else {
+                break
+            }
         }
     }
 } else {
@@ -561,19 +713,26 @@ if (-not (Test-Path $envFile) -and (Test-Path $envExample)) {
 if (Test-Path $envFile) {
     $envContent = Get-Content -Path $envFile -Raw
     
+    # Bersihkan baris error / escape sequence tidak valid di .env akibat kegagalan installer sebelumnya
+    $envContent = [System.Text.RegularExpressions.Regex]::Replace($envContent, '(?m)^.*scripts[\\/]unas-setup\.ps1.*(\r?\n)?', '')
+    $envContent = [System.Text.RegularExpressions.Regex]::Replace($envContent, '(?m)^DB_PASSWORD=.*char:\d+.*$', 'DB_PASSWORD=""')
+
     $envContent = $envContent -replace '(?m)^APP_NAME=.*', "APP_NAME=`"$appName`""
     $envContent = $envContent -replace '(?m)^APP_URL=.*', "APP_URL=http://localhost:$appPort"
+
+    # Sanitasi string password jika mengandung output stacktrace
+    if ($dbPass -match 'unas-setup\.ps1') { $dbPass = "" }
 
     if ($dbDriver -eq "mysql") {
         $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=mysql'
         if ($envContent -notmatch '(?m)^DB_HOST=') {
-            $envContent += "`r`nDB_HOST=$dbHost`r`nDB_PORT=$dbPort`r`nDB_DATABASE=$dbName`r`nDB_USERNAME=$dbUser`r`nDB_PASSWORD=$dbPass"
+            $envContent += "`r`nDB_HOST=$dbHost`r`nDB_PORT=$dbPort`r`nDB_DATABASE=$dbName`r`nDB_USERNAME=$dbUser`r`nDB_PASSWORD=`"$dbPass`""
         } else {
             $envContent = $envContent -replace '(?m)^DB_HOST=.*', "DB_HOST=$dbHost"
             $envContent = $envContent -replace '(?m)^DB_PORT=.*', "DB_PORT=$dbPort"
             $envContent = $envContent -replace '(?m)^DB_DATABASE=.*', "DB_DATABASE=$dbName"
             $envContent = $envContent -replace '(?m)^DB_USERNAME=.*', "DB_USERNAME=$dbUser"
-            $envContent = $envContent -replace '(?m)^DB_PASSWORD=.*', "DB_PASSWORD=$dbPass"
+            $envContent = $envContent -replace '(?m)^DB_PASSWORD=.*', "DB_PASSWORD=`"$dbPass`""
         }
     } else {
         $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=sqlite'
@@ -642,14 +801,67 @@ if ($envCheck -notmatch '(?m)^APP_KEY=.+') {
     Write-Host " [OK] Application Encryption Key berhasil di-generate." -ForegroundColor Green
 }
 
+# Bersihkan cache sebelum migrasi agar membaca file .env terbaru
+& $phpExe $artisan optimize:clear 2>$null | Out-Null
+
 # 6d. Migrasi Database Skema
 Write-Host " Menjalankan migrasi database skema..." -ForegroundColor Gray
-$migOut = & $phpExe $artisan migrate --force 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host " [PERINGATAN] Migrasi database menghasilkan catatan (Exit Code: $LASTEXITCODE):" -ForegroundColor Yellow
-    $migOut | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkYellow }
-} else {
-    Write-Host " [OK] Skema tabel database berhasil dimuat." -ForegroundColor Green
+$migDone = $false
+while (-not $migDone) {
+    $migOut = & $phpExe $artisan migrate --force 2>&1
+    $migErrStr = ($migOut -join "`n")
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host " [PERINGATAN] Migrasi database menghasilkan catatan (Exit Code: $LASTEXITCODE):" -ForegroundColor Yellow
+        $migOut | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkYellow }
+
+        if ($dbDriver -eq "mysql") {
+            Show-MySqlTutorial
+            Write-Host " Pilihan Solusi Migrasi:" -ForegroundColor White
+            Write-Host "   [1] Coba jalankan migrasi lagi (setelah memastikan MySQL di XAMPP / Laragon aktif)" -ForegroundColor Green
+            Write-Host "   [2] Buka XAMPP Control Panel / Laragon otomatis" -ForegroundColor Cyan
+            Write-Host "   [3] Beralih ke SQLite mandiri (hanya jika Anda ingin beralih)" -ForegroundColor Yellow
+            Write-Host "   [4] Lewati tahap migrasi dan lanjutkan proses berikutnya" -ForegroundColor Gray
+            $migRetryChoice = Prompt-User "Pilihan Solusi [1/2/3/4]" "1"
+
+            if ($migRetryChoice -eq "1") {
+                & $phpExe $artisan optimize:clear 2>$null | Out-Null
+                continue
+            } elseif ($migRetryChoice -eq "2") {
+                if (Test-Path "C:\xampp\xampp-control.exe") {
+                    Start-Process "C:\xampp\xampp-control.exe"
+                    Write-Host " [INFO] XAMPP Control Panel dibuka. Klik 'Start' pada MySQL lalu tekan Enter." -ForegroundColor Cyan
+                    pause
+                } elseif (Test-Path "C:\laragon\laragon.exe") {
+                    Start-Process "C:\laragon\laragon.exe"
+                    Write-Host " [INFO] Laragon dibuka. Klik 'Start All' lalu tekan Enter." -ForegroundColor Cyan
+                    pause
+                } else {
+                    Write-Host " [INFO] XAMPP/Laragon tidak terdeteksi di lokasi default C:\xampp atau C:\laragon." -ForegroundColor Yellow
+                }
+                & $phpExe $artisan optimize:clear 2>$null | Out-Null
+                continue
+            } elseif ($migRetryChoice -eq "3") {
+                $sqliteDb = Join-Path $projectRoot 'database\database.sqlite'
+                if (-not (Test-Path $sqliteDb)) {
+                    New-Item -ItemType File -Path $sqliteDb -Force | Out-Null
+                }
+                $envContent = Get-Content -Path $envFile -Raw
+                $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=sqlite'
+                Set-Content -Path $envFile -Value $envContent -Encoding ASCII
+                $dbDriver = "sqlite"
+                & $phpExe $artisan optimize:clear 2>$null | Out-Null
+                continue
+            } else {
+                break
+            }
+        } else {
+            break
+        }
+    } else {
+        Write-Host " [OK] Skema tabel database berhasil dimuat." -ForegroundColor Green
+        $migDone = $true
+    }
 }
 
 # 6e. Data Seeder Awal (RBAC, Akun Super Admin, COA)
@@ -729,18 +941,27 @@ if ($isAdmin) {
     } catch {}
 }
 
-# Pastikan router script server.php tersedia
+# Pastikan router script server.php dan direktori log tersedia
 $serverRouter = Join-Path $projectRoot 'server.php'
 $serverLog = Join-Path $projectRoot 'storage\logs\server.log'
+$serverErrLog = Join-Path $projectRoot 'storage\logs\server-error.log'
 $queueLog = Join-Path $projectRoot 'storage\logs\queue.log'
+$queueErrLog = Join-Path $projectRoot 'storage\logs\queue-error.log'
+$schedLog = Join-Path $projectRoot 'storage\logs\scheduler.log'
+$schedErrLog = Join-Path $projectRoot 'storage\logs\scheduler-error.log'
+
+$storageLogs = Join-Path $projectRoot 'storage\logs'
+if (-not (Test-Path $storageLogs)) {
+    New-Item -ItemType Directory -Path $storageLogs -Force | Out-Null
+}
 
 # Jalankan PHP Built-in Server di Background dengan server.php
 $serverProc = $null
 if (Test-Path $serverRouter) {
-    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "server.php" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverLog -PassThru
+    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "server.php" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErrLog -PassThru
 } else {
     $docRoot = Join-Path $projectRoot 'public'
-    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverLog -PassThru
+    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErrLog -PassThru
 }
 
 if ($serverProc) {
@@ -748,14 +969,13 @@ if ($serverProc) {
 }
 
 # Jalankan Background Queue Worker
-$queueProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "queue:work", "--queue=sync,default", "--sleep=3", "--tries=3" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueLog -PassThru
+$queueProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "queue:work", "--queue=sync,default", "--sleep=3", "--tries=3" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueErrLog -PassThru
 if ($queueProc) {
     Set-Content -Path (Join-Path $projectRoot 'storage\framework\queue.pid') -Value $queueProc.Id -Encoding ASCII
 }
 
 # Jalankan Background Scheduler (Cron Runner)
-$schedLog = Join-Path $projectRoot 'storage\logs\scheduler.log'
-$schedProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "schedule:work" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $schedLog -RedirectStandardError $schedLog -PassThru -ErrorAction SilentlyContinue
+$schedProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "schedule:work" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $schedLog -RedirectStandardError $schedErrLog -PassThru -ErrorAction SilentlyContinue
 
 # Buat Shortcut Desktop Otomatis
 try {

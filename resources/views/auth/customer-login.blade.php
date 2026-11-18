@@ -71,7 +71,7 @@
                     </label>
                     <div class="relative">
                         <input type="text" id="telepon" name="telepon" value="{{ old('telepon') }}" required autofocus placeholder="08xx atau username"
-                            class="w-full px-4 py-3 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400" />
+                            class="w-full px-4 py-3 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400" />
                     </div>
                 </div>
                 <div>
@@ -86,7 +86,7 @@
                         </a>
                     </div>
                     <input type="password" id="password" name="password" required placeholder="••••••••"
-                        class="w-full px-4 py-3 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400" />
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400" />
                 </div>
 
                 <button type="submit"

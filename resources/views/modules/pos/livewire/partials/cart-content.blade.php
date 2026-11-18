@@ -265,15 +265,10 @@
                 @include('modules.pos.livewire.partials.sn-control', ['itemKey' => $key, 'item' => $item])
             </div>
         @empty
-            <div class="py-12 text-center text-ink-400">
-                <div class="w-12 h-12 rounded-2xl bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 mx-auto mb-2 flex items-center justify-center text-ink-400">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                </div>
-                <p class="text-xs font-semibold text-ink-700 dark:text-ink-300">Keranjang masih kosong</p>
-                <p class="text-[11px] text-ink-500 mt-0.5">Pilih produk dari katalog atau scan barcode</p>
-            </div>
+            <x-ui.empty-state
+                title="Keranjang Masih Kosong"
+                description="Pilih produk dari katalog atau scan barcode untuk menambahkan barang ke transaksi."
+            />
         @endforelse
     </div>
 
