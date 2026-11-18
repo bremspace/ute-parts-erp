@@ -248,11 +248,7 @@ if ($baseContent) {
 }
 
 # Pastikan semua ekstensi wajib terpasang di bawah [PHP]
-$appendLines = @(
-    "",
-    ";; ==============================================================================",
-    ";; Bremspace ERP Mandatory Extensions and Performance",
-    ";; ==============================================================================",
+$dynExts = @(
     "extension_dir = `"$extPathFormatted`"",
     "extension=curl",
     "extension=fileinfo",
@@ -265,9 +261,21 @@ $appendLines = @(
     "extension=pdo_sqlite",
     "extension=sqlite3",
     "extension=zip",
-    "extension=bcmath",
-    "extension=exif",
-    "zend_extension=opcache",
+    "extension=exif"
+)
+if (Test-Path (Join-Path $extPath 'php_bcmath.dll')) {
+    $dynExts += "extension=bcmath"
+}
+if ((Test-Path (Join-Path $extPath 'php_opcache.dll')) -or (Test-Path (Join-Path $extPath 'opcache.dll'))) {
+    $dynExts += "zend_extension=opcache"
+}
+
+$appendLines = @(
+    "",
+    ";; ==============================================================================",
+    ";; Bremspace ERP Mandatory Extensions and Performance",
+    ";; ==============================================================================",
+    $dynExts -join "`r`n",
     "memory_limit = 512M",
     "max_execution_time = 300",
     "post_max_size = 64M",

@@ -20,16 +20,20 @@ $projectRoot = Split-Path -Parent $scriptDir
 
 # Helper: Prompt input dengan nilai default
 function Prompt-User([string]$promptText, [string]$defaultValue) {
-    if ($defaultValue -ne "") {
-        Write-Host "$promptText [$defaultValue]: " -NoNewline -ForegroundColor Yellow
-    } else {
-        Write-Host "$promptText: " -NoNewline -ForegroundColor Yellow
-    }
-    $inputVal = Read-Host
-    if ([string]::IsNullOrWhiteSpace($inputVal)) {
+    try {
+        if ($defaultValue -ne "") {
+            Write-Host "$($promptText) [$defaultValue]: " -NoNewline -ForegroundColor Yellow
+        } else {
+            Write-Host "$($promptText): " -NoNewline -ForegroundColor Yellow
+        }
+        $inputVal = Read-Host
+        if ([string]::IsNullOrWhiteSpace($inputVal)) {
+            return $defaultValue
+        }
+        return $inputVal.Trim()
+    } catch {
         return $defaultValue
     }
-    return $inputVal.Trim()
 }
 
 # Helper: Uji apakah TCP Port sedang aktif/didengarkan
@@ -167,13 +171,67 @@ Write-Host "[3/7] Menyiapkan runtime PHP 8.4+ dan konfigurasi php.ini..." -Foreg
 
 function Configure-PhpIniFile([string]$phpFolder) {
     $iniFile = Join-Path $phpFolder 'php.ini'
-    $extDir = (Join-Path $phpFolder 'ext').Replace('\', '/')
+    $extDir = Join-Path $phpFolder 'ext'
+    $extDirFormatted = $extDir.Replace('\', '/')
     $certFile = (Join-Path $phpFolder 'cacert.pem').Replace('\', '/')
 
     # Unduh cacert.pem jika belum ada
     if (-not (Test-Path (Join-Path $phpFolder 'cacert.pem'))) {
         $certUrl = "https://curl.se/ca/cacert.pem"
         Download-FileSafely $certUrl (Join-Path $phpFolder 'cacert.pem') | Out-Null
+    }
+
+    # Filter ekstensi yang benar-benar memiliki file dll di folder ext
+    $candidateExts = @('curl','fileinfo','gd','intl','mbstring','mysqli','openssl','pdo_mysql','pdo_sqlite','sqlite3','zip','exif','sodium')
+    $availableExtLines = @()
+    foreach ($cand in $candidateExts) {
+        if ((Test-Path (Join-Path $extDir "php_$cand.dll")) -or (Test-Path (Join-Path $extDir "$cand.dll"))) {
+            $availableExtLines += "extension=$cand"
+        }
+    }
+    # Di Windows, bcmath umumnya sudah built-in statis di php.exe. Hanya tambahkan jika dll fisiknya ada.
+    if (Test-Path (Join-Path $extDir 'php_bcmath.dll')) {
+        $availableExtLines += "extension=bcmath"
+    }
+    # Opcache hanya ditambahkan jika file dll tersedia di folder ext
+    $hasOpcache = (Test-Path (Join-Path $extDir 'php_opcache.dll')) -or (Test-Path (Join-Path $extDir 'opcache.dll'))
+
+    if (Test-Path $iniFile) {
+        # Modifikasi aman jika php.ini sudah ada (misal di XAMPP / Laragon)
+        $existing = Get-Content -Path $iniFile -Raw
+        if ($existing -notmatch '(?m)^extension_dir\s*=') {
+            $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^;?extension_dir\s*=.*', "extension_dir = `"$extDirFormatted`"")
+        }
+        foreach ($cand in $candidateExts) {
+            if ((Test-Path (Join-Path $extDir "php_$cand.dll")) -or (Test-Path (Join-Path $extDir "$cand.dll"))) {
+                $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, "(?m)^;\s*extension\s*=\s*(php_)?$cand(\.dll)?\b", "extension=$cand")
+                if ($existing -notmatch "(?m)^extension\s*=\s*(php_)?$cand\b") {
+                    $existing += "`r`nextension=$cand"
+                }
+            }
+        }
+        # Hindari warning bcmath jika tidak ada dll terpisah
+        if (-not (Test-Path (Join-Path $extDir 'php_bcmath.dll'))) {
+            $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^extension\s*=\s*(php_)?bcmath(\.dll)?\b', ';extension=bcmath')
+        }
+        # Hindari warning opcache jika dll tidak ditemukan
+        if ($hasOpcache) {
+            $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^;\s*zend_extension\s*=\s*(php_)?opcache(\.dll)?\b', 'zend_extension=opcache')
+            if ($existing -notmatch '(?m)^zend_extension\s*=\s*(php_)?opcache\b') {
+                $existing += "`r`nzend_extension=opcache"
+            }
+        } else {
+            $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^zend_extension\s*=\s*(php_)?opcache(\.dll)?\b', ';zend_extension=opcache')
+        }
+        $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^;?memory_limit\s*=.*', 'memory_limit = 512M')
+        $existing = [System.Text.RegularExpressions.Regex]::Replace($existing, '(?m)^;?max_execution_time\s*=.*', 'max_execution_time = 300')
+        Set-Content -Path $iniFile -Value $existing -Encoding ASCII
+        return
+    }
+
+    $extBlock = $availableExtLines -join "`r`n"
+    if ($hasOpcache) {
+        $extBlock += "`r`nzend_extension=opcache"
     }
 
     $iniTemplate = @"
@@ -220,24 +278,10 @@ allow_url_fopen = On
 allow_url_include = Off
 default_socket_timeout = 60
 
-extension_dir = "$extDir"
+extension_dir = "$extDirFormatted"
 
 ; Bremspace ERP Mandatory Extensions
-extension=bcmath
-extension=curl
-extension=exif
-extension=fileinfo
-extension=gd
-extension=intl
-extension=mbstring
-extension=mysqli
-extension=openssl
-extension=pdo_mysql
-extension=pdo_sqlite
-extension=sqlite3
-extension=zip
-extension=sodium
-zend_extension=opcache
+$extBlock
 
 [Date]
 date.timezone = Asia/Jakarta
@@ -561,19 +605,26 @@ if (-not (Test-Path $envFile) -and (Test-Path $envExample)) {
 if (Test-Path $envFile) {
     $envContent = Get-Content -Path $envFile -Raw
     
+    # Bersihkan baris error / escape sequence tidak valid di .env akibat kegagalan installer sebelumnya
+    $envContent = [System.Text.RegularExpressions.Regex]::Replace($envContent, '(?m)^.*scripts[\\/]unas-setup\.ps1.*(\r?\n)?', '')
+    $envContent = [System.Text.RegularExpressions.Regex]::Replace($envContent, '(?m)^DB_PASSWORD=.*char:\d+.*$', 'DB_PASSWORD=""')
+
     $envContent = $envContent -replace '(?m)^APP_NAME=.*', "APP_NAME=`"$appName`""
     $envContent = $envContent -replace '(?m)^APP_URL=.*', "APP_URL=http://localhost:$appPort"
+
+    # Sanitasi string password jika mengandung output stacktrace
+    if ($dbPass -match 'unas-setup\.ps1') { $dbPass = "" }
 
     if ($dbDriver -eq "mysql") {
         $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=mysql'
         if ($envContent -notmatch '(?m)^DB_HOST=') {
-            $envContent += "`r`nDB_HOST=$dbHost`r`nDB_PORT=$dbPort`r`nDB_DATABASE=$dbName`r`nDB_USERNAME=$dbUser`r`nDB_PASSWORD=$dbPass"
+            $envContent += "`r`nDB_HOST=$dbHost`r`nDB_PORT=$dbPort`r`nDB_DATABASE=$dbName`r`nDB_USERNAME=$dbUser`r`nDB_PASSWORD=`"$dbPass`""
         } else {
             $envContent = $envContent -replace '(?m)^DB_HOST=.*', "DB_HOST=$dbHost"
             $envContent = $envContent -replace '(?m)^DB_PORT=.*', "DB_PORT=$dbPort"
             $envContent = $envContent -replace '(?m)^DB_DATABASE=.*', "DB_DATABASE=$dbName"
             $envContent = $envContent -replace '(?m)^DB_USERNAME=.*', "DB_USERNAME=$dbUser"
-            $envContent = $envContent -replace '(?m)^DB_PASSWORD=.*', "DB_PASSWORD=$dbPass"
+            $envContent = $envContent -replace '(?m)^DB_PASSWORD=.*', "DB_PASSWORD=`"$dbPass`""
         }
     } else {
         $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=sqlite'
@@ -729,18 +780,27 @@ if ($isAdmin) {
     } catch {}
 }
 
-# Pastikan router script server.php tersedia
+# Pastikan router script server.php dan direktori log tersedia
 $serverRouter = Join-Path $projectRoot 'server.php'
 $serverLog = Join-Path $projectRoot 'storage\logs\server.log'
+$serverErrLog = Join-Path $projectRoot 'storage\logs\server-error.log'
 $queueLog = Join-Path $projectRoot 'storage\logs\queue.log'
+$queueErrLog = Join-Path $projectRoot 'storage\logs\queue-error.log'
+$schedLog = Join-Path $projectRoot 'storage\logs\scheduler.log'
+$schedErrLog = Join-Path $projectRoot 'storage\logs\scheduler-error.log'
+
+$storageLogs = Join-Path $projectRoot 'storage\logs'
+if (-not (Test-Path $storageLogs)) {
+    New-Item -ItemType Directory -Path $storageLogs -Force | Out-Null
+}
 
 # Jalankan PHP Built-in Server di Background dengan server.php
 $serverProc = $null
 if (Test-Path $serverRouter) {
-    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "server.php" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverLog -PassThru
+    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "server.php" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErrLog -PassThru
 } else {
     $docRoot = Join-Path $projectRoot 'public'
-    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverLog -PassThru
+    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErrLog -PassThru
 }
 
 if ($serverProc) {
@@ -748,14 +808,13 @@ if ($serverProc) {
 }
 
 # Jalankan Background Queue Worker
-$queueProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "queue:work", "--queue=sync,default", "--sleep=3", "--tries=3" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueLog -PassThru
+$queueProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "queue:work", "--queue=sync,default", "--sleep=3", "--tries=3" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueErrLog -PassThru
 if ($queueProc) {
     Set-Content -Path (Join-Path $projectRoot 'storage\framework\queue.pid') -Value $queueProc.Id -Encoding ASCII
 }
 
 # Jalankan Background Scheduler (Cron Runner)
-$schedLog = Join-Path $projectRoot 'storage\logs\scheduler.log'
-$schedProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "schedule:work" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $schedLog -RedirectStandardError $schedLog -PassThru -ErrorAction SilentlyContinue
+$schedProc = Start-Process -FilePath $phpExe -ArgumentList "artisan", "schedule:work" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $schedLog -RedirectStandardError $schedErrLog -PassThru -ErrorAction SilentlyContinue
 
 # Buat Shortcut Desktop Otomatis
 try {
