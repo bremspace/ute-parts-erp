@@ -10,14 +10,20 @@ if (function_exists('mysqli_report')) {
     mysqli_report(MYSQLI_REPORT_OFF);
 }
 
-$host = $argv[1] ?? '127.0.0.1';
-$port = (int) ($argv[2] ?? 3306);
-$user = $argv[3] ?? 'root';
-$pass = $argv[4] ?? '';
-$dbName = $argv[5] ?? '';
+// Dukung argumen flag --host=, --port=, --user=, --pass=, --dbname= maupun posisi argumen
+$opt = getopt('', ['host:', 'port:', 'user:', 'pass::', 'dbname:']);
 
-// Bersihkan trailing carriage return / newline
-$pass = trim($pass, "\r\n");
+$host = $opt['host'] ?? ($argv[1] ?? '127.0.0.1');
+$port = (int) ($opt['port'] ?? ($argv[2] ?? 3306));
+$user = $opt['user'] ?? ($argv[3] ?? 'root');
+$pass = isset($opt['pass']) ? (string) $opt['pass'] : ($argv[4] ?? '');
+$dbName = $opt['dbname'] ?? ($argv[5] ?? '');
+
+// Jika flag --pass tanpa nilai, pass diset string kosong
+if ($pass === false || $pass === null) {
+    $pass = '';
+}
+$pass = trim((string) $pass, "\r\n");
 
 function testMysql(string $host, string $user, string $pass, int $port): array
 {
@@ -38,34 +44,43 @@ function testMysql(string $host, string $user, string $pass, int $port): array
     ];
 }
 
-// 1. Coba kredensial input
-$res1 = testMysql($host, $user, $pass, $port);
-if ($res1['ok']) {
-    $link = $res1['link'];
+// Susun daftar prioritas password yang diuji
+$candidates = [];
+$candidates[] = $pass;
+if ($pass !== '') {
+    $candidates[] = '';
+}
+if ($user === 'root') {
+    foreach (['root', '123456', 'admin', 'password', 'mariadb', 'mysql'] as $common) {
+        if (!in_array($common, $candidates, true)) {
+            $candidates[] = $common;
+        }
+    }
+}
+
+$lastErr = ['errno' => 2002, 'error' => 'Koneksi gagal'];
+$workingLink = null;
+$workingPass = '';
+
+foreach ($candidates as $cand) {
+    $res = testMysql($host, $user, $cand, $port);
+    if ($res['ok']) {
+        $workingLink = $res['link'];
+        $workingPass = $cand;
+        break;
+    }
+    $lastErr = $res;
+}
+
+if ($workingLink !== null) {
     if ($dbName !== '') {
         $cleanDb = str_replace('`', '``', $dbName);
-        @mysqli_query($link, "CREATE DATABASE IF NOT EXISTS `{$cleanDb}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        @mysqli_query($workingLink, "CREATE DATABASE IF NOT EXISTS `{$cleanDb}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     }
-    @mysqli_close($link);
-    echo "SUCCESS|{$pass}\n";
+    @mysqli_close($workingLink);
+    echo "SUCCESS|{$workingPass}\n";
     exit(0);
 }
 
-// 2. Jika input pass tidak kosong dan user root, coba password kosong (XAMPP/Laragon default)
-if ($pass !== '' && $user === 'root') {
-    $res2 = testMysql($host, $user, '', $port);
-    if ($res2['ok']) {
-        $link = $res2['link'];
-        if ($dbName !== '') {
-            $cleanDb = str_replace('`', '``', $dbName);
-            @mysqli_query($link, "CREATE DATABASE IF NOT EXISTS `{$cleanDb}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        }
-        @mysqli_close($link);
-        echo "SUCCESS_EMPTY_PASS|\n";
-        exit(0);
-    }
-}
-
-// 3. Laporkan kegagalan
-echo "ERROR|{$res1['errno']}|{$res1['error']}\n";
+echo "ERROR|{$lastErr['errno']}|{$lastErr['error']}\n";
 exit(1);

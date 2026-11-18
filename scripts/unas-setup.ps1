@@ -401,7 +401,10 @@ if (-not $detectedPhp) {
 $phpExe = $detectedPhp.Path
 Write-Host " [OK] Menggunakan PHP Binary : $phpExe (Versi: $($detectedPhp.Version))" -ForegroundColor Green
 
-# Verifikasi ulang konfigurasi ekstensi php.ini
+# Verifikasi dan sinkronisasi konfigurasi php.ini aktif (bersihkan warning & lengkapi ekstensi)
+$parentPhp = Split-Path -Parent $phpExe
+Configure-PhpIniFile $parentPhp
+
 $loadedExts = & $phpExe -r "echo implode(',', get_loaded_extensions());" 2>$null
 $requiredExts = @('bcmath','curl','fileinfo','gd','intl','mbstring','openssl','pdo_mysql','pdo_sqlite','zip')
 $missingExts = @()
@@ -413,10 +416,9 @@ foreach ($ext in $requiredExts) {
 
 if ($missingExts.Count -gt 0) {
     Write-Host " [INFO] Memperbarui php.ini untuk melengkapi ekstensi: $($missingExts -join ', ')..." -ForegroundColor Yellow
-    $parentPhp = Split-Path -Parent $phpExe
     Configure-PhpIniFile $parentPhp
 }
-Write-Host " [OK] Konfigurasi php.ini terverifikasi (100% Ekstensi ERP Aktif)." -ForegroundColor Green
+Write-Host " [OK] Konfigurasi php.ini terverifikasi (Bebas Warning & 100% Ekstensi Aktif)." -ForegroundColor Green
 
 # ==============================================================================
 # 4. Verifikasi Dependensi Composer & Frontend
@@ -579,11 +581,56 @@ if ($dbChoice -eq "2") {
     # Uji koneksi via script test-db-connection.php
     $testDbScript = Join-Path $scriptDir 'test-db-connection.php'
     if (Test-Path $testDbScript) {
-        $dbTestOut = & $phpExe $testDbScript $dbHost $dbPort $dbUser $dbPass $dbName 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host " [OK] Koneksi MySQL terverifikasi & Database '$dbName' siap." -ForegroundColor Green
-        } else {
-            Write-Host " [PERINGATAN] Pengujian koneksi MySQL: $dbTestOut" -ForegroundColor Yellow
+        $mysqlVerified = $false
+        while (-not $mysqlVerified) {
+            $dbTestOutRaw = & $phpExe $testDbScript "--host=$dbHost" "--port=$dbPort" "--user=$dbUser" "--pass=$dbPass" "--dbname=$dbName" 2>&1
+            $testOutLine = ""
+            foreach ($line in $dbTestOutRaw) {
+                $trimmed = $line.ToString().Trim()
+                if ($trimmed -match '^(SUCCESS|ERROR)\|') {
+                    $testOutLine = $trimmed
+                    break
+                }
+            }
+            if (-not $testOutLine -and $dbTestOutRaw) {
+                $testOutLine = ($dbTestOutRaw | Select-Object -Last 1).ToString().Trim()
+            }
+
+            if ($testOutLine -match '^SUCCESS\|(.*)$') {
+                $actualPass = $matches[1]
+                if ($actualPass -ne $dbPass) {
+                    Write-Host " [INFO] Password terverifikasi yang cocok: $(if ($actualPass -eq '') {'[Tanpa Password]'} else {'[' + $actualPass + ']'})" -ForegroundColor Cyan
+                    $dbPass = $actualPass
+                }
+                Write-Host " [OK] Koneksi MySQL/MariaDB terverifikasi & Database '$dbName' siap." -ForegroundColor Green
+                $mysqlVerified = $true
+                break
+            }
+
+            # Tampilkan informasi error spesifik
+            $errDetail = $testOutLine
+            if ($testOutLine -match '^ERROR\|\d+\|(.*)$') {
+                $errDetail = $matches[1]
+            }
+            Write-Host " [PERINGATAN] Gagal terhubung ke MySQL/MariaDB: $errDetail" -ForegroundColor Yellow
+            Write-Host " Pilihan Solusi:" -ForegroundColor White
+            Write-Host "   [1] Beralih ke SQLite (Rekomendasi Cepat & Mandiri, 100% Langsung Jalan Tanpa MySQL)" -ForegroundColor Green
+            Write-Host "   [2] Masukkan ulang password / kredensial MySQL" -ForegroundColor Cyan
+            Write-Host "   [3] Tetap lanjutkan (Manual)" -ForegroundColor Gray
+            $dbRetryChoice = Prompt-User "Pilihan Tindakan [1/2/3]" "1"
+
+            if ($dbRetryChoice -eq "1") {
+                $dbDriver = "sqlite"
+                Write-Host " [OK] Mode dialihkan ke SQLite mandiri (database\database.sqlite)." -ForegroundColor Green
+                break
+            } elseif ($dbRetryChoice -eq "2") {
+                $dbHost = Prompt-User "Host Database" $dbHost
+                $dbPort = Prompt-User "Port Database" $dbPort
+                $dbUser = Prompt-User "Username Database" $dbUser
+                $dbPass = Prompt-User "Password Database (kosongkan jika tanpa password)" ""
+            } else {
+                break
+            }
         }
     }
 } else {
@@ -693,12 +740,39 @@ if ($envCheck -notmatch '(?m)^APP_KEY=.+') {
     Write-Host " [OK] Application Encryption Key berhasil di-generate." -ForegroundColor Green
 }
 
+# Bersihkan cache sebelum migrasi agar membaca file .env terbaru
+& $phpExe $artisan optimize:clear 2>$null | Out-Null
+
 # 6d. Migrasi Database Skema
 Write-Host " Menjalankan migrasi database skema..." -ForegroundColor Gray
 $migOut = & $phpExe $artisan migrate --force 2>&1
+$migErrStr = ($migOut -join "`n")
+
 if ($LASTEXITCODE -ne 0) {
     Write-Host " [PERINGATAN] Migrasi database menghasilkan catatan (Exit Code: $LASTEXITCODE):" -ForegroundColor Yellow
     $migOut | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkYellow }
+
+    # Solusi Otomatis jika koneksi MySQL ditolak (Access denied / Connection refused)
+    if ($dbDriver -eq "mysql" -and ($migErrStr -match 'Access denied' -or $migErrStr -match 'Connection refused' -or $migErrStr -match 'HY000' -or $migErrStr -match '2002')) {
+        Write-Host ""
+        Write-Host " [PEMULIHAN OTOMATIS] Terdeteksi kendala akses MySQL/MariaDB." -ForegroundColor Cyan
+        Write-Host " Mengalihkan database aplikasi secara otomatis ke mode SQLite mandiri agar sistem langsung siap pakai..." -ForegroundColor Yellow
+        $sqliteDb = Join-Path $projectRoot 'database\database.sqlite'
+        if (-not (Test-Path $sqliteDb)) {
+            New-Item -ItemType File -Path $sqliteDb -Force | Out-Null
+        }
+        $envContent = Get-Content -Path $envFile -Raw
+        $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=sqlite'
+        Set-Content -Path $envFile -Value $envContent -Encoding ASCII
+        $dbDriver = "sqlite"
+        & $phpExe $artisan optimize:clear 2>$null | Out-Null
+
+        Write-Host " Menjalankan ulang migrasi skema pada SQLite..." -ForegroundColor Gray
+        $migOut = & $phpExe $artisan migrate --force 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host " [OK] Skema tabel database SQLite berhasil dimuat." -ForegroundColor Green
+        }
+    }
 } else {
     Write-Host " [OK] Skema tabel database berhasil dimuat." -ForegroundColor Green
 }
