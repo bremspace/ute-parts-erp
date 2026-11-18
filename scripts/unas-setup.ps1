@@ -463,6 +463,32 @@ if ($nodeCmd -and $npmCmd) {
 Write-Host ""
 Write-Host "[5/7] Konfigurasi Database & Parameter Aplikasi..." -ForegroundColor Cyan
 
+function Show-MySqlTutorial {
+    Write-Host ""
+    Write-Host "======================================================================" -ForegroundColor Yellow
+    Write-Host "   PANDUAN MENYIAPKAN MYSQL / MARIADB (LARAGON / XAMPP)" -ForegroundColor Yellow
+    Write-Host "======================================================================" -ForegroundColor Yellow
+    Write-Host "Aplikasi ERP & POS memerlukan database MySQL/MariaDB aktif di port 3306." -ForegroundColor White
+    Write-Host ""
+    Write-Host "OPSI 1: Menggunakan LARAGON (Sangat Direkomendasikan di Windows)" -ForegroundColor Cyan
+    Write-Host "  1. Unduh Laragon: https://laragon.org/download/ (versi Portable / Full)" -ForegroundColor Gray
+    Write-Host "  2. Buka aplikasi Laragon, lalu klik tombol [Start All]" -ForegroundColor Gray
+    Write-Host "  3. Kredensial bawaan Laragon:" -ForegroundColor Gray
+    Write-Host "     - Host: 127.0.0.1  |  Port: 3306  |  User: root  |  Password: (kosong)" -ForegroundColor White
+    Write-Host ""
+    Write-Host "OPSI 2: Menggunakan XAMPP" -ForegroundColor Cyan
+    Write-Host "  1. Unduh XAMPP: https://www.apachefriends.org/" -ForegroundColor Gray
+    Write-Host "  2. Buka 'XAMPP Control Panel'" -ForegroundColor Gray
+    Write-Host "  3. Pada modul 'MySQL', klik tombol [Start] hingga status berubah hijau" -ForegroundColor Gray
+    Write-Host "  4. Kredensial bawaan XAMPP:" -ForegroundColor Gray
+    Write-Host "     - Host: 127.0.0.1  |  Port: 3306  |  User: root  |  Password: (kosong)" -ForegroundColor White
+    Write-Host ""
+    Write-Host "OPSI 3: Service Windows (Jika MariaDB/MySQL Sudah Terpasang)" -ForegroundColor Cyan
+    Write-Host "  Jalankan di Command Prompt Admin: net start MySQL  (atau: net start MariaDB)" -ForegroundColor Gray
+    Write-Host "======================================================================" -ForegroundColor Yellow
+    Write-Host ""
+}
+
 Write-Host "Pilih Engine Database:" -ForegroundColor White
 Write-Host "  [1] SQLite (Rekomendasi Cepat & Mandiri, 1-Click Zero Config)" -ForegroundColor Green
 Write-Host "  [2] MySQL / MariaDB (Rekomendasi Skala Besar, Jutaan Transaksi, POS Multi-Kasir LAN)" -ForegroundColor Cyan
@@ -533,19 +559,35 @@ if ($dbChoice -eq "2") {
         }
     }
 
-    # Mitigasi jika tidak ada Laragon / XAMPP di PC kosongan
+    # Panduan jika port 3306 belum aktif
     if (-not $mysqlListening) {
-        Write-Host " [PERINGATAN] Komputer ini belum memiliki MySQL / MariaDB terpasang." -ForegroundColor Yellow
-        Write-Host " Pilihan Solusi:" -ForegroundColor White
-        Write-Host "   [1] Pasang MariaDB Server resmi otomatis via winget (Windows Package Manager)" -ForegroundColor Green
-        Write-Host "   [2] Gunakan Remote MySQL / Komputer Server Toko Lain di Jaringan LAN / Wi-Fi" -ForegroundColor Cyan
-        Write-Host "   [3] Lewati dan masukkan konfigurasi manual" -ForegroundColor Gray
-        $mysqlFixChoice = Prompt-User "Pilihan Solusi [1/2/3]" "1"
+        Write-Host " [PERINGATAN] Port 3306 belum aktif atau MySQL / MariaDB belum berjalan." -ForegroundColor Yellow
+        Show-MySqlTutorial
+        Write-Host " Pilihan Tindakan:" -ForegroundColor White
+        Write-Host "   [1] Coba hubungkan ulang sekarang (setelah menyalakan Laragon/XAMPP)" -ForegroundColor Green
+        Write-Host "   [2] Buka XAMPP Control Panel / Laragon otomatis (jika terpasang)" -ForegroundColor Cyan
+        Write-Host "   [3] Pasang MariaDB Server resmi via winget otomatis" -ForegroundColor Yellow
+        Write-Host "   [4] Lanjutkan dengan konfigurasi host/port MySQL manual / remote" -ForegroundColor Gray
+        $mysqlFixChoice = Prompt-User "Pilihan Tindakan [1/2/3/4]" "1"
 
         if ($mysqlFixChoice -eq "1") {
+            Start-Sleep -Seconds 1
+            $mysqlListening = Test-PortActive 3306
+        } elseif ($mysqlFixChoice -eq "2") {
+            if (Test-Path "C:\xampp\xampp-control.exe") {
+                Start-Process "C:\xampp\xampp-control.exe"
+                Write-Host " [INFO] XAMPP Control Panel dibuka. Klik 'Start' pada MySQL lalu tekan Enter." -ForegroundColor Cyan
+                pause
+            } elseif (Test-Path "C:\laragon\laragon.exe") {
+                Start-Process "C:\laragon\laragon.exe"
+                Write-Host " [INFO] Laragon dibuka. Klik 'Start All' lalu tekan Enter." -ForegroundColor Cyan
+                pause
+            }
+            $mysqlListening = Test-PortActive 3306
+        } elseif ($mysqlFixChoice -eq "3") {
             $wingetCmd = Get-Command winget.exe -ErrorAction SilentlyContinue
             if ($wingetCmd) {
-                Write-Host " [AUTO-INSTALL] Mengunduh & memasang MariaDB Server resmi via winget..." -ForegroundColor Cyan
+                Write-Host " [AUTO-INSTALL] Mengunduh & memasang MariaDB Server via winget..." -ForegroundColor Cyan
                 try {
                     & winget install --id MariaDB.Server -e --silent --accept-source-agreements --accept-package-agreements
                     Start-Sleep -Seconds 4
@@ -558,8 +600,6 @@ if ($dbChoice -eq "2") {
                 } catch {
                     Write-Host " Gagal memasang otomatis via winget: $($_.Exception.Message)" -ForegroundColor Yellow
                 }
-            } else {
-                Write-Host " [INFO] winget.exe tidak tersedia di sistem Windows ini." -ForegroundColor Yellow
             }
         }
     }
@@ -612,22 +652,43 @@ if ($dbChoice -eq "2") {
             if ($testOutLine -match '^ERROR\|\d+\|(.*)$') {
                 $errDetail = $matches[1]
             }
-            Write-Host " [PERINGATAN] Gagal terhubung ke MySQL/MariaDB: $errDetail" -ForegroundColor Yellow
+            Write-Host " [PERINGATAN] Gagal terhubung ke MySQL/MariaDB ($dbHost`:$dbPort): $errDetail" -ForegroundColor Yellow
+            
+            # Tampilkan tutorial Laragon/XAMPP
+            Show-MySqlTutorial
+
             Write-Host " Pilihan Solusi:" -ForegroundColor White
-            Write-Host "   [1] Beralih ke SQLite (Rekomendasi Cepat & Mandiri, 100% Langsung Jalan Tanpa MySQL)" -ForegroundColor Green
-            Write-Host "   [2] Masukkan ulang password / kredensial MySQL" -ForegroundColor Cyan
-            Write-Host "   [3] Tetap lanjutkan (Manual)" -ForegroundColor Gray
-            $dbRetryChoice = Prompt-User "Pilihan Tindakan [1/2/3]" "1"
+            Write-Host "   [1] Coba hubungkan ulang sekarang (setelah menyalakan MySQL di XAMPP / Laragon)" -ForegroundColor Green
+            Write-Host "   [2] Masukkan ulang kredensial (Host / Port / User / Password / DB)" -ForegroundColor Cyan
+            Write-Host "   [3] Buka XAMPP Control Panel / Laragon otomatis (jika terpasang di PC)" -ForegroundColor Yellow
+            Write-Host "   [4] Tetap lanjutkan dengan kredensial ini (Manual)" -ForegroundColor Gray
+            Write-Host "   [5] Beralih ke SQLite mandiri (hanya jika sengaja ingin berganti pilihan)" -ForegroundColor DarkGray
+            $dbRetryChoice = Prompt-User "Pilihan Tindakan [1/2/3/4/5]" "1"
 
             if ($dbRetryChoice -eq "1") {
-                $dbDriver = "sqlite"
-                Write-Host " [OK] Mode dialihkan ke SQLite mandiri (database\database.sqlite)." -ForegroundColor Green
-                break
+                continue
             } elseif ($dbRetryChoice -eq "2") {
                 $dbHost = Prompt-User "Host Database" $dbHost
                 $dbPort = Prompt-User "Port Database" $dbPort
                 $dbUser = Prompt-User "Username Database" $dbUser
                 $dbPass = Prompt-User "Password Database (kosongkan jika tanpa password)" ""
+                $dbName = Prompt-User "Nama Database" $dbName
+            } elseif ($dbRetryChoice -eq "3") {
+                if (Test-Path "C:\xampp\xampp-control.exe") {
+                    Start-Process "C:\xampp\xampp-control.exe"
+                    Write-Host " [INFO] XAMPP Control Panel dibuka. Klik 'Start' pada baris MySQL lalu tekan Enter." -ForegroundColor Cyan
+                    pause
+                } elseif (Test-Path "C:\laragon\laragon.exe") {
+                    Start-Process "C:\laragon\laragon.exe"
+                    Write-Host " [INFO] Laragon dibuka. Klik 'Start All' lalu tekan Enter." -ForegroundColor Cyan
+                    pause
+                } else {
+                    Write-Host " [INFO] XAMPP/Laragon tidak terdeteksi di C:\xampp atau C:\laragon. Silakan nyalakan MySQL secara manual." -ForegroundColor Yellow
+                }
+            } elseif ($dbRetryChoice -eq "5") {
+                $dbDriver = "sqlite"
+                Write-Host " [OK] Mode dialihkan ke SQLite mandiri (database\database.sqlite)." -ForegroundColor Green
+                break
             } else {
                 break
             }
@@ -745,36 +806,62 @@ if ($envCheck -notmatch '(?m)^APP_KEY=.+') {
 
 # 6d. Migrasi Database Skema
 Write-Host " Menjalankan migrasi database skema..." -ForegroundColor Gray
-$migOut = & $phpExe $artisan migrate --force 2>&1
-$migErrStr = ($migOut -join "`n")
+$migDone = $false
+while (-not $migDone) {
+    $migOut = & $phpExe $artisan migrate --force 2>&1
+    $migErrStr = ($migOut -join "`n")
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host " [PERINGATAN] Migrasi database menghasilkan catatan (Exit Code: $LASTEXITCODE):" -ForegroundColor Yellow
-    $migOut | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkYellow }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host " [PERINGATAN] Migrasi database menghasilkan catatan (Exit Code: $LASTEXITCODE):" -ForegroundColor Yellow
+        $migOut | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkYellow }
 
-    # Solusi Otomatis jika koneksi MySQL ditolak (Access denied / Connection refused)
-    if ($dbDriver -eq "mysql" -and ($migErrStr -match 'Access denied' -or $migErrStr -match 'Connection refused' -or $migErrStr -match 'HY000' -or $migErrStr -match '2002')) {
-        Write-Host ""
-        Write-Host " [PEMULIHAN OTOMATIS] Terdeteksi kendala akses MySQL/MariaDB." -ForegroundColor Cyan
-        Write-Host " Mengalihkan database aplikasi secara otomatis ke mode SQLite mandiri agar sistem langsung siap pakai..." -ForegroundColor Yellow
-        $sqliteDb = Join-Path $projectRoot 'database\database.sqlite'
-        if (-not (Test-Path $sqliteDb)) {
-            New-Item -ItemType File -Path $sqliteDb -Force | Out-Null
+        if ($dbDriver -eq "mysql") {
+            Show-MySqlTutorial
+            Write-Host " Pilihan Solusi Migrasi:" -ForegroundColor White
+            Write-Host "   [1] Coba jalankan migrasi lagi (setelah memastikan MySQL di XAMPP / Laragon aktif)" -ForegroundColor Green
+            Write-Host "   [2] Buka XAMPP Control Panel / Laragon otomatis" -ForegroundColor Cyan
+            Write-Host "   [3] Beralih ke SQLite mandiri (hanya jika Anda ingin beralih)" -ForegroundColor Yellow
+            Write-Host "   [4] Lewati tahap migrasi dan lanjutkan proses berikutnya" -ForegroundColor Gray
+            $migRetryChoice = Prompt-User "Pilihan Solusi [1/2/3/4]" "1"
+
+            if ($migRetryChoice -eq "1") {
+                & $phpExe $artisan optimize:clear 2>$null | Out-Null
+                continue
+            } elseif ($migRetryChoice -eq "2") {
+                if (Test-Path "C:\xampp\xampp-control.exe") {
+                    Start-Process "C:\xampp\xampp-control.exe"
+                    Write-Host " [INFO] XAMPP Control Panel dibuka. Klik 'Start' pada MySQL lalu tekan Enter." -ForegroundColor Cyan
+                    pause
+                } elseif (Test-Path "C:\laragon\laragon.exe") {
+                    Start-Process "C:\laragon\laragon.exe"
+                    Write-Host " [INFO] Laragon dibuka. Klik 'Start All' lalu tekan Enter." -ForegroundColor Cyan
+                    pause
+                } else {
+                    Write-Host " [INFO] XAMPP/Laragon tidak terdeteksi di lokasi default C:\xampp atau C:\laragon." -ForegroundColor Yellow
+                }
+                & $phpExe $artisan optimize:clear 2>$null | Out-Null
+                continue
+            } elseif ($migRetryChoice -eq "3") {
+                $sqliteDb = Join-Path $projectRoot 'database\database.sqlite'
+                if (-not (Test-Path $sqliteDb)) {
+                    New-Item -ItemType File -Path $sqliteDb -Force | Out-Null
+                }
+                $envContent = Get-Content -Path $envFile -Raw
+                $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=sqlite'
+                Set-Content -Path $envFile -Value $envContent -Encoding ASCII
+                $dbDriver = "sqlite"
+                & $phpExe $artisan optimize:clear 2>$null | Out-Null
+                continue
+            } else {
+                break
+            }
+        } else {
+            break
         }
-        $envContent = Get-Content -Path $envFile -Raw
-        $envContent = $envContent -replace '(?m)^DB_CONNECTION=.*', 'DB_CONNECTION=sqlite'
-        Set-Content -Path $envFile -Value $envContent -Encoding ASCII
-        $dbDriver = "sqlite"
-        & $phpExe $artisan optimize:clear 2>$null | Out-Null
-
-        Write-Host " Menjalankan ulang migrasi skema pada SQLite..." -ForegroundColor Gray
-        $migOut = & $phpExe $artisan migrate --force 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host " [OK] Skema tabel database SQLite berhasil dimuat." -ForegroundColor Green
-        }
+    } else {
+        Write-Host " [OK] Skema tabel database berhasil dimuat." -ForegroundColor Green
+        $migDone = $true
     }
-} else {
-    Write-Host " [OK] Skema tabel database berhasil dimuat." -ForegroundColor Green
 }
 
 # 6e. Data Seeder Awal (RBAC, Akun Super Admin, COA)
