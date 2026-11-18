@@ -80,14 +80,14 @@
                     <x-prism.barcode-scan-input placeholder="Cari nama, HP, email, kode agen..." model="search" />
                 </div>
                 <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
-                    <select wire:model.live="filterTierId" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
+                    <select wire:model.live="filterTierId" class="px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px] w-full sm:w-auto">
                         <option value="" class="bg-ink-900">Semua Tier</option>
                         @foreach($tiers as $t)
                             <option value="{{ $t->id }}" class="bg-ink-900">{{ $t->nama }}</option>
                         @endforeach
                     </select>
 
-                    <select wire:model.live="filterTipeKonsumen" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
+                    <select wire:model.live="filterTipeKonsumen" class="px-3 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium min-h-[44px] w-full sm:w-auto">
                         <option value="" class="bg-ink-900">Semua Tipe</option>
                         <option value="retail" class="bg-ink-900">Retail</option>
                         <option value="reseller" class="bg-ink-900">Reseller</option>
@@ -247,11 +247,13 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="py-12 text-center text-ink-400">
-                        <svg class="w-10 h-10 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857" />
-                        </svg>
-                        Belum ada data pelanggan yang cocok dengan pencarian / filter.
+                    <td colspan="7" class="py-12">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="search"
+                            title="Pelanggan Tidak Ditemukan"
+                            description="Belum ada data pelanggan yang cocok dengan pencarian atau filter."
+                        />
                     </td>
                 </tr>
             @endforelse
@@ -881,8 +883,13 @@
                     @endcan
                 </div>
             @empty
-                <div class="col-span-full py-12 text-center text-ink-400">
-                    <p class="text-sm">Belum ada tier membership yang dikonfigurasi.</p>
+                <div class="col-span-full py-12">
+                    <x-ui.empty-state
+                        size="sm"
+                        icon="check"
+                        title="Belum Ada Tier"
+                        description="Belum ada tier membership yang dikonfigurasi."
+                    />
                 </div>
             @endforelse
         </div>
@@ -951,8 +958,13 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" class="py-12 text-center text-ink-400 text-xs">
-                        Belum ada riwayat kampanye broadcast yang dikirim.
+                    <td colspan="6" class="py-12">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="bell"
+                            title="Belum Ada Kampanye"
+                            description="Belum ada riwayat kampanye broadcast yang dikirim."
+                        />
                     </td>
                 </tr>
             @endforelse

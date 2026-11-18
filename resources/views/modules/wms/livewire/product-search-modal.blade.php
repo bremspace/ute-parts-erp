@@ -434,19 +434,17 @@
                 <!-- Product List -->
                 <div class="max-h-96 overflow-y-auto px-6 pb-4 space-y-1.5">
                     @if($products->isEmpty())
-                        <div class="text-center py-10">
-                            <svg class="mx-auto h-10 w-10 text-ink-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                            </svg>
-                            <h4 class="mt-2 text-sm font-semibold text-white">Tidak ada produk ditemukan</h4>
-                            @if($context === 'po' && $curatedSupplier && $supplierScope === 'curated')
-                                <p class="mt-1 text-xs text-ink-400">Tidak ada produk terdaftar untuk supplier <strong>{{ $curatedSupplier->nama }}</strong> dengan kata kunci ini.</p>
-                                <button type="button" wire:click="setSupplierScope('all')" class="mt-3 px-3 py-1.5 rounded-xl bg-up-primary/20 hover:bg-up-primary text-up-primary hover:text-white text-xs font-bold border border-up-primary/30 transition cursor-pointer">
-                                    🌐 Cari di Semua Produk (Lintas Supplier)
-                                </button>
-                            @else
-                                <p class="mt-1 text-xs text-ink-400">Coba kata kunci atau sesuaikan filter Anda.</p>
-                            @endif
+                        <div class="py-8">
+                            <x-ui.empty-state
+                                title="Tidak ada produk ditemukan"
+                                description="Coba kata kunci lain atau sesuaikan filter pencarian produk Anda."
+                            >
+                                @if($context === 'po' && $curatedSupplier && $supplierScope === 'curated')
+                                    <button type="button" wire:click="setSupplierScope('all')" class="mt-2 px-3 py-1.5 rounded-xl bg-up-primary/20 hover:bg-up-primary text-up-primary hover:text-white text-xs font-bold border border-up-primary/30 transition cursor-pointer">
+                                        🌐 Cari di Semua Produk (Lintas Supplier)
+                                    </button>
+                                @endif
+                            </x-ui.empty-state>
                         </div>
                     @else
                         <div class="divide-y divide-white/5">

@@ -296,14 +296,14 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Pill Badge Text</label>
-                        <input type="text" wire:model.live="heroForm.hero_badge_text"
+                        <input type="text" wire:model.live.debounce.300ms="heroForm.hero_badge_text"
                                placeholder="Contoh: Premium Guaranteed Suku Cadang &amp; Servis"
                                class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Headline Utama</label>
-                        <textarea wire:model.live="heroForm.hero_headline" rows="2"
+                        <textarea wire:model.live.debounce.300ms="heroForm.hero_headline" rows="2"
                                   placeholder="Suku Cadang Presisi. Garansi Nyata Toko Resmi."
                                   class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary"></textarea>
                         <span class="text-[11px] text-ink-500">Gunakan baris baru (enter) untuk pemenggalan judul hero yang proporsional.</span>
@@ -311,7 +311,7 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Subheadline / Deskripsi</label>
-                        <textarea wire:model.live="heroForm.hero_subheadline" rows="3"
+                        <textarea wire:model.live.debounce.300ms="heroForm.hero_subheadline" rows="3"
                                   placeholder="Layar LCD grade OEM, modul baterai densitas tinggi..."
                                   class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary"></textarea>
                     </div>
@@ -812,14 +812,14 @@
                     @if ($brandingForm['topbar_active'])
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Teks Pengumuman</label>
-                        <input type="text" wire:model.live="brandingForm.topbar_text"
+                        <input type="text" wire:model.live.debounce.300ms="brandingForm.topbar_text"
                                placeholder="Garansi Resmi Toko & Kirim Cepat se-Indonesia"
                                class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary">
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Link Tautan Pengumuman (Opsional)</label>
-                        <input type="text" wire:model.live="brandingForm.topbar_url"
+                        <input type="text" wire:model.live.debounce.300ms="brandingForm.topbar_url"
                                placeholder="https://... atau /shop"
                                class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary">
                     </div>
@@ -907,15 +907,15 @@
                 <h3 class="text-sm font-semibold text-white">SEO (Homepage)</h3>
                 <div>
                     <label class="block text-xs font-semibold text-ink-300 mb-1">SEO Title</label>
-                    <input type="text" wire:model.live="brandingForm.seo_title" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm" placeholder="Judul SEO homepage">
+                    <input type="text" wire:model.live.debounce.300ms="brandingForm.seo_title" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm" placeholder="Judul SEO homepage">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-ink-300 mb-1">SEO Description</label>
-                    <textarea wire:model.live="brandingForm.seo_description" rows="2" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm" placeholder="Deskripsi SEO homepage"></textarea>
+                    <textarea wire:model.live.debounce.300ms="brandingForm.seo_description" rows="2" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm" placeholder="Deskripsi SEO homepage"></textarea>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-ink-300 mb-1">SEO Keywords</label>
-                    <input type="text" wire:model.live="brandingForm.seo_keywords" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm" placeholder="keyword1, keyword2">
+                    <input type="text" wire:model.live.debounce.300ms="brandingForm.seo_keywords" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm" placeholder="keyword1, keyword2">
                 </div>
             </div>
         </x-prism.glass-card>
@@ -939,7 +939,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Nomor WhatsApp Toko</label>
-                        <input type="text" wire:model.live="contactForm.wa_number"
+                        <input type="text" wire:model.live.debounce.300ms="contactForm.wa_number"
                                placeholder="6281234567890"
                                class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary">
                         <span class="text-[11px] text-ink-500">Awali kode negara 62 tanpa spasi atau strip.</span>
@@ -947,7 +947,7 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Jam Operasional</label>
-                        <input type="text" wire:model.live="contactForm.operating_hours"
+                        <input type="text" wire:model.live.debounce.300ms="contactForm.operating_hours"
                                placeholder="Senin - Sabtu: 08:30 - 20:30 WIB"
                                class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary">
                     </div>
@@ -955,7 +955,7 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Template Pesan WhatsApp</label>
-                    <textarea wire:model.live="contactForm.wa_default_msg" rows="2"
+                    <textarea wire:model.live.debounce.300ms="contactForm.wa_default_msg" rows="2"
                               class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary"></textarea>
                 </div>
             </x-prism.glass-card>
@@ -966,25 +966,25 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Instagram URL</label>
-                        <input type="text" wire:model.live="contactForm.social_links.instagram"
+                        <input type="text" wire:model.live.debounce.300ms="contactForm.social_links.instagram"
                                placeholder="https://instagram.com/bremspace"
                                class="w-full px-3.5 py-2 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">TikTok URL</label>
-                        <input type="text" wire:model.live="contactForm.social_links.tiktok"
+                        <input type="text" wire:model.live.debounce.300ms="contactForm.social_links.tiktok"
                                placeholder="https://tiktok.com/@bremspace"
                                class="w-full px-3.5 py-2 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Shopee Store URL</label>
-                        <input type="text" wire:model.live="contactForm.social_links.shopee"
+                        <input type="text" wire:model.live.debounce.300ms="contactForm.social_links.shopee"
                                placeholder="https://shopee.co.id/bremspace"
                                class="w-full px-3.5 py-2 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Tokopedia Store URL</label>
-                        <input type="text" wire:model.live="contactForm.social_links.tokopedia"
+                        <input type="text" wire:model.live.debounce.300ms="contactForm.social_links.tokopedia"
                                placeholder="https://tokopedia.com/bremspace"
                                class="w-full px-3.5 py-2 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
                     </div>

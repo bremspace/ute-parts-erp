@@ -273,8 +273,8 @@
         @endif
 
         <div class="space-y-2">
-            @foreach($schedules as $schedule)
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-white/[0.03] border border-white/5 gap-2">
+            @forelse($schedules as $schedule)
+                <div wire:key="schedule-row-{{ $schedule->id }}" class="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-white/[0.03] border border-white/5 gap-2">
                     <div>
                         <div class="flex items-center gap-2">
                             <span class="font-bold text-ink-100 text-sm">{{ $schedule->nama }}</span>
@@ -303,7 +303,14 @@
                         </button>
                     @endcan
                 </div>
-            @endforeach
+            @empty
+                <div class="py-6">
+                    <x-ui.empty-state
+                        title="Belum Ada Jadwal Cycle Count"
+                        description="Klik '+ Jadwal Baru' di atas untuk mengonfigurasi audit stok berkala."
+                    />
+                </div>
+            @endforelse
         </div>
     </x-prism.glass-card>
 
@@ -319,8 +326,8 @@
             </select>
         </div>
 
-        @foreach($tasks as $task)
-            <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-black/10 dark:border-white/5 mb-2.5 hover:bg-white/[0.05] transition-colors shadow-sm">
+        @forelse($tasks as $task)
+            <div wire:key="task-card-{{ $task->id }}" class="p-3.5 rounded-2xl bg-white/[0.03] border border-black/10 dark:border-white/5 mb-2.5 hover:bg-white/[0.05] transition-colors shadow-sm">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div class="space-y-1">
                         <div class="flex flex-wrap items-center gap-2">
@@ -371,7 +378,14 @@
                     </div>
                 </div>
             </div>
-        @endforeach
+        @empty
+            <div class="py-8">
+                <x-ui.empty-state
+                    title="Belum Ada Tugas Cycle Count"
+                    description="Belum ada tugas hitung stok acak berkala yang dibuat atau terjadwal."
+                />
+            </div>
+        @endforelse
 
         {{-- Count form (Blind Count: Stok Sistem disembunyikan dari pelaksana) --}}
         @if($selectedTaskId)

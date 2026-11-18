@@ -120,7 +120,14 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="py-12 text-center text-ink-400">Belum ada PO. Klik "+ Buat PO" untuk input pembelian ke supplier.</td></tr>
+                    <tr>
+                        <td colspan="9" class="py-12 text-center text-ink-400">
+                            <x-ui.empty-state
+                                title="Belum Ada Purchase Order"
+                                description="Belum ada transaksi pengadaan ke supplier. Klik '+ Buat PO' untuk membuat pesanan pembelian baru."
+                            />
+                        </td>
+                    </tr>
                 @endforelse
                 @if($poList->hasPages())
                     <x-slot:pagination>
@@ -578,7 +585,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jumlah Bayar (Rp) *</label>
-                        <input type="text" inputmode="numeric" x-format-number wire:model.live="bayarPoJumlah" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                        <input type="text" inputmode="numeric" x-format-number wire:model="bayarPoJumlah" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
                     </div>
                     <div class="flex gap-2">
                         <button wire:click="$set('bayarPoId', null)" class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>

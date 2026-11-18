@@ -659,8 +659,13 @@
                             @endif
                         </div>
                         @empty
-                        <div class="py-6 text-center text-xs text-ink-400 bg-ink-50/50 dark:bg-white/[0.02] rounded-2xl border border-dashed border-ink-200 dark:border-white/10">
-                            Belum ada ulasan untuk suku cadang ini. Jadilah yang pertama memberikan review!
+                        <div class="py-6">
+                            <x-ui.empty-state
+                                size="sm"
+                                icon="document"
+                                title="Belum Ada Ulasan"
+                                description="Belum ada ulasan untuk suku cadang ini. Jadilah yang pertama memberikan review!"
+                            />
                         </div>
                         @endforelse
                     </div>
@@ -672,7 +677,7 @@
                         <div class="space-y-2 text-xs">
                             <div class="flex items-center gap-2">
                                 <label class="text-ink-500">Rating:</label>
-                                <select wire:model="reviewRating" class="px-2 py-1 rounded-lg border border-ink-200 dark:border-white/10 bg-transparent text-ink-900 dark:text-white">
+                                <select wire:model="reviewRating" class="px-2 py-1 rounded-lg border border-ink-200 dark:border-white/10 bg-transparent text-base sm:text-xs text-ink-900 dark:text-white min-h-[40px]">
                                     <option value="5">⭐⭐⭐⭐⭐ (5/5) Sempurna</option>
                                     <option value="4">⭐⭐⭐⭐ (4/5) Bagus</option>
                                     <option value="3">⭐⭐⭐ (3/5) Cukup</option>
@@ -680,8 +685,8 @@
                                     <option value="1">⭐ (1/5) Buruk</option>
                                 </select>
                             </div>
-                            <input type="text" wire:model="reviewJudul" placeholder="Judul ulasan (opsional)..." class="w-full px-3 py-2 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 text-xs text-ink-900 dark:text-white">
-                            <textarea wire:model="reviewIsi" rows="3" placeholder="Ceritakan kualitas fisik part, kemudahan pemasangan, atau respon layar..." class="w-full px-3 py-2 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 text-xs text-ink-900 dark:text-white"></textarea>
+                            <input type="text" wire:model="reviewJudul" placeholder="Judul ulasan (opsional)..." class="w-full px-3 py-2 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 text-base sm:text-xs text-ink-900 dark:text-white min-h-[44px]">
+                            <textarea wire:model="reviewIsi" rows="3" placeholder="Ceritakan kualitas fisik part, kemudahan pemasangan, atau respon layar..." class="w-full px-3 py-2 rounded-xl bg-ink-50 dark:bg-black/30 border border-ink-200 dark:border-white/10 text-base sm:text-xs text-ink-900 dark:text-white"></textarea>
                             @error('reviewIsi') <span class="text-red-400 text-[10px]">{{ $message }}</span> @enderror
                             <div class="flex justify-end">
                                 <button type="button" wire:click="submitReview" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-sm cursor-pointer">

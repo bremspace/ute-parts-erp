@@ -1969,7 +1969,7 @@
                     <!-- List Table -->
                     <div class="overflow-x-auto max-h-96 overflow-y-auto rounded-xl border border-black/10 dark:border-white/5">
                         <table class="w-full text-left text-xs">
-                            <thead class="bg-black/10 dark:bg-white/5 sticky top-0 backdrop-blur z-10 text-[10px] uppercase font-bold text-ink-400">
+                            <thead class="bg-slate-200 dark:bg-ink-950 sticky top-0 z-10 text-[10px] uppercase font-bold text-ink-600 dark:text-ink-400 border-b border-black/10 dark:border-white/10">
                                 <tr>
                                     <th class="py-2.5 px-3">No</th>
                                     <th class="py-2.5 px-3">Nama File Asli</th>

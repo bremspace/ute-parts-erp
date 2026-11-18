@@ -66,7 +66,10 @@
                 @empty
                     <tr>
                         <td colspan="7" class="py-12 text-center text-ink-400">
-                            Belum ada riwayat transfer antar gudang
+                            <x-ui.empty-state
+                                title="Belum Ada Riwayat Transfer"
+                                description="Belum ada transaksi perpindahan stok antar cabang atau gudang."
+                            />
                         </td>
                     </tr>
                 @endforelse

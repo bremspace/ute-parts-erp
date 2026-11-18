@@ -48,18 +48,18 @@
                 <div>
                     <label for="nama" class="block text-xs font-semibold text-ink-700 mb-1.5">Nama Lengkap</label>
                     <input type="text" id="nama" name="nama" value="{{ old('nama') }}" required autofocus placeholder="Nama Anda"
-                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium" />
                 </div>
                 <div>
                     <label for="telepon" class="block text-xs font-semibold text-ink-700 mb-1.5">Nomor HP / WhatsApp</label>
                     <input type="text" id="telepon" name="telepon" value="{{ old('telepon') }}" required placeholder="08xx-xxxx-xxxx"
-                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium" />
                     <p class="text-[11px] text-ink-400 mt-1">Nomor ini dipakai untuk login & verifikasi akun member.</p>
                 </div>
                 <div>
                     <label for="password" class="block text-xs font-semibold text-ink-700 mb-1.5">Kata Sandi</label>
                     <input type="password" id="password" name="password" required minlength="6" placeholder="Minimal 6 karakter"
-                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-medium" />
                 </div>
                 <div>
                     <label for="referral_kode" class="block text-xs font-semibold text-ink-700 mb-1.5 flex items-center justify-between">
@@ -67,7 +67,7 @@
                         <span class="text-[10px] text-ink-400 font-normal">Dari mitra yang mengundang</span>
                     </label>
                     <input type="text" id="referral_kode" name="referral_kode" value="{{ old('referral_kode', request('ref')) }}" placeholder="Contoh: AGN-XXXXXX"
-                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-mono uppercase tracking-wider" />
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-base sm:text-sm font-mono uppercase tracking-wider" />
                     <p class="text-[11px] text-ink-400 mt-1">Masukkan kode agen pengundang untuk terhubung ke jaringan mitra.</p>
                 </div>
 

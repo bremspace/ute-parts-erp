@@ -270,7 +270,10 @@
         @empty
             <tr>
                 <td colspan="8" class="py-12 text-center text-ink-400">
-                    Belum ada data retur penjualan yang sesuai dengan filter.
+                    <x-ui.empty-state
+                        title="Belum Ada Data Retur Penjualan"
+                        description="Belum ada transaksi retur yang sesuai dengan filter yang dipilih."
+                    />
                 </td>
             </tr>
         @endforelse
@@ -335,8 +338,11 @@
                     </div>
                 </div>
             @empty
-                <div class="py-12 text-center text-ink-400 text-xs">
-                    Belum ada data retur penjualan yang sesuai dengan filter.
+                <div class="py-12">
+                    <x-ui.empty-state
+                        title="Belum Ada Data Retur Penjualan"
+                        description="Belum ada transaksi retur yang sesuai dengan filter yang dipilih."
+                    />
                 </div>
             @endforelse
         </x-slot:mobileCards>

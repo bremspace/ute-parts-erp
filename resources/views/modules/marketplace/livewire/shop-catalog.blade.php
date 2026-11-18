@@ -1010,8 +1010,12 @@
 
                 </div>
             @empty
-                <div class="col-span-full py-16 text-center">
-                    <p class="text-sm text-ink-500">Tidak ada suku cadang yang cocok dengan kriteria pencarian.</p>
+                <div class="col-span-full py-16">
+                    <x-ui.empty-state
+                        icon="search"
+                        title="Produk Tidak Ditemukan"
+                        description="Tidak ada suku cadang yang cocok dengan kriteria pencarian atau filter yang dipilih."
+                    />
                 </div>
             @endforelse
         </div>
@@ -1117,7 +1121,14 @@
                     </div>
                 </div>
             @empty
-                <div class="py-12 text-center text-sm text-ink-500">Tidak ada produk ditemukan.</div>
+                <div class="py-12">
+                    <x-ui.empty-state
+                        size="sm"
+                        icon="search"
+                        title="Produk Tidak Ditemukan"
+                        description="Tidak ada suku cadang yang cocok dengan kriteria pencarian atau filter yang dipilih."
+                    />
+                </div>
             @endforelse
         </div>
 
@@ -1164,7 +1175,14 @@
                         </div>
                     </div>
                 @empty
-                    <div class="py-8 text-center text-xs text-ink-500">Tidak ada data.</div>
+                    <div class="py-8">
+                        <x-ui.empty-state
+                            size="sm"
+                            icon="search"
+                            title="Produk Tidak Ditemukan"
+                            description="Tidak ada suku cadang pada tampilan ini."
+                        />
+                    </div>
                 @endforelse
             </div>
         </div>

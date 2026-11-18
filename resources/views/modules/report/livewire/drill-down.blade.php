@@ -71,7 +71,7 @@
         <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
             <div class="flex items-center gap-1.5">
                 <label for="select-source-model" class="text-xs text-ink-400 font-semibold whitespace-nowrap">Sumber:</label>
-                <select id="select-source-model" wire:change="drillDown($event.target.value)" class="p-1.5 px-2.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none cursor-pointer">
+                <select id="select-source-model" wire:change="drillDown($event.target.value)" class="p-1.5 px-2.5 rounded-lg bg-white/5 border border-white/10 text-white text-base sm:text-xs min-h-[44px] sm:min-h-0 focus:border-up-primary outline-none cursor-pointer">
                     @foreach(\App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST as $modelKey => $modelLabel)
                         <option value="{{ $modelKey }}" class="bg-surface-800 text-white" @selected($currentModel === $modelKey)>{{ $modelLabel }}</option>
                     @endforeach
@@ -80,9 +80,9 @@
 
             <div class="flex items-center gap-1.5">
                 <span class="text-xs text-ink-400 font-semibold whitespace-nowrap">Periode:</span>
-                <input type="date" wire:model.live="periodeDari" title="Dari Tanggal" class="p-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none" />
+                <input type="date" wire:model.live="periodeDari" title="Dari Tanggal" class="p-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-base sm:text-xs min-h-[44px] sm:min-h-0 focus:border-up-primary outline-none" />
                 <span class="text-ink-500 text-xs">-</span>
-                <input type="date" wire:model.live="periodeSampai" title="Sampai Tanggal" class="p-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none" />
+                <input type="date" wire:model.live="periodeSampai" title="Sampai Tanggal" class="p-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-base sm:text-xs min-h-[44px] sm:min-h-0 focus:border-up-primary outline-none" />
                 @if($periodeDari || $periodeSampai)
                     <button type="button" wire:click="resetPeriode" title="Reset filter periode" class="p-1.5 px-2 rounded-lg bg-white/10 hover:bg-white/15 text-ink-300 text-xs font-semibold cursor-pointer">✕</button>
                 @endif
@@ -97,7 +97,7 @@
 
     <!-- [ISO 9001 Clause 7.5 / ISO 27001] ISO Controlled Document Header & Letterhead -->
     @if(!empty($isoMetadata))
-        <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-md shadow-sm">
+        <div class="p-4 rounded-2xl bg-white/[0.04] border border-white/10 shadow-sm">
             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-3 border-b border-white/10">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-up-primary/20 border border-up-primary/40 flex items-center justify-center text-up-primary font-black text-sm">

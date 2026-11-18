@@ -580,10 +580,11 @@ Write-Host "[8/8] Menyalakan server di background pada port $port..." -Foregroun
 
 $docRoot = Join-Path $projectRoot 'public'
 $logFile = Join-Path $projectRoot 'storage\logs\server.log'
+$errLogFile = Join-Path $projectRoot 'storage\logs\server-error.log'
 $pidFile = Join-Path $projectRoot 'storage\framework\server.pid'
 
 # Jalankan server secara independen di background
-$serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru
+$serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $errLogFile -PassThru
 
 # Catat PID proses server
 if ($serverProc) {
@@ -607,9 +608,10 @@ $queuePid = ""
 if ($isInstalled -and (Test-Path $envFile)) {
     $artisanPath = Join-Path $projectRoot 'artisan'
     $queueLog = Join-Path $projectRoot 'storage\logs\queue.log'
+    $queueErrLog = Join-Path $projectRoot 'storage\logs\queue-error.log'
     $queuePidFile = Join-Path $projectRoot 'storage\framework\queue.pid'
     try {
-        $qProc = Start-Process -FilePath $phpExe -ArgumentList "`"$artisanPath`"", "queue:work", "--sleep=3", "--tries=3" -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueLog -PassThru -ErrorAction SilentlyContinue
+        $qProc = Start-Process -FilePath $phpExe -ArgumentList "`"$artisanPath`"", "queue:work", "--sleep=3", "--tries=3" -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueErrLog -PassThru -ErrorAction SilentlyContinue
         if ($qProc) {
             $queuePid = $qProc.Id
             Set-Content -Path $queuePidFile -Value $qProc.Id -Encoding ASCII

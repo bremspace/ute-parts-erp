@@ -186,7 +186,12 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" class="py-6 text-center text-ink-400 text-xs">Tidak ada PO menunggu penerimaan.</td>
+                    <td colspan="5" class="py-8 text-center text-ink-400">
+                        <x-ui.empty-state
+                            title="Tidak Ada PO Menunggu Penerimaan"
+                            description="Semua purchase order telah diproses atau belum ada pengiriman fisik yang tiba di pintu gudang."
+                        />
+                    </td>
                 </tr>
             @endforelse
         </x-prism.data-table>
@@ -265,7 +270,12 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="py-6 text-center text-ink-400 text-xs">Belum ada dokumen GRN untuk status ini.</td>
+                    <td colspan="7" class="py-8 text-center text-ink-400">
+                        <x-ui.empty-state
+                            title="Belum Ada Dokumen GRN"
+                            description="Belum ada bukti penerimaan barang tercatat untuk status filter ini."
+                        />
+                    </td>
                 </tr>
             @endforelse
         </x-prism.data-table>

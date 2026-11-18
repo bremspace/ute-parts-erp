@@ -131,7 +131,10 @@
                     @empty
                         <tr>
                             <td colspan="9" class="py-12 text-center text-ink-400">
-                                Tidak ada item stok yang cocok dengan kriteria pencarian
+                                <x-ui.empty-state
+                                    title="Tidak Ada Item Stok"
+                                    description="Tidak ada item stok yang cocok dengan kriteria pencarian atau gudang yang dipilih."
+                                />
                             </td>
                         </tr>
                     @endforelse
@@ -220,8 +223,11 @@
                             </div>
                         </div>
                     @empty
-                        <div class="col-span-full py-12 text-center text-ink-400">
-                            Tidak ada item stok yang cocok dengan kriteria pencarian
+                        <div class="col-span-full py-12">
+                            <x-ui.empty-state
+                                title="Tidak Ada Item Stok"
+                                description="Tidak ada item stok yang cocok dengan kriteria pencarian atau gudang yang dipilih."
+                            />
                         </div>
                     @endforelse
                 </div>

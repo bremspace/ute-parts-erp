@@ -120,8 +120,8 @@
         </div>
     @endif
 
-    <!-- Top Bar: Apple-inspired frosted glass chrome with optical typography -->
-    <header class="bg-white/85 dark:bg-[#090D16]/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] sticky top-0 z-40 transition-colors duration-200 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]"
+    <!-- Top Bar: Apple-inspired chrome with optical typography -->
+    <header class="bg-white dark:bg-[#090D16] border-b border-slate-200/80 dark:border-white/[0.08] sticky top-0 z-40 transition-colors duration-200 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]"
         style="padding-top: env(safe-area-inset-top, 0);">
         <div class="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-3">
             <!-- Brand -->
@@ -489,7 +489,7 @@
     </div>
 
     <!-- Footer: High-tech editorial trust badges + store info -->
-    <footer class="mt-auto border-t border-ink-200/60 dark:border-white/[0.08] bg-white/70 dark:bg-ink-950 backdrop-blur-xl">
+    <footer class="mt-auto border-t border-ink-200/60 dark:border-white/[0.08] bg-white dark:bg-ink-950">
         <!-- Trust badges -->
         <div class="border-b border-ink-100 dark:border-white/[0.05]">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">

@@ -150,7 +150,7 @@
                                     :type="showPass ? 'text' : 'password'"
                                     wire:model="kunci_terenkripsi"
                                     placeholder="Masukkan {{ strtoupper($tipe_kunci) }} — aman terenkripsi"
-                                    class="w-full px-4 py-3 pr-10 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10"
+                                    class="w-full px-4 py-3 pr-10 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10"
                                 />
                                 <button
                                     type="button"

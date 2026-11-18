@@ -37,7 +37,7 @@ html, body {
     --up-gradient-signature: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);
     --up-gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
 
-    --up-glass-bg: rgba(15, 23, 42, 0.85);
+    --up-glass-bg: #0F172A;
     --up-glass-border: rgba(255, 255, 255, 0.08);
     --up-glass-border-hover: rgba(99, 102, 241, 0.35);
     --up-glass-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
@@ -58,11 +58,9 @@ html, body {
     --shadow-light-popover: 0 0 0 1px rgba(15, 23, 42, 0.08), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
 }
 
-/* Glass surface classes */
+/* [High-Performance Workstation Surface - Zero GPU blur overhead] */
 .glass-panel {
     background: var(--up-glass-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--up-glass-border);
     box-shadow: var(--up-glass-shadow);
     transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
