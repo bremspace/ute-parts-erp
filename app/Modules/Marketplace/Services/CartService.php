@@ -103,6 +103,14 @@ class CartService
                     $needSave = true;
                 }
             }
+
+            // Diskon satuan (box) sudah termasuk di harga; jangan hitung sebagai potongan tier
+            if (strcasecmp($satuan, $baseSatuan) !== 0) {
+                if ((float) ($cart[$k]['diskon_tier'] ?? 0) !== 0.0) {
+                    $cart[$k]['diskon_tier'] = 0.0;
+                    $needSave = true;
+                }
+            }
         }
         if ($needSave) {
             Session::put('shop.cart', $cart);
@@ -136,7 +144,8 @@ class CartService
                             $cart[$key]['harga'] = (float) $pricing['harga'];
                         }
                         $cart[$key]['harga_retail'] = $hargaRetail;
-                        $cart[$key]['diskon_tier'] = $diskonTier;
+                        // Satuan non-base (box): diskon satuan sudah di harga, bukan potongan tier
+                        $cart[$key]['diskon_tier'] = $isSatuanNonBase ? 0.0 : $diskonTier;
                         $cart[$key]['potensi_komisi'] = $potensiKomisi;
                         $cart[$key]['mode_reward'] = $pricing['mode_reward'] ?? 'diskon_langsung';
                         $cart[$key]['tier_nama'] = $pricing['tier'] ?? null;
