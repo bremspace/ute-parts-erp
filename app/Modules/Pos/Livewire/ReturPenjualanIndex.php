@@ -1211,7 +1211,7 @@ class ReturPenjualanIndex extends Component
 
         $cabangId = session('cabang_id') ?: (auth()->user()?->cabangs?->first()?->id ?: 1);
         $gudangs = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->orderBy('nama')->get();
-        $raks = Rak::whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId))->where('is_active', true)->orderBy('nama')->get();
+        $raks = Rak::with('gudang')->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId))->where('is_active', true)->orderBy('nama')->get();
 
         return view('modules.pos.livewire.retur-penjualan-index', [
             'returList' => $returList,
