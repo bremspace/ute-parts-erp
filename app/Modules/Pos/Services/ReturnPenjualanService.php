@@ -205,7 +205,9 @@ class ReturnPenjualanService
                 }
 
                 $konversiTrx = (float) ($trxItem->konversi ?? 1);
-                if ($konversiTrx <= 0) { $konversiTrx = 1; }
+                if ($konversiTrx <= 0) {
+                    $konversiTrx = 1;
+                }
 
                 // qtyRetur sekarang dalam base unit (pcs); harga_satuan per base unit
                 $hargaSatuanBase = (float) ($trxItem->harga_final ?? $trxItem->harga_satuan ?? 0) / $konversiTrx;
@@ -563,9 +565,13 @@ class ReturnPenjualanService
             foreach ($retur->items as $item) {
                 $qty = (int) $item->jumlah;
                 $konversi = (float) ($item->konversi ?? 1);
-                if ($konversi <= 0) { $konversi = 1; }
+                if ($konversi <= 0) {
+                    $konversi = 1;
+                }
                 $qtyBase = (int) round($qty * $konversi);
-                if ($qtyBase < 1) { $qtyBase = $qty; }
+                if ($qtyBase < 1) {
+                    $qtyBase = $qty;
+                }
                 $produkId = (int) $item->produk_id;
                 $skuVariantId = $item->sku_variant_id ? (int) $item->sku_variant_id : null;
                 $hppSatuan = (float) ($item->hpp ?? $item->produk?->harga_beli ?? 0);
