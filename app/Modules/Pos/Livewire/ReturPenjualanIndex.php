@@ -489,9 +489,14 @@ class ReturPenjualanIndex extends Component
                     }
                 }
             } else {
-                // Cacat/rusak: wajib pindah gudang -> kosongkan agar user pilih gudang lain
-                $this->itemInputs[$itemId]['gudang_retur_id'] = null;
-                $this->itemInputs[$itemId]['rak_retur_id'] = null;
+                // Cacat/rusak: default karantina di gudang asal, user bisa pindah
+                if (empty($this->itemInputs[$itemId]['gudang_retur_id'])) {
+                    $asalGudangId = $this->asalGudangId
+                        ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang?->id));
+                    if ($asalGudangId) {
+                        $this->itemInputs[$itemId]['gudang_retur_id'] = $asalGudangId;
+                    }
+                }
             }
         }
 
@@ -1096,11 +1101,7 @@ class ReturPenjualanIndex extends Component
                     $hasTukarError = true;
                 }
 
-                $kondisiItem = $input['kondisi_barang'] ?? 'rusak';
-                if ($kondisiItem === 'rusak' && empty($input['gudang_retur_id'])) {
-                    $this->addError("itemInputs.{$itemId}.gudang_retur_id", "Barang cacat wajib dipindah ke gudang karantina lain (tidak boleh gudang asal).");
-                    $hasGudangError = true;
-                }
+                // (validasi gudang untuk rusak dihapus agar flow existing tetap jalan; user tetap bisa memilih gudang karantina)
 
                 $itemTukarPrepared = [];
                 foreach ($itemTukar as $t) {
@@ -1159,11 +1160,7 @@ class ReturPenjualanIndex extends Component
             return;
         }
 
-        if ($hasGudangError) {
-            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Barang cacat wajib dipindah ke gudang karantina lain (tidak boleh gudang asal). Pilih gudang tujuan.']);
 
-            return;
-        }
 
         if ($totalReturQty <= 0 || empty($items)) {
             $this->addError('items', 'Belum ada barang yang dipilih untuk diretur. Masukkan kuantiti retur minimal 1 pada salah satu barang.');
