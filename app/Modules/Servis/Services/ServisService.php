@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Hr\Services\BagiHasilService;
@@ -16,6 +17,7 @@ use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
+use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Servis\Models\Garansi;
 use App\Modules\Servis\Models\JenisServis;
@@ -527,6 +529,15 @@ class ServisService
             // pengembalian dana setelah cair tanggung jawab finance).
             if (in_array($statusBaru, ['batal', 'ditolak'], true) && $statusLama === 'selesai') {
                 app(BagiHasilService::class)->reversal($tiket);
+            }
+
+            // [F-09] Tiket yang sudah pernah selesai (jurnal + komisi terposting)
+            // lalu dibatalkan/ditolak — termasuk override dari 'diambil' — batalkan
+            // baris komisi terkait agar tidak masuk payroll/approval dan dibayar
+            // atas jasa yang batal. Baris 'cair' tidak disentuh (uang sudah keluar;
+            // pengembalian dana tanggung jawab finance).
+            if (in_array($statusBaru, ['batal', 'ditolak'], true) && $tiket->tanggal_selesai !== null) {
+                $this->batalkanKomisiTiket($tiket, $alasan);
             }
 
             // [P1-5] Lepas klaim SN: saat transisi ke 'ditolak' (valid maupun
@@ -1434,31 +1445,39 @@ class ServisService
             }
 
             // [penagihan] SATU sumber: rincian item efektif (estimasi + pekerjaan),
-            // dikurangi goodwill yang sudah disetujui regulator.
-            $rincian = $tiket->getRincianBiayaLengkap();
+            // dikurangi goodwill yang sudah disetujui regulator, ditambah PPN
+            // keluaran bila cabang PKP [F-20].
             $totalTagihan = $this->getTotalTagihanBersih($tiket);
 
+            // [B-3] Pelunasan hanya mem-post SISA tagihan: cicilan yang sudah
+            // masuk lewat subledger piutang (mis. via modul Akunting) tidak
+            // boleh dihitung ulang — GL 120-01 bisa negatif & subledger macet
+            // 'sebagian' padahal buku besar sudah nol.
+            $piutang = ($tiket->pelanggan_id && Schema::hasTable('piutang')) ? $this->piutangServis($tiket) : null;
+            $sudahDibayar = $piutang ? round((float) $piutang->jumlah_dibayar, 2) : 0.0;
+            $sisaTagihan = round(max(0.0, $totalTagihan - $sudahDibayar), 2);
+
             // [fail-closed] Bila pemanggil menyertakan uang yang benar-benar
-            // diterima (POS/API), nominal itu WAJIB sama dengan rincian —
+            // diterima (POS/API), nominal itu WAJIB sama dengan sisa tagihan —
             // mencegah kas bertambah tanpa sesuaian piutang/jurnal.
-            if ($jumlahBayar !== null && abs(((float) $jumlahBayar) - $totalTagihan) > 0.01) {
+            if ($jumlahBayar !== null && abs(((float) $jumlahBayar) - $sisaTagihan) > 0.01) {
                 throw new \Exception(
-                    'Jumlah pembayaran (Rp '.number_format((float) $jumlahBayar, 0, ',', '.').') tidak sesuai rincian penagihan (Rp '.number_format($totalTagihan, 0, ',', '.').').'
+                    'Jumlah pembayaran (Rp '.number_format((float) $jumlahBayar, 0, ',', '.').') tidak sesuai sisa tagihan (Rp '.number_format($sisaTagihan, 0, ',', '.').'; sudah dibayar Rp '.number_format($sudahDibayar, 0, ',', '.').').'
                 );
             }
 
             $noJurnal = null;
-            if ($totalTagihan > 0) {
+            if ($sisaTagihan > 0) {
                 $jurnalService = app(JurnalService::class);
                 $noJurnal = $jurnalService->generateNoJurnal('servis-bayar', $tiket->cabang_id);
 
                 $debitLines = [];
                 if ($metodePembayaran === 'tunai') {
-                    $debitLines[] = ['akun_kode' => '110-04', 'debit' => $totalTagihan, 'kredit' => 0]; // Kas Laci
+                    $debitLines[] = ['akun_kode' => '110-04', 'debit' => $sisaTagihan, 'kredit' => 0]; // Kas Laci
                 } elseif ($metodePembayaran === 'split' && $splitDetail) {
                     $nonTunai = (float) ($splitDetail['non_tunai'] ?? 0);
-                    $porsiBank = min((float) $totalTagihan, $nonTunai);
-                    $porsiKas = max(0.0, (float) $totalTagihan - $porsiBank);
+                    $porsiBank = min((float) $sisaTagihan, $nonTunai);
+                    $porsiKas = max(0.0, (float) $sisaTagihan - $porsiBank);
 
                     if ($porsiKas > 0) {
                         $debitLines[] = ['akun_kode' => '110-04', 'debit' => $porsiKas, 'kredit' => 0];
@@ -1468,11 +1487,11 @@ class ServisService
                     }
                 } else {
                     // transfer, qris, kartu, online
-                    $debitLines[] = ['akun_kode' => '110-02', 'debit' => $totalTagihan, 'kredit' => 0]; // Bank
+                    $debitLines[] = ['akun_kode' => '110-02', 'debit' => $sisaTagihan, 'kredit' => 0]; // Bank
                 }
 
                 $lines = array_merge($debitLines, [
-                    ['akun_kode' => '120-01', 'debit' => 0, 'kredit' => $totalTagihan], // Piutang Usaha lunas
+                    ['akun_kode' => '120-01', 'debit' => 0, 'kredit' => $sisaTagihan], // Piutang Usaha turun sebesar sisa
                 ]);
 
                 $deskripsiJurnal = "Pelunasan servis {$tiket->no_tiket} ({$metodePembayaran})";
@@ -1497,16 +1516,17 @@ class ServisService
                 );
             }
 
-            // [SUBLEDGER-SYNC] Lunaskan piutang servis bila ada di tabel piutang
-            if ($tiket->pelanggan_id && Schema::hasTable('piutang')) {
-                $piutang = $this->piutangServis($tiket);
-                if ($piutang && $piutang->status === 'belum_lunas') {
-                    $piutang->update([
-                        'jumlah_dibayar' => $piutang->jumlah,
-                        'status' => 'lunas',
-                        'transaksi_id' => $transaksiId ?? $piutang->transaksi_id,
-                    ]);
-                }
+            // [SUBLEDGER-SYNC/B-3] Sinkronkan piutang untuk status APA PUN yang
+            // masih terbuka (belum_lunas maupun sebagian — cicilan via Akunting
+            // dulu tidak tersentuh sehingga macet 'sebagian' selamanya). Sisa
+            // dilunasi → jumlah_dibayar penuh → lunas. Idempoten bila sudah lunas.
+            if ($piutang && in_array($piutang->status, ['belum_lunas', 'sebagian'], true)) {
+                $dibayarBaru = round($sudahDibayar + $sisaTagihan, 2);
+                $piutang->update([
+                    'jumlah_dibayar' => $dibayarBaru,
+                    'status' => $dibayarBaru >= (float) $piutang->jumlah - 0.001 ? 'lunas' : 'sebagian',
+                    'transaksi_id' => $transaksiId ?? $piutang->transaksi_id,
+                ]);
             }
 
             $tiket->update([
@@ -1526,10 +1546,13 @@ class ServisService
                     number_format($tunaiNominal, 0, ',', '.'),
                     $metodeNon,
                     number_format($nonTunaiNominal, 0, ',', '.'),
-                    number_format($totalTagihan, 0, ',', '.')
+                    number_format($sisaTagihan, 0, ',', '.')
                 );
             } else {
-                $pesanLog = 'Pelunasan servis ('.strtoupper($metodePembayaran).'): Rp '.number_format($totalTagihan, 0, ',', '.');
+                $pesanLog = 'Pelunasan servis ('.strtoupper($metodePembayaran).'): Rp '.number_format($sisaTagihan, 0, ',', '.');
+            }
+            if ($sudahDibayar > 0) {
+                $pesanLog .= ' (sisa setelah pembayaran sebelumnya Rp '.number_format($sudahDibayar, 0, ',', '.').')';
             }
             if ($catatan) {
                 $pesanLog .= " - {$catatan}";
@@ -1822,16 +1845,74 @@ class ServisService
      */
     public function getTotalTagihanBersih(TiketServis $tiket): float
     {
+        return $this->getPajakBersih($tiket)['total_akhir'];
+    }
+
+    /**
+     * [F-20] Komponen pajak tagihan bersih (setelah goodwill/voucher), pola
+     * `PajakService::hitungPenjualan` POS: DPP vs PPN keluaran vs total akhir.
+     *
+     * - Tiket sudah selesai: nilai tersimpan saat selesai (satu sumber, tidak
+     *   retroaktif terhadap perubahan konfigurasi pajak cabang). Tiket legacy
+     *   tanpa kolom dpp terisi → dianggap tanpa PPN (total neto apa adanya).
+     * - Belum selesai: hitung live atas total item dikurangi diskon berlaku.
+     * - Komplain garansi gratis: tanpa tagihan → semua nol.
+     *
+     * @return array{dpp: float, ppn_nominal: float, ppn_percent: float, enabled: bool, total_akhir: float}
+     */
+    public function getPajakBersih(TiketServis $tiket): array
+    {
         if ($tiket->komplain_gratis) {
-            return 0.0;
+            return ['dpp' => 0.0, 'ppn_nominal' => 0.0, 'ppn_percent' => 0.0, 'enabled' => false, 'total_akhir' => 0.0];
         }
 
-        return max(
-            0.0,
-            (float) $tiket->getRincianBiayaLengkap()['total']
-                - $this->getGoodwillBerlaku($tiket)
-                - $this->getDiskonVoucher($tiket)
-        );
+        $diskon = $this->getGoodwillBerlaku($tiket) + $this->getDiskonVoucher($tiket);
+        $neto = max(0.0, (float) collect($tiket->getItemsPenagihan())->sum(fn ($i) => (float) $i['subtotal']) - $diskon);
+
+        if ($tiket->tanggal_selesai !== null) {
+            $dpp = $tiket->dpp !== null ? (float) $tiket->dpp : round($neto, 2);
+            $ppn = (float) ($tiket->ppn_nominal ?? 0);
+            $persen = (float) ($tiket->ppn_percent ?? 0);
+
+            return [
+                'dpp' => $dpp,
+                'ppn_nominal' => $ppn,
+                'ppn_percent' => $persen,
+                'enabled' => $persen > 0,
+                'total_akhir' => round($dpp + $ppn, 2),
+            ];
+        }
+
+        $hitung = app(PajakService::class)->hitungPenjualan($tiket->cabang_id, $neto);
+
+        return [
+            'dpp' => (float) $hitung['dpp'],
+            'ppn_nominal' => (float) $hitung['ppn_nominal'],
+            'ppn_percent' => (float) $hitung['ppn_percent'],
+            'enabled' => (bool) $hitung['enabled'],
+            'total_akhir' => (float) $hitung['total_akhir'],
+        ];
+    }
+
+    /**
+     * [B-3] Sisa tagihan yang benar-benar harus dibayar saat pelunasan:
+     * total tagihan (termasuk PPN) dikurangi yang sudah dibayar lewat
+     * subledger piutang (mis. cicilan via modul Akunting). Tanpa subledger
+     * (tanpa pelanggan), seluruh tagihan adalah sisa.
+     */
+    public function getSisaTagihan(TiketServis $tiket): float
+    {
+        $totalTagihan = $this->getTotalTagihanBersih($tiket);
+        $sudahDibayar = 0.0;
+
+        if ($tiket->pelanggan_id && Schema::hasTable('piutang')) {
+            $piutang = $this->piutangServis($tiket);
+            if ($piutang) {
+                $sudahDibayar = round((float) $piutang->jumlah_dibayar, 2);
+            }
+        }
+
+        return round(max(0.0, $totalTagihan - $sudahDibayar), 2);
     }
 
     /**
@@ -2132,6 +2213,47 @@ class ServisService
     }
 
     /**
+     * [F-09] Batalkan baris komisi milik tiket ini (pending/disetujui →
+     * dibatalkan) saat servis batal/ditolak setelah selesai. Dua jalur:
+     * - Engine multi-aktor: terikat eksplisit `tiket_servis_id`.
+     * - Legacy reseller (`hitungKomisiDariItems`): tanpa tiket_servis_id &
+     *   transaksi_id, dikenali dari pelanggan + keterangan persis
+     *   'Komisi dari servis {no_tiket}'; sekalian diisi tiket_servis_id-nya
+     *   untuk audit trail.
+     * Payroll hanya mengambil komisi pending/disetujui → komisi yang dibatalkan
+     * otomatis tidak dihitung/dibayar. Idempoten: status dibatalkan tidak cocok
+     * lagi dengan filter, dan keterangan legacy tidak lagi cocok persis.
+     */
+    private function batalkanKomisiTiket(TiketServis $tiket, string $alasan): void
+    {
+        // Satu grup kondisi (tiket ATAU legacy) supaya filter status berlaku
+        // untuk KEDUA jalur — tanpa grup, AND status hanya mengikat orWhere.
+        $query = Komisi::query()->where(function ($q) use ($tiket) {
+            $q->where('tiket_servis_id', $tiket->id);
+
+            if ($tiket->pelanggan_id) {
+                $q->orWhere(fn ($legacy) => $legacy
+                    ->whereNull('tiket_servis_id')
+                    ->whereNull('transaksi_id')
+                    ->where('pelanggan_id', $tiket->pelanggan_id)
+                    ->where('keterangan', 'Komisi dari servis '.$tiket->no_tiket));
+            }
+        });
+
+        $rows = $query->whereIn('status', [Komisi::STATUS_PENDING, Komisi::STATUS_DISETUJUI])
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($rows as $komisi) {
+            $komisi->update([
+                'status' => Komisi::STATUS_DIBATALKAN,
+                'tiket_servis_id' => $tiket->id,
+                'keterangan' => trim(($komisi->keterangan ?? '').' — servis dibatalkan ('.$alasan.')'),
+            ]);
+        }
+    }
+
+    /**
      * Balikkan semua jurnal yang pernah diposting untuk tiket ini (pendapatan
      * + pelunasan); jurnal ber-sumber `reversal` diabaikan agar reversal dobel
      * mustahil.
@@ -2426,18 +2548,43 @@ class ServisService
                 $totalTagihan = max(0.0, $totalTagihan - $totalDiskon);
             }
 
+            // [F-20] PPN keluaran (pola PosCheckoutService): total neto setelah
+            // diskon dipisah DPP vs PPN via PajakService (menghormati konfigurasi
+            // cabang: non-PKP → nol; inclusive → harga sudah termasuk PPN;
+            // exclusive → PPN ditambah di atas harga). DPP dipecah proporsional
+            // ke jasa & part; part = selisih (plug pembulatan) → jurnal balance.
+            $pajak = app(PajakService::class)->hitungPenjualan($tiket->cabang_id, $totalTagihan);
+            $ppnNominal = (float) $pajak['ppn_nominal'];
+            $dppTotal = (float) $pajak['dpp'];
+            $totalAkhir = (float) $pajak['total_akhir'];
+            $jasaDpp = $totalTagihan > 0 ? round($dppTotal * $jasaServis / $totalTagihan, 2) : 0.0;
+            $partDpp = round($dppTotal - $jasaDpp, 2);
+
+            // Simpan DPP/PPN per tiket (satu kali saat selesai; perubahan
+            // konfigurasi pajak setelahnya tidak retroaktif).
+            $tiket->update([
+                'dpp' => $dppTotal,
+                'ppn_nominal' => $ppnNominal,
+                'ppn_percent' => (float) $pajak['ppn_percent'],
+            ]);
+
             if ($totalTagihan > 0 || ($garansiGratis && $totalHpp > 0)) {
                 $noJurnal = $jurnalService->generateNoJurnal('servis', $tiket->cabang_id);
 
                 $lines = [];
 
                 if (! $garansiGratis) {
-                    $lines[] = ['akun_kode' => '120-01', 'debit' => $totalTagihan, 'kredit' => 0]; // Piutang Usaha diakui saat servis selesai
-                    $lines[] = ['akun_kode' => '420-01', 'debit' => 0, 'kredit' => $jasaServis]; // Pendapatan jasa servis
+                    $lines[] = ['akun_kode' => '120-01', 'debit' => $totalAkhir, 'kredit' => 0]; // Piutang Usaha diakui saat servis selesai (DPP + PPN)
+                    $lines[] = ['akun_kode' => '420-01', 'debit' => 0, 'kredit' => $jasaDpp]; // Pendapatan jasa servis = DPP jasa
                 }
 
-                if (! $garansiGratis && $totalJualSparepart > 0) {
-                    $lines[] = ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $totalJualSparepart]; // Pendapatan penjualan sparepart
+                if (! $garansiGratis && $partDpp > 0) {
+                    $lines[] = ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $partDpp]; // Pendapatan penjualan sparepart = DPP part
+                }
+
+                // [F-20] PPN Keluaran 220-01 — liabilitas pajak diakui saat selesai.
+                foreach (app(PajakService::class)->jurnalLines($ppnNominal, $noJurnal, (int) $tiket->cabang_id, (int) (auth()->id() ?? 0)) as $ppnLine) {
+                    $lines[] = $ppnLine;
                 }
                 if ($totalHpp > 0) {
                     $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0]; // HPP sparepart
@@ -2475,7 +2622,7 @@ class ServisService
                             'pelanggan_id' => $tiket->pelanggan_id,
                             'transaksi_id' => $tiket->transaksi_id,
                             'cabang_id' => $tiket->cabang_id,
-                            'jumlah' => $totalTagihan,
+                            'jumlah' => $totalAkhir,
                             'jumlah_dibayar' => 0,
                             'jatuh_tempo' => now()->addDays(14)->toDateString(),
                             'status' => 'belum_lunas',
@@ -2496,12 +2643,12 @@ class ServisService
                         [
                             [
                                 'kategori' => 'Servis',
-                                'subtotal' => $jasaServis,
+                                'subtotal' => $jasaDpp,
                                 'jumlah' => 1,
                             ],
                         ],
                         [
-                            'jumlah_transaksi' => $totalTagihan,
+                            'jumlah_transaksi' => $totalAkhir,
                             'keterangan' => 'Komisi dari servis '.$tiket->no_tiket,
                         ]
                     );

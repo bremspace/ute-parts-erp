@@ -3,6 +3,7 @@
 namespace App\Modules\Servis\Models;
 
 use App\Models\User;
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Marketplace\Models\WebReview;
 use App\Modules\Pos\Models\Transaksi;
@@ -21,6 +22,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'no_tiket', 'cabang_id', 'transaksi_id', 'jenis_servis_id', 'pelanggan_id', 'teknisi_id',
     'nama_pelanggan', 'telepon_pelanggan', 'jenis_hp', 'seri_hp', 'tipe_kunci', 'kunci_terenkripsi',
     'keluhan', 'kondisi_fisik', 'foto_unit', 'status', 'sumber', 'estimasi_biaya',
+    'dpp', 'ppn_nominal', 'ppn_percent',
     'alasan_estimasi', 'batas_waktu_menit', 'durasi_garansi_custom', 'auto_cancel_overdue', 'pengerjaan_mulai_at',
     'pengerjaan_deadline_at', 'pengerjaan_selesai_at', 'durasi_pengerjaan_menit',
     'status_sla_kpi', 'warning_overdue_sent_at', 'token_approval', 'tanggal_terima', 'tanggal_selesai',
@@ -52,6 +54,9 @@ class TiketServis extends Model
         'kondisi_fisik' => 'array',
         'foto_unit' => 'array',
         'estimasi_biaya' => 'decimal:2',
+        'dpp' => 'decimal:2',
+        'ppn_nominal' => 'decimal:2',
+        'ppn_percent' => 'decimal:2',
         'batas_waktu_menit' => 'integer',
         'durasi_garansi_custom' => 'integer',
         'auto_cancel_overdue' => 'boolean',
@@ -543,11 +548,24 @@ class TiketServis extends Model
     /**
      * Rincian lengkap item servis (Jasa & Part) untuk billing, struk thermal, dan riwayat.
      *
+     * [F-20] Komponen pajak: `dpp`/`ppn_nominal`/`ppn_percent`/`total_akhir`.
+     * Tiket selesai → nilai tersimpan saat selesai (tidak retroaktif); belum
+     * selesai → hitung live atas total bruto item (diskon diterapkan pada
+     * tagihan bersih oleh ServisService::getPajakBersih). `total` tetap jumlah
+     * harga item (basis komisi/bagi hasil modul lain tidak berubah).
+     *
      * @return array{
      *     items: array<int, array{tipe: string, nama: string, qty: int, harga: float, subtotal: float, sumber: string}>,
      *     total_jasa: float,
      *     total_part: float,
-     *     total: float
+     *     total: float,
+     *     dpp: float,
+     *     ppn_nominal: float,
+     *     ppn_percent: float,
+     *     pajak_enabled: bool,
+     *     total_akhir: float,
+     *     perubahan_lingkup: bool,
+     *     item_diluar_estimasi: array
      * }
      */
     public function getRincianBiayaLengkap(): array
@@ -576,11 +594,36 @@ class TiketServis extends Model
 
         $itemDiluarEstimasi = $this->getItemDiluarEstimasi();
 
+        // [F-20] Komponen PPN (pola PajakService POS): DPP vs PPN keluaran.
+        // Tiket sudah selesai → nilai tersimpan saat selesai (tidak retroaktif
+        // terhadap perubahan konfigurasi pajak cabang). Belum selesai → hitung
+        // live atas total bruto item (diskon goodwill/voucher diterapkan pada
+        // tagihan bersih oleh ServisService::getPajakBersih).
+        if ($this->tanggal_selesai !== null && $this->dpp !== null) {
+            $dpp = (float) $this->dpp;
+            $ppnNominal = (float) $this->ppn_nominal;
+            $ppnPercent = (float) $this->ppn_percent;
+            $pajakEnabled = $ppnPercent > 0;
+            $totalAkhir = round($dpp + $ppnNominal, 2);
+        } else {
+            $pajak = app(PajakService::class)->hitungPenjualan($this->cabang_id, $totalJasa + $totalPart);
+            $dpp = (float) $pajak['dpp'];
+            $ppnNominal = (float) $pajak['ppn_nominal'];
+            $ppnPercent = (float) $pajak['ppn_percent'];
+            $pajakEnabled = (bool) $pajak['enabled'];
+            $totalAkhir = (float) $pajak['total_akhir'];
+        }
+
         return [
             'items' => $rincian,
             'total_jasa' => $totalJasa,
             'total_part' => $totalPart,
             'total' => $totalJasa + $totalPart,
+            'dpp' => $dpp,
+            'ppn_nominal' => $ppnNominal,
+            'ppn_percent' => $ppnPercent,
+            'pajak_enabled' => $pajakEnabled,
+            'total_akhir' => $totalAkhir,
             'perubahan_lingkup' => $itemDiluarEstimasi !== [],
             'item_diluar_estimasi' => $itemDiluarEstimasi,
         ];
