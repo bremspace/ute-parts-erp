@@ -604,8 +604,13 @@
                                                         <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Rak Tujuan (Opsional)</label>
                                                         <select wire:model="itemInputs.{{ $itemId }}.rak_retur_id" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
                                                             <option value="" class="bg-ink-900 text-white">-- Tanpa Rak --</option>
+                                                            @php
+                                                                $selectedGudangId = $itemInputs[$itemId]['gudang_retur_id'] ?? null;
+                                                            @endphp
                                                             @foreach($raks as $rk)
-                                                                <option value="{{ $rk->id }}" class="bg-ink-900 text-white">{{ $rk->nama }} ({{ $rk->kode }}) - {{ $rk->gudang?->nama }}</option>
+                                                                @if(empty($selectedGudangId) || (int)$rk->gudang_id === (int)$selectedGudangId)
+                                                                    <option value="{{ $rk->id }}" class="bg-ink-900 text-white">{{ $rk->nama }} ({{ $rk->kode }})</option>
+                                                                @endif
                                                             @endforeach
                                                         </select>
                                                     </div>

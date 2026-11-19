@@ -386,6 +386,13 @@ class ReturPenjualanIndex extends Component
                 $this->persiapkanTukarProduk($itemId);
             }
         }
+
+        if (str_ends_with($key, '.gudang_retur_id')) {
+            $parts = explode('.', $key);
+            $itemId = (int) $parts[0];
+            // Reset rak tujuan jika gudang berubah (rak harus sesuai gudang)
+            $this->itemInputs[$itemId]['rak_retur_id'] = null;
+        }
     }
 
     /**
