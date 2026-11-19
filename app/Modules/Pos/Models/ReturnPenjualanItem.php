@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'alasan', 'tipe_penyelesaian', 'metode_pengembalian',
     'tukar_items_payload', 'selisih_nominal', 'foto_bukti',
     'gudang_id', 'rak_id',
+    'satuan', 'konversi',
 ])]
 class ReturnPenjualanItem extends Model
 {
@@ -24,6 +25,7 @@ class ReturnPenjualanItem extends Model
 
     protected $casts = [
         'jumlah' => 'decimal:2',
+        'konversi' => 'decimal:4',
         'harga_satuan' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'hpp' => 'decimal:2',
