@@ -456,6 +456,8 @@ class RiwayatTransaksiIndex extends Component
                 'nama' => $it->produk?->nama ?? 'Produk',
                 'sku' => $it->produk?->sku ?? '-',
                 'qty' => (int) $it->jumlah,
+                'satuan' => $it->satuan ?? 'pcs',
+                'konversi' => (float) ($it->konversi ?? 1),
                 'harga' => (float) $it->harga_satuan,
                 'subtotal' => (float) $it->subtotal,
             ])->toArray(),

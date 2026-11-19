@@ -1001,7 +1001,7 @@
                                                     </p>
                                                 @endif
                                                 <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">
-                                                    {{ $item->jumlah }} × Rp {{ number_format($item->harga_satuan, 0, ',', '.') }}
+                                                    {{ $item->jumlah }}{{ ($item->satuan && $item->satuan !== 'pcs') ? ' '.$item->satuan : '' }} × Rp {{ number_format($item->harga_satuan, 0, ',', '.') }}@if(($item->satuan ?? 'pcs') !== 'pcs' && (float) ($item->konversi ?? 1) > 1) <span class="text-[9px] text-ink-400">({{ (int) ($item->jumlah * ($item->konversi ?? 1)) }} pcs)</span>@endif
                                                 </p>
                                             </div>
                                             <span class="font-mono font-bold text-ink-900 dark:text-white tabular-nums shrink-0">

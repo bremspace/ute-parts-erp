@@ -526,7 +526,7 @@
                                     </div>
                                     <div class="text-right flex-shrink-0">
                                         <p class="font-bold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($it->subtotal, 0, ',', '.') }}</p>
-                                        <p class="text-[10px] text-ink-400">{{ $it->jumlah }} × Rp {{ number_format($it->harga_satuan, 0, ',', '.') }}</p>
+                                        <p class="text-[10px] text-ink-400">{{ $it->jumlah }}{{ ($it->satuan && $it->satuan !== 'pcs') ? ' '.$it->satuan : '' }} × Rp {{ number_format($it->harga_satuan, 0, ',', '.') }}@if(($it->satuan ?? 'pcs') !== 'pcs' && (float)($it->konversi ?? 1) > 1) ({{ (int) ($it->jumlah * ($it->konversi ?? 1)) }} pcs)@endif</p>
                                     </div>
                                 </div>
                             @endforeach

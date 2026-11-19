@@ -2185,7 +2185,12 @@
                                                 {{ $it['nama'] }}
                                                 <span class="block text-[10px] text-ink-500 font-mono">{{ $it['sku'] }}</span>
                                             </td>
-                                            <td class="py-2 text-center text-white tabular-nums">{{ $it['qty'] }}</td>
+                                            <td class="py-2 text-center text-white tabular-nums">
+                                                {{ $it['qty'] }}
+                                                @if(($it['satuan'] ?? 'pcs') !== 'pcs')
+                                                    <span class="block text-[9px] text-ink-400">{{ $it['satuan'] }} (×{{ (int) ($it['konversi'] ?? 1) }})</span>
+                                                @endif
+                                            </td>
                                             <td class="py-2 text-right text-ink-300 tabular-nums">Rp {{ number_format($it['harga'], 0, ',', '.') }}</td>
                                             <td class="py-2 text-right text-white font-bold tabular-nums">Rp {{ number_format($it['subtotal'], 0, ',', '.') }}</td>
                                         </tr>
