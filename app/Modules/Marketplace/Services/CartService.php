@@ -36,6 +36,86 @@ class CartService
     public function all(): array
     {
         $cart = Session::get('shop.cart', []);
+        // Backfill satuan/qty_satuan/harga_satuan untuk item keranjang lama (termasuk harga per box yang benar)
+        $needSave = false;
+        foreach ($cart as $k => $it) {
+            $produk = ! empty($it['product_id']) ? Produk::find($it['product_id']) : null;
+            $baseSatuan = $produk?->satuan ?: 'pcs';
+
+            if (! isset($it['satuan'])) {
+                $cart[$k]['satuan'] = $baseSatuan;
+                $needSave = true;
+            }
+            $satuan = $cart[$k]['satuan'];
+
+            // faktor & harga per satuan dari master (bukan asumsi 1)
+            $faktor = 1.0;
+            $hargaSatuanMaster = null;
+            if ($produk && strcasecmp($satuan, $baseSatuan) !== 0) {
+                foreach ($produk->getDaftarSatuan() as $s) {
+                    if (strcasecmp($s['satuan_kode'], $satuan) === 0) {
+                        $faktor = (float) ($s['faktor_konversi'] ?? 1.0);
+                        if (! empty($s['harga_jual'])) {
+                            $hargaSatuanMaster = (float) $s['harga_jual'];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (! isset($it['faktor_konversi']) || (float) $it['faktor_konversi'] === 1.0 && $faktor !== 1.0) {
+                $cart[$k]['faktor_konversi'] = $faktor;
+                $needSave = true;
+            }
+            $fk = (float) ($cart[$k]['faktor_konversi'] ?? 1.0);
+            if ($fk <= 0) { $fk = 1.0; }
+
+            // harga per base unit yang efektif
+            if (! isset($it['harga']) || (float) $it['harga'] <= 0) {
+                $cart[$k]['harga'] = (float) ($produk?->harga_jual_retail ?? 0);
+                $needSave = true;
+            }
+            $hargaBase = (float) $cart[$k]['harga'];
+
+            if (! isset($it['qty_satuan'])) {
+                $cart[$k]['qty_satuan'] = (int) round(($it['qty'] ?? 1) / $fk);
+                if ($cart[$k]['qty_satuan'] < 1) { $cart[$k]['qty_satuan'] = 1; }
+                $needSave = true;
+            }
+            if (! isset($it['harga_satuan'])) {
+                if ($hargaSatuanMaster !== null) {
+                    $cart[$k]['harga_satuan'] = $hargaSatuanMaster;
+                } else {
+                    $cart[$k]['harga_satuan'] = round($hargaBase * $fk, 2);
+                }
+                $needSave = true;
+            } elseif ($hargaSatuanMaster !== null && (float) $cart[$k]['harga_satuan'] !== $hargaSatuanMaster) {
+                // koreksi harga per satuan jika master berbeda (mis. harga lama salah)
+                $cart[$k]['harga_satuan'] = $hargaSatuanMaster;
+                $cart[$k]['harga'] = round($hargaSatuanMaster / $fk, 2);
+                $needSave = true;
+            }
+
+            // Pastikan harga (per base unit) konsisten dengan harga_satuan per satuan
+            if (isset($cart[$k]['harga_satuan']) && (float) $cart[$k]['harga_satuan'] > 0 && $fk > 0) {
+                $expectedBase = round((float) $cart[$k]['harga_satuan'] / $fk, 2);
+                if (abs((float) $cart[$k]['harga'] - $expectedBase) > 0.001) {
+                    $cart[$k]['harga'] = $expectedBase;
+                    $needSave = true;
+                }
+            }
+
+            // Diskon satuan (box) sudah termasuk di harga; jangan hitung sebagai potongan tier
+            if (strcasecmp($satuan, $baseSatuan) !== 0) {
+                if ((float) ($cart[$k]['diskon_tier'] ?? 0) !== 0.0) {
+                    $cart[$k]['diskon_tier'] = 0.0;
+                    $needSave = true;
+                }
+            }
+        }
+        if ($needSave) {
+            Session::put('shop.cart', $cart);
+        }
+
         $customer = auth('customer')->user();
         if ($customer && ! empty($cart)) {
             $changed = false;
@@ -50,15 +130,31 @@ class CartService
                     $diskonTier = max(0.0, $hargaRetail - (float) $pricing['harga']);
                     $potensiKomisi = (float) ($pricing['potensi_komisi'] ?? 0.0);
 
-                    if (
-                        (float) ($item['harga'] ?? 0) !== (float) $pricing['harga']
-                        || (float) ($item['harga_retail'] ?? 0) !== $hargaRetail
-                        || (float) ($item['potensi_komisi'] ?? 0) !== $potensiKomisi
-                        || empty($item['tier_nama'])
-                    ) {
-                        $cart[$key]['harga'] = (float) $pricing['harga'];
+                    $isSatuanNonBase = ! empty($item['satuan']) && strcasecmp($item['satuan'], $produk->satuan ?: 'pcs') !== 0;
+
+                    // Selalu perbarui diskon_tier (termasuk reset ke 0 untuk retail / satuan non-base)
+                    // agar keranjang lama tidak menyimpan potongan tier yang stale.
+                    $newDiskonTier = $isSatuanNonBase ? 0.0 : $diskonTier;
+                    $needUpdate = false;
+                    if (abs((float) ($item['diskon_tier'] ?? 0) - $newDiskonTier) > 0.001) {
+                        $needUpdate = true;
+                    }
+                    if (! $isSatuanNonBase && abs((float) ($item['harga'] ?? 0) - (float) $pricing['harga']) > 0.001) {
+                        $needUpdate = true;
+                    }
+                    if (abs((float) ($item['harga_retail'] ?? 0) - $hargaRetail) > 0.001) {
+                        $needUpdate = true;
+                    }
+                    if (empty($item['tier_nama'])) {
+                        $needUpdate = true;
+                    }
+
+                    if ($needUpdate) {
+                        if (! $isSatuanNonBase) {
+                            $cart[$key]['harga'] = (float) $pricing['harga'];
+                        }
                         $cart[$key]['harga_retail'] = $hargaRetail;
-                        $cart[$key]['diskon_tier'] = $diskonTier;
+                        $cart[$key]['diskon_tier'] = $newDiskonTier;
                         $cart[$key]['potensi_komisi'] = $potensiKomisi;
                         $cart[$key]['mode_reward'] = $pricing['mode_reward'] ?? 'diskon_langsung';
                         $cart[$key]['tier_nama'] = $pricing['tier'] ?? null;
@@ -166,12 +262,102 @@ class CartService
 
         if ($qty <= 0) {
             unset($cart[$key]);
-        } else {
-            if ($qty > $cart[$key]['stok_max']) {
-                $qty = $cart[$key]['stok_max'];
-            }
-            $cart[$key]['qty'] = $qty;
+            Session::put('shop.cart', $cart);
+
+            return $cart;
         }
+
+        if ($qty > $cart[$key]['stok_max']) {
+            $qty = $cart[$key]['stok_max'];
+        }
+
+        $item = $cart[$key];
+        $satuan = $item['satuan'] ?? 'pcs';
+        $faktor = (float) ($item['faktor_konversi'] ?? 1.0);
+        if ($faktor <= 0) { $faktor = 1.0; }
+        $faktorInt = (int) round($faktor);
+        if ($faktorInt < 1) { $faktorInt = 1; }
+
+        $produk = ! empty($item['product_id']) ? Produk::find($item['product_id']) : null;
+        $baseSatuan = $produk?->satuan ?: 'pcs';
+
+        // Jika satuan pcs tapi qty mencukupi 1 box, coba konversi ke box
+        if ($satuan === 'pcs' && $produk) {
+            $boxFaktor = 0;
+            $boxPrice = 0;
+            foreach ($produk->getDaftarSatuan() as $s) {
+                if (strcasecmp($s['satuan_kode'], 'box') === 0) {
+                    $boxFaktor = (int) round((float) ($s['faktor_konversi'] ?? 1.0));
+                    $boxPrice = (float) ($s['harga_jual'] ?? 0);
+                    break;
+                }
+            }
+            if ($boxFaktor >= 2 && $qty >= $boxFaktor) {
+                $satuan = 'box';
+                $faktor = (float) $boxFaktor;
+                $faktorInt = $boxFaktor;
+                // pastikan faktor_konversi tersimpan
+                $cart[$key]['faktor_konversi'] = $faktor;
+                $cart[$key]['harga_satuan'] = $boxPrice > 0 ? $boxPrice : (float) ($item['harga'] ?? 0) * $faktor;
+            }
+        }
+
+        // Harga per box & per pcs dari master
+        $boxPrice = (float) ($item['harga_satuan'] ?? 0);
+        if ($boxPrice <= 0 && $produk) {
+            foreach ($produk->getDaftarSatuan() as $s) {
+                if (strcasecmp($s['satuan_kode'], 'box') === 0) {
+                    $boxPrice = (float) ($s['harga_jual'] ?? 0);
+                    break;
+                }
+            }
+        }
+        if ($boxPrice <= 0) { $boxPrice = (float) ($item['harga'] ?? 0) * $faktor; }
+        $pcsPrice = (float) ($produk?->harga_jual_retail ?? $item['harga_retail'] ?? $item['harga'] ?? 0);
+
+        $customer = auth('customer')->user();
+
+        if ($satuan !== 'pcs' && $qty >= $faktorInt) {
+            // Hitung campuran box + pcs
+            $boxes = (int) floor($qty / $faktorInt);
+            $rem = $qty % $faktorInt;
+            $total = ($boxes * $boxPrice) + ($rem * $pcsPrice);
+            $effectiveBase = $total / max(1, $qty);
+
+            $cart[$key]['satuan'] = 'box';
+            $cart[$key]['faktor_konversi'] = $faktor;
+            $cart[$key]['qty_satuan'] = $boxes;
+            $cart[$key]['harga_satuan'] = $boxPrice;
+            $cart[$key]['harga'] = $effectiveBase;
+            $cart[$key]['diskon_tier'] = 0.0;
+            $cart[$key]['sisa_pcs'] = $rem;
+            $cart[$key]['breakdown'] = $boxes . ' box' . ($rem > 0 ? ' + ' . $rem . ' pcs' : '');
+        } elseif ($satuan !== 'pcs' && $qty < $faktorInt) {
+            // Tidak cukup untuk 1 box -> revert ke pcs
+            $cart[$key]['satuan'] = $baseSatuan;
+            $cart[$key]['faktor_konversi'] = 1.0;
+            $cart[$key]['qty_satuan'] = $qty;
+            $cart[$key]['harga_satuan'] = $pcsPrice;
+            $cart[$key]['sisa_pcs'] = 0;
+            $cart[$key]['breakdown'] = '';
+            if ($customer) {
+                $pricing = app(\App\Modules\Pos\Services\PricingService::class)->resolve($produk, $customer);
+                $cart[$key]['harga'] = (float) $pricing['harga'];
+                $cart[$key]['diskon_tier'] = (float) ($pricing['diskon_nominal'] ?? 0);
+                $cart[$key]['alasan_harga'] = $pricing['alasan'] ?? $cart[$key]['alasan_harga'];
+                $cart[$key]['tier_nama'] = $pricing['tier'] ?? $cart[$key]['tier_nama'];
+            } else {
+                $cart[$key]['harga'] = $pcsPrice;
+                $cart[$key]['diskon_tier'] = 0.0;
+            }
+        } else {
+            $cart[$key]['qty'] = $qty;
+            $cart[$key]['qty_satuan'] = $qty;
+            $cart[$key]['sisa_pcs'] = 0;
+            $cart[$key]['breakdown'] = '';
+        }
+
+        $cart[$key]['qty'] = $qty;
 
         Session::put('shop.cart', $cart);
 

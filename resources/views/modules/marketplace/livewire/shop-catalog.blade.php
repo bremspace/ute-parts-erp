@@ -979,7 +979,7 @@
                                 @endif
                                 <div class="flex items-center justify-between gap-2">
                                     <div class="text-sm sm:text-base font-bold text-ink-900 dark:text-white tracking-tight tabular-nums truncate">
-                                        Rp {{ number_format($price['harga'], 0, ',', '.') }}
+                                        Rp {{ number_format($price['harga'], 0, ',', '.') }}@if(collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')) <span class="text-[9px] text-ink-400 font-normal">/ box Rp {{ number_format((collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')->harga_jual) ?: 0, 0, ',', '.') }}</span>@endif
                                     </div>
                                     @if($stok > 0)
                                         <button type="button"
@@ -1088,7 +1088,7 @@
                                 </span>
                             @endif
                             <div class="text-sm sm:text-base font-bold text-ink-900 dark:text-white tabular-nums">
-                                Rp {{ number_format($price['harga'], 0, ',', '.') }}
+                                Rp {{ number_format($price['harga'], 0, ',', '.') }}@if(collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')) <span class="text-[9px] text-ink-400 font-normal">/ box Rp {{ number_format((collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')->harga_jual) ?: 0, 0, ',', '.') }}</span>@endif
                             </div>
                             <div class="inline-flex items-center gap-1.5 text-[11px] font-semibold {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500' : 'text-up-mint') : 'text-up-red' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
@@ -1158,7 +1158,7 @@
                         <div class="flex items-center gap-3 sm:gap-4 flex-shrink-0 text-right">
                             <span class="text-xs text-ink-500 tabular-nums hidden xs:inline">{{ $stockInfo['label'] }}</span>
                             <span class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white tabular-nums">
-                                Rp {{ number_format($price['harga'], 0, ',', '.') }}
+                                Rp {{ number_format($price['harga'], 0, ',', '.') }}@if(collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')) <span class="text-[9px] text-ink-400 font-normal">/ box Rp {{ number_format((collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')->harga_jual) ?: 0, 0, ',', '.') }}</span>@endif
                             </span>
                             @if($stok > 0)
                              @if($thumbImg)

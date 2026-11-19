@@ -173,10 +173,24 @@
                                             @endif
                                             <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
                                                 <span class="text-ink-400 font-semibold">
-                                                    @if(!empty($item['satuan']) && $item['satuan'] !== 'pcs' && !empty($item['qty_satuan']))
-                                                        {{ $item['qty_satuan'] }} {{ $item['satuan'] }} ({{ $item['qty'] }} pcs) × Rp {{ number_format($item['harga_satuan'] ?? $item['harga'], 0, ',', '.') }}
+                                                    @if(($item['satuan'] ?? 'pcs') !== 'pcs')
+                                                        @if(!empty($item['breakdown']))
+                                                            {{ $item['breakdown'] }}
+                                                        @else
+                                                            {{ (int) ($item['qty_satuan'] ?? 1) }} {{ $item['satuan'] }}
+                                                        @endif
+                                                        ({{ $item['qty'] }} pcs) × Rp {{ number_format((float) ($item['harga_satuan'] ?? $item['harga'] ?? 0), 0, ',', '.') }}
+                                                        @php
+                                                            $boxSaving = 0;
+                                                            if (isset($item['harga_satuan']) && isset($item['harga']) && (float)($item['faktor_konversi'] ?? 1) > 0) {
+                                                                $boxSaving = max(0, round(((float) $item['harga'] * (float) ($item['faktor_konversi'] ?? 1)) - (float) $item['harga_satuan'], 2));
+                                                            }
+                                                        @endphp
+                                                        @if($boxSaving > 0)
+                                                            <span class="text-[9px] text-up-mint font-bold">(hemat Rp {{ number_format($boxSaving, 0, ',', '.') }} / {{ $item['satuan'] }})</span>
+                                                        @endif
                                                     @else
-                                                        {{ $item['qty'] }} × Rp {{ number_format($item['harga'], 0, ',', '.') }}
+                                                        {{ $item['qty'] }} × Rp {{ number_format((float) ($item['harga'] ?? 0), 0, ',', '.') }}
                                                     @endif
                                                 </span>
                                                 @if(!empty($item['diskon_tier']) && (float) $item['diskon_tier'] > 0)
@@ -201,7 +215,7 @@
                                         <span class="tabular-nums line-through">Rp {{ number_format($subtotalRetail, 0, ',', '.') }}</span>
                                     </div>
                                     <div class="flex justify-between items-center text-up-mint font-semibold">
-                                        <span>Potongan Tier Member ({{ $pelanggan->tierMembership?->nama ?? ($pelanggan->tipe_konsumen === 'reseller' ? 'Reseller' : 'Member') }})</span>
+                                        <span>Diskon / Box ({{ $pelanggan->tierMembership?->nama ?? ($pelanggan->tipe_konsumen === 'reseller' ? 'Reseller' : 'Member') }})</span>
                                         <span class="tabular-nums">- Rp {{ number_format($diskonTier, 0, ',', '.') }}</span>
                                     </div>
                                     <div class="flex justify-between items-center text-ink-700 dark:text-ink-300 font-bold pt-1 border-t border-ink-100/60 dark:border-white/5">
@@ -413,7 +427,7 @@
                             Total pesanan terhitung untuk <strong class="text-ink-900 dark:text-white">{{ $jumlahItem }} suku cadang</strong>
                             @if(($diskonTier ?? 0) > 0)
                                 <div class="mt-1 text-up-mint font-bold text-[11px]">
-                                    🎉 Anda menghemat total Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan harga tier member
+                                    🎉 Anda menghemat total Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan diskon / box
                                 </div>
                             @endif
                             @if(($potensiKomisi ?? 0) > 0)
@@ -436,7 +450,7 @@
                                     <span class="line-through tabular-nums">Rp {{ number_format($subtotalRetail, 0, ',', '.') }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 text-xs text-up-mint font-semibold">
-                                    <span>Potongan Tier:</span>
+                                    <span>Diskon / Box:</span>
                                     <span class="tabular-nums">- Rp {{ number_format($diskonTier, 0, ',', '.') }}</span>
                                 </div>
                             @endif
