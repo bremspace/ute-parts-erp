@@ -98,13 +98,25 @@ class AkuntingController extends Controller
     public function storeCoa(Request $request)
     {
         $request->validate([
-            'kode' => 'required|string|max:20|unique:akun_coa,kode',
+            // [F-08] format kode sesuai skema PRD §4.6 (^[1-5]xx-xx).
+            'kode' => ['required', 'string', 'max:20', 'regex:'.AkunCOA::POLA_KODE_COA, 'unique:akun_coa,kode'],
             'nama' => 'required|string|max:255',
             'tipe' => 'required|in:aset,kewajiban,ekuitas,pendapatan,beban',
             'kelompok' => 'required|string|max:100',
             'saldo_normal' => 'required|in:debit,kredit',
+            'is_kontra' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean',
         ]);
+
+        // [F-08] konsistensi tipe ↔ saldo_normal; akun kontra wajib eksplisit.
+        $galat = AkunCOA::cekKonsistensiKlasifikasi(
+            (string) $request->input('tipe'),
+            (string) $request->input('saldo_normal'),
+            (bool) $request->input('is_kontra', false)
+        );
+        if ($galat !== null) {
+            return $this->error($galat, 422);
+        }
 
         $akun = AkunCOA::create($request->all());
 
@@ -121,13 +133,27 @@ class AkuntingController extends Controller
         $akun = AkunCOA::findOrFail($id);
 
         $request->validate([
-            'kode' => 'sometimes|string|max:20|unique:akun_coa,kode,'.$akun->id,
+            // [F-08] format kode sesuai skema PRD §4.6 (^[1-5]xx-xx).
+            'kode' => ['sometimes', 'string', 'max:20', 'regex:'.AkunCOA::POLA_KODE_COA, 'unique:akun_coa,kode,'.$akun->id],
             'nama' => 'sometimes|string|max:255',
             'tipe' => 'sometimes|in:aset,kewajiban,ekuitas,pendapatan,beban',
             'kelompok' => 'sometimes|string|max:100',
             'saldo_normal' => 'sometimes|in:debit,kredit',
+            'is_kontra' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean',
         ]);
+
+        // [F-08] konsistensi tipe ↔ saldo_normal ↔ is_kontra efektif (nilai
+        // yang tidak dikirim dibaca dari model — rename akun kontra ber-jurnal
+        // tidak boleh false-positive ditolak).
+        $galat = AkunCOA::cekKonsistensiKlasifikasi(
+            (string) $request->input('tipe', $akun->tipe),
+            (string) $request->input('saldo_normal', $akun->saldo_normal),
+            (bool) $request->input('is_kontra', $akun->is_kontra)
+        );
+        if ($galat !== null) {
+            return $this->error($galat, 422);
+        }
 
         // [F-09] Guard model AkunCOA menolak perubahan kode/tipe/saldo_normal
         // pada akun ber-jurnal; sampaikan sebagai 422 dengan pesan jelas.

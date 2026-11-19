@@ -68,7 +68,7 @@ class AkunCoaSeeder extends Seeder
 
             // PENDAPATAN
             ['kode' => '410-01', 'nama' => 'Pendapatan Penjualan',         'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit'],
-            ['kode' => '410-02', 'nama' => 'Retur Penjualan',              'tipe' => 'pendapatan', 'kelompok' => 'retur_penjualan',      'saldo_normal' => 'kredit'],
+            ['kode' => '410-02', 'nama' => 'Retur Penjualan',              'tipe' => 'pendapatan', 'kelompok' => 'retur_penjualan',      'saldo_normal' => 'debit', 'is_kontra' => true], // [F-06] kontra-pendapatan (PSAK 72): normal debit, mengurangi pendapatan
             ['kode' => '410-03', 'nama' => 'Pendapatan Penjualan Web Marketplace Ute', 'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit'],
             ['kode' => '410-04', 'nama' => 'Pendapatan Penjualan Omnichannel', 'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit'],
             ['kode' => '420-01', 'nama' => 'Pendapatan Jasa Servis',       'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_jasa',      'saldo_normal' => 'kredit'],
@@ -93,7 +93,7 @@ class AkunCoaSeeder extends Seeder
         foreach ($coa as $data) {
             AkunCOA::firstOrCreate(
                 ['kode' => $data['kode']],
-                ['nama' => $data['nama'], 'tipe' => $data['tipe'], 'kelompok' => $data['kelompok'], 'saldo_normal' => $data['saldo_normal']]
+                ['nama' => $data['nama'], 'tipe' => $data['tipe'], 'kelompok' => $data['kelompok'], 'saldo_normal' => $data['saldo_normal'], 'is_kontra' => $data['is_kontra'] ?? false]
             );
         }
 

@@ -11,7 +11,7 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
-    'kode', 'nama', 'tipe', 'kelompok', 'saldo_normal', 'parent_id', 'is_active',
+    'kode', 'nama', 'tipe', 'kelompok', 'saldo_normal', 'is_kontra', 'parent_id', 'is_active',
 ])]
 class AkunCOA extends Model
 {
@@ -34,7 +34,7 @@ class AkunCOA extends Model
     {
         return LogOptions::defaults()
             ->logOnly([
-                'kode', 'nama', 'tipe', 'kelompok', 'saldo_normal', 'parent_id', 'is_active',
+                'kode', 'nama', 'tipe', 'kelompok', 'saldo_normal', 'is_kontra', 'parent_id', 'is_active',
             ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
@@ -43,6 +43,7 @@ class AkunCOA extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_kontra' => 'boolean',
         'parent_id' => 'integer',
     ];
 
@@ -66,20 +67,64 @@ class AkunCOA extends Model
 
         /*
          * [F-09] Akun yang sudah memiliki baris jurnal: klasifikasi (kode,
-         * tipe, saldo_normal) TERKUNCI. Laporan historis membaca tipe/saldo
-         * normal terkini saat query — mengubahnya menulis ulang penyajian
-         * semua laporan masa lalu secara retroaktif (melanggar PSAK 25/IAS 8:
-         * reklasifikasi harus prospektif/terdokumentasi, bukan rewrite diam-diam).
-         * Nama/kelompok/status aktif tetap boleh diubah (ter-log via LogsActivity).
-         * Reklasifikasi akun berposting wajib lewat jurnal reklasifikasi.
-         * Guard di model = semua jalur Eloquent (UI, API, caller lain) terlindungi.
+         * tipe, saldo_normal, is_kontra) TERKUNCI. Laporan historis membaca
+         * tipe/saldo normal terkini saat query — mengubahnya menulis ulang
+         * penyajian semua laporan masa lalu secara retroaktif (melanggar
+         * PSAK 25/IAS 8: reklasifikasi harus prospektif/terdokumentasi, bukan
+         * rewrite diam-diam). is_kontra ikut dikunci karena menentukan netting
+         * laporan (ExportLaporanService::saldoLaporan). Nama/kelompok/status
+         * aktif tetap boleh diubah (ter-log via LogsActivity). Reklasifikasi
+         * akun berposting wajib lewat jurnal reklasifikasi. Guard di model =
+         * semua jalur Eloquent (UI, API, caller lain) terlindungi. Koreksi
+         * data terencana (mis. migration F-06/F-07) memakai raw DB secara
+         * sengaja dan hanya boleh dilakukan bila laporan terbukti invarian.
          */
         static::updating(function (AkunCOA $akun): void {
-            if ($akun->isDirty(['kode', 'tipe', 'saldo_normal']) && $akun->jurnal()->exists()) {
+            if ($akun->isDirty(['kode', 'tipe', 'saldo_normal', 'is_kontra']) && $akun->jurnal()->exists()) {
                 $kodeAsli = (string) $akun->getOriginal('kode');
-                throw new \DomainException("Akun COA {$kodeAsli} sudah memiliki baris jurnal: kode, tipe, dan saldo_normal tidak dapat diubah (reklasifikasi retroaktif laporan historis). Hanya nama/kelompok/status aktif yang boleh diubah; reklasifikasi wajib lewat jurnal reklasifikasi.");
+                throw new \DomainException("Akun COA {$kodeAsli} sudah memiliki baris jurnal: kode, tipe, saldo_normal, dan is_kontra tidak dapat diubah (reklasifikasi retroaktif laporan historis). Hanya nama/kelompok/status aktif yang boleh diubah; reklasifikasi wajib lewat jurnal reklasifikasi.");
             }
         });
+    }
+
+    /**
+     * [F-08] Pola kode COA standar (PRD §4.6): ^[1-5]xx-xx —
+     * 1xx aset, 2xx kewajiban, 3xx ekuitas, 4xx pendapatan, 5xx beban.
+     * Kode di luar skema (mis. nomor rekening bank '907024506') ditolak.
+     */
+    public const POLA_KODE_COA = '/^[1-5]\d{2}-\d{2}$/';
+
+    /**
+     * [F-08] Saldo normal wajar per tipe (kerangka konseptual/PSAK):
+     * aset & beban = debit; kewajiban, ekuitas, pendapatan = kredit.
+     */
+    public static function saldoNormalWajar(string $tipe): string
+    {
+        return in_array($tipe, ['aset', 'beban'], true) ? 'debit' : 'kredit';
+    }
+
+    /**
+     * [F-08] Konsistensi tipe ↔ saldo_normal ↔ is_kontra untuk CRUD COA.
+     * Akun biasa: saldo_normal WAJIB = saldoNormalWajar(tipe). Akun kontra
+     * (is_kontra=true, eksplisit): saldo_normal WAJIB kebalikan dari wajar —
+     * kontra-pendapatan debit, kontra-aset kredit, dst. Penyimpangan tanpa
+     * flag = hack netting liar (akar F-06/F-07) dan ditolak.
+     *
+     * @return string|null pesan galat, atau null bila konsisten
+     */
+    public static function cekKonsistensiKlasifikasi(string $tipe, string $saldoNormal, bool $isKontra): ?string
+    {
+        $wajar = self::saldoNormalWajar($tipe);
+
+        if ($isKontra) {
+            $harus = $wajar === 'debit' ? 'kredit' : 'debit';
+
+            return $saldoNormal === $harus ? null
+                : "Akun kontra (is_kontra) bertipe {$tipe} wajib bersaldo_normal {$harus} (kebalikan saldo normal induk); diberikan {$saldoNormal}.";
+        }
+
+        return $saldoNormal === $wajar ? null
+            : "saldo_normal {$saldoNormal} tidak sesuai tipe {$tipe} (normal {$wajar}). Akun kontra harus ditandai is_kontra=true secara eksplisit.";
     }
 
     public function jurnal(): HasMany

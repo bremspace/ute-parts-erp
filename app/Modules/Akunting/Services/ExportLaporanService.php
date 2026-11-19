@@ -301,9 +301,15 @@ class ExportLaporanService
                 $debit = (float) $row->total_debit;
                 $kredit = (float) $row->total_kredit;
 
-                $saldo = (string) $row->saldo_normal === 'debit'
-                    ? $debit - $kredit
-                    : $kredit - $debit;
+                // [F-06/F-07] akun kontra mengurangi kelompok tipenya secara
+                // eksplisit (invarian terhadap deklarasi saldo_normal).
+                $saldo = self::saldoLaporan(
+                    (string) $row->tipe,
+                    (bool) $row->is_kontra,
+                    (string) $row->saldo_normal,
+                    $debit,
+                    $kredit
+                );
 
                 return [
                     'kode' => (string) $row->kode,
@@ -801,7 +807,7 @@ class ExportLaporanService
             ->join('akun_coa', 'akun_coa.id', '=', 'jurnal_akuntansi.akun_coa_id')
             ->whereDate('jurnal_akuntansi.tanggal', '<=', $sampai)
             ->select('jurnal_akuntansi.akun_coa_id')
-            ->selectRaw('akun_coa.kode, akun_coa.nama, akun_coa.tipe, akun_coa.kelompok, akun_coa.saldo_normal')
+            ->selectRaw('akun_coa.kode, akun_coa.nama, akun_coa.tipe, akun_coa.kelompok, akun_coa.saldo_normal, akun_coa.is_kontra')
             ->selectRaw('SUM(jurnal_akuntansi.debit) as total_debit, SUM(jurnal_akuntansi.kredit) as total_kredit')
             ->groupBy(
                 'jurnal_akuntansi.akun_coa_id',
@@ -810,6 +816,7 @@ class ExportLaporanService
                 'akun_coa.tipe',
                 'akun_coa.kelompok',
                 'akun_coa.saldo_normal',
+                'akun_coa.is_kontra',
             );
 
         // [F2-5] cabang scoping — jangan bocorkan jurnal cabang lain
@@ -834,14 +841,44 @@ class ExportLaporanService
         return $q;
     }
 
+    /**
+     * [F-06/F-07] Saldo bertanda untuk laporan konsolidasi (laba rugi & neraca).
+     *
+     * Akun kontra (is_kontra=true) MENGURANGI kelompok tipenya: kontribusi =
+     * −(saldo pada sisi natural kontra). Sisi natural kontra diturunkan dari
+     * TIPE — kebalikan saldo normal induk (aset/beban → kredit; kewajiban/
+     * ekuitas/pendapatan → debit) — BUKAN dari deklarasi saldo_normal. Karena
+     * itu angka laporan INVARIAN terhadap koreksi deklarasi saldo_normal:
+     * hack netting lama (410-02 kredit, 130-02 debit, tanpa flag) maupun
+     * deklarasi PSAK yang benar (410-02 debit, 130-02 kredit, is_kontra)
+     * menghasilkan penyajian net yang sama. Tanpa flag, deklarasi lama
+     * "kebetulan benar" karena saldo_normal dibajak untuk netting; dengan
+     * flag, netting eksplisit dan saldo_normal kembali ke semantik klasifikasi
+     * yang benar (aturan sisi jurnal manual, accessor saldo, COA tree).
+     */
+    public static function saldoLaporan(string $tipe, bool $isKontra, string $saldoNormal, float $debit, float $kredit): float
+    {
+        if ($isKontra) {
+            $naturalDebit = in_array($tipe, ['kewajiban', 'ekuitas', 'pendapatan'], true);
+
+            return -($naturalDebit ? $debit - $kredit : $kredit - $debit);
+        }
+
+        return $saldoNormal === 'debit' ? $debit - $kredit : $kredit - $debit;
+    }
+
     private function groupAkun(Collection $j): Collection
     {
         return $j->groupBy('akun_coa_id')->map(function ($rows) {
             $akun = $rows->first()->akun ?? null;
             $saldo = $akun
-                ? ($akun->saldo_normal === 'debit'
-                    ? $rows->sum('debit') - $rows->sum('kredit')
-                    : $rows->sum('kredit') - $rows->sum('debit'))
+                ? self::saldoLaporan(
+                    (string) $akun->tipe,
+                    (bool) $akun->is_kontra,
+                    (string) $akun->saldo_normal,
+                    (float) $rows->sum('debit'),
+                    (float) $rows->sum('kredit')
+                )
                 : 0;
 
             return [

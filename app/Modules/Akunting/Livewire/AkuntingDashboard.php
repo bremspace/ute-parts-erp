@@ -171,7 +171,7 @@ class AkuntingDashboard extends Component
     public bool $showCoaModal = false;
 
     public array $coaForm = [
-        'id' => null, 'kode' => '', 'nama' => '', 'tipe' => 'aset', 'kelompok' => '', 'saldo_normal' => 'debit',
+        'id' => null, 'kode' => '', 'nama' => '', 'tipe' => 'aset', 'kelompok' => '', 'saldo_normal' => 'debit', 'is_kontra' => false,
     ];
 
     public bool $showBayarPiutangModal = false;
@@ -1143,6 +1143,7 @@ class AkuntingDashboard extends Component
             'tipe' => $akun->tipe,
             'kelompok' => $akun->kelompok,
             'saldo_normal' => $akun->saldo_normal,
+            'is_kontra' => (bool) $akun->is_kontra,
         ];
         $this->showCoaModal = true;
     }
@@ -1160,12 +1161,30 @@ class AkuntingDashboard extends Component
 
         $this->validate([
             // Mode edit: aturan unique mengabaikan record yang sedang diedit.
-            'coaForm.kode' => 'required|string|max:20|unique:akun_coa,kode,'.($this->coaForm['id'] ?? 'NULL'),
+            // [F-08] format kode sesuai skema PRD §4.6 (^[1-5]xx-xx).
+            'coaForm.kode' => ['required', 'string', 'max:20', 'regex:'.AkunCOA::POLA_KODE_COA, 'unique:akun_coa,kode,'.($this->coaForm['id'] ?? 'NULL')],
             'coaForm.nama' => 'required|string|max:255',
             'coaForm.tipe' => 'required|in:aset,kewajiban,ekuitas,pendapatan,beban',
             'coaForm.kelompok' => 'required|string|max:100',
             'coaForm.saldo_normal' => 'required|in:debit,kredit',
+            'coaForm.is_kontra' => 'sometimes|boolean',
         ]);
+
+        // [F-08] konsistensi tipe ↔ saldo_normal ↔ is_kontra efektif. Mode
+        // edit: nilai yang tidak dikirim form dibaca dari model (rename akun
+        // kontra ber-jurnal tidak boleh false-positive ditolak).
+        $existing = ! empty($this->coaForm['id']) ? AkunCOA::find($this->coaForm['id']) : null;
+        $isKontra = (bool) ($this->coaForm['is_kontra'] ?? $existing?->is_kontra ?? false);
+        $galat = AkunCOA::cekKonsistensiKlasifikasi(
+            (string) $this->coaForm['tipe'],
+            (string) $this->coaForm['saldo_normal'],
+            $isKontra
+        );
+        if ($galat !== null) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $galat]);
+
+            return;
+        }
 
         $data = [
             'kode' => $this->coaForm['kode'],
@@ -1174,6 +1193,9 @@ class AkuntingDashboard extends Component
             'kelompok' => $this->coaForm['kelompok'],
             'saldo_normal' => $this->coaForm['saldo_normal'],
         ];
+        if (array_key_exists('is_kontra', $this->coaForm)) {
+            $data['is_kontra'] = $isKontra;
+        }
 
         if (! empty($this->coaForm['id'])) {
             // [F-09] Akun ber-jurnal: kode/tipe/saldo_normal terkunci (guard
@@ -1289,7 +1311,7 @@ class AkuntingDashboard extends Component
     {
         $this->resetValidation();
         $this->coaForm = [
-            'id' => null, 'kode' => '', 'nama' => '', 'tipe' => 'aset', 'kelompok' => '', 'saldo_normal' => 'debit',
+            'id' => null, 'kode' => '', 'nama' => '', 'tipe' => 'aset', 'kelompok' => '', 'saldo_normal' => 'debit', 'is_kontra' => false,
         ];
     }
 
