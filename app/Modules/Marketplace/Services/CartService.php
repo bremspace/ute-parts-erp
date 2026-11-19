@@ -20,11 +20,14 @@ class CartService
         protected PricingService $pricingService
     ) {}
 
-    public function cartKey(int $produkId, ?int $variantId = null, ?string $catatan = null): string
+    public function cartKey(int $produkId, ?int $variantId = null, ?string $catatan = null, ?string $satuan = null): string
     {
         $base = $variantId ? 'p'.$produkId.'_v'.$variantId : 'p'.$produkId;
         if ($catatan) {
             $base .= '_c'.substr(md5(trim($catatan)), 0, 8);
+        }
+        if ($satuan) {
+            $base .= '_s'.substr(md5(trim($satuan)), 0, 6);
         }
 
         return $base;
@@ -72,16 +75,17 @@ class CartService
         return $cart;
     }
 
-    public function tambah(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null): array
+    public function tambah(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null, ?string $satuan = null): array
     {
-        return $this->isi($produkId, $variantId, $qty, $catatan);
+        return $this->isi($produkId, $variantId, $qty, $catatan, $satuan);
     }
 
-    public function isi(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null): array
+    public function isi(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null, ?string $satuan = null): array
     {
         $produk = Produk::findOrFail($produkId);
         $cleanCatatan = $catatan ? trim($catatan) : null;
-        $key = $this->cartKey($produkId, $variantId, $cleanCatatan);
+        $cleanSatuan = $satuan ? trim($satuan) : null;
+        $key = $this->cartKey($produkId, $variantId, $cleanCatatan, $cleanSatuan);
 
         // Cek stok total tersedia
         $stokTotal = StokItem::where('produk_id', $produkId)
@@ -119,6 +123,7 @@ class CartService
             'catatan' => $cleanCatatan,
             'name' => $produk->nama,
             'variant_name' => $variant?->nama_varian,
+            'satuan' => $cleanSatuan,
             'harga' => (float) $pricing['harga'],
             'harga_retail' => $hargaRetail,
             'diskon_tier' => $diskonTier,

@@ -341,6 +341,9 @@
                                         <div class="flex items-center gap-2 flex-wrap text-[11px]">
                                             <span class="text-ink-500 dark:text-ink-400">
                                                 {{ $item['variant_name'] ?? 'Standar' }}
+                                                @if(!empty($item['satuan']))
+                                                    <span class="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-ink-300 border border-white/10">Satuan: {{ $item['satuan'] }}</span>
+                                                @endif
                                                 @if($item['alasan_harga'] !== 'Harga Retail Standar')
                                                     <span class="text-up-mint font-medium">• {{ $item['alasan_harga'] }}</span>
                                                 @endif
