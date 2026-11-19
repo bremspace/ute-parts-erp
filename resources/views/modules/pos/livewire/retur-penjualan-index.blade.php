@@ -578,7 +578,8 @@
                                                     </div>
                                                 </div>
 
-                                                {{-- Gudang & Rak tujuan produk yang dikembalikan --}}
+                                                {{-- Gudang & Rak tujuan produk yang dikembalikan (hanya barang normal/bagus) --}}
+                                                @if(($itemInputs[$itemId]['kondisi_barang'] ?? 'rusak') === 'bagus')
                                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" x-data="{ gudangId: '{{ $itemInputs[$itemId]['gudang_retur_id'] ?? '' }}' }">
                                                     <div>
                                                         <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Tujuan Stok (Kembali ke Stok Asal / Pindah Gudang)</label>
@@ -602,6 +603,7 @@
                                                         </select>
                                                     </div>
                                                 </div>
+                                                @endif
 
                                                 <!-- Jika Item Refund: Pilihan Akun / Kas -->
                                                 @if(($itemInputs[$itemId]['tipe_penyelesaian'] ?? 'refund') === 'refund')

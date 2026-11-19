@@ -387,6 +387,19 @@ class ReturPenjualanIndex extends Component
             }
         }
 
+        if (str_ends_with($key, '.kondisi_barang')) {
+            $parts = explode('.', $key);
+            $itemId = (int) $parts[0];
+            // Auto-detect gudang asal untuk barang normal (bagus) yang dikembalikan ke stok
+            if ($value === 'bagus' && empty($this->itemInputs[$itemId]['gudang_retur_id'])) {
+                $asalGudangId = $this->selectedTransaksi?->gudang_id
+                    ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang?->id));
+                if ($asalGudangId) {
+                    $this->itemInputs[$itemId]['gudang_retur_id'] = $asalGudangId;
+                }
+            }
+        }
+
         if (str_ends_with($key, '.gudang_retur_id')) {
             $parts = explode('.', $key);
             $itemId = (int) $parts[0];
