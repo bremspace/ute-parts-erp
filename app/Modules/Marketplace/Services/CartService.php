@@ -122,13 +122,19 @@ class CartService
                     $diskonTier = max(0.0, $hargaRetail - (float) $pricing['harga']);
                     $potensiKomisi = (float) ($pricing['potensi_komisi'] ?? 0.0);
 
+                    $isSatuanNonBase = ! empty($item['satuan']) && strcasecmp($item['satuan'], $produk->satuan ?: 'pcs') !== 0;
+
                     if (
-                        (float) ($item['harga'] ?? 0) !== (float) $pricing['harga']
+                        (! $isSatuanNonBase && (float) ($item['harga'] ?? 0) !== (float) $pricing['harga'])
                         || (float) ($item['harga_retail'] ?? 0) !== $hargaRetail
                         || (float) ($item['potensi_komisi'] ?? 0) !== $potensiKomisi
                         || empty($item['tier_nama'])
                     ) {
-                        $cart[$key]['harga'] = (float) $pricing['harga'];
+                        // Untuk satuan non-base (box, dll), harga per base unit disimpan efektif;
+                        // jangan ditimpa harga retail base agar harga per box tetap benar.
+                        if (! $isSatuanNonBase) {
+                            $cart[$key]['harga'] = (float) $pricing['harga'];
+                        }
                         $cart[$key]['harga_retail'] = $hargaRetail;
                         $cart[$key]['diskon_tier'] = $diskonTier;
                         $cart[$key]['potensi_komisi'] = $potensiKomisi;
