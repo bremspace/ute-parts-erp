@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
@@ -281,11 +282,30 @@ class PosMultiSatuanIntegrationTest extends TestCase
         $stokSetelahVoid = StokItem::where('gudang_id', $this->gudang->id)->where('produk_id', $this->produk->id)->value('jumlah');
         $this->assertSame(25.0, (float) $stokSetelahVoid);
 
-        // 2. Verifikasi Reversal Jurnal (Ada jurnal pembalik void: Bank 110-02 dikreditkan 90.000)
-        $jurnalPembalik = JurnalAkuntansi::where('sumber', 'pos')
-            ->where('deskripsi', 'like', '%Pembalik Jurnal Void POS%')
+        // 2. Verifikasi Reversal Jurnal via jalur resmi (F-10/B-2): jurnal asal
+        // ditandai is_reversed + pembalik bersumber 'reversal' dan tertaut.
+        $jurnalAsal = JurnalAkuntansi::where('referensi_tipe', Transaksi::class)
+            ->where('referensi_id', $transaksi->id)
+            ->where('sumber', 'pos')
+            ->get();
+        $this->assertNotEmpty($jurnalAsal);
+        $noJurnalAsal = $jurnalAsal->first()->no_jurnal;
+
+        $headerAsal = JurnalHeader::where('no_jurnal', $noJurnalAsal)
+            ->where('cabang_key', $this->cabang->id)->first();
+        $this->assertNotNull($headerAsal);
+        $this->assertTrue((bool) $headerAsal->is_reversed, 'Jurnal asal harus ditandai is_reversed.');
+        $this->assertNotEmpty($headerAsal->reversed_by_no_jurnal);
+
+        $jurnalPembalik = JurnalAkuntansi::where('no_jurnal', $headerAsal->reversed_by_no_jurnal)
+            ->where('cabang_id', $this->cabang->id)
             ->get();
         $this->assertNotEmpty($jurnalPembalik);
         $this->assertSame(90000.0, (float) $jurnalPembalik->where('akun_coa_id', AkunCOA::where('kode', '110-02')->first()?->id)->sum('kredit'));
+
+        $headerPembalik = JurnalHeader::where('no_jurnal', $headerAsal->reversed_by_no_jurnal)
+            ->where('cabang_key', $this->cabang->id)->first();
+        $this->assertSame('reversal', $headerPembalik->sumber);
+        $this->assertSame($noJurnalAsal, $headerPembalik->reversal_of_no_jurnal);
     }
 }
