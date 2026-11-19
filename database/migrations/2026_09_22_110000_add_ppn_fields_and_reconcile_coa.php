@@ -84,6 +84,14 @@ return new class extends Migration
 
     public function down(): void
     {
+        // [F-01] Guard di AWAL: hapus akun via instance model — guard `deleting`
+        // AkunCOA menolak bila 110-03 sudah dipakai jurnal (rollback gagal
+        // eksplisit sebelum perubahan skema apa pun, bukan memusnahkan jurnal
+        // via FK cascade). Belum dipakai → dihapus agar rollback reversible.
+        app(ActivityLogger::class)->withoutLogging(
+            fn () => AkunCOA::where('kode', '110-03')->first()?->delete()
+        );
+
         if (Schema::hasColumn('transaksi', 'ppn_nominal')) {
             Schema::table('transaksi', function (Blueprint $table) {
                 $table->dropColumn('ppn_nominal');
@@ -96,8 +104,5 @@ return new class extends Migration
         }
 
         DB::table('konfigurasi')->where('kunci', 'pajak_enabled')->delete();
-        app(ActivityLogger::class)->withoutLogging(
-            fn () => AkunCOA::where('kode', '110-03')->delete()
-        );
     }
 };

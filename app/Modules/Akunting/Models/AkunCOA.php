@@ -46,6 +46,25 @@ class AkunCOA extends Model
         'parent_id' => 'integer',
     ];
 
+    /**
+     * [F-01] Akun COA yang sudah memiliki baris jurnal TIDAK boleh dihapus:
+     * FK jurnal_akuntansi.akun_coa_id semula cascadeOnDelete, sehingga
+     * delete akun akan memusnahkan jejak audit jurnal (data loss, neraca rusak).
+     * Guard ini melindungi semua jalur Eloquent (UI, API, migrasi down()).
+     * Koreksi/penonaktifan akun berposting: nonaktifkan (is_active=false),
+     * bukan hapus — sama dengan kebijakan hapusCoa di AkuntingDashboard.
+     * Proteksi level DB (raw query builder) ditegakkan FK restrictOnDelete
+     * pada migrasi 2026_11_20_000002.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (AkunCOA $akun): void {
+            if ($akun->jurnal()->exists()) {
+                throw new \DomainException("Akun COA {$akun->kode} tidak dapat dihapus karena sudah memiliki baris jurnal (jejak audit tidak boleh musnah). Nonaktifkan akun alih-alih menghapus.");
+            }
+        });
+    }
+
     public function jurnal(): HasMany
     {
         return $this->hasMany(JurnalAkuntansi::class, 'akun_coa_id');
