@@ -4304,9 +4304,10 @@ class ProdukTab extends Component
                 'stokItems as total_stok' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId))),
             ], 'jumlah')
             ->when($this->produkSearch, function ($q) {
-                $term = trim($this->produkSearch);
+                $term = preg_replace('/\s+/', ' ', trim($this->produkSearch));
                 $q->where(function ($sub) use ($term) {
-                    $sub->where('produk.nama', 'like', "%{$term}%")
+                    $sub->whereRaw("REPLACE(produk.nama, '  ', ' ') LIKE ?", ["%{$term}%"])
+                        ->orWhere('produk.nama', 'like', "%{$term}%")
                         ->orWhere('produk.brand_kompatibel', 'like', "%{$term}%")
                         ->orWhere('produk.model_kompatibel', 'like', "%{$term}%")
                         ->orWhere('produk.barcode', '=', $term)
