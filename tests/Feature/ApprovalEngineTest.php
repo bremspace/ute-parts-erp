@@ -569,12 +569,12 @@ class ApprovalEngineTest extends TestCase
         $this->actingAs($finance, 'web');
         Livewire::test(ApprovalInbox::class)
             ->assertSee('Menunggu')
-            ->assertDontSee('Tidak ada permintaan approval');
+            ->assertDontSee('Tidak Ada Permintaan Approval');
 
         // Kasir (role tidak cocok, tanpa permission) → daftar kosong
         $this->actingAs($kasir, 'web');
         Livewire::test(ApprovalInbox::class)
-            ->assertSee('Tidak ada permintaan approval');
+            ->assertSee('Tidak Ada Permintaan Approval');
     }
 
     public function test_route_approvals_rbac(): void
