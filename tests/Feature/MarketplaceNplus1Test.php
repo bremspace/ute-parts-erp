@@ -54,7 +54,7 @@ class MarketplaceNplus1Test extends TestCase
 
     private const BUDGET_KATALOG_LOGIN = 19;
 
-    private const BUDGET_DETAIL = 6;
+    private const BUDGET_DETAIL = 7; // +1 untuk satuanKonversi (fitur beli per satuan)
 
     private const BUDGET_RESOLVE_ORIGINS = 3;
 
