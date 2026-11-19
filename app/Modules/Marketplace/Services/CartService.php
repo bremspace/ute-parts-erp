@@ -94,6 +94,15 @@ class CartService
                 $cart[$k]['harga'] = round($hargaSatuanMaster / $fk, 2);
                 $needSave = true;
             }
+
+            // Pastikan harga (per base unit) konsisten dengan harga_satuan per satuan
+            if (isset($cart[$k]['harga_satuan']) && (float) $cart[$k]['harga_satuan'] > 0 && $fk > 0) {
+                $expectedBase = round((float) $cart[$k]['harga_satuan'] / $fk, 2);
+                if (abs((float) $cart[$k]['harga'] - $expectedBase) > 0.001) {
+                    $cart[$k]['harga'] = $expectedBase;
+                    $needSave = true;
+                }
+            }
         }
         if ($needSave) {
             Session::put('shop.cart', $cart);
