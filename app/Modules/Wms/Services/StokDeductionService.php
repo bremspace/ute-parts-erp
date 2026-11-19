@@ -224,13 +224,14 @@ class StokDeductionService
         string $referensiTipe,
         ?int $referensiId,
         ?int $userId,
-        ?string $catatan = null
+        ?string $catatan = null,
+        ?int $rakId = null
     ): StokItem {
         if ($qty <= 0) {
             throw new \Exception('Kuantitas stok harus > 0');
         }
 
-        $stok = $this->cariBarisStok($produkId, $skuVariantId, $gudangId, lock: true);
+        $stok = $this->cariBarisStok($produkId, $skuVariantId, $gudangId, lock: true, rakId: $rakId);
 
         if (! $stok) {
             throw new \Exception(
@@ -350,17 +351,23 @@ class StokDeductionService
      *   kanonik utk produk+gudang (jumlah terbesar, id terkecil sbg tie-break),
      *   sehingga gauge POS (agregat produk) & potong stok tidak lagi beda angka.
      */
-    public function cariBarisStok(int $produkId, ?int $skuVariantId, int $gudangId, bool $lock): ?StokItem
+    public function cariBarisStok(int $produkId, ?int $skuVariantId, int $gudangId, bool $lock, ?int $rakId = null): ?StokItem
     {
         if ($skuVariantId !== null) {
             $query = StokItem::where('produk_id', $produkId)
                 ->where('sku_variant_id', $skuVariantId)
                 ->where('gudang_id', $gudangId);
+            if ($rakId) {
+                $query->where('rak_id', $rakId);
+            }
 
             return $lock ? $query->lockForUpdate()->first() : $query->first();
         }
 
         $query = StokItem::where('produk_id', $produkId)->where('gudang_id', $gudangId);
+        if ($rakId) {
+            $query->where('rak_id', $rakId);
+        }
         if ($lock) {
             $query->lockForUpdate();
         }

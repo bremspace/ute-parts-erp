@@ -575,7 +575,8 @@ class ReturnPenjualanService
                         referensiTipe: ReturnPenjualan::class,
                         referensiId: $retur->id,
                         userId: $userId,
-                        catatan: "Retur Penjualan {$retur->no_return} (Layak Jual)"
+                        catatan: "Retur Penjualan {$retur->no_return} (Layak Jual)",
+                        rakId: $itemRakId
                     );
                 } else {
                     // Barang Rusak: masuk karantina retur supplier, tidak dijual ke pelanggan lain
