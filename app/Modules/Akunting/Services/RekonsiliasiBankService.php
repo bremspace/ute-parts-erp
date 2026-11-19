@@ -306,25 +306,48 @@ class RekonsiliasiBankService
 
     /**
      * Bersihkan format angka nominal uang Indonesia (1.250.000,50 -> 1250000.50).
+     *
+     * [E-2] Ribuan bertitik TANPA koma ('500.000', '1.250', '1.250.000') wajib
+     * dibaca sebagai ribuan (500000 / 1250 / 1250000), bukan terpotong (float)
+     * menjadi 500.0 / 1.25 — salah 1000x. Aturan:
+     * - titik & koma bersamaan: pemisah TERAKHIR = desimal (ID '1.250.000,50'
+     *   maupun US '1,250,000.50');
+     * - hanya koma: 2 bagian dengan ekor <= 2 digit = desimal ('500,50'),
+     *   selain itu ribuan US ('1,250,000');
+     * - hanya titik: pola grup 3 digit ('/^\d{1,3}(\.\d{3})+$/') = ribuan ID;
+     *   satu titik dengan ekor <= 2 digit tetap desimal gaya US ('500.50').
      */
     private function cleanNominal(string $val): float
     {
-        $val = trim($val);
-        // Jika ada titik ribuan dan koma desimal
-        if (str_contains($val, '.') && str_contains($val, ',')) {
-            $val = str_replace('.', '', $val);
-            $val = str_replace(',', '.', $val);
-        } elseif (str_contains($val, ',')) {
-            // Hanya ada koma (koma desimal atau pemisah)
+        // Buang simbol mata uang / spasi / karakter lain sejak awal.
+        $val = (string) preg_replace('/[^0-9.,\-]/', '', trim($val));
+
+        $adaTitik = str_contains($val, '.');
+        $adaKoma = str_contains($val, ',');
+
+        if ($adaTitik && $adaKoma) {
+            if (strrpos($val, ',') > strrpos($val, '.')) {
+                // Indonesia: titik ribuan, koma desimal (1.250.000,50)
+                $val = str_replace('.', '', $val);
+                $val = str_replace(',', '.', $val);
+            } else {
+                // US: koma ribuan, titik desimal (1,250,000.50)
+                $val = str_replace(',', '', $val);
+            }
+        } elseif ($adaKoma) {
+            // Hanya ada koma (koma desimal atau pemisah ribuan US)
             $parts = explode(',', $val);
             if (count($parts) === 2 && strlen($parts[1]) <= 2) {
                 $val = str_replace(',', '.', $val);
             } else {
                 $val = str_replace(',', '', $val);
             }
+        } elseif ($adaTitik && preg_match('/^-?\d{1,3}(\.\d{3})+$/', $val)) {
+            // [E-2] Hanya titik dengan grup 3 digit = ribuan ID tanpa desimal.
+            $val = str_replace('.', '', $val);
         }
 
-        return round(abs((float) preg_replace('/[^0-9.]/', '', $val)), 2);
+        return round(abs((float) $val), 2);
     }
 
     /**
@@ -458,26 +481,48 @@ class RekonsiliasiBankService
     /**
      * Buat Jurnal Penyesuaian 1-Klik dari baris rekonsiliasi bank (misal biaya admin / bunga bank).
      *
+     * [E-1] Guard integritas:
+     * - idempoten: hanya item 'unmatched' yang bisa disesuaikan; 'matched' DAN
+     *   'adjusted' ditolak (klik ulang tidak mem-post jurnal kedua);
+     * - arah jurnal sesuai tipe mutasi: DB (uang keluar) hanya biaya_admin,
+     *   CR (uang masuk) hanya pendapatan_bunga;
+     * - scope cabang fail-closed: cabang eksplisit / session wajib ada dan
+     *   cocok dengan cabang pemilik rekonsiliasi;
+     * - posting lewat JurnalService::post (balance, akun aktif, periode terbuka)
+     *   dengan idempotency key per item sebagai backstop unique index DB.
+     *
      * @param  string  $jenisPenyesuaian  'biaya_admin' | 'pendapatan_bunga'
+     * @param  int|null  $cabangId  scope cabang eksplisit; null = ambil dari session
      */
     public function buatJurnalPenyesuaian(
         int $itemId,
         string $jenisPenyesuaian,
         int $userId,
-        ?string $keterangan = null
+        ?string $keterangan = null,
+        ?int $cabangId = null
     ): array {
-        $item = RekonsiliasiBankItem::with('rekonsiliasi.akun')->findOrFail($itemId);
-
-        if ($item->status === 'matched') {
-            throw new \Exception('Baris mutasi ini sudah tercocokkan dengan jurnal.');
+        if (! in_array($jenisPenyesuaian, ['biaya_admin', 'pendapatan_bunga'], true)) {
+            throw new \InvalidArgumentException("Jenis penyesuaian '{$jenisPenyesuaian}' tidak valid. Gunakan 'biaya_admin' atau 'pendapatan_bunga'.");
         }
 
-        $cabangId = $item->rekonsiliasi->cabang_id;
+        $item = RekonsiliasiBankItem::with('rekonsiliasi.akun')->findOrFail($itemId);
+
+        // [E-1] Scope cabang fail-closed: tanpa cabang aktif, tolak.
+        $scopeCabangId = $cabangId ?? (int) (session('cabang_id') ?? 0);
+        if ($scopeCabangId <= 0) {
+            throw new \Exception('Cabang aktif belum dipilih. Penyesuaian rekonsiliasi bank memerlukan scope cabang.');
+        }
+        if ((int) $item->rekonsiliasi->cabang_id !== $scopeCabangId) {
+            throw new \Exception('Baris rekonsiliasi ini bukan milik cabang aktif Anda.');
+        }
+
+        $this->guardItemBisaDisesuaikan($item, $jenisPenyesuaian);
+
         $akunBank = $item->rekonsiliasi->akun;
 
-        // Tentukan akun lawan
+        // Tentukan akun lawan (arah sudah dijamin guard tipe DB/CR di atas)
         if ($jenisPenyesuaian === 'biaya_admin') {
-            // Biaya Admin: Debit Beban Lain-lain (520-05) / Kredit Bank
+            // Biaya Admin (mutasi DB/uang keluar): Debit Beban Lain-lain (520-05) / Kredit Bank
             $akunLawanKode = '520-05';
             $deskripsi = $keterangan ?: "Biaya Administrasi Bank {$item->rekonsiliasi->nama_bank} ({$item->deskripsi})";
             $lines = [
@@ -485,7 +530,7 @@ class RekonsiliasiBankService
                 ['akun_kode' => $akunBank->kode, 'debit' => 0, 'kredit' => $item->nominal],
             ];
         } else {
-            // Pendapatan Bunga: Debit Bank / Kredit Pendapatan Lain-lain (430-01)
+            // Pendapatan Bunga (mutasi CR/uang masuk): Debit Bank / Kredit Pendapatan Lain-lain (430-01)
             $akunLawanKode = '430-01';
             $deskripsi = $keterangan ?: "Pendapatan Bunga Bank {$item->rekonsiliasi->nama_bank} ({$item->deskripsi})";
             $lines = [
@@ -494,21 +539,26 @@ class RekonsiliasiBankService
             ];
         }
 
-        $noJurnal = $this->jurnalService->generateNoJurnal('manual', $cabangId);
+        return DB::transaction(function () use ($item, $lines, $deskripsi, $scopeCabangId, $userId, $jenisPenyesuaian) {
+            // [E-1] Kunci baris item lalu cek ulang status di dalam transaksi:
+            // request paralel yang lolos guard luar tetap ditolak di sini.
+            $locked = RekonsiliasiBankItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            $this->guardItemBisaDisesuaikan($locked, $jenisPenyesuaian);
 
-        return DB::transaction(function () use ($item, $noJurnal, $lines, $deskripsi, $cabangId, $userId) {
+            $noJurnal = $this->jurnalService->generateNoJurnal('manual', $scopeCabangId);
             $created = $this->jurnalService->post(
                 noJurnal: $noJurnal,
                 tanggal: $item->tanggal,
                 sumber: 'manual',
                 lines: $lines,
                 deskripsi: $deskripsi,
-                cabangId: $cabangId,
-                userId: $userId
+                cabangId: $scopeCabangId,
+                userId: $userId,
+                idempotencyKey: 'rekon-bank-item-'.$item->id,
             );
 
             // Update status item rekonsiliasi
-            $item->update([
+            $locked->update([
                 'status' => 'adjusted',
                 'jurnal_akuntansi_id' => $created[0]->id ?? null,
                 'no_jurnal_matched' => $noJurnal,
@@ -523,5 +573,32 @@ class RekonsiliasiBankService
                 'item_id' => $item->id,
             ];
         });
+    }
+
+    /**
+     * [E-1] Guard status & arah mutasi untuk penyesuaian 1-klik.
+     *
+     * @throws \Exception bila item sudah matched/adjusted atau tipe mutasi
+     *                    tidak sesuai jenis penyesuaian (DB→biaya_admin, CR→bunga)
+     */
+    private function guardItemBisaDisesuaikan(RekonsiliasiBankItem $item, string $jenisPenyesuaian): void
+    {
+        if ($item->status === 'matched') {
+            throw new \Exception('Baris mutasi ini sudah tercocokkan dengan jurnal.');
+        }
+        if ($item->status === 'adjusted') {
+            throw new \Exception('Baris mutasi ini sudah disesuaikan dengan jurnal penyesuaian sebelumnya.');
+        }
+        if ($item->status !== 'unmatched') {
+            throw new \Exception("Status baris '{$item->status}' tidak dapat disesuaikan.");
+        }
+
+        $tipe = strtoupper((string) $item->tipe);
+        if ($jenisPenyesuaian === 'biaya_admin' && $tipe !== 'DB') {
+            throw new \Exception("Jenis 'biaya_admin' hanya untuk mutasi DB (uang keluar); baris ini bertipe {$tipe} (uang masuk).");
+        }
+        if ($jenisPenyesuaian === 'pendapatan_bunga' && $tipe !== 'CR') {
+            throw new \Exception("Jenis 'pendapatan_bunga' hanya untuk mutasi CR (uang masuk); baris ini bertipe {$tipe} (uang keluar).");
+        }
     }
 }
