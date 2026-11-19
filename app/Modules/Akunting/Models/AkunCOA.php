@@ -63,6 +63,23 @@ class AkunCOA extends Model
                 throw new \DomainException("Akun COA {$akun->kode} tidak dapat dihapus karena sudah memiliki baris jurnal (jejak audit tidak boleh musnah). Nonaktifkan akun alih-alih menghapus.");
             }
         });
+
+        /*
+         * [F-09] Akun yang sudah memiliki baris jurnal: klasifikasi (kode,
+         * tipe, saldo_normal) TERKUNCI. Laporan historis membaca tipe/saldo
+         * normal terkini saat query — mengubahnya menulis ulang penyajian
+         * semua laporan masa lalu secara retroaktif (melanggar PSAK 25/IAS 8:
+         * reklasifikasi harus prospektif/terdokumentasi, bukan rewrite diam-diam).
+         * Nama/kelompok/status aktif tetap boleh diubah (ter-log via LogsActivity).
+         * Reklasifikasi akun berposting wajib lewat jurnal reklasifikasi.
+         * Guard di model = semua jalur Eloquent (UI, API, caller lain) terlindungi.
+         */
+        static::updating(function (AkunCOA $akun): void {
+            if ($akun->isDirty(['kode', 'tipe', 'saldo_normal']) && $akun->jurnal()->exists()) {
+                $kodeAsli = (string) $akun->getOriginal('kode');
+                throw new \DomainException("Akun COA {$kodeAsli} sudah memiliki baris jurnal: kode, tipe, dan saldo_normal tidak dapat diubah (reklasifikasi retroaktif laporan historis). Hanya nama/kelompok/status aktif yang boleh diubah; reklasifikasi wajib lewat jurnal reklasifikasi.");
+            }
+        });
     }
 
     public function jurnal(): HasMany

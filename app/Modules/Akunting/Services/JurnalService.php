@@ -416,16 +416,45 @@ class JurnalService
      * menandai jurnal asal sebagai `is_reversed = true`, menautkan nomor referensi,
      * dan mencatat activity log audit.
      *
+     * [F-03] Baca + cek header terjadi DI DALAM transaksi dengan lockForUpdate
+     * pada header asal (dua reversal concurrent ter-serialisasi), diperkuat
+     * unique index (cabang_key, reversal_of_no_jurnal) sebagai jaring DB.
+     * Jurnal tanpa header (legacy) ditolak — tidak ada tempat menandai
+     * is_reversed sehingga reversal berulang tidak bisa dicegah.
+     *
+     * [F-04] Jurnal penutup (sumber tutup_buku) TIDAK boleh dibalik lewat sini;
+     * pembalikan penutup hanya lewat reopen periode resmi (reversalJurnalPenutup).
+     *
+     * [F-05] $tanggal opsional: default now() (storno berjalan); reopen periode
+     * memakai tanggal akhir bulan yang dibuka via reversalJurnalPenutup().
+     *
      * @throws \Exception jika jurnal tidak ditemukan, sudah di-reversed, atau periode ditutup
      */
-    public function reversalJurnal(string $noJurnalAsal, int $cabangId, ?int $userId, string $alasan): array
+    public function reversalJurnal(string $noJurnalAsal, int $cabangId, ?int $userId, string $alasan, ?\DateTimeInterface $tanggal = null): array
+    {
+        return $this->prosesReversal($noJurnalAsal, $cabangId, $userId, $alasan, $tanggal, false);
+    }
+
+    /**
+     * [F-04 / F-05] Reversal KHUSUS jurnal penutup — satu-satunya pintu legal
+     * membalik ayat tutup buku, hanya dipanggil TutupBukuService::bukaBukuKembali
+     * setelah periode di-set open, dengan tanggal = akhir bulan yang direopen
+     * (bukan now()) agar laporan periode yang dibuka benar-benar pulih.
+     */
+    public function reversalJurnalPenutup(string $noJurnalAsal, int $cabangId, ?int $userId, string $alasan, \DateTimeInterface $tanggal): array
+    {
+        return $this->prosesReversal($noJurnalAsal, $cabangId, $userId, $alasan, $tanggal, true);
+    }
+
+    private function prosesReversal(string $noJurnalAsal, int $cabangId, ?int $userId, string $alasan, ?\DateTimeInterface $tanggal, bool $dariReopenPeriode): array
     {
         $alasan = trim($alasan);
         if ($alasan === '') {
             throw new \InvalidArgumentException('Alasan pembalikan jurnal (reversal) wajib diisi untuk kepatuhan audit ISO.');
         }
 
-        $this->cekPeriodeTerbuka(now(), $cabangId, 'reversal');
+        $tanggalReversal = $tanggal ?? now();
+        $this->cekPeriodeTerbuka($tanggalReversal, $cabangId, 'reversal');
 
         $linesAsal = JurnalAkuntansi::where('no_jurnal', $noJurnalAsal)
             ->where('cabang_id', $cabangId)
@@ -436,16 +465,8 @@ class JurnalService
             throw new \Exception("Jurnal dengan nomor '{$noJurnalAsal}' tidak ditemukan pada cabang ini.");
         }
 
-        $header = JurnalHeader::where('no_jurnal', $noJurnalAsal)
-            ->where('cabang_key', $cabangId)
-            ->first();
-
-        if ($header?->is_reversed) {
-            throw new \Exception("Jurnal {$noJurnalAsal} sudah pernah dibalik sebelumnya oleh jurnal {$header->reversed_by_no_jurnal}.");
-        }
-
-        if ($header?->sumber === 'reversal') {
-            throw new \Exception("Jurnal dengan sumber 'reversal' tidak dapat dibalik ulang.");
+        if (! $this->headerTableReady()) {
+            throw new \Exception("Jurnal {$noJurnalAsal} tidak dapat dibalik: tabel header jurnal belum tersedia. Jalankan migrasi jurnal_header terlebih dahulu.");
         }
 
         $reversalLines = [];
@@ -457,40 +478,74 @@ class JurnalService
             ];
         }
 
-        $noReversal = $this->generateNoJurnal('reversal', $cabangId);
+        return DB::transaction(function () use ($noJurnalAsal, $linesAsal, $reversalLines, $cabangId, $userId, $alasan, $tanggalReversal, $dariReopenPeriode) {
+            // [F-03] Lock header asal DI DALAM transaksi: request reversal
+            // concurrent menunggu di sini, lalu membaca is_reversed terbaru
+            // (cek di luar transaksi sebelumnya bisa basi → double reversal).
+            $header = JurnalHeader::where('no_jurnal', $noJurnalAsal)
+                ->where('cabang_key', $cabangId)
+                ->lockForUpdate()
+                ->first();
 
-        return DB::transaction(function () use ($noReversal, $noJurnalAsal, $header, $linesAsal, $reversalLines, $cabangId, $userId, $alasan) {
+            if (! $header) {
+                throw new \Exception("Jurnal {$noJurnalAsal} tidak memiliki header jurnal (data legacy) sehingga tidak dapat dibalik. Lakukan backfill header terlebih dahulu.");
+            }
+
+            if ($header->is_reversed) {
+                throw new \Exception("Jurnal {$noJurnalAsal} sudah pernah dibalik sebelumnya oleh jurnal {$header->reversed_by_no_jurnal}.");
+            }
+
+            if ($header->sumber === 'reversal') {
+                throw new \Exception("Jurnal dengan sumber 'reversal' tidak dapat dibalik ulang.");
+            }
+
+            // [F-04] Penutup hanya boleh dibalik lewat reopen periode resmi.
+            if ($header->sumber === 'tutup_buku' && ! $dariReopenPeriode) {
+                throw new \Exception('Jurnal penutup (tutup buku) tidak dapat dibalik melalui reversal biasa. Gunakan fitur Buka Kembali Periode (reopen) yang terotorisasi.');
+            }
+
+            $noReversal = $this->generateNoJurnal('reversal', $cabangId);
+
             $this->post(
                 noJurnal: $noReversal,
-                tanggal: now(),
+                tanggal: $tanggalReversal,
                 sumber: 'reversal',
                 lines: $reversalLines,
                 deskripsi: "Pembalik (Reversal) Jurnal {$noJurnalAsal}: {$alasan}",
                 cabangId: $cabangId,
                 userId: $userId,
                 referensiTipe: 'jurnal_header',
-                referensiId: $header?->id
+                referensiId: $header->id
             );
 
             // Perbarui metadata reversal pada header asal
-            if ($header) {
-                $header->update([
-                    'is_reversed' => true,
-                    'reversed_by_no_jurnal' => $noReversal,
-                    'reversed_at' => now(),
-                    'reversed_by_user_id' => $userId,
-                ]);
+            $header->update([
+                'is_reversed' => true,
+                'reversed_by_no_jurnal' => $noReversal,
+                'reversed_at' => now(),
+                'reversed_by_user_id' => $userId,
+            ]);
+
+            // Tautkan referensi pada header jurnal reversal baru.
+            // [F-03] Unique (cabang_key, reversal_of_no_jurnal) = jaring DB:
+            // bila state aplikasi somehow basi, reversal kedua tetap ditolak
+            // dan seluruh transaksi ini rollback (tidak ada pembalik ganda).
+            try {
+                JurnalHeader::where('no_jurnal', $noReversal)
+                    ->where('cabang_key', $cabangId)
+                    ->update([
+                        'reversal_of_no_jurnal' => $noJurnalAsal,
+                    ]);
+            } catch (QueryException $e) {
+                if (! $this->isUniqueViolation($e)) {
+                    throw $e;
+                }
+
+                throw new \Exception("Jurnal {$noJurnalAsal} sudah pernah dibalik sebelumnya (guard unique reversal).", 0, $e);
             }
 
-            // Tautkan referensi pada header jurnal reversal baru
-            JurnalHeader::where('no_jurnal', $noReversal)
-                ->where('cabang_key', $cabangId)
-                ->update([
-                    'reversal_of_no_jurnal' => $noJurnalAsal,
-                ]);
-
             activity()
-                ->performedOn($header ?: $linesAsal->first())
+                ->performedOn($header)
                 ->event('reversed')
                 ->withProperties([
                     'no_jurnal_asal' => $noJurnalAsal,
@@ -507,6 +562,6 @@ class JurnalService
                 'total_debit' => $linesAsal->sum('kredit'),
                 'total_kredit' => $linesAsal->sum('debit'),
             ];
-        });
+        }, 3);
     }
 }

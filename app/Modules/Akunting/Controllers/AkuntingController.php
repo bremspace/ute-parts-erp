@@ -129,7 +129,13 @@ class AkuntingController extends Controller
             'is_active' => 'sometimes|boolean',
         ]);
 
-        $akun->update($request->all());
+        // [F-09] Guard model AkunCOA menolak perubahan kode/tipe/saldo_normal
+        // pada akun ber-jurnal; sampaikan sebagai 422 dengan pesan jelas.
+        try {
+            $akun->update($request->all());
+        } catch (\DomainException $e) {
+            return $this->error($e->getMessage(), 422);
+        }
 
         app(AuditService::class)->catat(
             'AkunCOA', 'update', $akun->id,

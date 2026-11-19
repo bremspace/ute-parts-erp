@@ -1200,7 +1200,15 @@ class AkuntingDashboard extends Component
         ];
 
         if (! empty($this->coaForm['id'])) {
-            AkunCOA::findOrFail($this->coaForm['id'])->update($data);
+            // [F-09] Akun ber-jurnal: kode/tipe/saldo_normal terkunci (guard
+            // model AkunCOA). Tampilkan pesan jelas, modal tetap terbuka.
+            try {
+                AkunCOA::findOrFail($this->coaForm['id'])->update($data);
+            } catch (\DomainException $e) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+
+                return;
+            }
             $pesan = 'Akun COA diperbarui';
         } else {
             AkunCOA::create($data);
