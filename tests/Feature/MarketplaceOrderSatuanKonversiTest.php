@@ -305,8 +305,11 @@ class MarketplaceOrderSatuanKonversiTest extends TestCase
             $this->staff->id
         );
 
-        // Refund 1 box = harga per box 1.620.000 (bukan per pcs 135.000).
-        $this->assertEquals(1620000.0, (float) $retur->jumlah, 'Refund retur 1 box harus harga box');
+        // Refund 1 box berbasis harga per box (bukan per pcs 135.000), NETO
+        // alokasi diskon header [H1]: order ini kena diskon partai 3%
+        // (qty 24 >= min 5) -> DPP 3.142.800 dari subtotal 3.240.000.
+        // Refund = 1.620.000 x (3.142.800 / 3.240.000) = 1.571.400.
+        $this->assertEquals(1571400.0, (float) $retur->jumlah, 'Refund retur 1 box = harga box neto alokasi diskon partai header');
         // Stok kembali 12 pcs (76 -> 88), bukan 1 pcs.
         $this->assertEquals(88, $this->stok(), 'Retur 1 box harus mengembalikan 12 pcs');
     }
