@@ -589,14 +589,14 @@
                                                             @endif
                                                         </label>
                                                         <div class="flex gap-1.5">
-                                                            <select wire:model.live="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value; $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="flex-1 px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
+                                                            <select wire:model.live="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value" class="flex-1 px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
                                                                 <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
                                                                 @foreach($gudangs as $g)
                                                                     <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
                                                                 @endforeach
                                                             </select>
                                                             @if(($itemInputs[$itemId]['kondisi_barang'] ?? 'rusak') === 'bagus')
-                                                                <button type="button" title="Kembali ke gudang asal transaksi" @click="gudangId = '{{ $selectedTransaksi?->gudang_id }}'; $wire.set('itemInputs.{{ $itemId }}.gudang_retur_id', '{{ $selectedTransaksi?->gudang_id }}'); $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="px-2.5 py-2 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint text-[10px] font-bold cursor-pointer whitespace-nowrap">↻ Asal</button>
+                                                                <button type="button" title="Kembali ke gudang asal transaksi" @click="gudangId = '{{ $asalGudangId }}'; $wire.set('itemInputs.{{ $itemId }}.gudang_retur_id', '{{ $asalGudangId }}')" class="px-2.5 py-2 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint text-[10px] font-bold cursor-pointer whitespace-nowrap">↻ Asal</button>
                                                             @endif
                                                         </div>
                                                     </div>

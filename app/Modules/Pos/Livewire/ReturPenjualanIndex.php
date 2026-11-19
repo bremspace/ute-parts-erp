@@ -86,6 +86,9 @@ class ReturPenjualanIndex extends Component
 
     public ?int $rakReturId = null;
 
+    // Gudang asal transaksi (untuk shortcut kembali ke stok)
+    public ?int $asalGudangId = null;
+
     // Modal Struk Khusus Retur
     public bool $showReceiptModal = false;
 
@@ -146,6 +149,22 @@ class ReturPenjualanIndex extends Component
         }
     }
 
+    /**
+     * Deteksi rak asal (rak dengan stok terbanyak) untuk produk di gudang tertentu.
+     */
+    public function detectAsalRak(?int $produkId, ?int $gudangId): ?int
+    {
+        if (! $produkId || ! $gudangId) {
+            return null;
+        }
+
+        return StokItem::where('produk_id', $produkId)
+            ->where('gudang_id', $gudangId)
+            ->whereNotNull('rak_id')
+            ->orderByDesc('jumlah')
+            ->value('rak_id');
+    }
+
     public function bukaModalTambah(): void
     {
         $this->resetForm();
@@ -178,6 +197,7 @@ class ReturPenjualanIndex extends Component
         $this->activeTukarItemId = null;
         $this->metodeBayarSelisih = 'tunai';
         $this->jumlahBayarSelisih = 0;
+        $this->asalGudangId = null;
         $this->showCreateModal = false;
     }
 
@@ -260,6 +280,8 @@ class ReturPenjualanIndex extends Component
             }
         }
 
+        $this->asalGudangId = $transaksi->gudang_id ? (int) $transaksi->gudang_id : null;
+
         $this->selectedTransaksi = $transaksi;
         $this->showCreateModal = true;
         $this->transaksiItemData = [];
@@ -303,8 +325,8 @@ class ReturPenjualanIndex extends Component
                 'foto_bukti' => [],
                 'tukar_items' => [],
                 'tukar_search' => '',
-                'gudang_retur_id' => $transaksi->gudang_id,
-                'rak_retur_id' => null,
+                'gudang_retur_id' => $this->asalGudangId ?? $transaksi->gudang_id,
+                'rak_retur_id' => $this->detectAsalRak($item->produk_id ?? null, $this->asalGudangId ?? $transaksi->gudang_id),
             ];
         }
 
@@ -392,7 +414,7 @@ class ReturPenjualanIndex extends Component
             $itemId = (int) $parts[0];
             // Auto-detect gudang asal untuk barang normal (bagus) yang dikembalikan ke stok
             if ($value === 'bagus' && empty($this->itemInputs[$itemId]['gudang_retur_id'])) {
-                $asalGudangId = $this->selectedTransaksi?->gudang_id
+                $asalGudangId = $this->asalGudangId
                     ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang?->id));
                 if ($asalGudangId) {
                     $this->itemInputs[$itemId]['gudang_retur_id'] = $asalGudangId;
@@ -403,8 +425,18 @@ class ReturPenjualanIndex extends Component
         if (str_ends_with($key, '.gudang_retur_id')) {
             $parts = explode('.', $key);
             $itemId = (int) $parts[0];
-            // Reset rak tujuan jika gudang berubah (rak harus sesuai gudang)
-            $this->itemInputs[$itemId]['rak_retur_id'] = null;
+            // Auto-detect rak asal untuk produk ini di gudang terpilih
+            $produkId = (int) ($this->transaksiItemData[$itemId]['produk_id'] ?? 0);
+            $gudangId = (int) ($value ?? 0);
+            $asalRakId = null;
+            if ($produkId > 0 && $gudangId > 0) {
+                $asalRakId = StokItem::where('produk_id', $produkId)
+                    ->where('gudang_id', $gudangId)
+                    ->whereNotNull('rak_id')
+                    ->orderByDesc('jumlah')
+                    ->value('rak_id');
+            }
+            $this->itemInputs[$itemId]['rak_retur_id'] = $asalRakId;
         }
     }
 
