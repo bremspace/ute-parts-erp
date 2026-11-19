@@ -132,20 +132,29 @@ class CartService
 
                     $isSatuanNonBase = ! empty($item['satuan']) && strcasecmp($item['satuan'], $produk->satuan ?: 'pcs') !== 0;
 
-                    if (
-                        (! $isSatuanNonBase && (float) ($item['harga'] ?? 0) !== (float) $pricing['harga'])
-                        || (float) ($item['harga_retail'] ?? 0) !== $hargaRetail
-                        || (float) ($item['potensi_komisi'] ?? 0) !== $potensiKomisi
-                        || empty($item['tier_nama'])
-                    ) {
-                        // Untuk satuan non-base (box, dll), harga per base unit disimpan efektif;
-                        // jangan ditimpa harga retail base agar harga per box tetap benar.
+                    // Selalu perbarui diskon_tier (termasuk reset ke 0 untuk retail / satuan non-base)
+                    // agar keranjang lama tidak menyimpan potongan tier yang stale.
+                    $newDiskonTier = $isSatuanNonBase ? 0.0 : $diskonTier;
+                    $needUpdate = false;
+                    if (abs((float) ($item['diskon_tier'] ?? 0) - $newDiskonTier) > 0.001) {
+                        $needUpdate = true;
+                    }
+                    if (! $isSatuanNonBase && abs((float) ($item['harga'] ?? 0) - (float) $pricing['harga']) > 0.001) {
+                        $needUpdate = true;
+                    }
+                    if (abs((float) ($item['harga_retail'] ?? 0) - $hargaRetail) > 0.001) {
+                        $needUpdate = true;
+                    }
+                    if (empty($item['tier_nama'])) {
+                        $needUpdate = true;
+                    }
+
+                    if ($needUpdate) {
                         if (! $isSatuanNonBase) {
                             $cart[$key]['harga'] = (float) $pricing['harga'];
                         }
                         $cart[$key]['harga_retail'] = $hargaRetail;
-                        // Satuan non-base (box): diskon satuan sudah di harga, bukan potongan tier
-                        $cart[$key]['diskon_tier'] = $isSatuanNonBase ? 0.0 : $diskonTier;
+                        $cart[$key]['diskon_tier'] = $newDiskonTier;
                         $cart[$key]['potensi_komisi'] = $potensiKomisi;
                         $cart[$key]['mode_reward'] = $pricing['mode_reward'] ?? 'diskon_langsung';
                         $cart[$key]['tier_nama'] = $pricing['tier'] ?? null;
