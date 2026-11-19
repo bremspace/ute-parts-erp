@@ -3,6 +3,7 @@
 namespace App\Modules\Akunting\Services;
 
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\PeriodeAkuntansi;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -86,10 +87,24 @@ class TutupBukuService
         $balance = abs($selisih) < 0.01;
 
         // 2. Hitung mutasi akun nominal (Pendapatan & Beban) pada periode berjalan
+        // [F-05] Kecualikan juga jurnal REVERSAL dari ayat penutup (hasil reopen
+        // periode): tanpa ini, tutup buku ulang periode yang direopen menghitung
+        // ganda mutasi nominal (asal + reversal), karena penutup asli sudah
+        // dikecualikan lewat filter sumber.
+        $noPenutup = JurnalHeader::where('cabang_key', $cabangId)
+            ->where('sumber', 'tutup_buku')
+            ->pluck('no_jurnal');
+        $noReversalPenutup = $noPenutup->isEmpty()
+            ? collect()
+            : JurnalHeader::where('cabang_key', $cabangId)
+                ->whereIn('reversal_of_no_jurnal', $noPenutup)
+                ->pluck('no_jurnal');
+
         $jurnals = JurnalAkuntansi::where('cabang_id', $cabangId)
             ->whereDate('tanggal', '>=', $awalBulan)
             ->whereDate('tanggal', '<=', $akhirBulan)
             ->where('sumber', '!=', 'tutup_buku')
+            ->when($noReversalPenutup->isNotEmpty(), fn ($q) => $q->whereNotIn('no_jurnal', $noReversalPenutup))
             ->with('akun')
             ->get();
 
@@ -281,14 +296,19 @@ class TutupBukuService
                 'catatan' => $catatanBaru,
             ]);
 
-            // 2. Jika ada jurnal penutup, posting jurnal pembalik (reversal) atomik dengan audit trail
+            // 2. Jika ada jurnal penutup, posting jurnal pembalik (reversal) atomik dengan audit trail.
+            // [F-05] Reversal bertanggal AKHIR BULAN yang direopen (bukan now()):
+            // laporan periode yang dibuka benar-benar pulih dan bulan berjalan
+            // tidak terdistorsi mutasi periode lain (PSAK 1 periodisitas).
             $noJurnalReversal = null;
             if ($noJurnalPenutup) {
-                $reversal = $this->jurnalService->reversalJurnal(
+                $akhirBulan = Carbon::create($periode->tahun, $periode->bulan, 1)->endOfMonth()->endOfDay();
+                $reversal = $this->jurnalService->reversalJurnalPenutup(
                     noJurnalAsal: $noJurnalPenutup,
                     cabangId: $cabangId,
                     userId: $userId,
-                    alasan: "Pembukaan kembali (Re-open) periode {$periode->label_periode}: {$alasan}"
+                    alasan: "Pembukaan kembali (Re-open) periode {$periode->label_periode}: {$alasan}",
+                    tanggal: $akhirBulan
                 );
                 $noJurnalReversal = $reversal['no_jurnal_reversal'];
             }
