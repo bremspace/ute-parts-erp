@@ -2,8 +2,14 @@
 
 namespace App\Modules\Marketplace\Services;
 
+use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Marketplace\Models\Pengiriman;
+use App\Modules\Rbac\Models\Cabang;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Biteship Shipping (PRD §4.8).
@@ -74,8 +80,15 @@ class BiteshipService
 
     /**
      * Buat order pengiriman (setelah pembayaran lunas).
+     *
+     * [H7] Bila $pengiriman diberikan, kurir ditagih saat order Biteship
+     * berhasil dibuat → titipan ongkir 210-04 dilepas (Dr 210-04 / Cr 110-02)
+     * via catatPembayaranOngkir (idempoten per pengiriman). Kegagalan jurnal
+     * TIDAK membatalkan order kurir yang sudah terlanjur dibuat di Biteship —
+     * dicatat Log::error dan bisa diposting ulang manual via
+     * catatPembayaranOngkir (retry aman).
      */
-    public function createOrder(array $payload): array
+    public function createOrder(array $payload, ?Pengiriman $pengiriman = null): array
     {
         $response = Http::withHeaders($this->withAuth())
             ->timeout(25)
@@ -87,12 +100,88 @@ class BiteshipService
 
         $data = $response->json();
 
+        if ($pengiriman !== null) {
+            try {
+                $this->catatPembayaranOngkir($pengiriman);
+            } catch (\Throwable $e) {
+                Log::error('[Biteship] Order kurir berhasil dibuat tapi jurnal pelepasan ongkir 210-04 gagal — posting ulang via catatPembayaranOngkir', [
+                    'pengiriman_id' => $pengiriman->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return [
             'order_id' => $data['order_id'] ?? null,
             'tracking_id' => $data['tracking_id'] ?? null,
             'waybill_id' => $data['waybill_id'] ?? null,
             'status' => $data['status'] ?? null,
         ];
+    }
+
+    /**
+     * [H7] Lepas titipan ongkir (210-04) saat kurir ditagih/dibayar.
+     * Jurnal: Dr 210-04 Titipan Ongkir / Cr 110-02 Bank sebesar ongkir.
+     * Idempoten per pengiriman: pre-check jurnal debit 210-04 ber-referensi
+     * pengiriman ini + idempotencyKey `ongkir:{id}` (atomic guard race).
+     * Fail-closed: kegagalan jurnal (periode tutup/akun nonaktif) dilempar
+     * ke pemanggil — tidak ada pelepasan liabilitas tanpa jurnal.
+     *
+     * @param  float|null  $nominal  override nominal (default: ongkir pengiriman)
+     * @return bool true bila jurnal diposting; false bila sudah pernah / ongkir 0
+     */
+    public function catatPembayaranOngkir(Pengiriman $pengiriman, ?float $nominal = null): bool
+    {
+        $nominal = round($nominal ?? (float) $pengiriman->ongkir, 2);
+        if ($nominal <= 0) {
+            return false;
+        }
+
+        $sudah = JurnalAkuntansi::where('referensi_tipe', Pengiriman::class)
+            ->where('referensi_id', $pengiriman->id)
+            ->whereHas('akun', fn ($q) => $q->where('kode', '210-04'))
+            ->where('debit', '>', 0)
+            ->exists();
+        if ($sudah) {
+            return false;
+        }
+
+        $cabangId = $pengiriman->transaksi?->cabang_id ?: (currentCabangId() ?? Cabang::value('id'));
+
+        foreach ([
+            ['kode' => '210-04', 'nama' => 'Titipan Ongkir', 'tipe' => 'kewajiban', 'kelompok' => 'utang_lain', 'saldo_normal' => 'kredit'],
+            ['kode' => '110-02', 'nama' => 'Bank', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit'],
+        ] as $akun) {
+            AkunCOA::firstOrCreate(['kode' => $akun['kode']], $akun + ['is_active' => true]);
+        }
+
+        $jurnalService = app(JurnalService::class);
+        $noJurnal = $jurnalService->generateNoJurnal('pembayaran', $cabangId);
+        try {
+            $jurnalService->post(
+                $noJurnal,
+                now(),
+                'pembayaran',
+                [
+                    ['akun_kode' => '210-04', 'debit' => $nominal, 'kredit' => 0],
+                    ['akun_kode' => '110-02', 'debit' => 0, 'kredit' => $nominal],
+                ],
+                "Pembayaran ongkir kurir {$pengiriman->kurir} pengiriman #{$pengiriman->id}",
+                $cabangId,
+                null,
+                Pengiriman::class,
+                $pengiriman->id,
+                'ongkir:'.$pengiriman->id
+            );
+        } catch (\Exception $e) {
+            if (str_contains($e->getMessage(), 'idempotency guard')) {
+                return false;
+            }
+
+            throw $e;
+        }
+
+        return true;
     }
 
     /**

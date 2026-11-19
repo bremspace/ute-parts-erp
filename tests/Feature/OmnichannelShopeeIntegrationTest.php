@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Omnichannel\Adapters\ShopeeAdapter;
 use App\Modules\Omnichannel\Models\Channel;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
@@ -73,6 +74,15 @@ class OmnichannelShopeeIntegrationTest extends TestCase
             ],
             'is_active' => true,
         ]);
+
+        // [H12] Jurnal channel kini fail-CLOSED — akun HPP/persediaan wajib
+        // ada agar posting berhasil (sebelumnya gagal diam-diam via warning).
+        foreach ([
+            ['kode' => '510-02', 'nama' => 'HPP', 'tipe' => 'beban', 'kelompok' => 'hpp', 'saldo_normal' => 'debit'],
+            ['kode' => '130-01', 'nama' => 'Persediaan', 'tipe' => 'aset', 'kelompok' => 'persediaan', 'saldo_normal' => 'debit'],
+        ] as $coa) {
+            AkunCOA::firstOrCreate(['kode' => $coa['kode']], $coa + ['is_active' => true]);
+        }
     }
 
     public function test_shopee_adapter_signature_and_auth_url(): void

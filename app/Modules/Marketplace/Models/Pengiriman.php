@@ -19,6 +19,7 @@ class Pengiriman extends Model
         'ongkir' => 'decimal:2',
     ];
 
+    /** @return BelongsTo<Transaksi, $this> */
     public function transaksi(): BelongsTo
     {
         return $this->belongsTo(Transaksi::class);
