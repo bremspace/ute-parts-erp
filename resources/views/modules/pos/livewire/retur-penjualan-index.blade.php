@@ -531,7 +531,7 @@
                                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                                     <div>
                                                         <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Kondisi Fisik Barang *</label>
-                                                        <select wire:model="itemInputs.{{ $itemId }}.kondisi_barang" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
+                                                        <select wire:model.live="itemInputs.{{ $itemId }}.kondisi_barang" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
                                                             <option value="rusak">⚠️ Cacat / Rusak (Masuk Pool Karantina Supplier)</option>
                                                             <option value="bagus">✅ Normal / Layak Jual (Kembali ke Stok Aktif)</option>
                                                         </select>
@@ -589,7 +589,7 @@
                                                             @endif
                                                         </label>
                                                         <div class="flex gap-1.5">
-                                                            <select wire:model="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value; $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="flex-1 px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
+                                                            <select wire:model.live="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value; $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="flex-1 px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
                                                                 <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
                                                                 @foreach($gudangs as $g)
                                                                     <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
