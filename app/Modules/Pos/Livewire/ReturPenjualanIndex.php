@@ -213,6 +213,27 @@ class ReturPenjualanIndex extends Component
     }
 
     /**
+     * Gudang penampung stok/return (karantina) untuk barang cacat.
+     */
+    public function penampungGudangId(int $cabangId): ?int
+    {
+        $id = Gudang::where('cabang_id', $cabangId)
+            ->where(function ($q) {
+                $q->where('nama', 'like', '%RETURN%')
+                    ->orWhere('nama', 'like', '%PENAMPUNG%')
+                    ->orWhere('kode', 'like', '%R%');
+            })
+            ->where('is_active', true)
+            ->value('id');
+
+        if (! $id) {
+            $id = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id');
+        }
+
+        return $id ? (int) $id : null;
+    }
+
+    /**
      * Deteksi rak asal (rak dengan stok terbanyak) untuk produk di gudang tertentu.
      */
     public function detectAsalRak(?int $produkId, ?int $gudangId): ?int
@@ -388,7 +409,7 @@ class ReturPenjualanIndex extends Component
                 'foto_bukti' => [],
                 'tukar_items' => [],
                 'tukar_search' => '',
-                'gudang_retur_id' => $this->asalGudangId,
+                'gudang_retur_id' => $this->penampungGudangId($cabangId),
                 'rak_retur_id' => null,
             ];
         }
@@ -489,12 +510,12 @@ class ReturPenjualanIndex extends Component
                     }
                 }
             } else {
-                // Cacat/rusak: default karantina di gudang asal, user bisa pindah
+                // Cacat/rusak: default ke gudang penampung/return (karantina), bukan gudang asal
                 if (empty($this->itemInputs[$itemId]['gudang_retur_id'])) {
-                    $asalGudangId = $this->asalGudangId
-                        ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang?->id));
-                    if ($asalGudangId) {
-                        $this->itemInputs[$itemId]['gudang_retur_id'] = $asalGudangId;
+                    $cabangId = session('cabang_id') ?: (auth()->user()?->cabangs?->first()?->id ?: 1);
+                    $penampungId = $this->penampungGudangId((int) $cabangId);
+                    if ($penampungId) {
+                        $this->itemInputs[$itemId]['gudang_retur_id'] = $penampungId;
                     }
                 }
             }
