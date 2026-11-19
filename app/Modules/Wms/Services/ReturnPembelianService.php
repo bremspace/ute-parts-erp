@@ -4,10 +4,13 @@ namespace App\Modules\Wms\Services;
 
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\ReturnPenjualanItem;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
+use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\NomorSeri;
+use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\ReturnPembelian;
@@ -25,7 +28,8 @@ class ReturnPembelianService
     public function __construct(
         protected JurnalService $jurnalService,
         protected NomorSeriService $nomorSeriService,
-        protected ApprovalService $approvalService
+        protected ApprovalService $approvalService,
+        protected StokDeductionService $stokDeductionService
     ) {}
 
     /**
@@ -73,14 +77,24 @@ class ReturnPembelianService
                     continue;
                 }
 
-                // Cek stok fisik yang tersedia di gudang sebelum retur
-                $stokItem = StokItem::where('gudang_id', $gudangId)
-                    ->where('produk_id', $poItem->produk_id)
-                    ->where('sku_variant_id', $poItem->sku_variant_id)
-                    ->first();
+                // [C3] Kontrak satuan POS-native: jumlah dalam SATUAN PO (mis. box),
+                // stok selalu bergerak dalam base unit (qtyDasar = jumlah x konversi).
+                $konversi = max(0.0001, (float) ($poItem->konversi ?? 1));
+                $satuan = ($poItem->satuan ?? null) ?: 'pcs';
+                $qtyDasar = (int) round($qtyRetur * $konversi);
+
+                // Cek stok fisik yang tersedia di gudang sebelum retur.
+                // [C3] Resolver kanonik (sama dgn POS/GRN): PO varian null tetap
+                // menemukan baris stok ber-varian yang dibuat GRN.
+                $stokItem = $this->stokDeductionService->cariBarisStok(
+                    (int) $poItem->produk_id,
+                    $poItem->sku_variant_id ? (int) $poItem->sku_variant_id : null,
+                    $gudangId,
+                    lock: false
+                );
 
                 $stokTersedia = $stokItem ? (int) $stokItem->jumlah : 0;
-                if ($qtyRetur > $stokTersedia) {
+                if ($qtyDasar > $stokTersedia) {
                     throw ValidationException::withMessages([
                         'items' => "Stok di gudang untuk produk {$poItem->produk?->nama} tidak mencukupi untuk diretur ({$stokTersedia} tersedia)",
                     ]);
@@ -101,13 +115,19 @@ class ReturnPembelianService
                     ]);
                 }
 
+                // [C3] Nilai retur at biaya GRN aktual (bukan harga PO) agar kredit
+                // 130-01 sama dengan debit awal GRN — tanpa residu GL persediaan.
                 $hargaBeli = (float) $poItem->harga_beli;
-                $subtotal = round($hargaBeli * $qtyRetur, 2);
+                $hargaGrn = $this->hargaGrnAktual($poLocked->id, $poItem);
+                $subtotal = round(($hargaGrn ?? $hargaBeli) * $qtyRetur, 2);
 
                 $preparedItems[] = [
                     'po_item' => $poItem,
                     'qty' => $qtyRetur,
+                    'satuan' => $satuan,
+                    'konversi' => $konversi,
                     'harga_beli' => $hargaBeli,
+                    'harga_grn' => $hargaGrn,
                     'subtotal' => $subtotal,
                     'sn' => $itemData['sn'] ?? [],
                 ];
@@ -142,8 +162,11 @@ class ReturnPembelianService
                     'return_pembelian_id' => $retur->id,
                     'produk_id' => $prep['po_item']->produk_id,
                     'sku_variant_id' => $prep['po_item']->sku_variant_id,
+                    'satuan' => $prep['satuan'],
+                    'konversi' => $prep['konversi'],
                     'jumlah' => $prep['qty'],
                     'harga_beli' => $prep['harga_beli'],
+                    'harga_grn' => $prep['harga_grn'],
                     'subtotal' => $prep['subtotal'],
                 ]);
 
@@ -225,15 +248,24 @@ class ReturnPembelianService
 
             foreach ($poolItems as $pItem) {
                 $qty = (float) $pItem->jumlah;
-                $hargaBeli = (float) ($pItem->hpp ?? $pItem->produk?->harga_beli ?? 0);
-                $subtotal = round($hargaBeli * $qty, 2);
+                // [C3] Pool item mengikuti kontrak satuan C2: hpp per base unit,
+                // jumlah dalam satuan jual. Nilai klaim = hpp x qtyDasar.
+                $konversi = max(0.0001, (float) ($pItem->konversi ?? 1));
+                $satuan = $pItem->satuan ?: 'pcs';
+                $qtyDasar = (int) round($qty * $konversi);
+                $hppPerBase = (float) ($pItem->hpp ?? $pItem->produk?->harga_beli ?? 0);
+                $hargaBeli = round($hppPerBase * $konversi, 2);
+                $subtotal = round($hppPerBase * $qtyDasar, 2);
 
                 ReturnPembelianItem::create([
                     'return_pembelian_id' => $retur->id,
                     'produk_id' => $pItem->produk_id,
                     'sku_variant_id' => $pItem->sku_variant_id,
+                    'satuan' => $satuan,
+                    'konversi' => $konversi,
                     'jumlah' => $qty,
                     'harga_beli' => $hargaBeli,
+                    'harga_grn' => null,
                     'subtotal' => $subtotal,
                 ]);
 
@@ -332,18 +364,24 @@ class ReturnPembelianService
 
             // 2. Tambah unit fisik baru ke StokItem aktif & catat mutasi masuk
             foreach ($retur->items as $item) {
-                $qty = (int) $item->jumlah;
+                // [C3] Restore simetris dengan potongan: qtyDasar = jumlah x konversi.
+                $konversi = max(0.0001, (float) ($item->konversi ?? 1));
+                $qty = (int) round((float) $item->jumlah * $konversi);
                 $produkId = (int) $item->produk_id;
                 $skuVariantId = $item->sku_variant_id ? (int) $item->sku_variant_id : null;
 
-                $stokItem = StokItem::firstOrCreate(
-                    [
-                        'gudang_id' => $gudangId,
-                        'produk_id' => $produkId,
-                        'sku_variant_id' => $skuVariantId,
-                    ],
-                    ['jumlah' => 0]
-                );
+                // Resolver kanonik dulu (baris varian hasil GRN utk PO varian null);
+                // fallback firstOrCreate utk pool karantina yang belum punya baris stok.
+                $stokItem = $this->stokDeductionService->cariBarisStok($produkId, $skuVariantId, $gudangId, lock: true)
+                    ?? StokItem::firstOrCreate(
+                        [
+                            'gudang_id' => $gudangId,
+                            'produk_id' => $produkId,
+                            'sku_variant_id' => $skuVariantId,
+                        ],
+                        ['jumlah' => 0]
+                    );
+                $skuVariantId = $stokItem->sku_variant_id ? (int) $stokItem->sku_variant_id : null;
 
                 $saldoAwal = (int) $stokItem->jumlah;
                 $stokItem->increment('jumlah', $qty);
@@ -485,11 +523,14 @@ class ReturnPembelianService
                     // Kembalikan ke stok gudang via mutasi terdata
                     $deductionService = app(StokDeductionService::class);
                     foreach ($retur->items as $item) {
+                        // [C3] Restore qtyDasar (base unit), simetris dengan potongan.
+                        $konversi = max(0.0001, (float) ($item->konversi ?? 1));
+                        $qtyDasar = (int) round((float) $item->jumlah * $konversi);
                         $deductionService->mutasi(
                             (int) $item->produk_id,
                             $item->sku_variant_id,
                             $gudangId,
-                            (int) $item->jumlah,
+                            $qtyDasar,
                             'penyesuaian',
                             'retur_pembelian_ditolak',
                             ReturnPembelian::class,
@@ -595,6 +636,11 @@ class ReturnPembelianService
 
     /**
      * Potong stok fisik gudang jika berasal dari PO (bukan pool karantina).
+     *
+     * [C3] Kontrak satuan POS-native: potong SELALU qtyDasar = jumlah x konversi
+     * (base unit); lookup resolver kanonik (kompatibel GRN varian-null); GAGAL
+     * bila baris stok tidak ada / kurang — tidak ada silent skip sementara
+     * jurnal tetap kredit persediaan.
      */
     protected function potongStokFisik(ReturnPembelian $retur, ?int $userId = null): void
     {
@@ -605,49 +651,140 @@ class ReturnPembelianService
         $gudangId = (int) $retur->gudang_id;
 
         foreach ($retur->items as $item) {
-            $qty = (int) $item->jumlah;
+            $konversi = max(0.0001, (float) ($item->konversi ?? 1));
+            $qtyDasar = (int) round((float) $item->jumlah * $konversi);
+            if ($qtyDasar <= 0) {
+                continue;
+            }
             $produkId = (int) $item->produk_id;
             $skuVariantId = $item->sku_variant_id ? (int) $item->sku_variant_id : null;
+            $namaProduk = Produk::whereKey($produkId)->value('nama') ?? "produk #{$produkId}";
 
-            $stokItem = StokItem::where('gudang_id', $gudangId)
-                ->where('produk_id', $produkId)
-                ->where('sku_variant_id', $skuVariantId)
-                ->lockForUpdate()
-                ->first();
+            $stokItem = $this->stokDeductionService->cariBarisStok($produkId, $skuVariantId, $gudangId, lock: true);
 
-            if ($stokItem) {
-                $saldoAwal = (int) $stokItem->jumlah;
-                $stokItem->decrement('jumlah', $qty);
-                $saldoAkhir = $saldoAwal - $qty;
-
-                // Stok Log
-                StokLog::create([
-                    'gudang_id' => $gudangId,
-                    'produk_id' => $produkId,
-                    'sku_variant_id' => $skuVariantId,
-                    'user_id' => $userId,
-                    'jenis' => 'keluar',
-                    'referensi_tipe' => ReturnPembelian::class,
-                    'referensi_id' => $retur->id,
-                    'jumlah_sebelum' => $saldoAwal,
-                    'perubahan' => -$qty,
-                    'jumlah_setelah' => $saldoAkhir,
-                    'catatan' => "Retur Pembelian {$retur->no_return}",
-                ]);
-
-                // Stock Mutation Log
-                StockMutationLog::create([
-                    'produk_id' => $produkId,
-                    'sku_variant_id' => $skuVariantId,
-                    'gudang_id' => $gudangId,
-                    'user_id' => $userId,
-                    'delta' => -$qty,
-                    'sumber' => 'retur_pembelian',
-                    'referensi_tipe' => ReturnPembelian::class,
-                    'referensi_id' => $retur->id,
-                    'terjadi_at' => now(),
+            if (! $stokItem) {
+                throw ValidationException::withMessages([
+                    'items' => "Baris stok gudang untuk {$namaProduk} tidak ditemukan — retur tidak dapat dieksekusi",
                 ]);
             }
+            if ((int) $stokItem->jumlah < $qtyDasar) {
+                throw ValidationException::withMessages([
+                    'items' => "Stok di gudang untuk {$namaProduk} tidak mencukupi untuk diretur ({$stokItem->jumlah} tersedia)",
+                ]);
+            }
+
+            $saldoAwal = (int) $stokItem->jumlah;
+            $stokItem->decrement('jumlah', $qtyDasar);
+            $saldoAkhir = $saldoAwal - $qtyDasar;
+            // Log memakai varian baris stok aktual (bisa berbeda dari varian PO null).
+            $varianAktual = $stokItem->sku_variant_id ? (int) $stokItem->sku_variant_id : null;
+
+            // Stok Log
+            StokLog::create([
+                'gudang_id' => $gudangId,
+                'produk_id' => $produkId,
+                'sku_variant_id' => $varianAktual,
+                'user_id' => $userId,
+                'jenis' => 'keluar',
+                'referensi_tipe' => ReturnPembelian::class,
+                'referensi_id' => $retur->id,
+                'jumlah_sebelum' => $saldoAwal,
+                'perubahan' => -$qtyDasar,
+                'jumlah_setelah' => $saldoAkhir,
+                'catatan' => "Retur Pembelian {$retur->no_return}",
+            ]);
+
+            // Stock Mutation Log
+            StockMutationLog::create([
+                'produk_id' => $produkId,
+                'sku_variant_id' => $varianAktual,
+                'gudang_id' => $gudangId,
+                'user_id' => $userId,
+                'delta' => -$qtyDasar,
+                'sumber' => 'retur_pembelian',
+                'referensi_tipe' => ReturnPembelian::class,
+                'referensi_id' => $retur->id,
+                'terjadi_at' => now(),
+            ]);
+
+            // [C3/M7] Recompute weighted average setelah retur bila metode average.
+            $hargaReturPerSatuan = (float) ($item->harga_grn ?? $item->harga_beli);
+            $biayaReturPerBase = round($hargaReturPerSatuan / $konversi, 2);
+            $this->sesuaikanAverageSetelahRetur($produkId, $qtyDasar, $biayaReturPerBase, (int) $retur->cabang_id);
+        }
+    }
+
+    /**
+     * [C3] Biaya GRN aktual per satuan PO untuk item retur (harga_beli pada
+     * item_qty_received GRN = harga aktual saat terima, bukan harga PO).
+     * Null bila PO diterima tanpa GRN (jalur legacy) — fallback harga PO.
+     */
+    protected function hargaGrnAktual(int $poId, PurchaseOrderItem $poItem): ?float
+    {
+        $grn = Grn::where('po_id', $poId)->where('status', 'terima')->first();
+        if (! $grn) {
+            return null;
+        }
+
+        $varianPo = $poItem->sku_variant_id ? (int) $poItem->sku_variant_id : null;
+        foreach ($grn->item_qty_received ?? [] as $row) {
+            $varianRow = isset($row['sku_variant_id']) && $row['sku_variant_id'] ? (int) $row['sku_variant_id'] : null;
+            if ((int) ($row['produk_id'] ?? 0) === (int) $poItem->produk_id && $varianRow === $varianPo) {
+                $harga = (float) ($row['harga_beli'] ?? 0);
+
+                return $harga > 0 ? $harga : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * [C3/M7] Hitung ulang weighted average setelah retur (metode 'average').
+     * Barang keluar dikredit at biaya GRN aktual yang bisa berbeda dari average
+     * berjalan: avgBaru = (qtySebelum x avgLama - qtyDasar x biayaReturPerBase) / qtySisa.
+     * Mirror efek ProdukService::sesuaikanHargaBeliProduk (master + varian pertama
+     * + retail margin + HargaTier), tanpa mengubah harga jual bila tanpa margin.
+     */
+    protected function sesuaikanAverageSetelahRetur(int $produkId, int $qtyDasar, float $biayaReturPerBase, int $cabangId): void
+    {
+        $produk = Produk::whereKey($produkId)->lockForUpdate()->first();
+        if (! $produk || ($produk->metode_harga_beli ?: 'manual') !== 'average') {
+            return;
+        }
+
+        $stokSisa = (int) StokItem::where('produk_id', $produk->id)
+            ->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId))
+            ->sum('jumlah');
+        if ($stokSisa <= 0) {
+            return; // tidak ada sisa stok — average tidak bermakna, biarkan biaya terakhir
+        }
+
+        $hargaLama = (float) $produk->harga_beli;
+        $qtySebelum = $stokSisa + $qtyDasar;
+        $nilaiSisa = ($qtySebelum * $hargaLama) - ($qtyDasar * $biayaReturPerBase);
+        $hargaBaru = round($nilaiSisa / $stokSisa, 2);
+        if ($hargaBaru <= 0 || abs($hargaBaru - $hargaLama) < 0.005) {
+            return;
+        }
+
+        $updateData = ['harga_beli' => $hargaBaru];
+        if ($produk->margin_persen !== null && (float) $produk->margin_persen > 0) {
+            $hargaJualBaru = round($hargaBaru * (1 + ((float) $produk->margin_persen / 100)));
+            $updateData['harga_jual_retail'] = $hargaJualBaru;
+            HargaTier::where('produk_id', $produk->id)
+                ->where('tipe_konsumen', 'retail')
+                ->update(['nominal_tetap' => $hargaJualBaru, 'harga' => $hargaJualBaru]);
+        }
+        $produk->update($updateData);
+
+        $variant = $produk->skuVariants()->first();
+        if ($variant) {
+            $variantUpdate = ['harga_beli' => $hargaBaru];
+            if (isset($updateData['harga_jual_retail'])) {
+                $variantUpdate['harga_jual_retail'] = $updateData['harga_jual_retail'];
+            }
+            $variant->update($variantUpdate);
         }
     }
 
