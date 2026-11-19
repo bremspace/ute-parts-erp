@@ -52,7 +52,7 @@ if ($pass !== '') {
 }
 if ($user === 'root') {
     foreach (['root', '123456', 'admin', 'password', 'mariadb', 'mysql'] as $common) {
-        if (!in_array($common, $candidates, true)) {
+        if (! in_array($common, $candidates, true)) {
             $candidates[] = $common;
         }
     }
