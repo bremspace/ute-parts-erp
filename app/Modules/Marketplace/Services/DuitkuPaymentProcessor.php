@@ -3,6 +3,7 @@
 namespace App\Modules\Marketplace\Services;
 
 use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Services\PelangganService;
@@ -418,6 +419,21 @@ class DuitkuPaymentProcessor
      */
     protected function tanganiPembayaranOrderKadaluarsa(Transaksi $transaksi, int $amount, ?string $reference, ?string $metodeBayar): void
     {
+        // [H6] Idempoten per order: retry webhook Duitku (reference sama/beda/null)
+        // TIDAK boleh posting holding dobel — liabilitas 210-05 lebih saji.
+        // Pre-check semantik (jurnal kredit 210-05 utk order ini) bekerja baik
+        // dengan maupun tanpa tabel jurnal_header; idempotencyKey di post()
+        // menegakkan atomic guard terhadap race paralel.
+        $kunciIdempoten = 'holding:'.$transaksi->no_transaksi;
+        $sudahHolding = JurnalAkuntansi::where('referensi_tipe', Transaksi::class)
+            ->where('referensi_id', $transaksi->id)
+            ->whereHas('akun', fn ($q) => $q->where('kode', '210-05'))
+            ->where('kredit', '>', 0)
+            ->exists();
+        if ($sudahHolding) {
+            return;
+        }
+
         $cabangId = $transaksi->cabang_id ?: Cabang::firstOrFail()->id;
         $channelBayar = $metodeBayar ?: 'duitku';
         $debitAkun = ($channelBayar === 'qris') ? '110-02' : '120-02';
@@ -434,27 +450,37 @@ class DuitkuPaymentProcessor
             ]
         );
 
-        // Update catatan transaksi
+        $noJurnal = $this->jurnalService->generateNoJurnal('pos', $cabangId);
+        try {
+            $this->jurnalService->post(
+                $noJurnal,
+                now(),
+                'pos',
+                [
+                    ['akun_kode' => $debitAkun, 'debit' => $amount, 'kredit' => 0],
+                    ['akun_kode' => '210-05', 'debit' => 0, 'kredit' => $amount],
+                ],
+                "Titipan dana pembayaran order {$transaksi->status} {$transaksi->no_transaksi} ({$channelBayar})",
+                $cabangId,
+                null,
+                Transaksi::class,
+                $transaksi->id,
+                $kunciIdempoten
+            );
+        } catch (\Exception $e) {
+            // Race: webhook paralel sudah mengklaim kunci ini → anggap terproses.
+            if (str_contains($e->getMessage(), 'idempotency guard')) {
+                return;
+            }
+
+            throw $e;
+        }
+
+        // Update catatan transaksi (hanya sekali — pre-check di atas menahan retry).
         $transaksi->update([
             'catatan' => trim($transaksi->catatan." [PERLU TINDAKAN MANUAL: Dana masuk Rp {$amount} pada order status {$transaksi->status} via {$channelBayar}]"),
             'payment_reference' => $reference ?: $transaksi->payment_reference,
         ]);
-
-        $noJurnal = $this->jurnalService->generateNoJurnal('pos', $cabangId);
-        $this->jurnalService->post(
-            $noJurnal,
-            now(),
-            'pos',
-            [
-                ['akun_kode' => $debitAkun, 'debit' => $amount, 'kredit' => 0],
-                ['akun_kode' => '210-05', 'debit' => 0, 'kredit' => $amount],
-            ],
-            "Titipan dana pembayaran order {$transaksi->status} {$transaksi->no_transaksi} ({$channelBayar})",
-            $cabangId,
-            null,
-            Transaksi::class,
-            $transaksi->id
-        );
 
         $this->notifService->kirim(
             'inapp',
@@ -471,5 +497,98 @@ class DuitkuPaymentProcessor
                 'audience' => 'staf',
             ]
         );
+    }
+
+    /**
+     * [H7] Settlement kliring gateway Duitku (120-02) ke bank saat dana cair.
+     * Jurnal: Dr 110-02 sebesar dana diterima, selisih fee (kliring − diterima)
+     * → Dr 520-06 bila fee positif / Cr 520-06 bila koreksi fee, Cr 120-02
+     * sebesar nominal kliring yang diselesaikan. Balance dijaga JurnalService.
+     *
+     * Idempoten per referensi pencairan (batch settlement Duitku): pre-check
+     * deskripsi + referensi_tipe (bekerja tanpa tabel jurnal_header) dan
+     * idempotencyKey unique per cabang untuk race paralel.
+     *
+     * @param  string  $referensiPencairan  ID batch/referensi pencairan dari laporan Duitku
+     * @param  float  $nominalKliring  nilai kliring 120-02 yang diselesaikan (bruto)
+     * @param  float  $nominalDiterima  dana bersih yang benar-benar masuk bank
+     * @return array{kode: string, no_jurnal: string|null}
+     */
+    public function catatSettlementKliring(string $referensiPencairan, float $nominalKliring, float $nominalDiterima, ?int $cabangId = null): array
+    {
+        $referensiPencairan = trim($referensiPencairan);
+        if ($referensiPencairan === '') {
+            throw new \Exception('Referensi pencairan settlement wajib diisi.');
+        }
+        $nominalKliring = round($nominalKliring, 2);
+        $nominalDiterima = round($nominalDiterima, 2);
+        if ($nominalKliring <= 0) {
+            throw new \Exception('Nominal kliring settlement harus > 0.');
+        }
+        if ($nominalDiterima < 0) {
+            throw new \Exception('Nominal diterima settlement tidak boleh negatif.');
+        }
+        $cabangId = $cabangId ?: (currentCabangId() ?? Cabang::value('id'));
+
+        $kunci = 'settlement:120-02:'.$referensiPencairan;
+        $deskripsi = "Settlement kliring Duitku {$referensiPencairan}";
+        if ($this->settlementSudahDicatat('settlement_kliring', $deskripsi)) {
+            return ['kode' => 'sudah_diproses', 'no_jurnal' => null];
+        }
+
+        foreach ([
+            ['kode' => '110-02', 'nama' => 'Bank', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit'],
+            ['kode' => '120-02', 'nama' => 'Piutang / Kliring Duitku Gateway', 'tipe' => 'aset', 'kelompok' => 'piutang', 'saldo_normal' => 'debit'],
+            ['kode' => '520-06', 'nama' => 'Beban Biaya Admin Marketplace', 'tipe' => 'beban', 'kelompok' => 'biaya_marketplace', 'saldo_normal' => 'debit'],
+        ] as $akun) {
+            AkunCOA::firstOrCreate(['kode' => $akun['kode']], $akun + ['is_active' => true]);
+        }
+
+        $selisih = round($nominalKliring - $nominalDiterima, 2);
+        $lines = [];
+        if ($nominalDiterima > 0) {
+            $lines[] = ['akun_kode' => '110-02', 'debit' => $nominalDiterima, 'kredit' => 0];
+        }
+        if ($selisih > 0) {
+            $lines[] = ['akun_kode' => '520-06', 'debit' => $selisih, 'kredit' => 0];
+        } elseif ($selisih < 0) {
+            $lines[] = ['akun_kode' => '520-06', 'debit' => 0, 'kredit' => -$selisih];
+        }
+        $lines[] = ['akun_kode' => '120-02', 'debit' => 0, 'kredit' => $nominalKliring];
+
+        $noJurnal = $this->jurnalService->generateNoJurnal('pembayaran', $cabangId);
+        try {
+            $this->jurnalService->post(
+                $noJurnal,
+                now(),
+                'pembayaran',
+                $lines,
+                $deskripsi,
+                $cabangId,
+                null,
+                'settlement_kliring',
+                0,
+                $kunci
+            );
+        } catch (\Exception $e) {
+            if (str_contains($e->getMessage(), 'idempotency guard')) {
+                return ['kode' => 'sudah_diproses', 'no_jurnal' => null];
+            }
+
+            throw $e;
+        }
+
+        return ['kode' => 'sukses', 'no_jurnal' => $noJurnal];
+    }
+
+    /**
+     * [H7] Pre-check settlement idempoten via baris jurnal (referensi_tipe +
+     * deskripsi eksak) — tidak bergantung keberadaan tabel jurnal_header.
+     */
+    private function settlementSudahDicatat(string $referensiTipe, string $deskripsi): bool
+    {
+        return JurnalAkuntansi::where('referensi_tipe', $referensiTipe)
+            ->where('deskripsi', $deskripsi)
+            ->exists();
     }
 }

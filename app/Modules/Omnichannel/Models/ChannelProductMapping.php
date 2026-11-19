@@ -21,6 +21,7 @@ class ChannelProductMapping extends Model
         return $this->belongsTo(Channel::class);
     }
 
+    /** @return BelongsTo<Produk, $this> */
     public function produk(): BelongsTo
     {
         return $this->belongsTo(Produk::class);

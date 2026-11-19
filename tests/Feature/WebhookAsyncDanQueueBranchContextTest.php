@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Omnichannel\Jobs\ProcessChannelOrderJob;
@@ -97,6 +98,15 @@ class WebhookAsyncDanQueueBranchContextTest extends TestCase
             'channel_sku' => 'LCD-S23-01',
             'status' => 'tersinkron',
         ]);
+
+        // [H12] Jurnal channel kini fail-CLOSED — akun HPP/persediaan wajib
+        // ada agar posting berhasil (sebelumnya gagal diam-diam via warning).
+        foreach ([
+            ['kode' => '510-02', 'nama' => 'HPP', 'tipe' => 'beban', 'kelompok' => 'hpp', 'saldo_normal' => 'debit'],
+            ['kode' => '130-01', 'nama' => 'Persediaan', 'tipe' => 'aset', 'kelompok' => 'persediaan', 'saldo_normal' => 'debit'],
+        ] as $coa) {
+            AkunCOA::firstOrCreate(['kode' => $coa['kode']], $coa + ['is_active' => true]);
+        }
     }
 
     public function test_webhook_omnichannel_async_ingestion_and_staging(): void

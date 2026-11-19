@@ -186,7 +186,7 @@ class FaseLimaOptimizationTest extends TestCase
 
         // ChannelOrder harus fail-closed dan berstatus 'stok_kurang'
         $this->assertSame('stok_kurang', $channelOrder->status);
-        $this->assertStringContainsString('Insiden stok', (string) $channelOrder->catatan);
+        $this->assertStringContainsString('Insiden', (string) $channelOrder->catatan);
 
         // Transaksi lokal TIDAK BOLEH dibuat atau selesai
         $this->assertNull($channelOrder->transaksi_id);

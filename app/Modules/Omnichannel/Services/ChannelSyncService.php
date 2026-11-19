@@ -5,6 +5,7 @@ namespace App\Modules\Omnichannel\Services;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Marketplace\Models\Pengiriman;
 use App\Modules\Omnichannel\Adapters\ShopeeAdapter;
 use App\Modules\Omnichannel\Contracts\ChannelAdapterInterface;
@@ -13,6 +14,7 @@ use App\Modules\Omnichannel\Models\Channel;
 use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\StokDeductionService;
@@ -309,8 +311,10 @@ class ChannelSyncService
 
     /**
      * Buat Transaksi lokal dan potong stok gudang untuk order channel.
-     * Fail-closed: jika pemotongan stok gagal / stok fisik tidak mencukupi,
-     * status ChannelOrder dialihkan ke 'stok_kurang' dan transaksi/jurnal dibatalkan.
+     * Fail-closed: jika pemotongan stok gagal / stok fisik tidak mencukupi /
+     * jurnal penjualan gagal (periode tutup, akun nonaktif, tidak balance),
+     * seluruh transaksi DB di-rollback dan status ChannelOrder dialihkan ke
+     * 'stok_kurang' — tidak ada stok terpotong / transaksi jadi tanpa jurnal.
      */
     protected function potongStokDanBuatTransaksi(Channel $channel, ChannelOrder $channelOrder): void
     {
@@ -375,12 +379,28 @@ class ChannelSyncService
                         'produk_id' => $mapping->produk_id,
                         'sku_variant_id' => $mapping->sku_variant_id,
                         'jumlah' => $qty,
+                        // [H12] Kontrak satuan: qty channel dalam base unit (pcs),
+                        // konversi 1 → qtyDasar = jumlah x konversi konsisten.
+                        'satuan' => $mapping->produk?->satuan ?: 'pcs',
+                        'konversi' => 1,
                         'harga_satuan' => $itemPrice > 0 ? $itemPrice : (float) ($mapping->produk->harga_jual ?? 0),
                         'diskon_nominal' => 0,
                         'subtotal' => round(($itemPrice > 0 ? $itemPrice : (float) ($mapping->produk->harga_jual ?? 0)) * $qty, 2),
                         'hpp' => $hpp,
                     ];
                 }
+
+                // [H12] Pisah DPP/PPN/ongkir (pola DuitkuPaymentProcessor::pisahDppPpn
+                // / PajakService): total_amount channel termasuk ongkir; harga
+                // marketplace bersifat PPN-inclusive, jadi PPN diekstrak dari
+                // nilai barang bila pajak aktif utk cabang (tidak retroaktif —
+                // pajak nonaktif → PPN 0, DPP = nilai barang penuh).
+                $ongkir = max(0.0, min((float) ($payload['actual_shipping_fee'] ?? 0), $totalAmount));
+                $totalBarang = round($totalAmount - $ongkir, 2);
+                $pajakService = app(PajakService::class);
+                $pajak = $pajakService->hitung($cabangId, $totalBarang, 'inclusive');
+                $dpp = round((float) $pajak['dpp'], 2);
+                $ppnNominal = round((float) $pajak['ppn_nominal'], 2);
 
                 // Buat record Transaksi lokal setelah semua baris stok berhasil dipotong
                 $noTransaksi = 'TRX-CH-'.$channel->id.'-'.$channelOrder->channel_order_id;
@@ -389,7 +409,9 @@ class ChannelSyncService
                     [
                         'cabang_id' => $cabangId,
                         'sumber' => 'channel:'.$channel->platform,
-                        'subtotal' => $totalAmount,
+                        'subtotal' => $totalBarang,
+                        'dpp' => $dpp,
+                        'ppn_nominal' => $ppnNominal,
                         'total_akhir' => $totalAmount,
                         'metode_bayar' => $channel->platform ?: 'marketplace',
                         'status' => 'selesai',
@@ -410,7 +432,7 @@ class ChannelSyncService
                         [
                             'kurir' => $carrier,
                             'layanan' => 'Reguler',
-                            'ongkir' => (float) ($payload['actual_shipping_fee'] ?? 0),
+                            'ongkir' => $ongkir,
                             'asal_cabang' => $transaksi->cabang?->nama ?? 'Cabang',
                             'nama_penerima' => $payload['recipient_address']['name'] ?? $payload['buyer_username'] ?? 'Konsumen Channel',
                             'alamat_tujuan' => $payload['recipient_address']['full_address'] ?? '-',
@@ -421,44 +443,55 @@ class ChannelSyncService
                     );
                 }
 
-                // Catat Jurnal Penjualan Omnichannel Terintegrasi
-                try {
-                    $akunPiutangChannel = str_contains($channel->platform, 'shopee') ? '120-03' : '120-04';
-                    $jurnalService = app(JurnalService::class);
-                    $noJurnal = $jurnalService->generateNoJurnal('channel', $cabangId);
+                // [H12] Jurnal penjualan omnichannel — fail-CLOSED: bila jurnal
+                // gagal (periode tutup/akun nonaktif/tidak balance) exception
+                // diteruskan ke catch luar → DB::transaction rollback stok +
+                // Transaksi. Tidak ada lagi penjualan tercatat tanpa jurnal.
+                $akunPiutangChannel = str_contains($channel->platform, 'shopee') ? '120-03' : '120-04';
+                $jurnalService = app(JurnalService::class);
+                $noJurnal = $jurnalService->generateNoJurnal('channel', $cabangId);
 
-                    $lines = [
-                        ['akun_kode' => $akunPiutangChannel, 'debit' => $totalAmount, 'kredit' => 0],
-                        ['akun_kode' => '410-04', 'debit' => 0, 'kredit' => $totalAmount],
-                    ];
-
-                    if ($totalHpp > 0) {
-                        $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
-                        $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
-                    }
-
-                    $jurnalService->post(
-                        $noJurnal,
-                        now(),
-                        'channel',
-                        $lines,
-                        "Jurnal penjualan {$channel->nama} #{$channelOrder->channel_order_id}",
-                        $cabangId,
-                        null,
-                        Transaksi::class,
-                        $transaksi->id
+                $lines = [
+                    ['akun_kode' => $akunPiutangChannel, 'debit' => $totalAmount, 'kredit' => 0],
+                    ['akun_kode' => '410-04', 'debit' => 0, 'kredit' => $dpp],
+                ];
+                // Titipan ongkir (210-04) — dilepas saat kurir ditagih/dibayar
+                // (BiteshipService::catatPembayaranOngkir).
+                if ($ongkir > 0) {
+                    AkunCOA::firstOrCreate(
+                        ['kode' => '210-04'],
+                        ['nama' => 'Titipan Ongkir', 'tipe' => 'kewajiban', 'kelompok' => 'utang_lain', 'saldo_normal' => 'kredit', 'is_active' => true]
                     );
-                } catch (\Throwable $e) {
-                    Log::warning("Jurnal penjualan channel gagal (order #{$channelOrder->id}): {$e->getMessage()}");
+                    $lines[] = ['akun_kode' => '210-04', 'debit' => 0, 'kredit' => $ongkir];
                 }
+                // PPN Keluaran (220-01) — baris kanonik dari PajakService.
+                foreach ($pajakService->jurnalLines($ppnNominal, $noJurnal, (int) $cabangId, 0) as $ppnLine) {
+                    $lines[] = $ppnLine;
+                }
+                if ($totalHpp > 0) {
+                    $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
+                    $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
+                }
+
+                $jurnalService->post(
+                    $noJurnal,
+                    now(),
+                    'channel',
+                    $lines,
+                    "Jurnal penjualan {$channel->nama} #{$channelOrder->channel_order_id}",
+                    $cabangId,
+                    null,
+                    Transaksi::class,
+                    $transaksi->id
+                );
 
                 $channelOrder->update(['transaksi_id' => $transaksi->id]);
             });
         } catch (\Throwable $e) {
-            Log::error("Fail-closed: Pemotongan stok order channel #{$channelOrder->channel_order_id} gagal — {$e->getMessage()}");
+            Log::error("Fail-closed: Pemrosesan order channel #{$channelOrder->channel_order_id} gagal (stok/jurnal di-rollback) — {$e->getMessage()}");
             $channelOrder->update([
                 'status' => 'stok_kurang',
-                'catatan' => 'Insiden stok: '.$e->getMessage(),
+                'catatan' => 'Insiden: '.$e->getMessage(),
             ]);
         }
     }
@@ -512,6 +545,92 @@ class ChannelSyncService
         } catch (\Throwable $e) {
             Log::warning("Jurnal biaya admin channel gagal (order #{$order->id}): {$e->getMessage()}");
         }
+    }
+
+    /**
+     * [H7] Settlement piutang/saldo channel (120-03 Shopee / 120-04 lainnya)
+     * ke bank saat dana pencairan marketplace masuk rekening.
+     * Jurnal: Dr 110-02 dana diterima, selisih (kliring − diterima) → 520-06
+     * (Dr bila fee tambahan, Cr bila koreksi fee estimasi), Cr akun channel
+     * sebesar nominal kliring yang diselesaikan.
+     *
+     * `nominalKliring` = saldo kliring yang di-clear (untuk channel: neto
+     * setelah biaya admin estimasi yang sudah dijurnal prosesBiayaAdmin).
+     * Idempoten per referensi pencairan; fail-closed bila jurnal gagal.
+     *
+     * @return array{kode: string, no_jurnal: string|null}
+     */
+    public function catatSettlementChannel(Channel $channel, string $referensiPencairan, float $nominalKliring, float $nominalDiterima): array
+    {
+        $referensiPencairan = trim($referensiPencairan);
+        if ($referensiPencairan === '') {
+            throw new \Exception('Referensi pencairan settlement wajib diisi.');
+        }
+        $nominalKliring = round($nominalKliring, 2);
+        $nominalDiterima = round($nominalDiterima, 2);
+        if ($nominalKliring <= 0) {
+            throw new \Exception('Nominal kliring settlement harus > 0.');
+        }
+        if ($nominalDiterima < 0) {
+            throw new \Exception('Nominal diterima settlement tidak boleh negatif.');
+        }
+
+        $akunPiutangChannel = str_contains($channel->platform, 'shopee') ? '120-03' : '120-04';
+        $cabangId = $channel->kredensial['cabang_id'] ?? currentCabangId() ?? Cabang::value('id');
+        $kunci = 'settlement:'.$akunPiutangChannel.':'.$referensiPencairan;
+        $deskripsi = "Settlement channel {$channel->nama} {$referensiPencairan}";
+
+        $sudah = JurnalAkuntansi::where('referensi_tipe', 'settlement_channel')
+            ->where('deskripsi', $deskripsi)
+            ->exists();
+        if ($sudah) {
+            return ['kode' => 'sudah_diproses', 'no_jurnal' => null];
+        }
+
+        foreach ([
+            ['kode' => '110-02', 'nama' => 'Bank', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit'],
+            ['kode' => $akunPiutangChannel, 'nama' => 'Piutang / Saldo Channel Marketplace', 'tipe' => 'aset', 'kelompok' => 'piutang', 'saldo_normal' => 'debit'],
+            ['kode' => '520-06', 'nama' => 'Beban Biaya Admin Marketplace', 'tipe' => 'beban', 'kelompok' => 'biaya_marketplace', 'saldo_normal' => 'debit'],
+        ] as $akun) {
+            AkunCOA::firstOrCreate(['kode' => $akun['kode']], $akun + ['is_active' => true]);
+        }
+
+        $selisih = round($nominalKliring - $nominalDiterima, 2);
+        $lines = [];
+        if ($nominalDiterima > 0) {
+            $lines[] = ['akun_kode' => '110-02', 'debit' => $nominalDiterima, 'kredit' => 0];
+        }
+        if ($selisih > 0) {
+            $lines[] = ['akun_kode' => '520-06', 'debit' => $selisih, 'kredit' => 0];
+        } elseif ($selisih < 0) {
+            $lines[] = ['akun_kode' => '520-06', 'debit' => 0, 'kredit' => -$selisih];
+        }
+        $lines[] = ['akun_kode' => $akunPiutangChannel, 'debit' => 0, 'kredit' => $nominalKliring];
+
+        $jurnalService = app(JurnalService::class);
+        $noJurnal = $jurnalService->generateNoJurnal('channel', $cabangId);
+        try {
+            $jurnalService->post(
+                $noJurnal,
+                now(),
+                'channel',
+                $lines,
+                $deskripsi,
+                $cabangId,
+                null,
+                'settlement_channel',
+                0,
+                $kunci
+            );
+        } catch (\Throwable $e) {
+            if (str_contains($e->getMessage(), 'idempotency guard')) {
+                return ['kode' => 'sudah_diproses', 'no_jurnal' => null];
+            }
+
+            throw $e;
+        }
+
+        return ['kode' => 'sukses', 'no_jurnal' => $noJurnal];
     }
 
     /**
