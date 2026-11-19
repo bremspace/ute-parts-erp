@@ -438,7 +438,7 @@
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 text-xs">
                 <!-- 1. Rasio Earn Poin Global -->
                 <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
                     <label class="block font-semibold text-ink-300 text-[11px]">Rasio Earn Poin (%)</label>
@@ -797,7 +797,7 @@
         @endcan
 
         <!-- Grid Cards Tier Membership -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @forelse($tiers as $t)
                 <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/15 transition flex flex-col justify-between space-y-4 relative overflow-hidden group">
                     <!-- Accent bar di atas kartu -->
