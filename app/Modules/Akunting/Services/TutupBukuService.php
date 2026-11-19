@@ -78,35 +78,32 @@ class TutupBukuService
             ];
         }
 
-        $awalBulan = Carbon::create($tahun, $bulan, 1)->startOfMonth()->toDateString();
         $akhirBulan = Carbon::create($tahun, $bulan, 1)->endOfMonth()->toDateString();
+
+        // [C-1] Pengendalian urutan periode: tidak boleh menutup bulan N bila
+        // periode sebelumnya yang terdaftar masih open, dan tidak boleh tutup
+        // mundur bila saldo periode ini sudah tersapu penutup periode berikutnya.
+        $pesanUrutan = $this->pesanUrutanPeriode($cabangId, $tahun, $bulan, $periode->label_periode);
 
         // 1. Verifikasi Keseimbangan Neraca
         $neraca = $this->exportLaporanService->neracaSaldo($cabangId, $akhirBulan);
         $selisih = round((float) ($neraca['selisih'] ?? 0), 2);
         $balance = abs($selisih) < 0.01;
 
-        // 2. Hitung mutasi akun nominal (Pendapatan & Beban) pada periode berjalan
-        // [F-05] Kecualikan juga jurnal REVERSAL dari ayat penutup (hasil reopen
-        // periode): tanpa ini, tutup buku ulang periode yang direopen menghitung
-        // ganda mutasi nominal (asal + reversal), karena penutup asli sudah
-        // dikecualikan lewat filter sumber.
-        $noPenutup = JurnalHeader::where('cabang_key', $cabangId)
-            ->where('sumber', 'tutup_buku')
-            ->pluck('no_jurnal');
-        $noReversalPenutup = $noPenutup->isEmpty()
-            ? collect()
-            : JurnalHeader::where('cabang_key', $cabangId)
-                ->whereIn('reversal_of_no_jurnal', $noPenutup)
-                ->pluck('no_jurnal');
-
-        $jurnals = JurnalAkuntansi::where('cabang_id', $cabangId)
-            ->whereDate('tanggal', '>=', $awalBulan)
-            ->whereDate('tanggal', '<=', $akhirBulan)
-            ->where('sumber', '!=', 'tutup_buku')
-            ->when($noReversalPenutup->isNotEmpty(), fn ($q) => $q->whereNotIn('no_jurnal', $noReversalPenutup))
-            ->with('akun')
-            ->get();
+        // 2. [C-1] Hitung SALDO KUMULATIF akun nominal (Pendapatan & Beban) s/d
+        // akhir periode — bukan hanya mutasi bulan berjalan. Menjumlah SELURUH
+        // baris jurnal disetujui (termasuk ayat penutup periode sebelumnya beserta
+        // reversal-nya) menghasilkan saldo buku besar sebenarnya per tanggal tutup:
+        // periode yang sudah ditutup bersaldo nol, sehingga hasil = mutasi bulan ini
+        // + residual bulan terlewat. Ayat penutup memindahkan saldo ini ke Laba
+        // Ditahan sehingga akun nominal benar-benar nol per tanggal tutup (SAK:
+        // closing entries menolkan akun nominal, period-end control berurutan).
+        // Hanya jurnal disetujui yang ditutup — konsisten dengan neracaSaldo
+        // (maker-checker: jurnal pending/ditolak belum diakui di laporan).
+        $jurnals = ExportLaporanService::hanyaDisetujui(
+            JurnalAkuntansi::where('cabang_id', $cabangId)
+                ->whereDate('tanggal', '<=', $akhirBulan)
+        )->with('akun')->get();
 
         $pendapatanRows = $jurnals->where('akun.tipe', 'pendapatan')
             ->groupBy('akun_coa_id')
@@ -169,10 +166,10 @@ class TutupBukuService
             $lines[] = ['akun_kode' => self::AKUN_LABA_DITAHAN, 'debit' => abs($labaBersih), 'kredit' => 0.0];
         }
 
-        $siapTutup = $balance;
-        $pesan = $siapTutup
+        $siapTutup = $balance && $pesanUrutan === null;
+        $pesan = $pesanUrutan ?? ($siapTutup
             ? 'Neraca seimbang. Periode siap ditutup.'
-            : "Neraca tidak seimbang (selisih Rp {$selisih}). Tutup buku tidak diizinkan sebelum diagnosa neraca diselesaikan.";
+            : "Neraca tidak seimbang (selisih Rp {$selisih}). Tutup buku tidak diizinkan sebelum diagnosa neraca diselesaikan.");
 
         return [
             'siap_tutup' => $siapTutup,
@@ -186,6 +183,72 @@ class TutupBukuService
             'baris_jurnal_rencana' => $lines,
             'pesan' => $pesan,
         ];
+    }
+
+    /**
+     * [C-1] Pengendalian urutan periode tutup buku (period-end control berurutan).
+     *
+     * 1. Periode sebelumnya yang terdaftar masih open → tolak: tutup buku wajib
+     *    berurutan agar saldo nominal tidak tersapu parsial.
+     * 2. Ada periode SETELAHnya yang sudah closed → tolak tutup mundur: saldo
+     *    kumulatif periode ini sudah dipindahkan ke Laba Ditahan oleh ayat penutup
+     *    periode berikutnya (bulan terlewat yang tersapu), menutup lagi = transfer
+     *    ganda. Kecuali periode ini pernah ditutup lalu di-reopen resmi (penutup
+     *    di-reversal): saldonya muncul lagi dan wajib ditutup ulang.
+     *
+     * @return string|null pesan penolakan, atau null bila urutan layak
+     */
+    private function pesanUrutanPeriode(int $cabangId, int $tahun, int $bulan, string $labelPeriode): ?string
+    {
+        $sebelumnyaOpen = PeriodeAkuntansi::where('cabang_id', $cabangId)
+            ->where('status', 'open')
+            ->where(function ($q) use ($tahun, $bulan) {
+                $q->where('tahun', '<', $tahun)
+                    ->orWhere(function ($q2) use ($tahun, $bulan) {
+                        $q2->where('tahun', $tahun)->where('bulan', '<', $bulan);
+                    });
+            })
+            ->orderBy('tahun')
+            ->orderBy('bulan')
+            ->get();
+
+        if ($sebelumnyaOpen->isNotEmpty()) {
+            $label = $sebelumnyaOpen->map(fn (PeriodeAkuntansi $p) => $p->label_periode)->implode(', ');
+
+            return "Tutup buku wajib berurutan: periode {$label} masih terbuka. Tutup periode tersebut terlebih dahulu sebelum menutup {$labelPeriode}.";
+        }
+
+        $sesudahClosed = PeriodeAkuntansi::where('cabang_id', $cabangId)
+            ->where('status', 'closed')
+            ->where(function ($q) use ($tahun, $bulan) {
+                $q->where('tahun', '>', $tahun)
+                    ->orWhere(function ($q2) use ($tahun, $bulan) {
+                        $q2->where('tahun', $tahun)->where('bulan', '>', $bulan);
+                    });
+            })
+            ->exists();
+
+        if ($sesudahClosed) {
+            // Pengecualian: periode ini pernah ditutup lalu di-reopen resmi
+            // (ayat penutupnya di-reversal via bukaBukuKembali). Saldo nominalnya
+            // muncul kembali di buku besar dan wajib ditutup ulang — penutup
+            // periode berikutnya TIDAK pernah menyapu saldo ini (saat itu periode
+            // ini sudah closed/nol), jadi tutup ulang bukan transfer ganda.
+            $awalBulan = Carbon::create($tahun, $bulan, 1)->startOfMonth()->toDateString();
+            $akhirBulan = Carbon::create($tahun, $bulan, 1)->endOfMonth()->toDateString();
+            $pernahDitutupLaluReopen = JurnalHeader::where('cabang_key', $cabangId)
+                ->where('sumber', 'tutup_buku')
+                ->where('is_reversed', true)
+                ->whereDate('tanggal', '>=', $awalBulan)
+                ->whereDate('tanggal', '<=', $akhirBulan)
+                ->exists();
+
+            if (! $pernahDitutupLaluReopen) {
+                return "Periode setelah {$labelPeriode} sudah ditutup; saldo nominal periode ini sudah dipindahkan ke Laba Ditahan oleh ayat penutup tersebut. Tutup mundur tidak diizinkan karena akan menyebabkan transfer ganda.";
+            }
+        }
+
+        return null;
     }
 
     /**
