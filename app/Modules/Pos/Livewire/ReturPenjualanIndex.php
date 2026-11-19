@@ -461,9 +461,21 @@ class ReturPenjualanIndex extends Component
     /**
      * Buka / tutup panel picker produk pengganti untuk item tertentu.
      */
+    public function updatedTukarSearch($value): void
+    {
+        if ($this->activeTukarItemId) {
+            $this->itemInputs[$this->activeTukarItemId]['tukar_search'] = $value;
+        }
+    }
+
     public function bukaPilihTukar(int $itemId): void
     {
         $this->activeTukarItemId = $this->activeTukarItemId === $itemId ? null : $itemId;
+        if ($this->activeTukarItemId === $itemId) {
+            $this->tukarSearch = $this->itemInputs[$itemId]['tukar_search'] ?? '';
+        } else {
+            $this->tukarSearch = '';
+        }
     }
 
     /**
@@ -498,7 +510,7 @@ class ReturPenjualanIndex extends Component
                 ?? Gudang::value('id');
         }
 
-        $term = trim($this->itemInputs[$itemId]['tukar_search'] ?? '');
+        $term = trim($this->tukarSearch ?? '');
 
         // 1. Ambil produk yang sama persis secara definitif
         $pSama = Produk::with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId))])

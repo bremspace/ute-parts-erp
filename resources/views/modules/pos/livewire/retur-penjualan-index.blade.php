@@ -399,7 +399,7 @@
                                     wire:model="kwitansiInput"
                                     wire:keydown.enter="cariKwitansi"
                                     placeholder="Ketik atau Scan QR / Barcode Struk Faktur..."
-                                    class="w-full pl-11 pr-3.5 py-2.5 rounded-xl glass-input text-xs font-mono font-bold text-white min-h-[44px]"
+                                    class="w-full pl-11 pr-3.5 py-2.5 rounded-xl glass-input text-xs font-mono font-bold text-white min-h-[44px] {{ empty($kwitansiInput) ? 'border-up-red/50' : '' }}"
                                     data-barcode-input="true"
                                     x-ref="kwitansiField"
                                 />
@@ -702,7 +702,7 @@
                                                                     <div class="relative flex-1">
                                                                         <input
                                                                             type="text"
-                                                                            wire:model.live.debounce.300ms="itemInputs.{{ $itemId }}.tukar_search"
+                                                                            wire:model.live.debounce.150ms="tukarSearch"
                                                                             placeholder="Pencarian manual nama produk atau scan barcode..."
                                                                             class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder-ink-400"
                                                                         />
@@ -827,6 +827,12 @@
                                                                             @endforeach
                                                                         </div>
                                                                     </div>
+                                                                  @else
+                                                                      @if(!empty($itemInputs[$itemId]['tukar_search']))
+                                                                          <div class="p-3 text-center text-ink-400 text-xs">
+                                                                              Tidak ada produk yang cocok dengan pencarian.
+                                                                          </div>
+                                                                      @endif
                                                                 @endif
                                                             </div>
                                                         @endif
