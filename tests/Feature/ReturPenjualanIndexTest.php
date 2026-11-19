@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCoa;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Pos\Livewire\ReturPenjualanIndex;
+use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Livewire\SettingsRbac;
@@ -187,6 +189,59 @@ class ReturPenjualanIndexTest extends TestCase
             'tipe_penyelesaian' => 'refund',
             'status' => 'selesai',
         ]);
+    }
+
+    public function test_e2e_retur_box_via_ui_refund_hpp_dan_stok_benar(): void
+    {
+        session(['cabang_id' => $this->cabang->id]);
+
+        $pelanggan = Pelanggan::create(['nama' => 'Budi Box E2E', 'tipe' => 'retail']);
+        $transaksi = Transaksi::create([
+            'no_transaksi' => 'TRX-BOX-E2E',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_barang' => 1,
+            'subtotal' => 38000,
+            'total_akhir' => 38000,
+            'status' => 'selesai',
+        ]);
+        // 1 box = 4 pcs; harga & HPP per box.
+        $trxItem = TransaksiItem::create([
+            'transaksi_id' => $transaksi->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1, 'satuan' => 'box', 'konversi' => 4,
+            'harga_satuan' => 38000, 'subtotal' => 38000, 'hpp' => 30000,
+        ]);
+        $stok = StokItem::create(['gudang_id' => $this->gudang->id, 'produk_id' => $this->produk->id, 'jumlah' => 10]);
+
+        Livewire::actingAs($this->user)
+            ->test(ReturPenjualanIndex::class)
+            ->set('kwitansiInput', 'TRX-BOX-E2E')
+            ->call('cariKwitansi')
+            ->set("itemInputs.{$trxItem->id}.jumlah", 1)
+            ->set("itemInputs.{$trxItem->id}.kondisi_barang", 'bagus')
+            ->set('tipePenyelesaian', 'refund')
+            ->set('metodePengembalian', 'kas')
+            ->set('alasan', 'Salah beli box')
+            ->call('simpanRetur')
+            ->assertDispatched('alert');
+
+        // Refund via UI = harga per box (38.000), bukan per pcs (9.500).
+        $this->assertDatabaseHas('return_penjualan', ['transaksi_id' => $transaksi->id, 'jumlah' => 38000]);
+        $this->assertDatabaseHas('return_penjualan_item', ['produk_id' => $this->produk->id, 'satuan' => 'box', 'jumlah' => 1]);
+
+        // Stok kembali 4 pcs (1 box x konversi 4): 10 -> 14.
+        $stok->refresh();
+        $this->assertEquals(14, (int) $stok->jumlah, 'Stok harus kembali 4 pcs');
+
+        // Jurnal balance: retur 38.000 + persediaan 30.000 = 68.000.
+        $retur = ReturnPenjualan::where('transaksi_id', $transaksi->id)->first();
+        $jurnal = JurnalHeader::where('referensi_tipe', ReturnPenjualan::class)->where('referensi_id', $retur->id)->first();
+        $this->assertNotNull($jurnal);
+        $this->assertEquals(68000.0, (float) $jurnal->total_debit);
+        $this->assertEquals(68000.0, (float) $jurnal->total_kredit);
     }
 
     public function test_mount_dengan_transaksi_id_menampilkan_nomor_faktur_bukan_id(): void
