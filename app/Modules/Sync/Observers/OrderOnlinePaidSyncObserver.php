@@ -3,6 +3,7 @@
 namespace App\Modules\Sync\Observers;
 
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Sync\Services\HybridSyncOutboxService;
 use Illuminate\Support\Facades\Log;
 
@@ -30,13 +31,13 @@ class OrderOnlinePaidSyncObserver
                 'nomor_order' => $transaksi->no_transaksi ?? (string) $transaksi->id,
                 'total' => $transaksi->total_akhir ?? 0,
                 'cabang_id' => $transaksi->cabang_id ?? null,
-                'items' => $transaksi->items?->map(function ($item) {
+                'items' => $transaksi->items->map(function (TransaksiItem $item): array {
                     return [
                         'produk_id' => $item->produk_id,
-                        'qty' => $item->jumlah ?? 1,
-                        'harga' => $item->harga_satuan ?? 0,
+                        'qty' => $item->jumlah,
+                        'harga' => $item->harga_satuan,
                     ];
-                })->toArray() ?? [],
+                })->toArray(),
             ];
 
             app(HybridSyncOutboxService::class)->enqueue(

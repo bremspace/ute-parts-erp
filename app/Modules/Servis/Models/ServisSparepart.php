@@ -28,6 +28,7 @@ class ServisSparepart extends Model
         return $this->belongsTo(TiketServis::class);
     }
 
+    /** @return BelongsTo<Produk, $this> */
     public function produk(): BelongsTo
     {
         return $this->belongsTo(Produk::class);

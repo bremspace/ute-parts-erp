@@ -11,6 +11,8 @@ use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -379,7 +381,10 @@ class BagiHasilService
         ];
     }
 
-    public function riwayatTeknisi(int $karyawanId, int $limit = 10)
+    /**
+     * @return Collection<int, BagiHasil>
+     */
+    public function riwayatTeknisi(int $karyawanId, int $limit = 10): Collection
     {
         return BagiHasil::with('tiketServis')
             ->where('karyawan_id', $karyawanId)
@@ -409,7 +414,10 @@ class BagiHasilService
             ->toArray();
     }
 
-    protected function queryPendingPeriode(string $periode, ?int $cabangId)
+    /**
+     * @return Builder<BagiHasil>
+     */
+    protected function queryPendingPeriode(string $periode, ?int $cabangId): Builder
     {
         $query = BagiHasil::where('periode', $periode)
             ->whereIn('status', [BagiHasil::STATUS_PENDING, BagiHasil::STATUS_DISETUJUI]);

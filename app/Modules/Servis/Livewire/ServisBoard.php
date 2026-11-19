@@ -10,6 +10,7 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Servis\Services\ServisStateMachine;
 use App\Modules\Wms\Livewire\ProductSearchModal;
@@ -19,13 +20,33 @@ use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Traits\ParsesNominal;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
+/**
+ * Papan kanban servis. Properti computed Livewire (getXProperty()) dideklarasikan
+ * di sini agar tipe magic property dikenali analisis statis.
+ *
+ * @property-read EloquentCollection<int, TiketServis> $bookingOnline
+ * @property-read bool $canEditHargaPart
+ * @property-read Collection<int, Produk> $cariPartResults
+ * @property-read int $fotoCount
+ * @property-read array<string, EloquentCollection<int, TiketServis>> $groupedTikets
+ * @property-read Collection<int, TiketServis> $listTikets
+ * @property-read Collection<int, Pelanggan> $pelangganCariServis
+ * @property-read Collection<int, Produk> $produkEstimasiList
+ * @property-read TiketServis|null $selectedTiket
+ * @property-read array<string, array{label: string, color: string}> $stateMachineColumns
+ * @property-read array<int, array{id: int, no_tiket: string}> $tiketPerluPersetujuan
+ */
 class ServisBoard extends Component
 {
     use ParsesNominal;
@@ -291,13 +312,13 @@ class ServisBoard extends Component
 
     public string $batalItemAlasan = '';
 
-    public function mount()
+    public function mount(): void
     {
         $this->photoInputs = [null, null, null]; // max 3 foto
     }
 
     #[On('produk-dipilih-global')]
-    public function onProdukDipilihGlobal($targetIndex = null, $context = null, $produkId = null): void
+    public function onProdukDipilihGlobal(mixed $targetIndex = null, mixed $context = null, mixed $produkId = null): void
     {
         $idx = null;
         if (is_array($targetIndex)) {
@@ -384,7 +405,7 @@ class ServisBoard extends Component
     }
 
     #[On('buka-pencarian-produk')]
-    public function bukaPencarianProduk($targetIndex = null, $context = 'servis'): void
+    public function bukaPencarianProduk(mixed $targetIndex = null, mixed $context = 'servis'): void
     {
         if (is_array($targetIndex)) {
             $context = $targetIndex['context'] ?? $context;
@@ -397,7 +418,8 @@ class ServisBoard extends Component
         $this->showCariPartModal = true;
     }
 
-    public function getCariPartResultsProperty()
+    /** @return Collection<int, Produk> */
+    public function getCariPartResultsProperty(): Collection
     {
         if (! $this->showCariPartModal) {
             return collect();
@@ -523,7 +545,7 @@ class ServisBoard extends Component
     }
 
     /** [F2-5] Export laporan servis via queue & unduh langsung. */
-    public function exportLaporan(string $format = 'xlsx')
+    public function exportLaporan(string $format = 'xlsx'): ?BinaryFileResponse
     {
         if (! auth()->user()?->can('laporan.cabang')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
@@ -560,6 +582,7 @@ class ServisBoard extends Component
         return response()->download($fullPath, 'laporan-servis-'.now()->format('Ymd-His').'.'.$fmt);
     }
 
+    /** @return array<string, array{label: string, color: string}> */
     public function getStateMachineColumnsProperty(): array
     {
         return ServisStateMachine::kanbanColumns();
@@ -639,6 +662,7 @@ class ServisBoard extends Component
         return $id ? $this->queryTiketScoped()->find($id) : null;
     }
 
+    /** @return array<string, EloquentCollection<int, TiketServis>> */
     public function getGroupedTiketsProperty(): array
     {
         // [B-07] Dua tahap — ORDER BY + LIMIT hanya boleh menyentuh kolom SEMPIT.
@@ -738,7 +762,7 @@ class ServisBoard extends Component
      * [T-07a] Normalisasi viewMode — hanya menerima 'kanban' | 'list'.
      * Persist ke localStorage dilakukan di sisi browser (toggle toolbar).
      */
-    public function updatedViewMode($value): void
+    public function updatedViewMode(mixed $value): void
     {
         if (! in_array($value, ['kanban', 'list'], true)) {
             $this->viewMode = 'kanban';
@@ -750,7 +774,8 @@ class ServisBoard extends Component
      * menggabungkan kembali koleksi kolom `groupedTikets` yang sudah ter-hydrate
      * (eager load lengkap), diurutkan tiket terbaru di atas.
      */
-    public function getListTiketsProperty()
+    /** @return Collection<int, TiketServis> */
+    public function getListTiketsProperty(): Collection
     {
         return collect($this->groupedTikets)
             ->flatMap(fn ($kolom) => $kolom)
@@ -785,8 +810,10 @@ class ServisBoard extends Component
 
     /**
      * Antrean booking servis online yang menunggu konfirmasi cabang.
+     *
+     * @return EloquentCollection<int, TiketServis>
      */
-    public function getBookingOnlineProperty()
+    public function getBookingOnlineProperty(): EloquentCollection
     {
         // Dua tahap seperti kanban (B-07): ORDER BY created_at hanya di query id sempit
         $ids = $this->scopeTiket(
@@ -804,7 +831,7 @@ class ServisBoard extends Component
     /**
      * Konfirmasi tiket dari booking online ke diterima.
      */
-    public function konfirmasiBookingOnline(int $tiketId)
+    public function konfirmasiBookingOnline(int $tiketId): void
     {
         $tiket = $this->tiketScoped($tiketId);
 
@@ -865,7 +892,7 @@ class ServisBoard extends Component
         }
     }
 
-    public function handleIntakeFotoUpload(int $index, $content): void
+    public function handleIntakeFotoUpload(int $index, mixed $content): void
     {
         if ($content) {
             $this->intakePhotoInputs[$index] = $content;
@@ -937,7 +964,7 @@ class ServisBoard extends Component
     }
 
     // --- Foto handling (base64, opsional — [B-06] tanpa batas minimum) ---
-    public function handleFotoUpload(int $index, $content)
+    public function handleFotoUpload(int $index, mixed $content): void
     {
         if (! $content) {
             return;
@@ -947,7 +974,7 @@ class ServisBoard extends Component
         $this->photoInputs[$index] = $content;
     }
 
-    public function removeFoto(int $index)
+    public function removeFoto(int $index): void
     {
         $this->photoInputs[$index] = null;
     }
@@ -957,7 +984,7 @@ class ServisBoard extends Component
         return count(array_filter($this->photoInputs));
     }
 
-    public function toggleKondisiFisik(string $check)
+    public function toggleKondisiFisik(string $check): void
     {
         $list = $this->terimaForm['kondisi_fisik'] ?? [];
         if (in_array($check, $list, true)) {
@@ -968,7 +995,7 @@ class ServisBoard extends Component
     }
 
     // --- Terima Unit ---
-    public function openTerimaModal()
+    public function openTerimaModal(): void
     {
         // [B-14] Route `/app/servis` hanya dijaga `permission:servis.view`; sejak
         // role non-teknisi (kasir/marketing) boleh punya permission itu, aksi
@@ -1005,8 +1032,12 @@ class ServisBoard extends Component
         $this->showTerimaModal = true;
     }
 
-    /** [T-18] hasil pencarian pelanggan utk customer-picker */
-    public function getPelangganCariServisProperty()
+    /**
+     * [T-18] hasil pencarian pelanggan utk customer-picker
+     *
+     * @return Collection<int, Pelanggan>
+     */
+    public function getPelangganCariServisProperty(): Collection
     {
         if (strlen($this->pelangganSearch) < 2) {
             return collect();
@@ -1022,7 +1053,7 @@ class ServisBoard extends Component
     }
 
     /** pilih pelanggan dari picker (terima unit) */
-    public function setPelangganServis(?int $id)
+    public function setPelangganServis(?int $id): void
     {
         $this->terimaForm['pelanggan_id'] = $id;
         if ($id) {
@@ -1034,7 +1065,7 @@ class ServisBoard extends Component
     }
 
     /** [T-18] buka modal quick-add pelanggan baru dari terima unit — satu sumber (CRM-06 path) */
-    public function openPelangganBaruServis()
+    public function openPelangganBaruServis(): void
     {
         $this->pelangganBaruForm = [
             'nama' => '',
@@ -1050,7 +1081,7 @@ class ServisBoard extends Component
     }
 
     /** [T-18] simpan pelanggan baru via PelangganService (sama dgn CRM-06 / POS) → langsung dipilih */
-    public function simpanPelangganBaruServis()
+    public function simpanPelangganBaruServis(): void
     {
         $this->validate([
             'pelangganBaruForm.nama' => 'required|string|max:255',
@@ -1081,7 +1112,7 @@ class ServisBoard extends Component
         }
     }
 
-    public function simpanTerima()
+    public function simpanTerima(): void
     {
         if (! $this->boleh('servis.create', 'Anda tidak punya izin menerima unit servis')) {
             return;
@@ -1207,7 +1238,7 @@ class ServisBoard extends Component
     }
 
     // --- Status update (state machine) ---
-    public function updateStatus(int $tiketId, string $statusBaru, string $alasan = '')
+    public function updateStatus(int $tiketId, string $statusBaru, string $alasan = ''): void
     {
         // [T-06] Otorisasi OBJEK duluan: tiket cabang lain → 404 (ModelNotFoundException)
         // sebelum guard izin aksi. Guard izin lebih dulu membuat tiket cabang lain
@@ -1314,10 +1345,10 @@ class ServisBoard extends Component
         $this->recalculateTerimaEstimasiTotal();
     }
 
-    public function updatedTerimaEstimasiItems($value, $key): void
+    public function updatedTerimaEstimasiItems(mixed $value, mixed $key): void
     {
         $parts = explode('.', (string) $key);
-        $idx = (int) ($parts[0] ?? 0);
+        $idx = (int) $parts[0];
         $field = $parts[1] ?? '';
 
         if (! isset($this->terimaEstimasiItems[$idx])) {
@@ -1379,10 +1410,10 @@ class ServisBoard extends Component
         $this->terimaEstimasiBiaya = (float) array_sum(array_column($this->terimaEstimasiItems, 'subtotal'));
     }
 
-    public function updatedEstimasiItems($value, $key): void
+    public function updatedEstimasiItems(mixed $value, mixed $key): void
     {
         $parts = explode('.', (string) $key);
-        $idx = (int) ($parts[0] ?? 0);
+        $idx = (int) $parts[0];
         $field = $parts[1] ?? '';
 
         if (! isset($this->estimasiItems[$idx])) {
@@ -1446,7 +1477,7 @@ class ServisBoard extends Component
         $this->estimasiBiaya = (float) array_sum(array_column($this->estimasiItems, 'subtotal'));
     }
 
-    public function openEstimasiModal(int $tiketId)
+    public function openEstimasiModal(int $tiketId): void
     {
         $tiket = $this->tiketScoped($tiketId);
         $this->estimasiTiketId = $tiketId;
@@ -1487,7 +1518,7 @@ class ServisBoard extends Component
         $this->showEstimasiModal = true;
     }
 
-    public function simpanEstimasi()
+    public function simpanEstimasi(): void
     {
         // [B-14] Sama dgn API [SERVICE-05] → `permission:servis.update-status`.
         if (! $this->boleh('servis.update-status', 'Anda tidak punya izin input estimasi biaya servis')) {
@@ -1575,7 +1606,7 @@ class ServisBoard extends Component
         $this->showProgressModal = true;
     }
 
-    public function handleProgressFotoUpload($content): void
+    public function handleProgressFotoUpload(mixed $content): void
     {
         if (! $content) {
             return;
@@ -1643,14 +1674,14 @@ class ServisBoard extends Component
     }
 
     // --- Approve / Reject (admin, dengan alasan) ---
-    public function openApproveModal(int $tiketId)
+    public function openApproveModal(int $tiketId): void
     {
         $this->approveTiketId = $tiketId;
         $this->approveAlasan = '';
         $this->showApproveModal = true;
     }
 
-    public function prosesApprove(string $action)
+    public function prosesApprove(string $action): void
     {
         // [T-06] Otorisasi OBJEK duluan (404 untuk tiket cabang lain) sebelum
         // guard izin aksi — konsisten dengan updateStatus().
@@ -1974,14 +2005,14 @@ class ServisBoard extends Component
     }
 
     // --- Drag & drop ---
-    public function dropTicket(int $tiketId, string $statusTujuan)
+    public function dropTicket(int $tiketId, string $statusTujuan): void
     {
         // Simulate: drop = update status ke kolom tujuan (state machine akan validasi)
         $this->updateStatus($tiketId, $statusTujuan);
     }
 
     // --- Detail ---
-    public function openDetail(int $tiketId)
+    public function openDetail(int $tiketId): void
     {
         // [T-06 / P0-10] Tiket harus milik cabang aktif sesi — kalau tidak, detail
         // (termasuk kunci gadget terenkripsi) tidak boleh dibuka sama sekali.
@@ -2162,21 +2193,21 @@ class ServisBoard extends Component
         ];
     }
 
-    public function addPekerjaanRow(string $tipe = 'jasa')
+    public function addPekerjaanRow(string $tipe = 'jasa'): void
     {
         $this->pekerjaanItems[] = $this->pekerjaanRowBaru($tipe);
     }
 
-    public function removePekerjaanRow(int $idx)
+    public function removePekerjaanRow(int $idx): void
     {
         unset($this->pekerjaanItems[$idx]);
         $this->pekerjaanItems = array_values($this->pekerjaanItems);
     }
 
-    public function updatedPekerjaanItems($value, $key): void
+    public function updatedPekerjaanItems(mixed $value, mixed $key): void
     {
         $parts = explode('.', (string) $key);
-        $idx = (int) ($parts[0] ?? 0);
+        $idx = (int) $parts[0];
         $field = $parts[1] ?? '';
 
         if (! isset($this->pekerjaanItems[$idx])) {
@@ -2220,7 +2251,7 @@ class ServisBoard extends Component
     }
 
     /** [T-17] Simpan item pekerjaan → ServisService::inputPekerjaan (part: stok 1x, jasa: tagihan) */
-    public function simpanPekerjaan()
+    public function simpanPekerjaan(): void
     {
         $tiket = $this->tiketScoped($this->selectedTiketId);
 
@@ -2307,14 +2338,15 @@ class ServisBoard extends Component
         return isSuperAdminOrOwner();
     }
 
-    public function getProdukEstimasiListProperty()
+    /** @return Collection<int, Produk> */
+    public function getProdukEstimasiListProperty(): Collection
     {
         // Produk: tidak perlu lagi load semua produk ke dropdown.
         // Pencarian produk global via ProductSearchModal.
         return collect();
     }
 
-    public function render()
+    public function render(): View
     {
         $cabangId = session('cabang_id');
 

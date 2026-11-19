@@ -20,6 +20,9 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * @property string|null $kode_lama
+ */
 #[Fillable([
     'nama', 'slug', 'barcode', 'barcode_alt', 'deskripsi', 'kategori', 'kategori_id', 'brand_kompatibel',
     'model_kompatibel', 'kondisi', 'satuan', 'harga_beli',
@@ -43,6 +46,7 @@ class Produk extends Model
      * @property string|null $slug
      * @property string|null $barcode
      * @property string|null $barcode_alt
+     * @property string|null $kode_lama
      * @property string|null $deskripsi
      * @property string|null $kategori
      * @property int|null $kategori_id

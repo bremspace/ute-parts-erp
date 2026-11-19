@@ -2,6 +2,8 @@
 
 namespace App\Modules\Rbac\Models;
 
+use App\Models\User;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +16,8 @@ use Spatie\Activitylog\Models\Activity;
  *
  * causerNama: "sistem" bila tidak ada user login (job queue / seed / webhook) —
  * bukan "null" supaya jelas di UI riwayat.
+ *
+ * @property int|null $cabang_id
  */
 #[Fillable([])]
 class AktivitasLog extends Activity
@@ -52,7 +56,11 @@ class AktivitasLog extends Activity
         });
     }
 
-    /** Relasi ke Cabang */
+    /**
+     * Relasi ke Cabang
+     *
+     * @return BelongsTo<Cabang, $this>
+     */
     public function cabang(): BelongsTo
     {
         return $this->belongsTo(Cabang::class, 'cabang_id');
@@ -66,9 +74,17 @@ class AktivitasLog extends Activity
 
     public function getCauserNamaAttribute(): string
     {
-        // Causer bisa User (name) maupun Pelanggan (nama) — keduanya Model.
-        return $this->causer?->name
-            ?? ($this->causer?->nama ?? 'sistem');
+        // Causer bisa User (name) maupun Pelanggan (nama) — narrowing eksplisit
+        // agar akses properti type-safe; perilaku tetap name ?? nama ?? 'sistem'.
+        $causer = $this->causer;
+        if ($causer instanceof User) {
+            return $causer->name ?? 'sistem';
+        }
+        if ($causer instanceof Pelanggan) {
+            return $causer->nama ?? 'sistem';
+        }
+
+        return 'sistem';
     }
 
     public function getIpAttribute(): ?string

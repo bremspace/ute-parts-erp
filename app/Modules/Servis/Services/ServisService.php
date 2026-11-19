@@ -2556,7 +2556,7 @@ class ServisService
 
         // [Komplain garansi] Perbaikan gratis: LUNAS OTOMATIS saat selesai
         // (setelah persetujuan regulator) — tanpa piutang & tanpa tagihan.
-        if ($garansiGratis ?? false) {
+        if ($garansiGratis) {
             $tiket->update([
                 'status_pembayaran' => 'lunas',
                 'tanggal_bayar' => now(),

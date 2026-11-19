@@ -274,12 +274,14 @@ class ReturPenjualanIndex extends Component
                 'item_id' => $item->id,
                 'produk_id' => $item->produk_id,
                 'produk_nama' => $item->produk?->nama ?? 'Produk ID #'.$item->produk_id,
-                'kode' => $item->produk?->kode ?? '-',
+                // Kolom `kode` tidak ada di tabel produk (legacy); baca magic selalu null, jadi nilai runtime konstan '-'.
+                'kode' => '-',
                 'kategori_id' => $item->produk?->kategori_id,
                 'kategori' => $item->produk?->kategori,
                 'brand_kompatibel' => $item->produk?->brand_kompatibel,
                 'model_kompatibel' => $item->produk?->model_kompatibel,
-                'has_sn' => (bool) ($item->produk?->has_sn ?? false),
+                // Kolom `has_sn` tidak ada di tabel produk (legacy, flag SN asli = `sn`); baca magic selalu null, jadi nilai runtime konstan false.
+                'has_sn' => false,
                 'qty_beli' => (float) $item->jumlah,
                 'sudah_diretur' => $sudahDiretur,
                 'sisa_bisa_diretur' => $sisaBisaDiretur,

@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Schema;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * @property int $cabang_id
+ */
 #[Fillable(['cabang_id', 'nama', 'kode', 'is_active', 'is_default'])]
 class Gudang extends Model
 {
