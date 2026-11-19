@@ -215,7 +215,7 @@
                                         <span class="tabular-nums line-through">Rp {{ number_format($subtotalRetail, 0, ',', '.') }}</span>
                                     </div>
                                     <div class="flex justify-between items-center text-up-mint font-semibold">
-                                        <span>Potongan Tier Member ({{ $pelanggan->tierMembership?->nama ?? ($pelanggan->tipe_konsumen === 'reseller' ? 'Reseller' : 'Member') }})</span>
+                                        <span>Diskon / Box ({{ $pelanggan->tierMembership?->nama ?? ($pelanggan->tipe_konsumen === 'reseller' ? 'Reseller' : 'Member') }})</span>
                                         <span class="tabular-nums">- Rp {{ number_format($diskonTier, 0, ',', '.') }}</span>
                                     </div>
                                     <div class="flex justify-between items-center text-ink-700 dark:text-ink-300 font-bold pt-1 border-t border-ink-100/60 dark:border-white/5">
@@ -427,7 +427,7 @@
                             Total pesanan terhitung untuk <strong class="text-ink-900 dark:text-white">{{ $jumlahItem }} suku cadang</strong>
                             @if(($diskonTier ?? 0) > 0)
                                 <div class="mt-1 text-up-mint font-bold text-[11px]">
-                                    🎉 Anda menghemat total Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan harga tier member
+                                    🎉 Anda menghemat total Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan diskon / box
                                 </div>
                             @endif
                             @if(($potensiKomisi ?? 0) > 0)
@@ -450,7 +450,7 @@
                                     <span class="line-through tabular-nums">Rp {{ number_format($subtotalRetail, 0, ',', '.') }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 text-xs text-up-mint font-semibold">
-                                    <span>Potongan Tier:</span>
+                                    <span>Diskon / Box:</span>
                                     <span class="tabular-nums">- Rp {{ number_format($diskonTier, 0, ',', '.') }}</span>
                                 </div>
                             @endif
