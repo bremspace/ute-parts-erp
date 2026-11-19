@@ -481,13 +481,13 @@
                         </div>
                     </div>
 
-                    @if(!empty($productDetail) && count($productDetail->getDaftarSatuan()) > 1)
+                    @if(!empty($produk) && count($produk->getDaftarSatuan()) > 1)
                         <div class="space-y-1">
                             <label class="block text-xs font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider">
                                 Satuan
                             </label>
                             <select wire:model.live="selectedSatuan" class="px-3 py-2 rounded-xl glass-input text-xs font-bold text-ink-900 dark:text-white bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 min-h-[44px]">
-                                @foreach($productDetail->getDaftarSatuan() as $sat)
+                                @foreach($produk->getDaftarSatuan() as $sat)
                                     <option value="{{ $sat['satuan_kode'] }}">{{ $sat['label'] }} ({{ $sat['keterangan'] }})</option>
                                 @endforeach
                             </select>
