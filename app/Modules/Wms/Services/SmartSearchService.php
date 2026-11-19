@@ -140,7 +140,7 @@ class SmartSearchService
             return $query;
         }
 
-        $term = trim($q);
+        $term = preg_replace('/\s+/', ' ', trim($q));
         if ($term === '') {
             return $query;
         }
@@ -292,7 +292,7 @@ class SmartSearchService
             return $query;
         }
 
-        $term = trim($q);
+        $term = preg_replace('/\s+/', ' ', trim($q));
         if ($term === '') {
             return $query;
         }
@@ -311,11 +311,11 @@ class SmartSearchService
         $bindings[] = $term;
 
         // 3. Prefix Nama Produk (Diawali kata pencarian) (+700)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 700 ELSE 0 END';
+        $cases[] = 'CASE WHEN LOWER(REPLACE(produk.nama, \'  \', \' \')) LIKE LOWER(?) THEN 700 ELSE 0 END';
         $bindings[] = $term.'%';
 
         // 4. Frasa Lengkap Ada di Nama Produk (+500)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 500 ELSE 0 END';
+        $cases[] = 'CASE WHEN LOWER(REPLACE(produk.nama, \'  \', \' \')) LIKE LOWER(?) THEN 500 ELSE 0 END';
         $bindings[] = '%'.$term.'%';
 
         // 5. Seluruh Kata Token Ada di Nama Produk (+300)
