@@ -115,7 +115,7 @@ class AkunCoaDeleteSafetyTest extends TestCase
         $this->postJurnalKe('110-03');
 
         // down() migration FK mengembalikan perilaku lama (cascade) — reversibility.
-        $this->migration('2026_11_20_000002_restrict_jurnal_akuntansi_akun_coa_fk.php')->down();
+        $this->migration('2026_11_20_000003_restrict_jurnal_akuntansi_akun_coa_fk.php')->down();
 
         DB::table('akun_coa')->where('kode', '110-03')->delete();
 
