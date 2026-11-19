@@ -364,7 +364,7 @@ class SimulasiE2ETest extends TestCase
         $proses = $service->prosesPeriode($this->periode);
         $this->assertEquals(100000, $proses['total']);
 
-        $accrue = JurnalAkuntansi::where('no_jurnal', 'JRL-BH-'.$this->periode)->get();
+        $accrue = JurnalAkuntansi::where('no_jurnal', $proses['no_jurnal'])->get();
         $this->assertSame(2, $accrue->count());
         $this->assertEquals($accrue->sum('debit'), $accrue->sum('kredit'));
         $this->assertEquals(100000, (float) $accrue->sum('debit'));
