@@ -578,11 +578,16 @@
                                                     </div>
                                                 </div>
 
-                                                {{-- Gudang & Rak tujuan produk yang dikembalikan (hanya barang normal/bagus) --}}
-                                                @if(($itemInputs[$itemId]['kondisi_barang'] ?? 'rusak') === 'bagus')
+                                                {{-- Gudang & Rak tujuan produk yang dikembalikan --}}
                                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" x-data="{ gudangId: '{{ $itemInputs[$itemId]['gudang_retur_id'] ?? '' }}' }">
                                                     <div>
-                                                        <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Tujuan Stok (Kembali ke Stok Asal / Pindah Gudang)</label>
+                                                        <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">
+                                                            @if(($itemInputs[$itemId]['kondisi_barang'] ?? 'rusak') === 'bagus')
+                                                                Tujuan Stok (Kembali ke Stok Asal / Pindah Gudang)
+                                                            @else
+                                                                Gudang Karantina (Lokasi Penyimpanan Barang Cacat)
+                                                            @endif
+                                                        </label>
                                                         <div class="flex gap-1.5">
                                                             <select wire:model="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value; $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="flex-1 px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
                                                                 <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
@@ -590,7 +595,9 @@
                                                                     <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
                                                                 @endforeach
                                                             </select>
-                                                            <button type="button" title="Kembali ke gudang asal transaksi" @click="gudangId = '{{ $selectedTransaksi?->gudang_id }}'; $wire.set('itemInputs.{{ $itemId }}.gudang_retur_id', '{{ $selectedTransaksi?->gudang_id }}'); $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="px-2.5 py-2 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint text-[10px] font-bold cursor-pointer whitespace-nowrap">↻ Asal</button>
+                                                            @if(($itemInputs[$itemId]['kondisi_barang'] ?? 'rusak') === 'bagus')
+                                                                <button type="button" title="Kembali ke gudang asal transaksi" @click="gudangId = '{{ $selectedTransaksi?->gudang_id }}'; $wire.set('itemInputs.{{ $itemId }}.gudang_retur_id', '{{ $selectedTransaksi?->gudang_id }}'); $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="px-2.5 py-2 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint text-[10px] font-bold cursor-pointer whitespace-nowrap">↻ Asal</button>
+                                                            @endif
                                                         </div>
                                                     </div>
                                                     <div>
@@ -603,7 +610,6 @@
                                                         </select>
                                                     </div>
                                                 </div>
-                                                @endif
 
                                                 <!-- Jika Item Refund: Pilihan Akun / Kas -->
                                                 @if(($itemInputs[$itemId]['tipe_penyelesaian'] ?? 'refund') === 'refund')
