@@ -3,6 +3,15 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-19 — POS: Mobile bottom-sheet UX untuk semua modal kasir
+
+- **Pola bottom-sheet**: semua 9 modal POS kasir dikonversi ke slide-up dari bawah di mobile (`items-end sm:items-center`, `rounded-t-3xl sm:rounded-3xl`, `max-h-[92dvh]`), modal desktop tetap tengah.
+- **Safe area insets**: `pb-[max(env(safe-area-inset-bottom),1.25rem)]` mencegah konten terpotong di iPhone notch/Dynamic Island.
+- **Grab handle**: indikator drag (`w-10 h-1 rounded-full`) di atas setiap modal mobile (`sm:hidden`).
+- **Touch targets**: semua input form `min-h-[44px]` di mobile, `text-base sm:text-xs` mencegah iOS auto-zoom (font <16px).
+- **Modal yang diupdate**: payment-modal, diskon-modal, kas-modal, mutasi-kas-modal, pelanggan-baru-modal, void-transaksi-modal, bayar-servis-modal, riwayat-transaksi-modal, pesanan-online-modal.
+- **Build**: `npm run build` ✅ (6.58s), `PHPUnit PricingServiceTest` ✅.
+
 ## 2026-11-15 — Servis: KPI komplain berulang, eskalasi SLA & voucher goodwill
 
 - **KPI `komplain_berulang`**: metrik HR baru menghitung komplain pasca-servis yang tiket asalnya ditangani teknisi (target 2/komplain, makin rendah makin baik; dipakai di KPI & payroll).
