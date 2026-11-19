@@ -80,7 +80,29 @@ class OrderService
                 $diskonPerUnit = (float) ($pricing['diskon_nominal'] ?? 0);
                 $potensiKomisiPerUnit = (float) ($pricing['potensi_komisi'] ?? 0);
                 $modeRewardMitra = $pricing['mode_reward'] ?? 'diskon_langsung';
-                $lineSubtotal = round($harga * $qty, 2);
+
+                // Campuran box + pcs: hitung subtotal dari komponen (box + pcs) bukan harga per base
+                $sisaPcs = (int) ($item['sisa_pcs'] ?? 0);
+                if ($sisaPcs > 0 && ($item['satuan'] ?? 'pcs') !== 'pcs') {
+                    $faktor = (float) ($satuanInfo['faktor_konversi'] ?? 1.0);
+                    if ($faktor <= 0) { $faktor = 1.0; }
+                    $faktorInt = (int) round($faktor);
+                    $boxCount = (int) floor($qty / $faktorInt);
+                    $boxPrice = 0.0;
+                    foreach ($produk->getDaftarSatuan() as $s) {
+                        if (strcasecmp($s['satuan_kode'], 'box') === 0) {
+                            $boxPrice = (float) ($s['harga_jual'] ?? 0);
+                            break;
+                        }
+                    }
+                    if ($boxPrice <= 0) { $boxPrice = $harga * $faktor; }
+                    $pcsPrice = (float) $produk->harga_jual_retail;
+                    $total = ($boxCount * $boxPrice) + ($sisaPcs * $pcsPrice);
+                    $lineSubtotal = round($total, 2);
+                    $harga = $qty > 0 ? round($total / $qty, 2) : $harga;
+                } else {
+                    $lineSubtotal = round($harga * $qty, 2);
+                }
                 $subtotal += $lineSubtotal;
                 $totalKomisiMitra += round($potensiKomisiPerUnit * $qty, 2);
 
