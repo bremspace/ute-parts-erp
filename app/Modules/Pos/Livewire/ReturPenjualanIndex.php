@@ -497,26 +497,23 @@ class ReturPenjualanIndex extends Component
             $parts = explode('.', $key);
             $itemId = (int) $parts[0];
             if ($value === 'bagus') {
-                // Auto-detect gudang & rak asal untuk barang normal
-                if (empty($this->itemInputs[$itemId]['gudang_retur_id'])) {
-                    $asalGudangId = $this->asalGudangId
-                        ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang?->id));
-                    if ($asalGudangId) {
-                        $this->itemInputs[$itemId]['gudang_retur_id'] = $asalGudangId;
-                        $this->itemInputs[$itemId]['rak_retur_id'] = $this->detectAsalRak(
-                            (int) ($this->transaksiItemData[$itemId]['produk_id'] ?? 0),
-                            $asalGudangId
-                        );
-                    }
+                // Auto-detect gudang & rak asal untuk barang normal (reset saat toggle)
+                $asalGudangId = $this->asalGudangId
+                    ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang?->id));
+                if ($asalGudangId) {
+                    $this->itemInputs[$itemId]['gudang_retur_id'] = $asalGudangId;
+                    $this->itemInputs[$itemId]['rak_retur_id'] = $this->detectAsalRak(
+                        (int) ($this->transaksiItemData[$itemId]['produk_id'] ?? 0),
+                        $asalGudangId
+                    );
                 }
             } else {
-                // Cacat/rusak: default ke gudang penampung/return (karantina), bukan gudang asal
-                if (empty($this->itemInputs[$itemId]['gudang_retur_id'])) {
-                    $cabangId = session('cabang_id') ?: (auth()->user()?->cabangs?->first()?->id ?: 1);
-                    $penampungId = $this->penampungGudangId((int) $cabangId);
-                    if ($penampungId) {
-                        $this->itemInputs[$itemId]['gudang_retur_id'] = $penampungId;
-                    }
+                // Cacat/rusak: default ke gudang penampung/return (karantina)
+                $cabangId = session('cabang_id') ?: (auth()->user()?->cabangs?->first()?->id ?: 1);
+                $penampungId = $this->penampungGudangId((int) $cabangId);
+                if ($penampungId) {
+                    $this->itemInputs[$itemId]['gudang_retur_id'] = $penampungId;
+                    $this->itemInputs[$itemId]['rak_retur_id'] = null;
                 }
             }
         }
