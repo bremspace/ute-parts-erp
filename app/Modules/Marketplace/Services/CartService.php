@@ -116,6 +116,27 @@ class CartService
             : (float) $produk->harga_jual_retail;
         $diskonTier = max(0.0, $hargaRetail - (float) $pricing['harga']);
 
+        // Harga & qty per satuan yang dipilih (untuk tampilan & subtotal per satuan)
+        $baseSatuan = $produk->satuan ?: 'pcs';
+        $faktorKonversi = 1.0;
+        $hargaSatuanPilih = (float) $pricing['harga']; // per base unit
+        if ($cleanSatuan && strcasecmp($cleanSatuan, $baseSatuan) !== 0) {
+            foreach ($produk->getDaftarSatuan() as $s) {
+                if (strcasecmp($s['satuan_kode'], $cleanSatuan) === 0) {
+                    $faktorKonversi = (float) ($s['faktor_konversi'] ?? 1.0);
+                    if (! empty($s['harga_jual'])) {
+                        $hargaSatuanPilih = (float) $s['harga_jual'] / max(0.0001, $faktorKonversi); // per base unit
+                    } else {
+                        $hargaSatuanPilih = (float) $pricing['harga']; // tetap base
+                    }
+                    break;
+                }
+            }
+        }
+        // qty_satuan = jumlah satuan yang dibeli (bukan base unit)
+        $qtySatuan = (int) round($newQty / max(0.0001, $faktorKonversi));
+        if ($qtySatuan < 1) { $qtySatuan = 1; }
+
         $cart[$key] = [
             'key' => $key,
             'product_id' => $produkId,
@@ -123,14 +144,17 @@ class CartService
             'catatan' => $cleanCatatan,
             'name' => $produk->nama,
             'variant_name' => $variant?->nama_varian,
-            'satuan' => $cleanSatuan,
-            'harga' => (float) $pricing['harga'],
+            'satuan' => $cleanSatuan ?: $baseSatuan,
+            'harga' => $hargaSatuanPilih,
+            'harga_satuan' => round($hargaSatuanPilih * $faktorKonversi, 2),
+            'faktor_konversi' => $faktorKonversi,
+            'qty' => $newQty,
+            'qty_satuan' => $qtySatuan,
             'harga_retail' => $hargaRetail,
             'diskon_tier' => $diskonTier,
             'potensi_komisi' => (float) ($pricing['potensi_komisi'] ?? 0.0),
             'mode_reward' => $pricing['mode_reward'] ?? 'diskon_langsung',
             'tier_nama' => $pricing['tier'] ?? null,
-            'qty' => $newQty,
             'alasan_harga' => $pricing['alasan'],
             'stok_max' => (int) $stokTotal,
         ];
