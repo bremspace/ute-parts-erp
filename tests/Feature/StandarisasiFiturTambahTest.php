@@ -21,6 +21,7 @@ use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Livewire\PoTab;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\ProdukSatuanKonversi;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\ReturnPembelian;
@@ -508,6 +509,13 @@ class StandarisasiFiturTambahTest extends TestCase
             'produk_id' => $produk->id,
             'gudang_id' => $gudang->id,
             'jumlah' => 100, // 100 pcs tersedia
+        ]);
+
+        // [H10] Master satuan box: 1 box = 10 pcs, harga jual per box 250.000.
+        // Checkout API kini mengambil konversi & harga dari master ini, bukan client.
+        ProdukSatuanKonversi::create([
+            'produk_id' => $produk->id, 'satuan_kode' => 'box', 'satuan_asal' => 'pcs',
+            'pengali' => 1, 'faktor_konversi' => 10, 'harga_jual' => 250000, 'urutan' => 1,
         ]);
 
         // Customer buys 2 box (1 box = 10 pcs, konversi = 10 -> total 20 pcs dasar) via QRIS

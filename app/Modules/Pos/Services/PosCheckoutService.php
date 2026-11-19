@@ -164,6 +164,9 @@ class PosCheckoutService
                     'harga_satuan' => (float) $item['harga_satuan'],
                     'diskon_nominal' => (float) ($item['diskon_nominal'] ?? 0),
                     'subtotal' => (float) $item['subtotal'],
+                    // [H1] Harga unit NETO setelah diskon item (subtotal_item / jumlah).
+                    // Snapshot utk refund retur — tanpa ini retur memakai harga kotor.
+                    'harga_final' => $qty > 0 ? round((float) $item['subtotal'] / $qty, 2) : (float) $item['harga_satuan'],
                     'hpp' => $hppPerSatuan,
                     'catatan' => $item['catatan'] ?? null,
                 ]);
@@ -279,6 +282,10 @@ class PosCheckoutService
                     'no_piutang' => sprintf('AR-%s-%04d', now()->format('Ymd'), $countPiutang),
                     'pelanggan_id' => $pelangganId,
                     'transaksi_id' => $transaksi->id,
+                    // [H3] Referensi polimorfik eksplisit — lookup piutang retur/void
+                    // (referensi_tipe=Transaksi + referensi_id) wajib menemukan baris ini.
+                    'referensi_tipe' => Transaksi::class,
+                    'referensi_id' => $transaksi->id,
                     'cabang_id' => $cabangId,
                     'jumlah' => $totalAkhir,
                     'jumlah_dibayar' => 0,

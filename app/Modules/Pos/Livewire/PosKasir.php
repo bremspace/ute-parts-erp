@@ -164,7 +164,8 @@ class PosKasir extends Component
 
     public float $pajakNominal = 0.0;
 
-    // [F1-2] DPP (dasar pengenaan PPN) = subtotal - diskon — ikut pajakNominal di totalAkhir
+    // [F1-2][H11] DPP kanonik (PajakService::hitungPenjualan): exclusive = subtotal - diskon;
+    // inclusive = net/(1+persen). totalAkhir = dpp + pajakNominal (benar utk kedua mode).
     public float $dpp = 0.0;
 
     public float $ppnPersen = 0.0;
@@ -941,15 +942,18 @@ class PosKasir extends Component
 
     public function getTotalAkhirProperty(): float
     {
-        $dpp = max(0.0, $this->subtotal - $this->diskonTotal);
-
-        return max(0.0, $dpp + $this->pajakNominal);
+        // [H11] Pakai DPP kanonik tersimpan (recalcPajak/hitungPenjualan) — inclusive
+        // sudah diekstrak di sana; menghitung ulang subtotal-diskon lalu menambah PPN
+        // membuat harga inclusive ditagih dobel.
+        return max(0.0, $this->dpp + $this->pajakNominal);
     }
 
     /**
      * Rekonsiliasi otomatis PPN per cabang (diaktifkan via konfigurasi pajak_enabled).
      * Dipanggil setelah cart / diskon berubah (add/update/remove/setHargaFleksibel/clear/updatedDiskon*).
-     * [F1-2] DPP = subtotal - diskonTotal; pajakNominal = PPN dari DPP.
+     * [F1-2][H11] Definisi KANONIK PajakService::hitungPenjualan (sama dgn Marketplace
+     * & API POS): exclusive → total = DPP + PPN; inclusive → harga sudah termasuk PPN,
+     * DPP diekstrak dari net dan total TIDAK ditambah PPN lagi.
      */
     private function recalcPajak(): void
     {
@@ -972,21 +976,21 @@ class PosKasir extends Component
 
         $cabangId = session('cabang_id');
         $pajakService = app(PajakService::class);
-        $dpp = max(0.0, $this->subtotal - $this->diskonTotal);
-        $this->dpp = $dpp;
 
-        $enabled = $cabangId ? $pajakService->enabled($cabangId) : false;
-
-        if (! $enabled) {
+        if (! $cabangId || ! $pajakService->enabled($cabangId)) {
+            $this->dpp = max(0.0, $this->subtotal - $this->diskonTotal);
             $this->pajakNominal = 0.0;
             $this->ppnPersen = 0.0;
 
             return;
         }
 
-        $result = $pajakService->hitung($cabangId, $dpp);
-        $this->pajakNominal = $result['ppn_nominal'];
-        $this->ppnPersen = $result['ppn_percent'];
+        // [H11] inclusive: dpp = net/(1+persen), ppn = net - dpp, total = net.
+        // getTotalAkhirProperty (dpp + pajakNominal) benar utk kedua mode.
+        $result = $pajakService->hitungPenjualan($cabangId, $this->subtotal, $this->diskonTotal);
+        $this->dpp = (float) $result['dpp'];
+        $this->pajakNominal = (float) $result['ppn_nominal'];
+        $this->ppnPersen = (float) $result['ppn_percent'];
     }
 
     // [F1-2] Diskon berubah → wajib rehitung PPN (DPP berubah)

@@ -117,9 +117,9 @@ class SemuaHalamanTest extends TestCase
         $produk = Produk::firstOrFail();
 
         $resp = $this->postJson('/api/pos/transaksi', [
-            'items' => [['produk_id' => $produk->id, 'jumlah' => 1, 'harga_satuan' => 100000]],
+            'items' => [['produk_id' => $produk->id, 'jumlah' => 1, 'harga_satuan' => 1100000]],
             'metode_bayar' => 'tunai',
-            'jumlah_bayar' => 100000,
+            'jumlah_bayar' => 1100000,
         ]);
 
         $resp->assertStatus(422); // kas belum dibuka → diblokir
@@ -137,15 +137,16 @@ class SemuaHalamanTest extends TestCase
 
         // Transaksi tunai sekarang boleh
         $resp = $this->postJson('/api/pos/transaksi', [
-            'items' => [['produk_id' => $produk->id, 'jumlah' => 1, 'harga_satuan' => 100000]],
+            'items' => [['produk_id' => $produk->id, 'jumlah' => 1, 'harga_satuan' => 1100000]],
             'metode_bayar' => 'tunai',
-            'jumlah_bayar' => 100000,
+            'jumlah_bayar' => 1100000,
         ]);
         $resp->assertSuccessful();
 
-        // Tutup kas → saldo sistem = 100000 + 100000 = 200000, fisik harus sama (no selisih)
-        $tutup = $this->postJson('/api/pos/kas/tutup', ['saldo_fisik' => 200000])->assertSuccessful();
-        $this->assertEquals(200000, (float) $tutup->json('data.saldo_sistem'));
+        // Tutup kas → saldo sistem = 100000 + 1100000 = 1200000, fisik harus sama (no selisih)
+        // [H10] harga transaksi = harga server (harga_jual_retail), bukan harga client.
+        $tutup = $this->postJson('/api/pos/kas/tutup', ['saldo_fisik' => 1200000])->assertSuccessful();
+        $this->assertEquals(1200000, (float) $tutup->json('data.saldo_sistem'));
         $this->assertEquals(0, (float) $tutup->json('data.selisih'));
 
         // Kas sesi tercatat buka → tutup
@@ -162,9 +163,9 @@ class SemuaHalamanTest extends TestCase
 
         $produk = Produk::firstOrFail();
         $resp = $this->postJson('/api/pos/transaksi', [
-            'items' => [['produk_id' => $produk->id, 'jumlah' => 1, 'harga_satuan' => 100000]],
+            'items' => [['produk_id' => $produk->id, 'jumlah' => 1, 'harga_satuan' => 1100000]],
             'metode_bayar' => 'transfer',
-            'jumlah_bayar' => 100000,
+            'jumlah_bayar' => 1100000,
         ])->assertSuccessful();
 
         $no = $resp->json('data.no_transaksi');

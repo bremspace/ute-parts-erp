@@ -22,6 +22,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PosController extends Controller
 {
@@ -271,6 +272,9 @@ class PosController extends Controller
             'items.*.produk_id' => 'required|exists:produk,id',
             'items.*.sku_variant_id' => 'nullable|exists:sku_variants,id',
             'items.*.jumlah' => 'required|integer|min:1',
+            // [H10] harga_satuan & konversi client hanya divalidasi utk kompatibilitas
+            // payload lama — NILAINYA DIABAIKAN; harga & konversi di-resolve server-side
+            // dari master produk (lihat resolveHargaSatuan di bawah).
             'items.*.harga_satuan' => 'required|numeric|min:0',
             'items.*.diskon_nominal' => 'nullable|numeric|min:0',
             'items.*.satuan' => 'nullable|string|max:50',
@@ -332,17 +336,52 @@ class PosController extends Controller
             return DB::transaction(function () use ($request, $cabangId, $gudangId) {
                 $subtotal = 0;
                 $itemsData = [];
+                $pelanggan = $request->pelanggan_id
+                    ? Pelanggan::with('tierMembership')->find($request->pelanggan_id)
+                    : null;
 
                 // Validasi & siapkan stok
                 foreach ($request->items as $item) {
                     $produk = Produk::findOrFail($item['produk_id']);
                     $qty = (int) $item['jumlah'];
-                    $satuan = $item['satuan'] ?? ($produk->satuan_unit ?: 'pcs');
-                    $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+                    $variant = ! empty($item['sku_variant_id']) ? SkuVariant::find($item['sku_variant_id']) : null;
+
+                    // [H10] Satuan & konversi WAJIB dari master satuan produk, bukan client.
+                    // Satuan tak dikenal ditolak (fail-closed) — jangan diam-diam fallback
+                    // ke harga dasar yang membuat tagihan & potong stok salah satuan.
+                    $satuanClient = trim((string) ($item['satuan'] ?? ''));
+                    if ($satuanClient !== '') {
+                        $dikenal = false;
+                        foreach ($produk->getDaftarSatuan() as $s) {
+                            if (strcasecmp((string) $s['satuan_kode'], $satuanClient) === 0) {
+                                $dikenal = true;
+                                break;
+                            }
+                        }
+                        if (! $dikenal) {
+                            throw ValidationException::withMessages([
+                                'items' => "Satuan '{$satuanClient}' tidak dikenal untuk produk {$produk->nama}.",
+                            ]);
+                        }
+                    }
+
+                    // [H10] Harga dihitung server-side (resolver yang sama dgn Marketplace
+                    // OrderService & Livewire PosKasir). harga_satuan & konversi dari client
+                    // DIABAIKAN — itu vektor manipulasi pendapatan & stok.
+                    $satuanInfo = $this->pricingService->resolveHargaSatuan(
+                        $produk,
+                        $pelanggan,
+                        $variant,
+                        $satuanClient !== '' ? $satuanClient : null
+                    );
+                    $konversi = max(0.0001, (float) $satuanInfo['faktor_konversi']);
+                    $satuan = $satuanInfo['satuan'];
                     $qtyDasar = (int) round($qty * $konversi);
-                    $hargaSatuan = (float) $item['harga_satuan'];
-                    $diskonItem = (float) ($item['diskon_nominal'] ?? 0);
-                    $lineSubtotal = max(0, ($hargaSatuan * $qty) - $diskonItem);
+                    // Kontrak POS-native: harga_satuan per SATUAN jual = harga base x konversi.
+                    $hargaSatuan = round((float) $satuanInfo['harga'] * $konversi, 2);
+                    // Diskon item ikut resolver (tier), bukan input client.
+                    $diskonItem = round((float) ($satuanInfo['pricing']['diskon_nominal'] ?? 0) * $qtyDasar, 2);
+                    $lineSubtotal = round($hargaSatuan * $qty, 2);
                     $subtotal += $lineSubtotal;
 
                     // Cek ketersediaan stok di gudang jika gudang ditentukan (memperhitungkan reservasi aktif)
@@ -388,12 +427,14 @@ class PosController extends Controller
                     $diskonHeader += round(($subtotal * (float) $request->diskon_persen) / 100, 2);
                 }
 
-                // [F1-2] PPN per cabang: DPP = subtotal - diskon; totalAkhir = DPP + PPN
-                $dpp = max(0, $subtotal - $diskonHeader);
-                $pajak = app(PajakService::class)->hitung($cabangId, $dpp);
+                // [F1-2][H11] PPN per cabang via definisi KANONIK PajakService::hitungPenjualan
+                // (sama dgn Marketplace OrderService). Exclusive: total = DPP + PPN.
+                // Inclusive: harga sudah termasuk PPN → DPP diekstrak, total = net
+                // (JANGAN menambah PPN lagi ke harga inclusive — overcharge).
+                $pajak = app(PajakService::class)->hitungPenjualan($cabangId, $subtotal, $diskonHeader);
+                $dpp = (float) $pajak['dpp'];
                 $ppnNominal = (float) $pajak['ppn_nominal'];
-
-                $totalAkhir = $dpp + $ppnNominal;
+                $totalAkhir = (float) $pajak['total_akhir'];
                 if ($request->metode_bayar === 'tunai') {
                     $jumlahBayar = (float) $request->jumlah_bayar;
                     $kembalian = max(0, $jumlahBayar - $totalAkhir);

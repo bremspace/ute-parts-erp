@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'transaksi_id', 'produk_id', 'sku_variant_id', 'jumlah',
-    'satuan', 'konversi', 'harga_satuan', 'diskon_nominal', 'subtotal', 'hpp',
+    'satuan', 'konversi', 'harga_satuan', 'diskon_nominal', 'subtotal', 'harga_final', 'hpp',
     'catatan',
 ])]
 class TransaksiItem extends Model
@@ -25,6 +25,7 @@ class TransaksiItem extends Model
      * @property float $harga_satuan
      * @property float $diskon_nominal
      * @property float $subtotal
+     * @property float|null $harga_final
      * @property float $hpp
      * @property string|null $catatan
      */
@@ -36,6 +37,7 @@ class TransaksiItem extends Model
         'harga_satuan' => 'decimal:2',
         'diskon_nominal' => 'decimal:2',
         'subtotal' => 'decimal:2',
+        'harga_final' => 'decimal:2',
         'hpp' => 'decimal:2',
     ];
 
