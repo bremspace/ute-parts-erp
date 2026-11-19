@@ -3,13 +3,16 @@
 namespace Tests\Feature;
 
 use App\Console\Commands\SyncFlushCommand;
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Sync\Jobs\PushHybridSyncJob;
 use App\Modules\Sync\Models\HybridSyncInbox;
 use App\Modules\Sync\Models\HybridSyncOutbox;
 use App\Modules\Sync\Services\HybridSyncOutboxService;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\StokItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -232,6 +235,29 @@ class HybridSyncTest extends TestCase
         // Set mode node sebagai primary_store
         config(['sync.node_role' => 'primary_store']);
 
+        // [C4] Produk & stok lokal wajib ada (tidak ada lagi auto-create produk
+        // harga_beli=0) + COA untuk jurnal pendapatan/HPP.
+        foreach ([
+            ['120-02', 'Kliring Gateway', 'aset', 'kas', 'debit'],
+            ['410-03', 'Pendapatan Online', 'pendapatan', 'pendapatan_penjualan', 'kredit'],
+            ['510-02', 'HPP', 'beban', 'hpp', 'debit'],
+            ['130-01', 'Persediaan', 'aset', 'persediaan', 'debit'],
+        ] as [$kode, $nama, $tipe, $kelompok, $saldo]) {
+            AkunCOA::firstOrCreate(['kode' => $kode], [
+                'nama' => $nama, 'tipe' => $tipe, 'kelompok' => $kelompok, 'saldo_normal' => $saldo, 'is_active' => true,
+            ]);
+        }
+        $gudang = Gudang::create([
+            'cabang_id' => $this->cabang->id, 'nama' => 'Gudang Utama', 'kode' => 'GDG-SYNC', 'is_active' => true, 'is_default' => true,
+        ]);
+        $produk = Produk::create([
+            'nama' => 'Produk Online Sync', 'slug' => 'produk-online-sync', 'kategori' => 'Umum', 'kondisi' => 'baru',
+            'satuan' => 'pcs', 'harga_beli' => 100000, 'harga_jual_retail' => 125000,
+        ]);
+        StokItem::create([
+            'produk_id' => $produk->id, 'gudang_id' => $gudang->id, 'jumlah' => 10, 'jumlah_minimum' => 1,
+        ]);
+
         $uuidOrder = (string) Str::uuid();
         $dataOrder = [
             'sync_uuid' => $uuidOrder,
@@ -240,24 +266,33 @@ class HybridSyncTest extends TestCase
             'payload' => [
                 'order_id' => 555,
                 'nomor_order' => 'ORDER-DUITKU-555',
-                'cabang_id' => 1,
+                'cabang_id' => $this->cabang->id,
                 'total' => 250000,
                 'items' => [
-                    ['produk_id' => 1, 'qty' => 2, 'harga' => 125000],
+                    ['produk_id' => $produk->id, 'qty' => 2, 'harga' => 125000],
                 ],
             ],
         ];
 
         $resOrder = $this->postSigned('/api/internal/sync/push', $dataOrder);
         $resOrder->assertStatus(200);
+        $resOrder->assertJson(['success' => true]);
 
         // Verifikasi transaksi tercatat di tabel transaksi lokal dengan status lunas (siap dikemas)
         $this->assertDatabaseHas('transaksi', [
             'no_transaksi' => 'ORDER-DUITKU-555',
-            'cabang_id' => 1,
+            'cabang_id' => $this->cabang->id,
             'total_akhir' => 250000,
             'status' => 'lunas',
         ]);
+
+        // [C4] Item memakai satuan dasar produk + konversi 1 (payload tanpa satuan),
+        // hpp fallback harga_beli lokal, stok terpotong, jurnal HPP ada.
+        $this->assertDatabaseHas('transaksi_item', [
+            'produk_id' => $produk->id, 'jumlah' => 2, 'satuan' => 'pcs', 'konversi' => 1, 'hpp' => 100000,
+        ]);
+        $this->assertDatabaseHas('stok_items', ['produk_id' => $produk->id, 'jumlah' => 8]);
+        $this->assertDatabaseHas('jurnal_akuntansi', ['debit' => 200000]); // Dr 510-02 HPP 2x100.000
 
         // Verifikasi catatan inbox tersimpan dengan status processed
         $this->assertDatabaseHas('hybrid_sync_inbox', [

@@ -3,6 +3,7 @@
 namespace App\Modules\Sync\Services;
 
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
@@ -281,119 +282,213 @@ class HybridSyncProcessorService
     }
 
     /**
-     * Handle order.online_paid: pesanan marketplace lunas masuk toko lokal
-     * Potong stok fisik resmi via StokDeductionService dan buat jurnal akuntansi.
+     * Handle order.online_paid: pesanan marketplace lunas masuk toko lokal.
+     *
+     * [C4] Kontrak satuan/HPP mengikuti POS-native (PosCheckoutService &
+     * TransaksiVoidService):
+     * - satuan & konversi asli payload disimpan apa adanya (default: satuan dasar
+     *   produk + konversi 1) — TIDAK hardcode pcs/1;
+     * - hpp per SATUAN tervalidasi: hpp cloud <= 0 -> harga_beli lokal x konversi;
+     * - stok dipotong qtyDasar = round(jumlah x konversi), konsisten dgn tersimpan;
+     * - jurnal WAJIB: Dr 120-02 total / Cr 410-03 DPP (+ Cr 220-01 PPN Keluaran,
+     *   Cr 210-04 Titipan Ongkir) DAN baris HPP Dr 510-02 / Cr 130-01;
+     * - fail-CLOSED: kegagalan stok/jurnal melempar exception -> process()
+     *   me-rollback seluruh event & menandai inbox failed (selaras KasSesiState);
+     * - produk tak dikenal TIDAK auto-create harga_beli=0: event ditolak dengan
+     *   error jelas agar master produk disinkronkan lebih dulu.
      */
     protected function handleOrderOnlinePaid(array $payload): void
     {
-        $orderId = $payload['order_id'] ?? null;
-        $nomorOrder = $payload['nomor_order'] ?? ('ONLINE-'.($orderId ?? uniqid()));
-        $cabangId = $payload['cabang_id'] ?? (class_exists(Cabang::class) ? Cabang::first()?->id ?? 1 : 1);
-        $total = $payload['total'] ?? 0;
+        $nomorOrder = $payload['nomor_order'] ?? ('ONLINE-'.($payload['order_id'] ?? uniqid()));
+        $cabangId = (int) ($payload['cabang_id'] ?? (class_exists(Cabang::class) ? Cabang::first()?->id ?? 1 : 1));
+        $total = (float) ($payload['total'] ?? 0);
         $items = $payload['items'] ?? [];
 
-        // 1. Catat ke Transaksi lokal jika model tersedia
-        $transaksi = null;
-        if (class_exists(Transaksi::class)) {
-            $transaksi = Transaksi::firstOrCreate(
-                ['no_transaksi' => $nomorOrder],
-                [
-                    'cabang_id' => $cabangId,
-                    'total_akhir' => $total,
-                    'subtotal' => $total,
-                    'status' => 'lunas', // Status 'lunas' agar langsung muncul di tab 'Siap Dikemas' pada PesananOnlineIndex
-                    'sumber' => 'marketplace',
-                    'metode_bayar' => 'transfer',
-                    'catatan' => 'Pesanan Online Lunas dari Cloud VPS',
-                ]
+        if (! is_array($items) || empty($items)) {
+            throw new \RuntimeException("Pesanan online {$nomorOrder} tidak memiliki item — sinkronisasi ditolak.");
+        }
+        if ($total <= 0) {
+            throw new \RuntimeException("Total pesanan online {$nomorOrder} tidak valid ({$total}) — sinkronisasi ditolak.");
+        }
+
+        // Idempotensi per nomor order: transaksi sudah ada berarti event ini sudah
+        // pernah diproses utuh (atomik) — jangan potong stok / posting jurnal dobel.
+        if (Transaksi::where('no_transaksi', $nomorOrder)->exists()) {
+            Log::info("[HybridSync] Pesanan online {$nomorOrder} sudah tercatat lokal — skip (idempotent).");
+
+            return;
+        }
+
+        // 1. Normalisasi & validasi seluruh item SEBELUM menulis apa pun (fail-closed).
+        $normalized = [];
+        $totalHpp = 0.0;
+        foreach ($items as $it) {
+            if (! is_array($it)) {
+                throw new \RuntimeException("Item pesanan online {$nomorOrder} tidak valid — sinkronisasi ditolak.");
+            }
+
+            $produkId = (int) ($it['produk_id'] ?? 0);
+            if ($produkId <= 0) {
+                throw new \RuntimeException("Item pesanan online {$nomorOrder} tanpa produk_id — sinkronisasi ditolak.");
+            }
+            $produk = Produk::find($produkId);
+            if (! $produk) {
+                throw new \RuntimeException("Produk {$produkId} (pesanan {$nomorOrder}) tidak ditemukan di database lokal. Sinkronkan master produk terlebih dahulu — pesanan tidak diproses.");
+            }
+
+            $jumlah = (float) ($it['qty'] ?? $it['jumlah'] ?? 0);
+            if ($jumlah <= 0) {
+                throw new \RuntimeException("Jumlah item produk {$produkId} (pesanan {$nomorOrder}) tidak valid — sinkronisasi ditolak.");
+            }
+            $konversi = (float) ($it['konversi'] ?? 1);
+            if ($konversi <= 0) {
+                throw new \RuntimeException("Konversi satuan item produk {$produkId} (pesanan {$nomorOrder}) tidak valid — sinkronisasi ditolak.");
+            }
+            $satuan = (string) ($it['satuan'] ?? ($produk->satuan ?: 'pcs'));
+            $qtyDasar = (int) round($jumlah * $konversi);
+            if ($qtyDasar <= 0) {
+                throw new \RuntimeException("Qty dasar item produk {$produkId} (pesanan {$nomorOrder}) membulat ke nol — sinkronisasi ditolak.");
+            }
+
+            // hpp per SATUAN: nilai cloud valid (>0) dipakai apa adanya; bila
+            // 0/negatif/kosong fallback harga_beli master lokal x konversi.
+            $hppCloud = (float) ($it['hpp'] ?? 0);
+            $hppPerSatuan = $hppCloud > 0 ? $hppCloud : (float) $produk->harga_beli * $konversi;
+
+            $harga = (float) ($it['harga'] ?? $it['harga_satuan'] ?? 0);
+            $diskon = (float) ($it['diskon_nominal'] ?? 0);
+
+            $normalized[] = [
+                'produk_id' => $produkId,
+                'sku_variant_id' => isset($it['sku_variant_id']) ? (int) $it['sku_variant_id'] : null,
+                'jumlah' => $jumlah,
+                'satuan' => $satuan,
+                'konversi' => $konversi,
+                'qty_dasar' => $qtyDasar,
+                'harga_satuan' => $harga,
+                'diskon_nominal' => $diskon,
+                'subtotal' => round($harga * $jumlah - $diskon, 2),
+                'hpp' => $hppPerSatuan,
+            ];
+            // Total HPP = hpp per satuan x jumlah (= qtyDasar x harga_beli utk fallback lokal).
+            $totalHpp += $hppPerSatuan * $jumlah;
+        }
+        $totalHpp = round($totalHpp, 2);
+
+        if ($totalHpp <= 0) {
+            throw new \RuntimeException("HPP pesanan online {$nomorOrder} nol — perbarui harga_beli produk lokal atau kirim hpp valid dari cloud sebelum sinkronisasi.");
+        }
+
+        // 2. Pisah DPP/PPN/ongkir dari kolom cloud (pola DuitkuPaymentProcessor).
+        $ongkir = max(0.0, (float) ($payload['ongkir'] ?? 0));
+        $totalBarang = max(0.0, round($total - $ongkir, 2));
+        [$dpp, $ppn] = $this->pisahDppPpnPayload($payload, $totalBarang, $nomorOrder);
+
+        // 3. Transaksi + item dengan satuan/konversi asli & hpp per satuan tervalidasi.
+        $transaksi = Transaksi::create([
+            'no_transaksi' => $nomorOrder,
+            'cabang_id' => $cabangId,
+            'subtotal' => $totalBarang,
+            'dpp' => $dpp,
+            'pajak_nominal' => $ppn,
+            'ppn_nominal' => $ppn,
+            'total_akhir' => $total,
+            'jumlah_bayar' => $total,
+            'paid_at' => now(),
+            'status' => 'lunas', // Status 'lunas' agar langsung muncul di tab 'Siap Dikemas' pada PesananOnlineIndex
+            'sumber' => 'marketplace',
+            'metode_bayar' => 'transfer',
+            'catatan' => 'Pesanan Online Lunas dari Cloud VPS',
+        ]);
+
+        foreach ($normalized as $n) {
+            TransaksiItem::create([
+                'transaksi_id' => $transaksi->id,
+                'produk_id' => $n['produk_id'],
+                'sku_variant_id' => $n['sku_variant_id'],
+                'jumlah' => $n['jumlah'],
+                'satuan' => $n['satuan'],
+                'konversi' => $n['konversi'],
+                'harga_satuan' => $n['harga_satuan'],
+                'diskon_nominal' => $n['diskon_nominal'],
+                'subtotal' => $n['subtotal'],
+                'hpp' => $n['hpp'],
+            ]);
+        }
+
+        // 4. Potong stok fisik qtyDasar — exception TIDAK ditelan (fail-closed:
+        // stok kurang / gudang tak ada -> seluruh event rollback).
+        $stokService = app(StokDeductionService::class);
+        foreach ($normalized as $n) {
+            $stokService->kurangiDariGudangTersedia(
+                $n['produk_id'],
+                $n['sku_variant_id'],
+                $n['qty_dasar'],
+                $cabangId,
+                'penjualan',
+                Transaksi::class,
+                $transaksi->id,
+                null,
+                "Pesanan Online Lunas {$nomorOrder} ({$n['jumlah']} {$n['satuan']})"
             );
+        }
 
-            // Simpan items transaksi jika belum ada
-            if ($transaksi->wasRecentlyCreated && ! empty($items) && class_exists(TransaksiItem::class)) {
-                foreach ($items as $it) {
-                    $pId = $it['produk_id'] ?? null;
-                    if ($pId) {
-                        // Pastikan produk ada di database lokal agar tidak melanggar foreign key constraint
-                        if (class_exists(Produk::class) && ! Produk::where('id', $pId)->exists()) {
-                            DB::table('produk')->insert([
-                                'id' => $pId,
-                                'nama' => $it['nama'] ?? 'Produk '.$pId,
-                                'slug' => 'produk-'.$pId.'-'.uniqid(),
-                                'harga_jual_retail' => $it['harga'] ?? 0,
-                                'harga_beli' => 0,
-                                'is_active' => true,
-                                'created_at' => now(),
-                                'updated_at' => now(),
-                            ]);
-                        }
+        // 5. Jurnal lengkap: kliring / pendapatan DPP / PPN / ongkir / HPP.
+        // Gagal posting -> exception -> rollback stok & transaksi (fail-closed).
+        $jurnalService = app(JurnalService::class);
+        $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
+        $lines = [
+            ['akun_kode' => '120-02', 'debit' => $total, 'kredit' => 0], // Kliring Payment Gateway
+            ['akun_kode' => '410-03', 'debit' => 0, 'kredit' => $dpp], // Pendapatan Online (DPP, tanpa PPN/ongkir)
+        ];
+        if ($ongkir > 0) {
+            $lines[] = ['akun_kode' => '210-04', 'debit' => 0, 'kredit' => $ongkir]; // Titipan Ongkir
+        }
+        foreach (app(PajakService::class)->jurnalLines($ppn, $noJurnal, $cabangId, 0) as $ppnLine) {
+            $lines[] = $ppnLine; // PPN Keluaran 220-01
+        }
+        // HPP wajib berpasangan dengan pendapatan: Dr 510-02 / Cr 130-01 sebesar total HPP tervalidasi.
+        $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
+        $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
 
-                        TransaksiItem::create([
-                            'transaksi_id' => $transaksi->id,
-                            'produk_id' => $pId,
-                            'sku_variant_id' => $it['sku_variant_id'] ?? null,
-                            'jumlah' => $it['qty'] ?? $it['jumlah'] ?? 1,
-                            'satuan' => 'pcs',
-                            'konversi' => 1,
-                            'harga_satuan' => $it['harga'] ?? 0,
-                            'subtotal' => ($it['harga'] ?? 0) * ($it['qty'] ?? 1),
-                            'hpp' => $it['hpp'] ?? 0,
-                        ]);
-                    }
-                }
+        $jurnalService->post(
+            $noJurnal,
+            now(),
+            'pos',
+            $lines,
+            "Jurnal otomatis pesanan online {$nomorOrder}",
+            $cabangId,
+            null,
+            Transaksi::class,
+            $transaksi->id
+        );
+    }
+
+    /**
+     * Pisah DPP/PPN dari kolom payload cloud — pola DuitkuPaymentProcessor::pisahDppPpn.
+     * ppn_nominal/pajak_nominal/ppn eksplisit dipakai; bila kosong, PPN disimpulkan
+     * dari selisih total barang vs dpp cloud. TIDAK menghitung ulang dari konfigurasi
+     * pajak lokal (nilai pajak dihitung sekali saat order dibuat di cloud).
+     *
+     * @return array{0: float, 1: float} [dpp, ppnNominal]
+     */
+    private function pisahDppPpnPayload(array $payload, float $totalBarang, string $nomorOrder): array
+    {
+        $ppn = max(0.0, (float) ($payload['ppn_nominal'] ?? $payload['pajak_nominal'] ?? $payload['ppn'] ?? 0));
+
+        if ($ppn <= 0) {
+            $dppCloud = (float) ($payload['dpp'] ?? 0);
+            if ($dppCloud > 0 && $dppCloud < $totalBarang) {
+                $ppn = round($totalBarang - $dppCloud, 2);
             }
         }
 
-        // 2. Potong stok fisik resmi via StokDeductionService jika ada
-        if (class_exists(StokDeductionService::class) && ! empty($items)) {
-            try {
-                $stokService = app(StokDeductionService::class);
-                foreach ($items as $item) {
-                    $produkId = $item['produk_id'] ?? null;
-                    $qty = (int) round(($item['qty'] ?? $item['jumlah'] ?? 0) * ($item['konversi'] ?? 1));
-                    $skuVariantId = $item['sku_variant_id'] ?? null;
-
-                    if ($produkId && $qty > 0) {
-                        $stokService->kurangiDariGudangTersedia(
-                            $produkId,
-                            $skuVariantId,
-                            $qty,
-                            $cabangId,
-                            'penjualan',
-                            Transaksi::class,
-                            $transaksi?->id ?? 0,
-                            null,
-                            "Pesanan Online Lunas {$nomorOrder}"
-                        );
-                    }
-                }
-            } catch (\Throwable $e) {
-                Log::warning('[HybridSync] Warning potong stok online: '.$e->getMessage());
-            }
+        if ($totalBarang > 0 && $ppn >= $totalBarang) {
+            throw new \RuntimeException("PPN pesanan online {$nomorOrder} ({$ppn}) >= total barang ({$totalBarang}) — data pajak tidak valid.");
         }
 
-        // 3. Buat jurnal otomatis jika JurnalService ada
-        if (class_exists(JurnalService::class) && $total > 0) {
-            try {
-                $jurnalService = app(JurnalService::class);
-                $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
-                $lines = [
-                    ['akun_kode' => '120-02', 'debit' => (float) $total, 'kredit' => 0], // Piutang Payment Gateway
-                    ['akun_kode' => '410-03', 'debit' => 0, 'kredit' => (float) $total], // Pendapatan Penjualan Online
-                ];
+        $dpp = $ppn > 0 ? round($totalBarang - $ppn, 2) : $totalBarang;
 
-                $jurnalService->post(
-                    $noJurnal,
-                    now(),
-                    'pos',
-                    $lines,
-                    "Jurnal otomatis pesanan online {$nomorOrder}",
-                    $cabangId,
-                    null,
-                    null
-                );
-            } catch (\Throwable $e) {
-                Log::warning('[HybridSync] Warning catat jurnal online: '.$e->getMessage());
-            }
-        }
+        return [$dpp, $ppn];
     }
 }
