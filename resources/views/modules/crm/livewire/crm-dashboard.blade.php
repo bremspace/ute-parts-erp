@@ -383,7 +383,7 @@
                 </p>
             </div>
 
-            <div class="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap justify-stretch md:justify-end flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto md:justify-end flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
                 @can('tier.manage')
                 <button
                     type="button"
@@ -438,7 +438,7 @@
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 text-xs">
                 <!-- 1. Rasio Earn Poin Global -->
                 <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
                     <label class="block font-semibold text-ink-300 text-[11px]">Rasio Earn Poin (%)</label>
