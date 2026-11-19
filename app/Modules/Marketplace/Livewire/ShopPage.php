@@ -396,7 +396,7 @@ class ShopPage extends Component
         // Diurutkan dari ketersediaan stok (tersedia > habis) dan produk terlaris.
         $query = Produk::where('is_active', true)
             ->withSum('stokItems', 'jumlah')
-            ->with(['hargaTier', 'skuVariants']);
+            ->with(['hargaTier', 'skuVariants', 'satuanKonversi']);
 
         $filters = [
             'search' => $this->search,
