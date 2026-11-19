@@ -173,10 +173,20 @@
                                             @endif
                                             <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
                                                 <span class="text-ink-400 font-semibold">
-                                                    @if(!empty($item['satuan']) && $item['satuan'] !== 'pcs' && !empty($item['qty_satuan']))
-                                                        {{ $item['qty_satuan'] }} {{ $item['satuan'] }} ({{ $item['qty'] }} pcs) × Rp {{ number_format($item['harga_satuan'] ?? $item['harga'], 0, ',', '.') }}
+                                                    @if(($item['satuan'] ?? 'pcs') !== 'pcs')
+                                                        {{ (int) ($item['qty_satuan'] ?? $item['qty'] ?? 1) }} {{ $item['satuan'] }} ({{ $item['qty'] }} pcs) × Rp {{ number_format((float) ($item['harga_satuan'] ?? $item['harga'] ?? 0), 0, ',', '.') }}
+                                                        @php
+                                                            $baseSatuan = $item['satuan'] ?? 'pcs';
+                                                            $boxSaving = 0;
+                                                            if ($baseSatuan !== 'pcs' && isset($item['harga_satuan']) && isset($item['harga'])) {
+                                                                $boxSaving = max(0, round(((float) $item['harga'] * (float) ($item['faktor_konversi'] ?? 1)) - (float) $item['harga_satuan'], 2));
+                                                            }
+                                                        @endphp
+                                                        @if($boxSaving > 0)
+                                                            <span class="text-[9px] text-up-mint font-bold">(hemat Rp {{ number_format($boxSaving, 0, ',', '.') }} / {{ $item['satuan'] }})</span>
+                                                        @endif
                                                     @else
-                                                        {{ $item['qty'] }} × Rp {{ number_format($item['harga'], 0, ',', '.') }}
+                                                        {{ $item['qty'] }} × Rp {{ number_format((float) ($item['harga'] ?? 0), 0, ',', '.') }}
                                                     @endif
                                                 </span>
                                                 @if(!empty($item['diskon_tier']) && (float) $item['diskon_tier'] > 0)
