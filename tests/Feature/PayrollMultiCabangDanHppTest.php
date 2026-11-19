@@ -141,7 +141,7 @@ class PayrollMultiCabangDanHppTest extends TestCase
         $this->assertEquals(PayrollPeriode::STATUS_DRAFT, $periodeC2->status);
 
         // Verifikasi jurnal tercatat dengan cabang_id = 1
-        $jurnalC1 = JurnalAkuntansi::where('no_jurnal', 'JRL-PR-'.$periode)
+        $jurnalC1 = JurnalAkuntansi::where('no_jurnal', 'JRL-PR-'.$this->cabang1->id.'-'.$periode)
             ->where('cabang_id', $this->cabang1->id)
             ->first();
         $this->assertNotNull($jurnalC1);

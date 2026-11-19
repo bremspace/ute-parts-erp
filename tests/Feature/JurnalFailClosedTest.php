@@ -150,7 +150,7 @@ class JurnalFailClosedTest extends TestCase
             PayrollPeriode::where('periode', '2026-10')->value('status'),
             'Periode tidak boleh final bila jurnal gagal'
         );
-        $this->assertSame(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-2026-10')->count());
+        $this->assertSame(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-1-2026-10')->count());
         $this->assertSame(0, PayrollSlip::where('status', 'approved')->count());
     }
 
@@ -176,7 +176,7 @@ class JurnalFailClosedTest extends TestCase
         $this->assertTrue($gagal, 'Jurnal pembayaran payroll gagal harus dilempar');
         $this->assertSame(1, PayrollSlip::where('status', 'approved')->count(), 'Slip tidak boleh jadi dibayar');
         $this->assertNotSame('dibayar', PayrollPeriode::where('periode', '2026-11')->value('status'));
-        $this->assertSame(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-BAYAR-2026-11')->count());
+        $this->assertSame(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-BAYAR-1-2026-11')->count());
     }
 
     public function test_payroll_finalisasi_berhasil_periode_selesai(): void
@@ -187,6 +187,6 @@ class JurnalFailClosedTest extends TestCase
         $service->finalisasiDisetujui('2026-12');
 
         $this->assertSame(PayrollPeriode::STATUS_SELESAI, PayrollPeriode::where('periode', '2026-12')->value('status'));
-        $this->assertGreaterThan(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-2026-12')->count());
+        $this->assertGreaterThan(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-1-2026-12')->count());
     }
 }

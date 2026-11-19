@@ -221,7 +221,7 @@ class BagiHasilTest extends TestCase
         $this->assertSame(BagiHasilPeriode::STATUS_SELESAI, BagiHasilPeriode::first()->status);
 
         // Jurnal accrual balance: 520-11 debit 150.000 / 210-06 kredit 150.000
-        $accrue = JurnalAkuntansi::with('akun')->where('no_jurnal', 'JRL-BH-'.$this->periode)->get();
+        $accrue = JurnalAkuntansi::with('akun')->where('no_jurnal', 'JRL-BH-1-'.$this->periode)->get();
         $this->assertSame(2, $accrue->count());
         $this->assertEquals($accrue->sum('debit'), $accrue->sum('kredit'));
         $this->assertEquals(150000, (float) $accrue->sum('debit'));
@@ -231,7 +231,7 @@ class BagiHasilTest extends TestCase
         // Proses ulang → idempoten (tidak ada jurnal baru)
         $ulang = $service->prosesPeriode($this->periode, 1);
         $this->assertTrue($ulang['sudah_diproses']);
-        $this->assertSame(2, JurnalAkuntansi::where('no_jurnal', 'JRL-BH-'.$this->periode)->count());
+        $this->assertSame(2, JurnalAkuntansi::where('no_jurnal', 'JRL-BH-1-'.$this->periode)->count());
 
         // Bayar → jurnal kas + status cair
         $bayar = $service->bayarPeriode($this->periode, '110-01', 1);
@@ -241,7 +241,7 @@ class BagiHasilTest extends TestCase
         $this->assertNotNull(BagiHasil::first()->paid_at);
         $this->assertSame(BagiHasilPeriode::STATUS_DIBAYAR, BagiHasilPeriode::first()->status);
 
-        $bayarLines = JurnalAkuntansi::where('no_jurnal', 'JRL-BH-BAYAR-'.$this->periode)->get();
+        $bayarLines = JurnalAkuntansi::where('no_jurnal', 'JRL-BH-BAYAR-1-'.$this->periode)->get();
         $this->assertSame(2, $bayarLines->count());
         $this->assertEquals($bayarLines->sum('debit'), $bayarLines->sum('kredit'));
 

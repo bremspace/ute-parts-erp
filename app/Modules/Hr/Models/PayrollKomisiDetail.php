@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['slip_id', 'tiket_servis_id', 'teknisi_id', 'jenis', 'nominal'])]
+#[Fillable(['slip_id', 'komisi_id', 'tiket_servis_id', 'teknisi_id', 'jenis', 'nominal'])]
 class PayrollKomisiDetail extends Model
 {
     use LogsActivity;

@@ -109,7 +109,7 @@
                 </div>
                 <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 pt-2 sm:pt-0">
                     <button wire:click="hitungDraft"
-                        @if(($periodeRecord?->status ?? '') === 'dibayar') disabled @endif
+                        @if(in_array($periodeRecord?->status ?? '', ['selesai', 'dibayar'], true)) disabled @endif
                         class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm transition active:scale-[0.98]">
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                         <span class="truncate">Draft</span>
@@ -121,7 +121,7 @@
                         <span class="truncate">Approve</span>
                     </button>
                     <button wire:click="bukaBayarModal"
-                        @if(($periodeRecord?->status ?? '') === 'dibayar') disabled @endif
+                        @if(($periodeRecord?->status ?? '') !== 'selesai') disabled @endif
                         class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-xl text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm transition active:scale-[0.98]">
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         <span class="truncate">Bayar</span>
