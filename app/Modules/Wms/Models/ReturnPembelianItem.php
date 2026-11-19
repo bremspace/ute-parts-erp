@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'return_pembelian_id', 'produk_id', 'sku_variant_id', 'jumlah',
-    'harga_beli', 'subtotal',
+    'return_pembelian_id', 'produk_id', 'sku_variant_id', 'satuan', 'konversi',
+    'jumlah', 'harga_beli', 'harga_grn', 'subtotal',
 ])]
 class ReturnPembelianItem extends Model
 {
@@ -16,7 +16,9 @@ class ReturnPembelianItem extends Model
 
     protected $casts = [
         'jumlah' => 'decimal:2',
+        'konversi' => 'decimal:4',
         'harga_beli' => 'decimal:2',
+        'harga_grn' => 'decimal:2',
         'subtotal' => 'decimal:2',
     ];
 
