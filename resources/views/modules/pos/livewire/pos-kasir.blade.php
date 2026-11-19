@@ -289,7 +289,7 @@
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                     x-transition:leave-end="opacity-0 translate-y-3 sm:translate-y-2 scale-[0.99] sm:scale-[0.98]"
-                    class="fixed inset-0 z-50 sm:absolute sm:inset-auto sm:left-0 sm:right-0 sm:w-full sm:top-full sm:mt-2 origin-top bg-white/98 dark:bg-[#0B1120]/98 sm:bg-white/95 sm:dark:bg-[#0B1120]/95 backdrop-blur-2xl border-0 sm:border border-ink-200/90 dark:border-white/15 rounded-none sm:rounded-2xl shadow-2xl overflow-hidden h-full max-h-screen sm:h-auto sm:max-h-[75vh] flex flex-col"
+                    class="fixed inset-0 z-50 sm:absolute sm:inset-auto sm:left-0 sm:right-0 sm:w-full sm:top-full sm:mt-2 origin-top bg-white/98 dark:bg-[#0B1120]/98 sm:bg-white/95 sm:dark:bg-[#0B1120]/95 sm:backdrop-blur-md border-0 sm:border border-ink-200/90 dark:border-white/15 rounded-none sm:rounded-2xl shadow-2xl overflow-hidden h-full max-h-screen sm:h-auto sm:max-h-[75vh] flex flex-col"
                     x-cloak
                 >
                     <!-- Dedicated Mobile Search Header (sm:hidden) -->
@@ -1248,9 +1248,9 @@
     </div>
 
     <!-- MAIN STAGE: TABEL TRANSAKSI KASIR (LELUASA, MODERN & BERSIH) -->
-    <div class="flex-1 min-h-[200px] md:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm">
-        <!-- Mobile Cart Header: Counter & View Toggle (sm:hidden) -->
-        <div class="sm:hidden flex items-center justify-between pb-2 mb-1.5 border-b border-ink-200/70 dark:border-white/10 flex-shrink-0">
+    <div class="flex-1 min-h-[200px] md:min-h-[380px] xl:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm">
+        <!-- Compact Cart Header: Counter & View Toggle (shown < lg; tablet/HP pakai kartu ringkas) -->
+        <div class="lg:hidden flex items-center justify-between pb-2 mb-1.5 border-b border-ink-200/70 dark:border-white/10 flex-shrink-0">
             <div class="flex items-center gap-2">
                 <span class="text-xs font-bold text-ink-900 dark:text-white">Keranjang Belanja</span>
                 <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold text-[10px] tabular-nums border border-up-primary/20">
@@ -1288,7 +1288,7 @@
         </div>
 
         <!-- 1. Mobile Cart: Card View Mode -->
-        <div x-show="cartViewMode === 'card'" class="sm:hidden flex-1 min-h-[160px] overflow-y-auto space-y-2.5 pr-0.5">
+        <div x-show="cartViewMode === 'card'" class="lg:hidden flex-1 min-h-[160px] overflow-y-auto space-y-2.5 pr-0.5">
             @forelse($cart as $key => $item)
                 <div
                     wire:key="cart-mobile-card-{{ $key }}"
@@ -1511,7 +1511,7 @@
         </div>
 
         <!-- 2. Mobile Cart: List View Mode (Kompak & Padat untuk Banyak Item) -->
-        <div x-show="cartViewMode === 'list'" class="sm:hidden flex-1 min-h-[160px] overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 pr-0.5">
+        <div x-show="cartViewMode === 'list'" class="lg:hidden flex-1 min-h-[160px] overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 pr-0.5">
             @forelse($cart as $key => $item)
                 <div
                     wire:key="cart-mobile-list-{{ $key }}"
@@ -1668,11 +1668,11 @@
             @endforelse
         </div>
 
-        <!-- 3. Table Area (Desktop sm:flex) -->
-        <div class="hidden sm:flex flex-col flex-1 min-h-0 overflow-x-auto overflow-y-auto pr-0.5">
+        <!-- 3. Table Area (Desktop lg:flex) -->
+        <div class="hidden lg:flex flex-col flex-1 min-h-0 overflow-x-auto overflow-y-auto pr-0.5">
             <table class="w-full text-left text-xs border-collapse">
                 <thead class="sticky top-0 z-10 bg-white dark:bg-[#0F172A] border-b border-ink-200/80 dark:border-white/10">
-                    <tr class="text-[11px] font-bold text-ink-500 uppercase tracking-wider">
+                    <tr class="text-[11px] font-bold text-ink-600 dark:text-ink-400 uppercase tracking-wider">
                         <th class="py-2.5 px-2.5 text-center w-10">#</th>
                         <th class="py-2.5 px-3 w-28 sm:w-32">Kode / SKU</th>
                         <th class="py-2.5 px-3 min-w-[180px]">Nama Barang & Spesifikasi</th>
@@ -1920,7 +1920,7 @@
                 <!-- Sisi Kiri: Info Mitra & Partai -->
                 <div class="flex items-center gap-2 flex-wrap">
                     @if($diskonPartai > 0)
-                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-up-mint/15 text-up-mint border border-up-mint/30 font-bold text-[11px]">
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-up-mint/15 text-emerald-700 dark:text-up-mint border border-up-mint/30 font-bold text-[11px]">
                             <span>🎉 {{ $alasanPartai }}</span>
                             <span class="tabular-nums">-Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
                         </div>
@@ -2093,7 +2093,7 @@
                             class="px-3.5 py-2 rounded-lg bg-transparent hover:bg-rose-500/10 text-slate-500 hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-400 font-medium text-xs transition border border-slate-200 dark:border-white/10 hover:border-rose-500/30 cursor-pointer active:scale-[0.98] min-h-[42px] flex items-center justify-center gap-1.5"
                         >
                             <span>Batal</span>
-                            <span class="hidden sm:inline text-[10px] font-mono opacity-60">(ESC)</span>
+                            <span class="hidden lg:inline text-[10px] font-mono opacity-60">(ESC)</span>
                         </button>
 
                         <button
@@ -2102,7 +2102,7 @@
                             class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.06] dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 font-medium text-xs transition border border-slate-200 dark:border-white/10 cursor-pointer active:scale-[0.98] min-h-[42px] flex items-center justify-center gap-1.5"
                         >
                             <span>Tahan</span>
-                            <span class="hidden sm:inline text-[10px] font-mono opacity-60">(F6)</span>
+                            <span class="hidden lg:inline text-[10px] font-mono opacity-60">(F6)</span>
                         </button>
                     </div>
 
@@ -2117,7 +2117,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                             <span>BAYAR</span>
-                            <span class="hidden sm:inline text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-700/60 text-emerald-100">F4</span>
+                            <span class="hidden lg:inline text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-700/60 text-emerald-100">F4</span>
                         </span>
                         <span class="px-2 py-0.5 rounded bg-black/20 text-white text-xs font-mono font-medium tabular-nums whitespace-nowrap">
                             Rp {{ number_format($totalAkhir, 0, ',', '.') }}

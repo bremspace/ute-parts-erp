@@ -1,9 +1,12 @@
 {{-- [KAS-LACI-MUTASI] MODAL MUTASI KAS LACI (IN/OUT NON-POS) --}}
 @if($showMutasiKasModal)
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 backdrop-blur-md p-4 sm:p-6 overflow-y-auto"
+    <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-950/80 backdrop-blur-md p-0 sm:p-6 overflow-y-auto"
          x-data="{}"
          x-init="$nextTick(() => { $refs.mutasiNominalInput?.focus(); })">
-        <div class="w-full max-w-md bg-white dark:bg-[#0B1120] border border-ink-200/80 dark:border-white/10 p-5 sm:p-6 rounded-3xl shadow-2xl relative max-h-[90vh] flex flex-col my-auto">
+        <div class="w-full max-w-md bg-white dark:bg-[#0B1120] border-t sm:border border-ink-200/80 dark:border-white/10 p-5 sm:p-6 rounded-t-3xl sm:rounded-3xl shadow-2xl relative max-h-[92dvh] sm:max-h-[90vh] flex flex-col pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6">
+            <!-- Mobile Grab Handle -->
+            <div class="sm:hidden w-10 h-1 rounded-full bg-ink-300 dark:bg-white/20 mx-auto -mt-1 mb-3.5 shrink-0"></div>
+
             <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-ink-200/70 dark:border-white/10">
                 <div class="flex items-center gap-2.5">
                     <span class="w-3 h-3 rounded-full {{ $mutasiJenis === 'masuk' ? 'bg-up-mint ring-4 ring-up-mint/20' : 'bg-up-accent ring-4 ring-up-accent/20' }}"></span>
@@ -43,7 +46,7 @@
                     </label>
                     <select
                         wire:model.live="mutasiAkunLawan"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white bg-white/50 dark:bg-ink-900/80 border border-ink-200/80 dark:border-white/10 focus:border-up-primary cursor-pointer min-h-[42px]">
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-semibold text-ink-900 dark:text-white bg-white/50 dark:bg-ink-900/80 border border-ink-200/80 dark:border-white/10 focus:border-up-primary cursor-pointer min-h-[44px] sm:min-h-[42px]">
                         @foreach($mutasiKategoriList as $kat)
                             <option value="{{ $kat['kode'] }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">
                                 [{{ $kat['kode'] }}] {{ $kat['nama'] }}
@@ -77,7 +80,7 @@
                         type="text"
                         wire:model="mutasiKeterangan"
                         placeholder="Contoh: Beli lakban & kantong plastik / Uang kembalian"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[42px] {{ $errors->has('mutasiKeterangan') ? 'border-up-red/60' : '' }}"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium text-ink-900 dark:text-white min-h-[44px] sm:min-h-[42px] {{ $errors->has('mutasiKeterangan') ? 'border-up-red/60' : '' }}"
                     />
                     @error('mutasiKeterangan')
                         <p class="mt-1.5 text-[11px] font-semibold text-up-red">{{ $message }}</p>

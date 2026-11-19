@@ -1,11 +1,14 @@
 <!-- MODAL: OTORISASI VOID TRANSAKSI POS -->
 @if($showVoidModal)
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 backdrop-blur-md p-4 sm:p-6 overflow-y-auto"
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-950/80 backdrop-blur-md p-0 sm:p-6 overflow-y-auto"
         x-data="{}"
         @keydown.window.escape="$wire.tutupVoidModal()"
     >
-        <div class="w-full max-w-md bg-white dark:bg-[#0B1120] border border-ink-200/80 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col">
+        <div class="w-full max-w-md bg-white dark:bg-[#0B1120] border-t sm:border border-ink-200/80 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] pb-[max(env(safe-area-inset-bottom),1rem)] sm:pb-0">
+            <!-- Mobile Grab Handle -->
+            <div class="sm:hidden w-10 h-1 rounded-full bg-ink-300 dark:bg-white/20 mx-auto mt-3 mb-1 shrink-0"></div>
+
             <!-- Header Modal -->
             <div class="p-4 sm:p-5 border-b border-ink-200/70 dark:border-white/10 flex items-center justify-between gap-3 bg-up-red/10">
                 <div class="flex items-center gap-2.5">
@@ -27,7 +30,7 @@
             </div>
 
             <!-- Body Form Void -->
-            <div class="p-4 sm:p-5 space-y-4">
+            <div class="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
                 <!-- Info Transaksi Terpilih -->
                 <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-200/70 dark:border-white/5 flex items-center justify-between text-xs">
                     <div>
@@ -62,7 +65,7 @@
                         wire:model="voidAlasan"
                         rows="2"
                         placeholder="Contoh: Konsumen membatalkan pembelian / salah input nominal"
-                        class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white border border-ink-200/80 dark:border-white/10 focus:border-up-red focus:ring-1 focus:ring-up-red"
+                        class="w-full px-3 py-2 rounded-xl glass-input text-base sm:text-xs font-medium text-ink-900 dark:text-white border border-ink-200/80 dark:border-white/10 focus:border-up-red focus:ring-1 focus:ring-up-red"
                     ></textarea>
                     @error('voidAlasan') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror
                 </div>
@@ -84,7 +87,7 @@
                             type="text"
                             wire:model="voidSupervisorAuth"
                             placeholder="admin@bremspace.id"
-                            class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white border border-ink-200/80 dark:border-white/10"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-base sm:text-xs font-medium text-ink-900 dark:text-white border border-ink-200/80 dark:border-white/10 min-h-[44px] sm:min-h-[38px]"
                         />
                         @error('voidSupervisorAuth') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror
                     </div>
@@ -97,7 +100,7 @@
                             type="password"
                             wire:model="voidSupervisorPassword"
                             placeholder="••••••••"
-                            class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white border border-ink-200/80 dark:border-white/10"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-base sm:text-xs font-medium text-ink-900 dark:text-white border border-ink-200/80 dark:border-white/10 min-h-[44px] sm:min-h-[38px]"
                         />
                         @error('voidSupervisorPassword') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror
                     </div>
@@ -105,18 +108,18 @@
             </div>
 
             <!-- Footer Modal -->
-            <div class="p-4 border-t border-ink-200/70 dark:border-white/10 flex items-center justify-end gap-2 bg-ink-50/50 dark:bg-white/[0.02]">
+            <div class="p-4 border-t border-ink-200/70 dark:border-white/10 flex items-center justify-end gap-2 bg-ink-50/50 dark:bg-white/[0.02] shrink-0">
                 <button
                     type="button"
                     wire:click="tutupVoidModal"
-                    class="px-4 py-2 rounded-xl text-xs font-bold text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10 transition cursor-pointer min-h-[38px]"
+                    class="px-4 py-2.5 rounded-xl text-xs font-bold text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/10 transition cursor-pointer min-h-[44px] sm:min-h-[38px]"
                 >
                     Batal
                 </button>
                 <button
                     type="button"
                     wire:click="prosesVoidTransaksi"
-                    class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-up-red hover:bg-red-600 shadow-md shadow-up-red/20 transition cursor-pointer flex items-center gap-1.5 min-h-[38px] active:scale-95"
+                    class="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-up-red hover:bg-red-600 shadow-md shadow-up-red/20 transition cursor-pointer flex items-center gap-1.5 min-h-[44px] sm:min-h-[38px] active:scale-95"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

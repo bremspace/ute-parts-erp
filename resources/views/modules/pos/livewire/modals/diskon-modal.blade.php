@@ -1,19 +1,22 @@
 <!-- MODAL PENGATURAN DISKON & SKEMA REWARD TRANSAKSI -->
 @if($showDiskonModal)
-    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-ink-950/80 backdrop-blur-md p-4 sm:p-6 overflow-y-auto"
+    <div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-ink-950/80 backdrop-blur-md p-0 sm:p-6 overflow-y-auto"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0">
-        <div class="w-full max-w-lg bg-white dark:bg-[#0B1120] border border-ink-200/80 dark:border-white/10 p-5 sm:p-6 rounded-3xl shadow-2xl relative my-auto max-h-[92vh] flex flex-col"
+        <div class="w-full max-w-lg bg-white dark:bg-[#0B1120] border-t sm:border border-ink-200/80 dark:border-white/10 p-5 sm:p-6 rounded-t-3xl sm:rounded-3xl shadow-2xl relative max-h-[92dvh] sm:max-h-[90vh] flex flex-col pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6"
              x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 scale-95"
-             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
              x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100 scale-100"
-             x-transition:leave-end="opacity-0 scale-95">
+             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+             x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
+            <!-- Mobile Grab Handle -->
+            <div class="sm:hidden w-10 h-1 rounded-full bg-ink-300 dark:bg-white/20 mx-auto -mt-1 mb-3.5 shrink-0"></div>
+
             <!-- Header Modal -->
             <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-ink-200/70 dark:border-white/10 shrink-0">
                 <div class="flex items-center gap-2.5">
@@ -253,7 +256,7 @@
                                 type="text"
                                 wire:model="diskonManualAlasan"
                                 placeholder="Contoh: Promo khusus toko, Clearance sale, dll"
-                                class="w-full px-3 py-2 rounded-xl glass-input text-xs text-ink-900 dark:text-white border-ink-200/80 dark:border-white/15"
+                                class="w-full px-3 py-2 rounded-xl glass-input text-base sm:text-xs text-ink-900 dark:text-white border-ink-200/80 dark:border-white/15 min-h-[44px] sm:min-h-[38px]"
                             />
                         </div>
 
@@ -284,7 +287,7 @@
                                             wire:model="diskonSupervisorAuth"
                                             autocomplete="username"
                                             placeholder="superadmin@bremspace.id"
-                                            class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs text-ink-900 dark:text-white border-ink-200/80 dark:border-white/15"
+                                            class="w-full px-2.5 py-1.5 rounded-lg glass-input text-base sm:text-xs text-ink-900 dark:text-white border-ink-200/80 dark:border-white/15 min-h-[44px] sm:min-h-[36px]"
                                         />
                                     </div>
                                     <div>
@@ -294,7 +297,7 @@
                                             wire:model="diskonSupervisorPassword"
                                             autocomplete="current-password"
                                             placeholder="••••••••"
-                                            class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs text-ink-900 dark:text-white border-ink-200/80 dark:border-white/15"
+                                            class="w-full px-2.5 py-1.5 rounded-lg glass-input text-base sm:text-xs text-ink-900 dark:text-white border-ink-200/80 dark:border-white/15 min-h-[44px] sm:min-h-[36px]"
                                         />
                                     </div>
                                 </div>

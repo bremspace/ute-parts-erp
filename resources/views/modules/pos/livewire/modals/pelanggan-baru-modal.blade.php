@@ -1,7 +1,10 @@
 <!-- MODAL: TAMBAH PELANGGAN BARU -->
 @if($showPelangganBaruModal)
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 backdrop-blur-md p-4 sm:p-6 overflow-y-auto">
-        <div class="w-full max-w-sm bg-white dark:bg-[#0B1120] border border-ink-200/80 dark:border-white/10 p-5 sm:p-6 rounded-3xl relative my-auto shadow-2xl">
+    <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-950/80 backdrop-blur-md p-0 sm:p-6 overflow-y-auto">
+        <div class="w-full max-w-md bg-white dark:bg-[#0B1120] border-t sm:border border-ink-200/80 dark:border-white/10 p-5 sm:p-6 rounded-t-3xl sm:rounded-3xl relative max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6">
+            <!-- Mobile Grab Handle -->
+            <div class="sm:hidden w-10 h-1 rounded-full bg-ink-300 dark:bg-white/20 mx-auto -mt-1 mb-3.5 shrink-0"></div>
+
             <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-ink-200/70 dark:border-white/10">
                 <div class="flex items-center gap-2.5">
                     <div class="w-9 h-9 rounded-xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary">
@@ -28,7 +31,7 @@
                         type="text"
                         wire:model="pelangganBaruForm.nama"
                         placeholder="Contoh: Budi Pratama / Toko Mitra"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white min-h-[42px]"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-semibold text-ink-900 dark:text-white min-h-[44px] sm:min-h-[42px]"
                         autofocus
                     />
                     @error('pelangganBaruForm.nama') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
@@ -38,7 +41,7 @@
                     <input
                         type="text"
                         wire:model="pelangganBaruForm.telepon"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold font-mono text-ink-900 dark:text-white min-h-[42px]"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-semibold font-mono text-ink-900 dark:text-white min-h-[44px] sm:min-h-[42px]"
                         placeholder="08xxxxxxxxxx"
                     />
                     @error('pelangganBaruForm.telepon') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
@@ -49,7 +52,7 @@
                         type="email"
                         wire:model="pelangganBaruForm.email"
                         placeholder="nama@email.com"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[42px]"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium text-ink-900 dark:text-white min-h-[44px] sm:min-h-[42px]"
                     />
                     @error('pelangganBaruForm.email') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
                 </div>
@@ -59,7 +62,7 @@
                         wire:model="pelangganBaruForm.alamat"
                         rows="2"
                         placeholder="Alamat domisili atau toko..."
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium text-ink-900 dark:text-white"
                     ></textarea>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -68,12 +71,12 @@
                         <input
                             type="date"
                             wire:model="pelangganBaruForm.tanggal_lahir"
-                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[42px]"
+                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-medium text-ink-900 dark:text-white min-h-[44px] sm:min-h-[42px]"
                         />
                     </div>
                     <div>
                         <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Tipe Konsumen</label>
-                        <select wire:model.live="pelangganBaruForm.tipe_konsumen" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white min-h-[42px]">
+                        <select wire:model.live="pelangganBaruForm.tipe_konsumen" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-semibold text-ink-900 dark:text-white min-h-[44px] sm:min-h-[42px]">
                             <option value="retail">Retail (Umum)</option>
                             <option value="reseller">Reseller</option>
                             <option value="agen">Agen / Mitra B2B</option>
@@ -88,7 +91,7 @@
                         type="text"
                         wire:model="pelangganBaruForm.kode_agen"
                         placeholder="Otomatis jika kosong"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono uppercase text-ink-900 dark:text-white min-h-[42px]"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-mono uppercase text-ink-900 dark:text-white min-h-[44px] sm:min-h-[42px]"
                     />
                     @error('pelangganBaruForm.kode_agen') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
                 </div>
@@ -100,7 +103,7 @@
                         type="text"
                         wire:model="pelangganBaruForm.referral_kode"
                         placeholder="Masukkan Kode Agen Upline jika ada (misal: AGN-XXXXXX)"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono uppercase text-ink-900 dark:text-white min-h-[42px]"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-mono uppercase text-ink-900 dark:text-white min-h-[44px] sm:min-h-[42px]"
                     />
                     @error('pelangganBaruForm.referral_kode') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
                 </div>
