@@ -1920,9 +1920,9 @@ class ServisBoard extends Component
             return;
         }
 
-        $rincian = $tiket->getRincianBiayaLengkap();
-
-        $this->bayarTotalTagihan = $rincian['total'];
+        // [B-3/F-20] Tampilkan sisa tagihan sebenarnya: termasuk PPN keluaran
+        // dan dikurangi cicilan yang sudah masuk via subledger piutang.
+        $this->bayarTotalTagihan = app(ServisService::class)->getSisaTagihan($tiket);
         $this->bayarTiketId = $tiketId;
         $this->bayarMetode = 'tunai';
         $this->bayarCatatan = '';
@@ -1940,7 +1940,7 @@ class ServisBoard extends Component
         $tiket = $this->tiketScoped($this->bayarTiketId);
 
         try {
-            app(ServisService::class)->bayar($tiket, $this->bayarMetode, auth()->user(), $this->bayarCatatan, null, null, (float) $tiket->getRincianBiayaLengkap()['total']);
+            app(ServisService::class)->bayar($tiket, $this->bayarMetode, auth()->user(), $this->bayarCatatan, null, null, app(ServisService::class)->getSisaTagihan($tiket));
             $this->showBayarModal = false;
             $this->dispatch('alert', ['type' => 'success', 'message' => "Pembayaran servis {$tiket->no_tiket} berhasil dicatat (Lunas)."]);
             $this->bukaStrukServis($tiket->id);
@@ -1963,6 +1963,9 @@ class ServisBoard extends Component
 
         $isLunas = ($tiket->status_pembayaran === 'lunas');
 
+        // [F-20] Struk memisah DPP vs PPN keluaran (nilai tersimpan saat selesai).
+        $pajakBersih = app(ServisService::class)->getPajakBersih($tiket);
+
         $this->receiptData = [
             'no_transaksi' => $tiket->transaksi?->no_transaksi ?? $tiket->no_tiket,
             'no_tiket' => $tiket->no_tiket,
@@ -1979,9 +1982,9 @@ class ServisBoard extends Component
             'subtotal' => $rincian['total'],
             'diskon' => app(ServisService::class)->getGoodwillBerlaku($tiket)
                 + app(ServisService::class)->getDiskonVoucher($tiket),
-            'dpp' => $rincian['total'],
-            'pajak' => 0,
-            'ppn_persen' => 0,
+            'dpp' => $pajakBersih['dpp'],
+            'pajak' => $pajakBersih['ppn_nominal'],
+            'ppn_persen' => $pajakBersih['ppn_percent'],
             'total' => app(ServisService::class)->getTotalTagihanBersih($tiket),
             'bayar' => $isLunas ? app(ServisService::class)->getTotalTagihanBersih($tiket) : 0,
             'kembali' => 0,

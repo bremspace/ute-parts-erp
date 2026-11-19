@@ -196,7 +196,7 @@ class ServisEstimasiTambahanPartTest extends TestCase
         $tiket = $this->buatTiketDenganEstimasi();
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('tidak sesuai rincian penagihan');
+        $this->expectExceptionMessage('tidak sesuai sisa tagihan');
 
         app(ServisService::class)->bayar($tiket, 'tunai', $this->admin, null, null, null, 999);
     }

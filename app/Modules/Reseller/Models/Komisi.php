@@ -27,6 +27,9 @@ class Komisi extends Model
 
     public const STATUS_CAIR = 'cair';
 
+    /** [F-09] Tiket servis batal/ditolak setelah selesai — komisi tidak boleh dibayar. */
+    public const STATUS_DIBATALKAN = 'dibatalkan';
+
     protected $table = 'komisi';
 
     protected $casts = [
