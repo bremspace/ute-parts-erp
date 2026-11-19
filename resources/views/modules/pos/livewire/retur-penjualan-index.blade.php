@@ -434,17 +434,6 @@
                                 </div>
                             </div>
 
-                            {{-- Gudang & Rak Tujuan untuk Produk yang Dikembalikan --}}
-                            <div class="p-3 rounded-xl bg-ink-900/40 border border-white/10 space-y-2">
-                                <label class="block text-[10px] font-bold text-ink-300 uppercase tracking-wider mb-1">Gudang Tujuan Produk Dikembalikan (Wajib)</label>
-                                <select wire:model.live="gudangReturId" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[40px] cursor-pointer {{ empty($gudangReturId) ? 'border-up-red/50' : '' }}">
-                                    <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
-                                    @foreach($gudangs as $g)
-                                        <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
                             {{-- [ANTI-FRAUD] Deteksi Cerdas Masa Garansi --}}
                             @if($isGaransiExpired)
                                 <div class="p-3.5 rounded-2xl bg-up-red/15 border border-up-red/40 text-white space-y-1">
@@ -592,13 +581,16 @@
                                                 {{-- Gudang & Rak tujuan produk yang dikembalikan --}}
                                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" x-data="{ gudangId: '{{ $itemInputs[$itemId]['gudang_retur_id'] ?? '' }}' }">
                                                     <div>
-                                                        <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Gudang Tujuan (Wajib)</label>
-                                                        <select wire:model="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value; $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
-                                                            <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
-                                                            @foreach($gudangs as $g)
-                                                                <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
-                                                            @endforeach
-                                                        </select>
+                                                        <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Tujuan Stok (Kembali ke Stok Asal / Pindah Gudang)</label>
+                                                        <div class="flex gap-1.5">
+                                                            <select wire:model="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value; $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="flex-1 px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
+                                                                <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
+                                                                @foreach($gudangs as $g)
+                                                                    <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
+                                                                @endforeach
+                                                            </select>
+                                                            <button type="button" title="Kembali ke gudang asal transaksi" @click="gudangId = '{{ $selectedTransaksi?->gudang_id }}'; $wire.set('itemInputs.{{ $itemId }}.gudang_retur_id', '{{ $selectedTransaksi?->gudang_id }}'); $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="px-2.5 py-2 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint text-[10px] font-bold cursor-pointer whitespace-nowrap">↻ Asal</button>
+                                                        </div>
                                                     </div>
                                                     <div>
                                                         <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Rak Tujuan (Opsional)</label>
