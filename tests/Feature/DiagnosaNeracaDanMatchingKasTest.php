@@ -120,13 +120,31 @@ class DiagnosaNeracaDanMatchingKasTest extends TestCase
         $this->assertEquals('Finance / Accounting', $temuanJurnal['bagian']);
         $this->assertTrue($temuanJurnal['solusi_otomatis_tersedia']);
 
-        // Uji coba fitur auto-remediasi (perbaiki otomatis)
+        // Uji coba fitur auto-remediasi (perbaiki otomatis).
+        // [B-1 / D-1] Koreksi kini berupa jurnal TERPISAH lewat mesin JurnalService
+        // (pembalikan baris asal + plug suspense 520-05); jurnal asal TIDAK diubah
+        // (immutability), sehingga nominal selisih tetap terdeteksi diagnosa sampai
+        // jurnal asal diselesaikan manual via reversal/repost resmi.
         $perbaikan = $service->perbaikiOtomatis('seimbangkan_jurnal', $temuanJurnal['payload'], $this->user->id);
         $this->assertTrue($perbaikan['success']);
 
-        // Setelah perbaikan di-post, diagnosa ulang harus seimbang
-        $hasilUlang = $service->diagnosa($this->cabang->id);
-        $this->assertTrue($hasilUlang['is_balance']);
+        // Jurnal asal tetap utuh: 1 baris, debit 500rb, kredit 0.
+        $asal = \DB::table('jurnal_akuntansi')->where('no_jurnal', 'JRL-TIMPANG-01')->get();
+        $this->assertCount(1, $asal);
+        $this->assertEquals(500000, (float) $asal->sum('debit'));
+        $this->assertEquals(0, (float) $asal->sum('kredit'));
+
+        // Koreksi terpisah balance dan punya header sinkron (mesin resmi).
+        $noKoreksi = \DB::table('jurnal_akuntansi')->where('no_jurnal', '!=', 'JRL-TIMPANG-01')->value('no_jurnal');
+        $this->assertNotNull($noKoreksi);
+        $koreksi = \DB::table('jurnal_akuntansi')->where('no_jurnal', $noKoreksi)->get();
+        $this->assertEquals(round((float) $koreksi->sum('debit'), 2), round((float) $koreksi->sum('kredit'), 2));
+        $this->assertNotNull(\DB::table('jurnal_header')->where('no_jurnal', $noKoreksi)->first());
+
+        // Panggilan ulang ditolak (idempoten) — tidak ada koreksi kedua.
+        $ulang = $service->perbaikiOtomatis('seimbangkan_jurnal', $temuanJurnal['payload'], $this->user->id);
+        $this->assertFalse($ulang['success']);
+        $this->assertEquals(2, \DB::table('jurnal_akuntansi')->distinct()->count('no_jurnal'));
     }
 
     public function test_matching_kas_real_berhasil_disimpan_dan_dijurnal_penyesuaian(): void

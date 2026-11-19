@@ -3,6 +3,8 @@
 namespace App\Modules\Akunting\Services;
 
 use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\KasMatching;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
@@ -464,16 +466,23 @@ class DiagnosaNeracaService
             return;
         }
 
+        // [D-2] Deteksi "sudah disesuaikan" TIDAK boleh bergantung LIKE deskripsi
+        // (frasa approval "Selisih kas sesi #id (disetujui)" berbeda kapitalisasi).
+        // Jurnal selisih (jalur approval maupun auto-fix) selalu melibatkan akun
+        // lawan 520-07 / 430-01; jurnal buka-kas/deposit-back referensi kas_sesi
+        // tidak pernah memakai akun itu.
+        $akunSelisihIds = AkunCOA::whereIn('kode', ['520-07', '430-01'])->pluck('id');
+
         $query = DB::table('kas_sesi')
             ->where('status', 'tutup')
             ->whereNotNull('selisih')
             ->where('selisih', '<>', 0)
-            ->whereNotExists(function ($q) {
+            ->whereNotExists(function ($q) use ($akunSelisihIds) {
                 $q->select(DB::raw(1))
                     ->from('jurnal_akuntansi')
                     ->where('jurnal_akuntansi.referensi_tipe', 'kas_sesi')
                     ->whereColumn('jurnal_akuntansi.referensi_id', 'kas_sesi.id')
-                    ->where('jurnal_akuntansi.deskripsi', 'like', '%Selisih Kas%');
+                    ->whereIn('jurnal_akuntansi.akun_coa_id', $akunSelisihIds);
             });
 
         if ($cabangId !== null) {
@@ -594,129 +603,336 @@ class DiagnosaNeracaService
     /**
      * Eksekusi solusi otomatis yang disetujui pengguna.
      *
+     * [B-1 / D-1 / D-2 / D-3] Guard keamanan auto-fix:
+     * - Izin server-side `akunting.approve` (Livewire action bisa dipanggil langsung).
+     * - Scope cabang fail-closed: $cabangScopeId > 0 = hanya cabang itu;
+     *   null = konsolidasi HANYA bila user punya `laporan.konsolidasi`;
+     *   0 / tanpa hak = tolak.
+     * - Nominal TIDAK PERNAH dari payload client: selalu hitung ulang dari DB.
+     * - Semua posting lewat JurnalService::post resmi (balance, akun aktif,
+     *   periode terbuka, header sinkron, idempotency key unique per cabang).
+     * - Jurnal existing TIDAK PERNAH dimodifikasi (immutability ISO): koreksi
+     *   `seimbangkan_jurnal` berupa jurnal TERPISAH (pembalikan baris asal +
+     *   plug akun suspense 520-05) dengan nomor baru.
+     *
+     * @param  int|null  $cabangScopeId  scope cabang pemanggil (null = konsolidasi berizin)
      * @return array{success: bool, message: string}
      */
-    public function perbaikiOtomatis(string $aksiKey, array $payload, ?int $userId = null): array
+    public function perbaikiOtomatis(string $aksiKey, array $payload, ?int $userId = null, ?int $cabangScopeId = null): array
     {
-        return DB::transaction(function () use ($aksiKey, $payload, $userId) {
+        $user = auth()->user();
+        if (! $user || ! $user->can('akunting.approve')) {
+            return ['success' => false, 'message' => 'Anda tidak memiliki izin (akunting.approve) untuk menjalankan perbaikan otomatis.'];
+        }
+
+        $konsolidasi = $cabangScopeId === null;
+        if ($konsolidasi && ! $user->can('laporan.konsolidasi')) {
+            return ['success' => false, 'message' => 'Scope cabang tidak valid. Pilih cabang aktif atau gunakan cakupan konsolidasi berizin.'];
+        }
+        if (! $konsolidasi && $cabangScopeId <= 0) {
+            return ['success' => false, 'message' => 'Tidak ada cabang aktif. Perbaikan otomatis tidak dapat dijalankan (fail-closed).'];
+        }
+
+        // Idempotensi ditegakkan unique index jurnal_header(cabang_key, idempotency_key);
+        // tanpa tabel header tidak ada jaminan anti-dobel -> tolak (fail-closed).
+        if (! Schema::hasTable('jurnal_header')) {
+            return ['success' => false, 'message' => 'Tabel jurnal_header belum tersedia. Jalankan migrasi sebelum memakai perbaikan otomatis.'];
+        }
+
+        $authId = auth()->id();
+        $userId = $authId !== null ? (int) $authId : $userId;
+
+        return DB::transaction(function () use ($aksiKey, $payload, $userId, $cabangScopeId, $konsolidasi) {
             switch ($aksiKey) {
                 case 'seimbangkan_jurnal':
-                    $noJurnal = $payload['no_jurnal'] ?? null;
-                    $cabangId = $payload['cabang_id'] ?? null;
-                    $selisih = abs((float) ($payload['selisih'] ?? 0));
-                    $sisiKurang = $payload['sisi_kurang'] ?? 'debit';
-
-                    if (! $noJurnal || $selisih <= 0) {
-                        return ['success' => false, 'message' => 'Parameter perbaikan jurnal tidak valid.'];
-                    }
-
-                    // Seimbangkan langsung baris pada no_jurnal yang timpang agar nomor jurnal tersebut seimbang
-                    $akunSuspense = AkunCOA::where('kode', '520-05')->first() ?: AkunCOA::where('tipe', 'beban')->first();
-                    if (! $akunSuspense) {
-                        return ['success' => false, 'message' => 'Akun suspense tidak ditemukan.'];
-                    }
-
-                    DB::table('jurnal_akuntansi')->insert([
-                        'no_jurnal' => $noJurnal,
-                        'tanggal' => now(),
-                        'cabang_id' => $cabangId,
-                        'akun_coa_id' => $akunSuspense->id,
-                        'sumber' => 'manual',
-                        'deskripsi' => "Penyeimbang Koreksi Otomatis {$noJurnal}",
-                        'debit' => $sisiKurang === 'debit' ? $selisih : 0,
-                        'kredit' => $sisiKurang === 'kredit' ? $selisih : 0,
-                        'user_id' => $userId,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-
-                    return ['success' => true, 'message' => "Baris penyeimbang berhasil ditambahkan pada jurnal {$noJurnal}."];
-
+                    return $this->perbaikiSeimbangkanJurnal($payload, $userId, $cabangScopeId, $konsolidasi);
                 case 'posting_selisih_kas_matching':
-                    $matchingId = $payload['kas_matching_id'] ?? null;
-                    $matching = KasMatching::with('akun')->find($matchingId);
-                    if (! $matching || $matching->jurnal_id) {
-                        return ['success' => false, 'message' => 'Data matching kas tidak ditemukan atau sudah disesuaikan.'];
-                    }
-
-                    $selisih = (float) $matching->selisih;
-                    if (abs($selisih) < 0.01) {
-                        return ['success' => false, 'message' => 'Tidak ada selisih kas yang perlu dibukukan.'];
-                    }
-
-                    $akunKasKode = $matching->akun?->kode ?? '110-01';
-                    $noJurnal = $this->jurnalService->generateNoJurnal('kas', $matching->cabang_id);
-
-                    // Selisih = Fisik - Sistem
-                    // Jika selisih > 0 (Fisik lebih banyak): Debit Kas, Kredit Pendapatan Lain-lain (430-01) / Selisih Kas
-                    // Jika selisih < 0 (Fisik tekor): Debit Beban Selisih Kas (520-07), Kredit Kas
-                    $lines = $selisih > 0
-                        ? [
-                            ['akun_kode' => $akunKasKode, 'debit' => abs($selisih), 'kredit' => 0],
-                            ['akun_kode' => '430-01', 'debit' => 0, 'kredit' => abs($selisih)],
-                        ]
-                        : [
-                            ['akun_kode' => '520-07', 'debit' => abs($selisih), 'kredit' => 0],
-                            ['akun_kode' => $akunKasKode, 'debit' => 0, 'kredit' => abs($selisih)],
-                        ];
-
-                    $jurnalRows = $this->jurnalService->post(
-                        $noJurnal,
-                        now(),
-                        'kas',
-                        $lines,
-                        "Penyesuaian Selisih Kas Real per {$matching->tanggal->format('d/m/Y')}",
-                        $matching->cabang_id,
-                        $userId,
-                        KasMatching::class,
-                        $matching->id
-                    );
-
-                    $matching->update([
-                        'status' => 'disesuaikan',
-                        'jurnal_id' => $jurnalRows[0]->id ?? null,
-                    ]);
-
-                    return ['success' => true, 'message' => "Jurnal penyesuaian selisih kas {$noJurnal} berhasil dibukukan."];
-
+                    return $this->perbaikiSelisihKasMatching($payload, $userId, $cabangScopeId, $konsolidasi);
                 case 'posting_selisih_kas_sesi':
-                    $sesiId = $payload['kas_sesi_id'] ?? null;
-                    $sesi = DB::table('kas_sesi')->where('id', $sesiId)->first();
-                    if (! $sesi || ! $sesi->selisih) {
-                        return ['success' => false, 'message' => 'Sesi kasir tidak valid atau tidak memiliki selisih.'];
-                    }
-
-                    $selisih = (float) $sesi->selisih;
-                    $noJurnal = $this->jurnalService->generateNoJurnal('kas', (int) $sesi->cabang_id);
-                    $akunKasLaci = '110-04';
-
-                    $lines = $selisih > 0
-                        ? [
-                            ['akun_kode' => $akunKasLaci, 'debit' => abs($selisih), 'kredit' => 0],
-                            ['akun_kode' => '430-01', 'debit' => 0, 'kredit' => abs($selisih)],
-                        ]
-                        : [
-                            ['akun_kode' => '520-07', 'debit' => abs($selisih), 'kredit' => 0],
-                            ['akun_kode' => $akunKasLaci, 'debit' => 0, 'kredit' => abs($selisih)],
-                        ];
-
-                    $this->jurnalService->post(
-                        $noJurnal,
-                        now(),
-                        'kas',
-                        $lines,
-                        "Penyesuaian Selisih Kas Sesi Kasir #{$sesi->id}",
-                        $sesi->cabang_id,
-                        $userId,
-                        'kas_sesi',
-                        $sesi->id
-                    );
-
-                    return ['success' => true, 'message' => "Jurnal selisih kas sesi #{$sesi->id} berhasil diposting ({$noJurnal})."];
-
+                    return $this->perbaikiSelisihKasSesi($payload, $userId, $cabangScopeId, $konsolidasi);
                 default:
                     return ['success' => false, 'message' => "Aksi perbaikan '{$aksiKey}' belum didukung secara otomatis."];
             }
         });
+    }
+
+    /**
+     * [B-1 / D-1] Koreksi jurnal timpang TANPA menyentuh jurnal asal.
+     *
+     * Nominal & sisi kurang dihitung ulang dari DB (payload client diabaikan).
+     * Koreksi = jurnal baru terpisah: seluruh baris asal dibalik (D<->K) plus
+     * plug selisih di akun suspense 520-05, sehingga entri koreksi balance dan
+     * lolos mesin JurnalService (akun aktif, periode terbuka, header sinkron).
+     * Jurnal asal tetap utuh (immutability) dan tetap ditandai diagnosa sampai
+     * diselesaikan manual via reversal/repost resmi. Idempoten per no_jurnal.
+     *
+     * @return array{success: bool, message: string}
+     */
+    protected function perbaikiSeimbangkanJurnal(array $payload, ?int $userId, ?int $cabangScopeId, bool $konsolidasi): array
+    {
+        $noJurnal = trim((string) ($payload['no_jurnal'] ?? ''));
+        if ($noJurnal === '') {
+            return ['success' => false, 'message' => 'Parameter no_jurnal wajib diisi.'];
+        }
+
+        $query = JurnalAkuntansi::where('no_jurnal', $noJurnal)->with('akun');
+        if (! $konsolidasi) {
+            $query->where('cabang_id', $cabangScopeId);
+        }
+        $linesAsal = $query->lockForUpdate()->get();
+        if ($linesAsal->isEmpty()) {
+            return ['success' => false, 'message' => "Jurnal {$noJurnal} tidak ditemukan pada scope cabang Anda."];
+        }
+
+        $cabangJurnal = $linesAsal->first()->cabang_id;
+        if (! $this->scopeCabangValid($cabangJurnal, $cabangScopeId, $konsolidasi)) {
+            return ['success' => false, 'message' => "Jurnal {$noJurnal} bukan milik cabang yang Anda scope."];
+        }
+        if ($konsolidasi && $linesAsal->pluck('cabang_id')->unique()->count() > 1) {
+            return ['success' => false, 'message' => "Nomor jurnal {$noJurnal} dipakai lebih dari satu cabang. Jalankan perbaikan dari scope cabang terkait."];
+        }
+        $cabangJurnal = (int) $cabangJurnal;
+
+        // Hitung ulang dari DB — selisih/sisi_kurang/cabang_id payload diabaikan.
+        $totalDebit = round((float) $linesAsal->sum('debit'), 2);
+        $totalKredit = round((float) $linesAsal->sum('kredit'), 2);
+        $selisih = round(abs($totalDebit - $totalKredit), 2);
+        if ($selisih < 0.01) {
+            return ['success' => false, 'message' => "Jurnal {$noJurnal} sudah balance; tidak ada koreksi yang diperlukan."];
+        }
+
+        $kunci = "diagnosa-seimbangkan:{$noJurnal}";
+        if ($this->idempotensiTerpakai($kunci, $cabangJurnal)) {
+            return ['success' => false, 'message' => "Jurnal koreksi untuk {$noJurnal} sudah pernah diposting (idempotency guard). Selesaikan jurnal asal via reversal/repost manual."];
+        }
+
+        // Akun suspense WAJIB 520-05 (tanpa fallback akun beban sembarang).
+        $suspense = AkunCOA::where('kode', '520-05')->first();
+        if (! $suspense || ! $suspense->is_active) {
+            return ['success' => false, 'message' => 'Akun suspense 520-05 tidak ditemukan atau nonaktif. Koreksi otomatis dibatalkan.'];
+        }
+
+        $lines = [];
+        foreach ($linesAsal as $line) {
+            $lines[] = [
+                'akun_kode' => $line->akun?->kode,
+                'debit' => (float) $line->kredit,
+                'kredit' => (float) $line->debit,
+            ];
+        }
+        // Plug penyeimbang di sisi yang kurang pada entri pembalikan.
+        $lines[] = $totalDebit > $totalKredit
+            ? ['akun_kode' => '520-05', 'debit' => $selisih, 'kredit' => 0]
+            : ['akun_kode' => '520-05', 'debit' => 0, 'kredit' => $selisih];
+
+        $headerAsal = JurnalHeader::where('no_jurnal', $noJurnal)->where('cabang_key', $cabangJurnal)->first();
+        $noKoreksi = $this->jurnalService->generateNoJurnal('manual', $cabangJurnal);
+
+        try {
+            $this->jurnalService->post(
+                $noKoreksi,
+                now(),
+                'manual',
+                $lines,
+                "Jurnal Koreksi Diagnosa (pembalikan + suspense) atas {$noJurnal}",
+                $cabangJurnal,
+                $userId,
+                'jurnal_header',
+                $headerAsal?->id,
+                $kunci
+            );
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+
+        return ['success' => true, 'message' => "Jurnal koreksi {$noKoreksi} diposting lewat mesin jurnal resmi (selisih Rp ".number_format($selisih, 0, ',', '.')." diparkir di suspense 520-05). Jurnal asal {$noJurnal} tidak diubah; selesaikan dengan reversal/repost manual."];
+    }
+
+    /**
+     * [D-3] Posting penyesuaian selisih kas matching: izin + scope cabang +
+     * idempoten (jurnal_id + idempotency key + lock baris matching).
+     *
+     * @return array{success: bool, message: string}
+     */
+    protected function perbaikiSelisihKasMatching(array $payload, ?int $userId, ?int $cabangScopeId, bool $konsolidasi): array
+    {
+        $matchingId = (int) ($payload['kas_matching_id'] ?? 0);
+        $matching = KasMatching::where('id', $matchingId)->lockForUpdate()->first();
+        if (! $matching) {
+            return ['success' => false, 'message' => 'Data matching kas tidak ditemukan.'];
+        }
+        if (! $this->scopeCabangValid($matching->cabang_id, $cabangScopeId, $konsolidasi)) {
+            return ['success' => false, 'message' => 'Matching kas ini bukan milik cabang yang Anda scope.'];
+        }
+        if ($matching->jurnal_id) {
+            return ['success' => false, 'message' => 'Data matching kas sudah disesuaikan.'];
+        }
+
+        // Nominal dari DB (record matching), bukan payload client.
+        $selisih = (float) $matching->selisih;
+        if (abs($selisih) < 0.01) {
+            return ['success' => false, 'message' => 'Tidak ada selisih kas yang perlu dibukukan.'];
+        }
+
+        $cabangId = (int) $matching->cabang_id;
+        $kunci = "diagnosa-kas-matching:{$matching->id}";
+        if ($this->idempotensiTerpakai($kunci, $cabangId)) {
+            return ['success' => false, 'message' => 'Penyesuaian matching kas ini sudah pernah diposting (idempotency guard).'];
+        }
+
+        $akunKas = AkunCOA::find($matching->akun_id);
+        $akunKasKode = $akunKas?->kode ?? '110-01';
+        $noJurnal = $this->jurnalService->generateNoJurnal('kas', $cabangId);
+
+        // Selisih = Fisik - Sistem
+        // Jika selisih > 0 (Fisik lebih banyak): Debit Kas, Kredit Pendapatan Lain-lain (430-01)
+        // Jika selisih < 0 (Fisik tekor): Debit Beban Selisih Kas (520-07), Kredit Kas
+        $lines = $selisih > 0
+            ? [
+                ['akun_kode' => $akunKasKode, 'debit' => abs($selisih), 'kredit' => 0],
+                ['akun_kode' => '430-01', 'debit' => 0, 'kredit' => abs($selisih)],
+            ]
+            : [
+                ['akun_kode' => '520-07', 'debit' => abs($selisih), 'kredit' => 0],
+                ['akun_kode' => $akunKasKode, 'debit' => 0, 'kredit' => abs($selisih)],
+            ];
+
+        try {
+            $jurnalRows = $this->jurnalService->post(
+                $noJurnal,
+                now(),
+                'kas',
+                $lines,
+                "Penyesuaian Selisih Kas Real per {$matching->tanggal->format('d/m/Y')}",
+                $cabangId,
+                $userId,
+                KasMatching::class,
+                $matching->id,
+                $kunci
+            );
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+
+        $matching->update([
+            'status' => 'disesuaikan',
+            'jurnal_id' => $jurnalRows[0]->id ?? null,
+        ]);
+
+        return ['success' => true, 'message' => "Jurnal penyesuaian selisih kas {$noJurnal} berhasil dibukukan."];
+    }
+
+    /**
+     * [D-2 / D-3] Posting selisih kas sesi: izin + scope cabang + idempoten.
+     * Guard memakai referensi (kas_sesi, id) + akun lawan selisih — bukan LIKE
+     * deskripsi — sehingga sesi yang sudah disesuaikan via approval tidak dobel.
+     *
+     * @return array{success: bool, message: string}
+     */
+    protected function perbaikiSelisihKasSesi(array $payload, ?int $userId, ?int $cabangScopeId, bool $konsolidasi): array
+    {
+        $sesiId = (int) ($payload['kas_sesi_id'] ?? 0);
+        $sesi = DB::table('kas_sesi')->where('id', $sesiId)->lockForUpdate()->first();
+        if (! $sesi || ! $sesi->selisih) {
+            return ['success' => false, 'message' => 'Sesi kasir tidak valid atau tidak memiliki selisih.'];
+        }
+        if ($sesi->status !== 'tutup') {
+            return ['success' => false, 'message' => 'Sesi kasir belum tutup. Selisih hanya dapat disesuaikan setelah sesi ditutup.'];
+        }
+        if (! $this->scopeCabangValid((int) $sesi->cabang_id, $cabangScopeId, $konsolidasi)) {
+            return ['success' => false, 'message' => 'Sesi kasir ini bukan milik cabang yang Anda scope.'];
+        }
+
+        $selisih = (float) $sesi->selisih;
+        if (abs($selisih) < 0.01) {
+            return ['success' => false, 'message' => 'Tidak ada selisih kas yang perlu dibukukan.'];
+        }
+
+        if ($this->selisihKasSesiSudahDijurnal($sesiId)) {
+            return ['success' => false, 'message' => 'Selisih sesi kasir ini sudah pernah dijurnal (termasuk via approval).'];
+        }
+
+        $cabangId = (int) $sesi->cabang_id;
+        $kunci = "diagnosa-kas-sesi:{$sesi->id}";
+        if ($this->idempotensiTerpakai($kunci, $cabangId)) {
+            return ['success' => false, 'message' => 'Penyesuaian sesi kasir ini sudah pernah diposting (idempotency guard).'];
+        }
+
+        $noJurnal = $this->jurnalService->generateNoJurnal('kas', $cabangId);
+        $akunKasLaci = '110-04';
+
+        $lines = $selisih > 0
+            ? [
+                ['akun_kode' => $akunKasLaci, 'debit' => abs($selisih), 'kredit' => 0],
+                ['akun_kode' => '430-01', 'debit' => 0, 'kredit' => abs($selisih)],
+            ]
+            : [
+                ['akun_kode' => '520-07', 'debit' => abs($selisih), 'kredit' => 0],
+                ['akun_kode' => $akunKasLaci, 'debit' => 0, 'kredit' => abs($selisih)],
+            ];
+
+        try {
+            $this->jurnalService->post(
+                $noJurnal,
+                now(),
+                'kas',
+                $lines,
+                "Penyesuaian Selisih Kas Sesi Kasir #{$sesi->id}",
+                $cabangId,
+                $userId,
+                'kas_sesi',
+                $sesi->id,
+                $kunci
+            );
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+
+        return ['success' => true, 'message' => "Jurnal selisih kas sesi #{$sesi->id} berhasil diposting ({$noJurnal})."];
+    }
+
+    /**
+     * [D-3] Scope cabang fail-closed: target wajib bercabang; scope cabang
+     * harus sama persis; konsolidasi (izin sudah dicek di muka) membolehkan semua.
+     */
+    protected function scopeCabangValid(?int $cabangTarget, ?int $cabangScopeId, bool $konsolidasi): bool
+    {
+        if ($cabangTarget === null || $cabangTarget <= 0) {
+            return false;
+        }
+        if ($konsolidasi) {
+            return true;
+        }
+
+        return $cabangScopeId !== null && $cabangTarget === $cabangScopeId;
+    }
+
+    /**
+     * Cek idempotency key sudah dipakai pada cabang ini (unique index DB).
+     */
+    protected function idempotensiTerpakai(string $kunci, int $cabangId): bool
+    {
+        return JurnalHeader::where('cabang_key', $cabangId)
+            ->where('idempotency_key', $kunci)
+            ->exists();
+    }
+
+    /**
+     * [D-2] Selisih sesi sudah dijurnal? Deteksi via referensi (kas_sesi, id)
+     * + akun lawan selisih (520-07 / 430-01) — tahan collation & perubahan frasa,
+     * tidak tertukar dengan jurnal buka-kas / deposit-back sesi yang sama.
+     */
+    protected function selisihKasSesiSudahDijurnal(int $sesiId): bool
+    {
+        $akunSelisihIds = AkunCOA::whereIn('kode', ['520-07', '430-01'])->pluck('id');
+        if ($akunSelisihIds->isEmpty()) {
+            return false;
+        }
+
+        return DB::table('jurnal_akuntansi')
+            ->where('referensi_tipe', 'kas_sesi')
+            ->where('referensi_id', $sesiId)
+            ->whereIn('akun_coa_id', $akunSelisihIds)
+            ->exists();
     }
 }
