@@ -72,7 +72,10 @@ class OrderService
                 }
 
                 $pricing = $this->pricingService->resolve($produk, $pelanggan, $variant);
-                $harga = $pricing['harga'];
+                // Hormati harga per satuan yang disimpan di keranjang (mis. per box)
+                $harga = isset($item['harga']) && (float) $item['harga'] > 0
+                    ? (float) $item['harga']
+                    : $pricing['harga'];
                 $diskonPerUnit = (float) ($pricing['diskon_nominal'] ?? 0);
                 $potensiKomisiPerUnit = (float) ($pricing['potensi_komisi'] ?? 0);
                 $modeRewardMitra = $pricing['mode_reward'] ?? 'diskon_langsung';

@@ -140,7 +140,7 @@ class SmartSearchService
             return $query;
         }
 
-        $term = trim($q);
+        $term = preg_replace('/\s+/', ' ', trim($q));
         if ($term === '') {
             return $query;
         }
@@ -218,6 +218,13 @@ class SmartSearchService
                 ->all();
         }) : [];
 
+        // Untuk pencarian frase panjang (>=4 kata), batasi hasil ke produk yang memuat
+        // frasa lengkap (dengan toleransi spasi ganda) agar tidak terlalu banyak hasil.
+        $wordCount = count($tokenGroups);
+        if ($wordCount >= 4) {
+            $query->whereRaw("LOWER(REPLACE(produk.nama, '  ', ' ')) LIKE LOWER(?)", ['%'.$term.'%']);
+        }
+
         return $query->where(function ($sub) use ($term, $tokenGroups, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds, $matchingSupplierIds) {
             // 1. Exact match Barcode utama produk & multi barcode terindeks (barcode_1 .. barcode_N)
             $sub->where('produk.barcode', $term)
@@ -292,7 +299,7 @@ class SmartSearchService
             return $query;
         }
 
-        $term = trim($q);
+        $term = preg_replace('/\s+/', ' ', trim($q));
         if ($term === '') {
             return $query;
         }
@@ -311,11 +318,11 @@ class SmartSearchService
         $bindings[] = $term;
 
         // 3. Prefix Nama Produk (Diawali kata pencarian) (+700)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 700 ELSE 0 END';
+        $cases[] = 'CASE WHEN LOWER(REPLACE(produk.nama, \'  \', \' \')) LIKE LOWER(?) THEN 700 ELSE 0 END';
         $bindings[] = $term.'%';
 
         // 4. Frasa Lengkap Ada di Nama Produk (+500)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 500 ELSE 0 END';
+        $cases[] = 'CASE WHEN LOWER(REPLACE(produk.nama, \'  \', \' \')) LIKE LOWER(?) THEN 500 ELSE 0 END';
         $bindings[] = '%'.$term.'%';
 
         // 5. Seluruh Kata Token Ada di Nama Produk (+300)

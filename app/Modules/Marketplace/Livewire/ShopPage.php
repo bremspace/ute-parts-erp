@@ -76,6 +76,8 @@ class ShopPage extends Component
     // Detail: pilihan varian & qty
     public ?int $selectedVariantId = null;
 
+    public ?string $selectedSatuan = null; // satuan_kode yang dipilih pembeli
+
     #[Url(as: 'tipe', except: null)]
     public ?string $selectedGadgetModel = null;
 
@@ -446,7 +448,7 @@ class ShopPage extends Component
 
         return Produk::where('slug', $this->slug)
             ->where('is_active', true)
-            ->with(['hargaTier', 'skuVariants' => fn ($q) => $q->where('is_active', true), 'tipeHps'])
+            ->with(['hargaTier', 'skuVariants' => fn ($q) => $q->where('is_active', true), 'tipeHps', 'satuanKonversi'])
             ->first();
     }
 
@@ -651,7 +653,17 @@ class ShopPage extends Component
             }
         }
 
-        $itemQty = $produkId ? 1 : max(1, $this->qty);
+        $rawQty = $produkId ? 1 : max(1, $this->qty);
+        $satuan = $this->selectedSatuan ?: ($produk->satuan ?: 'pcs');
+        $faktor = 1.0;
+        foreach ($produk->getDaftarSatuan() as $s) {
+            if (strcasecmp($s['satuan_kode'], $satuan) === 0) {
+                $faktor = (float) ($s['faktor_konversi'] ?? 1.0);
+                break;
+            }
+        }
+        $itemQty = (int) ceil($rawQty * $faktor);
+        if ($itemQty < 1) { $itemQty = 1; }
         $catatan = (! $produkId || ($this->productDetail && $produkId === $this->productDetail->id)) && $this->selectedGadgetModel
             ? "Model: {$this->selectedGadgetModel}"
             : null;
@@ -661,7 +673,8 @@ class ShopPage extends Component
                 $produk->id,
                 $activeVariantId,
                 $itemQty,
-                $catatan
+                $catatan,
+                $satuan
             );
             $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
             $this->dispatch('alert', ['type' => 'success', 'message' => "{$produk->nama} berhasil ditambahkan ke keranjang"]);
@@ -693,12 +706,25 @@ class ShopPage extends Component
             ? "Model: {$this->selectedGadgetModel}"
             : null;
 
+        $rawQtyBl = $produkId ? 1 : max(1, $this->qty);
+        $satuanBl = $this->selectedSatuan ?: ($produk->satuan ?: 'pcs');
+        $faktorBl = 1.0;
+        foreach ($produk->getDaftarSatuan() as $s) {
+            if (strcasecmp($s['satuan_kode'], $satuanBl) === 0) {
+                $faktorBl = (float) ($s['faktor_konversi'] ?? 1.0);
+                break;
+            }
+        }
+        $itemQtyBl = (int) ceil($rawQtyBl * $faktorBl);
+        if ($itemQtyBl < 1) { $itemQtyBl = 1; }
+
         try {
             app(CartService::class)->isi(
                 $produk->id,
                 $activeVariantId,
-                $produkId ? 1 : max(1, $this->qty),
-                $catatan
+                $itemQtyBl,
+                $catatan,
+                $satuanBl
             );
             $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
 

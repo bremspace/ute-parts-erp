@@ -38,7 +38,7 @@
             }
         }
     }"
-    @ute:barcode-scanned.window="if ($wire.showCreateModal) { if ($wire.tipePenyelesaian === 'tukar_produk') { $wire.cariTukarDenganBarcode($event.detail.code); } else { $wire.set('kwitansiInput', $event.detail.code); $nextTick(() => { $wire.call('cariKwitansi'); }); } }"
+    @ute:barcode-scanned.window="if ($wire.showCreateModal) { if ($wire.activeTukarItemId) { $wire.cariTukarDenganBarcode($event.detail.code, $wire.activeTukarItemId); } else if ($wire.tipePenyelesaian === 'tukar_produk') { $wire.cariTukarDenganBarcode($event.detail.code); } else { $wire.set('kwitansiInput', $event.detail.code); $nextTick(() => { $wire.call('cariKwitansi'); }); } }"
 >
     {{-- Header & Aksi Utama --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -399,7 +399,7 @@
                                     wire:model="kwitansiInput"
                                     wire:keydown.enter="cariKwitansi"
                                     placeholder="Ketik atau Scan QR / Barcode Struk Faktur..."
-                                    class="w-full pl-11 pr-3.5 py-2.5 rounded-xl glass-input text-xs font-mono font-bold text-white min-h-[44px]"
+                                    class="w-full pl-11 pr-3.5 py-2.5 rounded-xl glass-input text-xs font-mono font-bold text-white min-h-[44px] {{ empty($kwitansiInput) ? 'border-up-red/50' : '' }}"
                                     data-barcode-input="true"
                                     x-ref="kwitansiField"
                                 />
@@ -522,6 +522,14 @@
                                                 @error("itemInputs.{$itemId}.jumlah")
                                                     <span class="text-[10px] text-up-red font-medium block mt-1">{{ $message }}</span>
                                                 @enderror
+                                                @if($itemId > 0 && ($itemInputs[$itemId]['jumlah'] ?? 0) >= 2)
+                                                    <button type="button" wire:click="pecahUnit({{ $itemId }})" class="mt-1.5 w-full px-2 py-1.5 rounded-lg bg-up-amber/15 hover:bg-up-amber/25 text-up-amber text-[10px] font-bold cursor-pointer">
+                                                        ✂ Pecah jadi {{ $itemInputs[$itemId]['jumlah'] }} unit terpisah (kondisi/gudang/tukar per unit)
+                                                    </button>
+                                                @endif
+                                                @if($itemId < 0)
+                                                    <span class="mt-1 block text-[9px] font-bold text-up-primary">Unit terpisah (ID {{ abs($itemId) }})</span>
+                                                @endif
                                             </div>
                                         </div>
 
@@ -531,7 +539,7 @@
                                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                                     <div>
                                                         <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Kondisi Fisik Barang *</label>
-                                                        <select wire:model="itemInputs.{{ $itemId }}.kondisi_barang" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
+                                                        <select wire:model.live="itemInputs.{{ $itemId }}.kondisi_barang" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
                                                             <option value="rusak">⚠️ Cacat / Rusak (Masuk Pool Karantina Supplier)</option>
                                                             <option value="bagus">✅ Normal / Layak Jual (Kembali ke Stok Aktif)</option>
                                                         </select>
@@ -574,6 +582,39 @@
                                                         <select wire:model.live="itemInputs.{{ $itemId }}.tipe_penyelesaian" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer font-bold">
                                                             <option value="refund">💵 Pengembalian Uang (Refund)</option>
                                                             <option value="tukar_produk">🔄 Tukar Produk (Exchange)</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {{-- Gudang & Rak tujuan produk yang dikembalikan --}}
+                                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" x-data="{ gudangId: '{{ $itemInputs[$itemId]['gudang_retur_id'] ?? '' }}' }">
+                                                    <div>
+                                                        <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">
+                                                            @if(($itemInputs[$itemId]['kondisi_barang'] ?? 'rusak') === 'bagus')
+                                                                Tujuan Stok (Kembali ke Stok Asal / Pindah Gudang)
+                                                            @else
+                                                                Gudang Karantina (Lokasi Penyimpanan Barang Cacat)
+                                                            @endif
+                                                        </label>
+                                                        <div class="flex gap-1.5">
+                                                            <select wire:model.live="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value" class="flex-1 px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
+                                                                <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
+                                                                @foreach($gudangs as $g)
+                                                                    <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
+                                                                @endforeach
+                                                            </select>
+                                                            @if(($itemInputs[$itemId]['kondisi_barang'] ?? 'rusak') === 'bagus')
+                                                                <button type="button" title="Kembali ke gudang asal transaksi" @click="gudangId = '{{ $asalGudangId }}'; $wire.set('itemInputs.{{ $itemId }}.gudang_retur_id', '{{ $asalGudangId }}')" class="px-2.5 py-2 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint text-[10px] font-bold cursor-pointer whitespace-nowrap">↻ Asal</button>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Rak Tujuan (Opsional)</label>
+                                                        <select wire:model="itemInputs.{{ $itemId }}.rak_retur_id" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
+                                                            <option value="" class="bg-ink-900 text-white">-- Tanpa Rak --</option>
+                                                            @foreach($raks as $rk)
+                                                                <option value="{{ $rk->id }}" data-gudang="{{ $rk->gudang_id }}" x-show="gudangId === '' || gudangId == '{{ $rk->gudang_id }}'" class="bg-ink-900 text-white">{{ $rk->nama }} ({{ $rk->kode }})</option>
+                                                            @endforeach
                                                         </select>
                                                     </div>
                                                 </div>
@@ -702,7 +743,7 @@
                                                                     <div class="relative flex-1">
                                                                         <input
                                                                             type="text"
-                                                                            wire:model.live.debounce.300ms="itemInputs.{{ $itemId }}.tukar_search"
+                                                                            wire:model.live.debounce.150ms="tukarSearch"
                                                                             placeholder="Pencarian manual nama produk atau scan barcode..."
                                                                             class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder-ink-400"
                                                                         />
@@ -729,6 +770,10 @@
                                                                                         <div class="font-bold text-white text-xs">{{ $p->nama }}</div>
                                                                                         <div class="text-[10px] text-ink-400">
                                                                                             Stok: <strong class="{{ $p->stok_tersedia_val > 0 ? 'text-up-mint' : 'text-up-red' }}">{{ $p->stok_tersedia_val }}</strong> · Rp {{ number_format($p->harga_jual_val, 0, ',', '.') }}
+                                                                                        </div>
+                                                                                        <div class="text-[9px] text-ink-500">
+                                                                                            @if($p->supplier?->nama) Supp: {{ $p->supplier->nama }} @endif
+                                                                                            @if($p->kualitas?->nama) · Kualitas: {{ $p->kualitas->nama }} @endif
                                                                                         </div>
                                                                                     </div>
                                                                                     <div>
@@ -772,6 +817,10 @@
                                                                                                 <span class="text-up-amber font-semibold">(+Rp {{ number_format($p->selisih_nominal, 0, ',', '.') }})</span>
                                                                                             @endif
                                                                                         </div>
+                                                                                        <div class="text-[9px] text-ink-500">
+                                                                                            @if($p->supplier?->nama) Supp: {{ $p->supplier->nama }} @endif
+                                                                                            @if($p->kualitas?->nama) · Kualitas: {{ $p->kualitas->nama }} @endif
+                                                                                        </div>
                                                                                     </div>
                                                                                     <div>
                                                                                         @if($p->is_lebih_murah)
@@ -809,6 +858,10 @@
                                                                                                 <span class="text-up-amber font-semibold">(+Rp {{ number_format($p->selisih_nominal, 0, ',', '.') }})</span>
                                                                                             @endif
                                                                                         </div>
+                                                                                        <div class="text-[9px] text-ink-500">
+                                                                                            @if($p->supplier?->nama) Supp: {{ $p->supplier->nama }} @endif
+                                                                                            @if($p->kualitas?->nama) · Kualitas: {{ $p->kualitas->nama }} @endif
+                                                                                        </div>
                                                                                     </div>
                                                                                     <div>
                                                                                         @if($p->is_lebih_murah)
@@ -827,6 +880,12 @@
                                                                             @endforeach
                                                                         </div>
                                                                     </div>
+                                                                  @else
+                                                                      @if(!empty($itemInputs[$itemId]['tukar_search']))
+                                                                          <div class="p-3 text-center text-ink-400 text-xs">
+                                                                              Tidak ada produk yang cocok dengan pencarian.
+                                                                          </div>
+                                                                      @endif
                                                                 @endif
                                                             </div>
                                                         @endif

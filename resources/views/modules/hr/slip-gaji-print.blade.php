@@ -372,5 +372,9 @@
     @endif
 </div>
 
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
+    document.getElementById('btn-print-label')?.addEventListener('click', () => window.print());
+    document.getElementById('btn-close-label')?.addEventListener('click', () => window.close());
+</script>
 </body>
 </html>

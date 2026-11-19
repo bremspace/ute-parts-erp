@@ -20,11 +20,14 @@ class CartService
         protected PricingService $pricingService
     ) {}
 
-    public function cartKey(int $produkId, ?int $variantId = null, ?string $catatan = null): string
+    public function cartKey(int $produkId, ?int $variantId = null, ?string $catatan = null, ?string $satuan = null): string
     {
         $base = $variantId ? 'p'.$produkId.'_v'.$variantId : 'p'.$produkId;
         if ($catatan) {
             $base .= '_c'.substr(md5(trim($catatan)), 0, 8);
+        }
+        if ($satuan) {
+            $base .= '_s'.substr(md5(trim($satuan)), 0, 6);
         }
 
         return $base;
@@ -72,16 +75,17 @@ class CartService
         return $cart;
     }
 
-    public function tambah(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null): array
+    public function tambah(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null, ?string $satuan = null): array
     {
-        return $this->isi($produkId, $variantId, $qty, $catatan);
+        return $this->isi($produkId, $variantId, $qty, $catatan, $satuan);
     }
 
-    public function isi(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null): array
+    public function isi(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null, ?string $satuan = null): array
     {
         $produk = Produk::findOrFail($produkId);
         $cleanCatatan = $catatan ? trim($catatan) : null;
-        $key = $this->cartKey($produkId, $variantId, $cleanCatatan);
+        $cleanSatuan = $satuan ? trim($satuan) : null;
+        $key = $this->cartKey($produkId, $variantId, $cleanCatatan, $cleanSatuan);
 
         // Cek stok total tersedia
         $stokTotal = StokItem::where('produk_id', $produkId)
@@ -112,6 +116,27 @@ class CartService
             : (float) $produk->harga_jual_retail;
         $diskonTier = max(0.0, $hargaRetail - (float) $pricing['harga']);
 
+        // Harga & qty per satuan yang dipilih (untuk tampilan & subtotal per satuan)
+        $baseSatuan = $produk->satuan ?: 'pcs';
+        $faktorKonversi = 1.0;
+        $hargaSatuanPilih = (float) $pricing['harga']; // per base unit
+        if ($cleanSatuan && strcasecmp($cleanSatuan, $baseSatuan) !== 0) {
+            foreach ($produk->getDaftarSatuan() as $s) {
+                if (strcasecmp($s['satuan_kode'], $cleanSatuan) === 0) {
+                    $faktorKonversi = (float) ($s['faktor_konversi'] ?? 1.0);
+                    if (! empty($s['harga_jual'])) {
+                        $hargaSatuanPilih = (float) $s['harga_jual'] / max(0.0001, $faktorKonversi); // per base unit
+                    } else {
+                        $hargaSatuanPilih = (float) $pricing['harga']; // tetap base
+                    }
+                    break;
+                }
+            }
+        }
+        // qty_satuan = jumlah satuan yang dibeli (bukan base unit)
+        $qtySatuan = (int) round($newQty / max(0.0001, $faktorKonversi));
+        if ($qtySatuan < 1) { $qtySatuan = 1; }
+
         $cart[$key] = [
             'key' => $key,
             'product_id' => $produkId,
@@ -119,13 +144,17 @@ class CartService
             'catatan' => $cleanCatatan,
             'name' => $produk->nama,
             'variant_name' => $variant?->nama_varian,
-            'harga' => (float) $pricing['harga'],
+            'satuan' => $cleanSatuan ?: $baseSatuan,
+            'harga' => $hargaSatuanPilih,
+            'harga_satuan' => round($hargaSatuanPilih * $faktorKonversi, 2),
+            'faktor_konversi' => $faktorKonversi,
+            'qty' => $newQty,
+            'qty_satuan' => $qtySatuan,
             'harga_retail' => $hargaRetail,
             'diskon_tier' => $diskonTier,
             'potensi_komisi' => (float) ($pricing['potensi_komisi'] ?? 0.0),
             'mode_reward' => $pricing['mode_reward'] ?? 'diskon_langsung',
             'tier_nama' => $pricing['tier'] ?? null,
-            'qty' => $newQty,
             'alasan_harga' => $pricing['alasan'],
             'stok_max' => (int) $stokTotal,
         ];

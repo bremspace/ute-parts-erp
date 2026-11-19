@@ -152,6 +152,11 @@ class SettingsRbac extends Component
     #[Url(as: 'psub')]
     public string $printerSubTab = 'struk'; // 'struk' | 'label' | 'wms_doc' | 'hr_slip' | 'laporan' | 'pengiriman'
 
+    // Deteksi printer terinstall (untuk dropdown CUPS)
+    public array $detectedPrinters = [];
+
+    public bool $printerDetecting = false;
+
     public array $printerForm = [
         'label_preset' => '33x15',
         'label_width' => 33.0,
@@ -165,6 +170,10 @@ class SettingsRbac extends Component
         'label_show_sku' => true,
         'struk_default_width' => '80mm',
         'struk_footer' => 'Terima kasih atas kunjungan Anda',
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $wmsDocForm = [
@@ -174,6 +183,10 @@ class SettingsRbac extends Component
         'font_size' => '10pt',
         'show_kop' => true,
         'show_ttd' => true,
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $hrSlipForm = [
@@ -186,6 +199,10 @@ class SettingsRbac extends Component
         'show_potongan' => true,
         'show_ttd' => true,
         'catatan_kaki' => 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP.',
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $laporanDocForm = [
@@ -199,6 +216,10 @@ class SettingsRbac extends Component
         'jabatan_pembuat' => 'Staf Akuntansi / Kasir',
         'jabatan_pemeriksa' => 'Kepala Cabang / Spv',
         'jabatan_penyetuju' => 'Owner / Direktur',
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $labelPengirimanForm = [
@@ -209,6 +230,10 @@ class SettingsRbac extends Component
         'show_qr_resi' => true,
         'show_fragile_warning' => true,
         'catatan_pengiriman' => 'FRAGILE: Barang Elektronik & Sparepart HP. Jangan dibanting / ditindih beban berat.',
+        // Printer Hardware
+        'thermal_printer_name' => '',
+        'thermal_bluetooth_mac' => '',
+        'thermal_auto_print' => false,
     ];
 
     public array $strukForm = [
@@ -764,6 +789,68 @@ class SettingsRbac extends Component
         ];
     }
 
+    /**
+     * Deteksi printer terinstall di sistem (Windows: Get-Printer, Linux: lpstat).
+     * Hasil disimpan di $detectedPrinters untuk dropdown.
+     */
+    public function deteksiPrinter(): void
+    {
+        $this->printerDetecting = true;
+        $printers = [];
+
+        if (stripos(PHP_OS, 'WIN') === 0) {
+            $output = [];
+            $exitCode = 0;
+            exec('powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name" 2>&1', $output, $exitCode);
+            foreach ($output as $line) {
+                $line = trim($line);
+                if ($line !== '' && stripos($line, 'error') === false && stripos($line, 'exception') === false) {
+                    $printers[] = $line;
+                }
+            }
+            if (empty($printers)) {
+                $output2 = [];
+                $exitCode2 = 0;
+                exec('wmic printer get name 2>&1', $output2, $exitCode2);
+                foreach ($output2 as $line) {
+                    $line = trim($line);
+                    if ($line !== '' && strtolower($line) !== 'name') {
+                        $printers[] = $line;
+                    }
+                }
+            }
+        } else {
+            $output = [];
+            $exitCode = 0;
+            exec('lpstat -p 2>&1', $output, $exitCode);
+            foreach ($output as $line) {
+                if (preg_match('/^printer\s+(\S+)/i', trim($line), $m)) {
+                    $printers[] = $m[1];
+                }
+            }
+            if (empty($printers)) {
+                $output2 = [];
+                $exitCode2 = 0;
+                exec('lpstat -a 2>&1', $output2, $exitCode2);
+                foreach ($output2 as $line) {
+                    if (preg_match('/^(\S+)\s+accepting/i', trim($line), $m)) {
+                        $printers[] = $m[1];
+                    }
+                }
+            }
+        }
+
+        $this->detectedPrinters = array_values(array_unique(array_filter($printers)));
+        sort($this->detectedPrinters);
+        $this->printerDetecting = false;
+
+        if (count($this->detectedPrinters) > 0) {
+            $this->dispatch('alert', ['type' => 'success', 'message' => count($this->detectedPrinters) . ' printer terdeteksi.']);
+        } else {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tidak ada printer terdeteksi. Pastikan printer terinstall dan aktif.']);
+        }
+    }
+
     public function updatedPrinterFormLabelPreset(string $preset): void
     {
         match ($preset) {
@@ -837,6 +924,9 @@ class SettingsRbac extends Component
         $strukData = array_merge($config->getStrukConfig(), [
             'default_width' => $this->printerForm['struk_default_width'],
             'footer_text' => $this->printerForm['struk_footer'],
+            'thermal_printer_name' => $this->printerForm['thermal_printer_name'],
+            'thermal_bluetooth_mac' => $this->printerForm['thermal_bluetooth_mac'],
+            'thermal_auto_print' => $this->printerForm['thermal_auto_print'],
         ]);
 
         $config->set('label_qr_config', $labelData, 'Ukuran dan margin cetak label QR produk');
@@ -845,6 +935,9 @@ class SettingsRbac extends Component
         // Sinkronkan ke strukForm
         $this->strukForm['default_width'] = $this->printerForm['struk_default_width'];
         $this->strukForm['footer_text'] = $this->printerForm['struk_footer'];
+        $this->strukForm['thermal_printer_name'] = $this->printerForm['thermal_printer_name'];
+        $this->strukForm['thermal_bluetooth_mac'] = $this->printerForm['thermal_bluetooth_mac'];
+        $this->strukForm['thermal_auto_print'] = $this->printerForm['thermal_auto_print'];
 
         app(AuditService::class)->catat(
             'Konfigurasi',

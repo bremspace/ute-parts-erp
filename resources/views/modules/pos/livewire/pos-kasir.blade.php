@@ -293,7 +293,7 @@
                     x-cloak
                 >
                     <!-- Dedicated Mobile Search Header (sm:hidden) -->
-                    <div class="sm:hidden p-3 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-xl border-b border-ink-200/80 dark:border-white/10 flex flex-col gap-2 shrink-0">
+                    <div class="sm:hidden p-2 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-xl border-b border-ink-200/80 dark:border-white/10 flex flex-col gap-1.5 shrink-0">
                         <div class="flex items-center gap-2">
                             <button
                                 type="button"
@@ -421,7 +421,7 @@
                     </div>
 
                     <div
-                        class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-2 sm:p-2 space-y-1.5 overscroll-contain flex-1 min-h-0"
+                        class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-1 sm:p-1.5 space-y-0.5 overscroll-contain flex-1 min-h-0"
                         @scroll.passive="if ($wire.adaLebihBanyak && !window._posLoadingMore && ($el.scrollHeight - $el.scrollTop - $el.clientHeight < 350)) { window._posLoadingMore = true; $wire.call('muatLebihBanyak').finally(() => { window._posLoadingMore = false; }); }"
                     >
                         <div wire:loading.delay wire:target="search" class="p-3 space-y-2">
@@ -449,16 +449,16 @@
                                     aria-disabled="true"
                                     title="{{ $alasanTidakBisaDipilih }}"
                                 @endif
-                                class="p-3 sm:p-3 rounded-2xl border border-transparent transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] flex flex-col gap-2 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
+                                class="p-1.5 sm:p-2 rounded-lg border border-transparent transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] flex flex-col gap-1 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
                             >
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0 flex items-start gap-2.5 sm:gap-3 flex-1">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0 flex items-start gap-2 flex-1">
                                         <!-- Thumbnail with fallback icon -->
-                                        <div class="w-12 h-12 rounded-xl bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                        <div class="w-8 h-8 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
                                             @if($prod->thumbnail_url ?: $prod->gambar)
                                                 <img src="{{ $prod->thumbnail_url ?: $prod->gambar }}" alt="{{ $prod->nama }}" class="w-full h-full object-cover rounded-xl" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
                                                 <div class="hidden w-full h-full items-center justify-center text-ink-400 dark:text-ink-500">
-                                                    <svg class="w-5 h-5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg class="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                                     </svg>
                                                 </div>
@@ -471,24 +471,21 @@
 
                                         <!-- Title, SKU, Chips & Apple-grade compatibility badge -->
                                         <div class="min-w-0 flex-1">
-                                            <div class="flex items-center gap-1.5 flex-wrap mb-1">
-                                                <span class="font-mono text-[10px] sm:text-[11px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
+                                            <div class="flex items-center gap-1 flex-wrap mb-0.5">
+                                                <span class="font-mono text-[9px] sm:text-[10px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
                                                     {{ $prod->sku }}
                                                 </span>
-                                                <span class="text-[10px] uppercase font-semibold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded">
+                                                <span class="text-[9px] uppercase font-semibold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1 py-0.5 rounded">
                                                     {{ $prod->kategoriRelasi?->nama ?? $prod->kategori ?? 'Sparepart' }}
                                                 </span>
                                                 @if($prod->brand?->nama ?? $prod->brand)
-                                                    <span class="text-[10px] font-semibold text-ink-600 dark:text-ink-300 bg-ink-100/80 dark:bg-white/10 px-1.5 py-0.5 rounded">
+                                                    <span class="text-[9px] font-semibold text-ink-600 dark:text-ink-300 bg-ink-100/80 dark:bg-white/10 px-1 py-0.5 rounded">
                                                         {{ $prod->brand?->nama ?? $prod->brand }}
                                                     </span>
                                                 @endif
                                                 @if($prod->supplier?->nama)
-                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded" title="Suplier: {{ $prod->supplier->nama }}">
-                                                        <svg class="w-3 h-3 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                                                        </svg>
-                                                        <span>Suplier: {{ $prod->supplier->nama }}</span>
+                                                    <span class="text-[8px] font-medium text-amber-600 dark:text-amber-400/80" title="Suplier: {{ $prod->supplier->nama }}">
+                                                        {{ $prod->supplier->nama }}
                                                     </span>
                                                 @endif
                                                 @php
@@ -496,27 +493,21 @@
                                                     $posisiRak = !empty($rakPerProduk[$prod->id]) ? implode(', ', $rakPerProduk[$prod->id]) : null;
                                                 @endphp
                                                 @if($selectedGudangId && $namaGudangAktif)
-                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded" title="Gudang: {{ $namaGudangAktif }}">
-                                                        <svg class="w-3 h-3 text-sky-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                                                        </svg>
-                                                        <span>Gudang: {{ $namaGudangAktif }}</span>
+                                                    <span class="text-[8px] font-medium text-sky-600 dark:text-sky-400/80" title="Gudang: {{ $namaGudangAktif }}">
+                                                        {{ $namaGudangAktif }}
                                                     </span>
                                                 @endif
                                                 @if($posisiRak)
-                                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-500/10 border border-violet-500/25 px-1.5 py-0.5 rounded" title="Posisi Rak: {{ $posisiRak }}">
-                                                        <svg class="w-3 h-3 text-violet-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                                                        </svg>
-                                                        <span>Rak: {{ $posisiRak }}</span>
+                                                    <span class="text-[8px] font-medium text-violet-600 dark:text-violet-400/80" title="Posisi Rak: {{ $posisiRak }}">
+                                                        Rak: {{ $posisiRak }}
                                                     </span>
                                                 @endif
-                                                <span class="text-[10px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded uppercase">
-                                                    Satuan: {{ $satuanDasar }}
+                                                <span class="text-[8px] font-medium text-ink-500 dark:text-ink-400">
+                                                    {{ $satuanDasar }}
                                                 </span>
                                             </div>
 
-                                            <h4 class="font-bold text-xs sm:text-sm md:text-base text-ink-900 dark:text-white leading-snug break-words">
+                                            <h4 class="font-bold text-xs text-ink-900 dark:text-white leading-snug break-words">
                                                 {{ $prod->nama }}
                                             </h4>
 
@@ -525,11 +516,8 @@
                                             @endphp
                                             @if($thModels->isNotEmpty())
                                                 <div class="flex items-center gap-1 flex-wrap mt-1">
-                                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-up-primary bg-up-primary/10 px-2 py-0.5 rounded-lg border border-up-primary/20 tracking-tight" title="{{ $thModels->join(', ') }}">
-                                                        <svg class="w-3 h-3 text-up-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                                        </svg>
-                                                        <span>Kompatibel: {{ $thModels->take(4)->join(', ') }}{{ $thModels->count() > 4 ? ' (+'.($thModels->count() - 4).')' : '' }}</span>
+                                                    <span class="text-[8px] font-medium text-up-primary/80" title="{{ $thModels->join(', ') }}">
+                                                        Kompatibel: {{ $thModels->take(3)->join(', ') }}{{ $thModels->count() > 3 ? ' +'.($thModels->count() - 3) : '' }}
                                                     </span>
                                                 </div>
                                             @endif
@@ -550,9 +538,9 @@
                                                 @endif
                                             </div>
                                         @endif
-                                        <span class="text-xs sm:text-sm font-black text-up-mint tabular-nums">
+                                        <span class="text-xs font-black text-up-mint tabular-nums">
                                             Rp {{ number_format($baseHarga, 0, ',', '.') }}
-                                            <span class="text-[10px] font-normal text-ink-400">/{{ $satuanDasar }}</span>
+                                            <span class="text-[8px] font-normal text-ink-400">/{{ $satuanDasar }}</span>
                                         </span>
                                         @if(($pricing['diskon_nominal'] ?? 0) > 0)
                                             <span class="text-[9px] font-semibold text-emerald-500 tabular-nums">
@@ -598,15 +586,15 @@
 
                                 <!-- Pilihan Kemasan (kompak) -->
                                 @if($satuanList->isNotEmpty())
-                                    <div class="flex items-center gap-1.5 flex-wrap pt-1.5 border-t border-ink-100 dark:border-white/5">
-                                        <span class="text-[9px] font-semibold text-ink-400 uppercase tracking-wider hidden sm:inline">Kemasan:</span>
+                                    <div class="flex items-center gap-1 flex-wrap pt-1 border-t border-ink-100 dark:border-white/5">
+                                        <span class="text-[8px] font-medium text-ink-400/70 hidden sm:inline">Kemasan:</span>
                                         @foreach($satuanList as $sk)
                                             @php
                                                 $fKonv = max(0.0001, (float) $sk->faktor_konversi);
                                                 $hargaSk = $sk->harga_jual > 0 ? (float) $sk->harga_jual : round($baseHarga * $fKonv, 2);
                                             @endphp
-                                            <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 text-ink-600 dark:text-ink-300 tabular-nums">
-                                                1 {{ strtoupper($sk->satuan_kode) }} ({{ $fKonv + 0 }} {{ $satuanDasar }}) → Rp {{ number_format($hargaSk, 0, ',', '.') }}
+                                            <span class="text-[8px] px-1 py-0.5 rounded bg-ink-100 dark:bg-white/5 text-ink-600 dark:text-ink-300 tabular-nums">
+                                                {{ strtoupper($sk->satuan_kode) }} ({{ $fKonv + 0 }}) → Rp{{ number_format($hargaSk, 0, ',', '.') }}
                                             </span>
                                         @endforeach
                                     </div>
@@ -815,7 +803,7 @@
                 <button
                     type="button"
                     @click="mobileCrmOpen = true"
-                    class="sm:hidden px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[38px] shrink-0 whitespace-nowrap {{ $customer ? 'bg-up-primary/10 border-up-primary/30 text-up-primary font-bold' : 'bg-ink-100 dark:bg-white/5 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-200' }}"
+                    class="sm:hidden px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[32px] shrink-0 whitespace-nowrap {{ $customer ? 'bg-up-primary/10 border-up-primary/30 text-up-primary font-bold' : 'bg-ink-100 dark:bg-white/5 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-200' }}"
                     title="Pilih / Cari Pelanggan CRM"
                 >
                     <svg class="w-3.5 h-3.5 {{ $customer ? 'text-up-primary' : 'text-ink-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1629,7 +1617,7 @@
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', -1)"
-                                    class="w-8 h-8 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    class="w-9 h-9 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Kurangi"
                                 >-</button>
                                 <input
@@ -1644,7 +1632,7 @@
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', 1)"
-                                    class="w-8 h-8 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    class="w-9 h-9 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Tambah"
                                 >+</button>
                             </div>
@@ -1990,7 +1978,7 @@
         @endif
 
         <!-- BOTTOM CONTROL CENTER: Status Sesi Kas, Ditahan & Action Bayar (Sticky di Mobile agar Tombol Bayar Selalu Siap Tampil Tanpa Tertutup Apapun) -->
-        <div class="border-t border-ink-200/80 dark:border-white/10 pt-2.5 sm:pt-3 mt-2 flex-shrink-0 flex items-center justify-between gap-2.5 flex-wrap sticky bottom-0 z-30 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-md -mx-3 -mb-3 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] sm:mx-0 sm:mb-0 sm:px-0 sm:pb-0 sm:static shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] sm:shadow-none">
+        <div class="border-t border-ink-200/80 dark:border-white/10 pt-2 sm:pt-2.5 mt-1.5 flex-shrink-0 flex items-center justify-between gap-2 flex-wrap sticky bottom-0 z-30 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-md -mx-3 -mb-3 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:mx-0 sm:mb-0 sm:px-0 sm:pb-0 sm:static shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] sm:shadow-none">
             <!-- Left Info & Sesi Kas (Desktop only inline, Mobile via top action pill) -->
             <div class="hidden sm:flex items-center gap-2.5 flex-wrap">
                 <!-- Sesi Kas Indicator -->

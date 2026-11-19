@@ -172,7 +172,13 @@
                                                 </p>
                                             @endif
                                             <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
-                                                <span class="text-ink-400 font-semibold">{{ $item['qty'] }} × Rp {{ number_format($item['harga'], 0, ',', '.') }}</span>
+                                                <span class="text-ink-400 font-semibold">
+                                                    @if(!empty($item['satuan']) && $item['satuan'] !== 'pcs' && !empty($item['qty_satuan']))
+                                                        {{ $item['qty_satuan'] }} {{ $item['satuan'] }} ({{ $item['qty'] }} pcs) × Rp {{ number_format($item['harga_satuan'] ?? $item['harga'], 0, ',', '.') }}
+                                                    @else
+                                                        {{ $item['qty'] }} × Rp {{ number_format($item['harga'], 0, ',', '.') }}
+                                                    @endif
+                                                </span>
                                                 @if(!empty($item['diskon_tier']) && (float) $item['diskon_tier'] > 0)
                                                     <span class="line-through text-ink-400 text-[10px]">Rp {{ number_format($item['harga_retail'], 0, ',', '.') }}</span>
                                                     <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-black">
@@ -341,6 +347,9 @@
                                         <div class="flex items-center gap-2 flex-wrap text-[11px]">
                                             <span class="text-ink-500 dark:text-ink-400">
                                                 {{ $item['variant_name'] ?? 'Standar' }}
+                                                @if(!empty($item['satuan']))
+                                                    <span class="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-ink-300 border border-white/10">Satuan: {{ $item['satuan'] }}</span>
+                                                @endif
                                                 @if($item['alasan_harga'] !== 'Harga Retail Standar')
                                                     <span class="text-up-mint font-medium">• {{ $item['alasan_harga'] }}</span>
                                                 @endif
