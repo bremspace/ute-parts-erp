@@ -591,7 +591,7 @@
 
                     <div class="space-y-1.5 pt-1">
                         @foreach($hargaPartaiTiersQty as $idx => $tierQty)
-                            <div class="flex items-center gap-2 bg-black/20 p-2 rounded-lg border border-white/5" wire:key="tier-qty-{{ $idx }}">
+                            <div class="flex flex-col sm:flex-row sm:items-end gap-2 bg-black/20 p-2 rounded-lg border border-white/5" wire:key="tier-qty-{{ $idx }}">
                                 <span class="text-[9px] font-bold text-ink-400 w-5">#{{ $idx + 1 }}</span>
                                 <div class="flex-1">
                                     <span class="text-[9px] text-ink-400 block">Min Qty</span>
@@ -663,7 +663,7 @@
 
                     <div class="space-y-1.5 pt-1">
                         @foreach($hargaPartaiTiersNominal as $idx => $tierNom)
-                            <div class="flex items-center gap-2 bg-black/20 p-2 rounded-lg border border-white/5" wire:key="tier-nom-{{ $idx }}">
+                            <div class="flex flex-col sm:flex-row sm:items-end gap-2 bg-black/20 p-2 rounded-lg border border-white/5" wire:key="tier-nom-{{ $idx }}">
                                 <span class="text-[9px] font-bold text-ink-400 w-5">#{{ $idx + 1 }}</span>
                                 <div class="flex-1">
                                     <span class="text-[9px] text-ink-400 block">Min Belanja Rp</span>
