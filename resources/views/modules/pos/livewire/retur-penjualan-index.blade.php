@@ -522,6 +522,14 @@
                                                 @error("itemInputs.{$itemId}.jumlah")
                                                     <span class="text-[10px] text-up-red font-medium block mt-1">{{ $message }}</span>
                                                 @enderror
+                                                @if($itemId > 0 && ($itemInputs[$itemId]['jumlah'] ?? 0) >= 2)
+                                                    <button type="button" wire:click="pecahUnit({{ $itemId }})" class="mt-1.5 w-full px-2 py-1.5 rounded-lg bg-up-amber/15 hover:bg-up-amber/25 text-up-amber text-[10px] font-bold cursor-pointer">
+                                                        ✂ Pecah jadi {{ $itemInputs[$itemId]['jumlah'] }} unit terpisah (kondisi/gudang/tukar per unit)
+                                                    </button>
+                                                @endif
+                                                @if($itemId < 0)
+                                                    <span class="mt-1 block text-[9px] font-bold text-up-primary">Unit terpisah (ID {{ abs($itemId) }})</span>
+                                                @endif
                                             </div>
                                         </div>
 

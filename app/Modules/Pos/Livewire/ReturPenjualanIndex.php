@@ -150,6 +150,69 @@ class ReturPenjualanIndex extends Component
     }
 
     /**
+     * Pecah satu baris retur (qty>1) menjadi beberapa unit terpisah
+     * agar tiap unit bisa punya kondisi/gudang/tukar berbeda.
+     */
+    public function pecahUnit(int $itemId): void
+    {
+        $itemInfo = $this->transaksiItemData[$itemId] ?? null;
+        if (! $itemInfo) {
+            return;
+        }
+
+        $qty = (int) ($this->itemInputs[$itemId]['jumlah'] ?? 0);
+        if ($qty < 2) {
+            $qty = (int) ($itemInfo['sisa_bisa_diretur'] ?? 0);
+        }
+        if ($qty < 2) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Minimal 2 unit untuk dipecah.']);
+            return;
+        }
+        $qty = min($qty, (int) ($itemInfo['sisa_bisa_diretur'] ?? $qty));
+        if ($qty < 2) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Minimal 2 unit untuk dipecah.']);
+            return;
+        }
+
+        $baseKondisi = $this->itemInputs[$itemId]['kondisi_barang'] ?? 'rusak';
+        $baseTipe = $this->itemInputs[$itemId]['tipe_penyelesaian'] ?? $this->tipePenyelesaian;
+        $baseMetode = $this->itemInputs[$itemId]['metode_pengembalian'] ?? $this->metodePengembalian;
+        $baseAlasan = $this->itemInputs[$itemId]['alasan'] ?? '';
+        $baseGudang = $this->itemInputs[$itemId]['gudang_retur_id'] ?? null;
+        $baseRak = $this->itemInputs[$itemId]['rak_retur_id'] ?? null;
+        $realItemId = (int) ($this->itemInputs[$itemId]['transaksi_item_id'] ?? $itemId);
+
+        unset($this->transaksiItemData[$itemId]);
+        unset($this->itemInputs[$itemId]);
+
+        for ($u = 1; $u <= $qty; $u++) {
+            $vid = -($itemId * 1000 + $u);
+            $this->transaksiItemData[$vid] = array_merge($itemInfo, [
+                'item_id' => $vid,
+                'qty_beli' => 1,
+                'sisa_bisa_diretur' => 1,
+                'sudah_diretur' => 0,
+            ]);
+            $this->itemInputs[$vid] = [
+                'transaksi_item_id' => $realItemId,
+                'jumlah' => 1,
+                'kondisi_barang' => $baseKondisi,
+                'alasan' => $baseAlasan,
+                'tipe_penyelesaian' => $baseTipe,
+                'metode_pengembalian' => $baseMetode,
+                'sn_raw' => '',
+                'foto_bukti' => [],
+                'tukar_items' => [],
+                'tukar_search' => '',
+                'gudang_retur_id' => $baseGudang,
+                'rak_retur_id' => $baseRak,
+            ];
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Dipecah menjadi {$qty} unit terpisah."]);
+    }
+
+    /**
      * Deteksi rak asal (rak dengan stok terbanyak) untuk produk di gudang tertentu.
      */
     public function detectAsalRak(?int $produkId, ?int $gudangId): ?int
