@@ -101,10 +101,11 @@ class ReturnPenjualanService
         ?string $catatanQc = null,
         string $metodeBayarSelisih = 'tunai',
         float $jumlahBayarSelisih = 0,
-        float $kembalianSelisih = 0
+        float $kembalianSelisih = 0,
+        ?int $gudangReturId = null
     ): ReturnPenjualan {
         $cabangId = (int) ($transaksi->cabang_id ?: (session('cabang_id') ?: Cabang::value('id') ?: 1));
-        $gudangId = $this->resolveGudangId($transaksi->gudang_id ? (int) $transaksi->gudang_id : null, $cabangId);
+        $gudangId = $this->resolveGudangId($gudangReturId ?: ($transaksi->gudang_id ? (int) $transaksi->gudang_id : null), $cabangId);
 
         if (empty($items)) {
             throw ValidationException::withMessages(['items' => 'Item retur tidak boleh kosong']);

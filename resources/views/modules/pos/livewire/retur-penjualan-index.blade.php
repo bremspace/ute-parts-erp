@@ -38,7 +38,7 @@
             }
         }
     }"
-    @ute:barcode-scanned.window="if ($wire.showCreateModal) { if ($wire.tipePenyelesaian === 'tukar_produk') { $wire.cariTukarDenganBarcode($event.detail.code); } else { $wire.set('kwitansiInput', $event.detail.code); $nextTick(() => { $wire.call('cariKwitansi'); }); } }"
+    @ute:barcode-scanned.window="if ($wire.showCreateModal) { if ($wire.activeTukarItemId) { $wire.cariTukarDenganBarcode($event.detail.code, $wire.activeTukarItemId); } else if ($wire.tipePenyelesaian === 'tukar_produk') { $wire.cariTukarDenganBarcode($event.detail.code); } else { $wire.set('kwitansiInput', $event.detail.code); $nextTick(() => { $wire.call('cariKwitansi'); }); } }"
 >
     {{-- Header & Aksi Utama --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -432,6 +432,17 @@
                                     <span class="text-ink-400 block text-[10px]">Total Belanja:</span>
                                     <span class="font-bold text-up-mint tabular-nums">Rp {{ number_format($selectedTransaksi->total_akhir, 0, ',', '.') }}</span>
                                 </div>
+                            </div>
+
+                            {{-- Gudang & Rak Tujuan untuk Produk yang Dikembalikan --}}
+                            <div class="p-3 rounded-xl bg-ink-900/40 border border-white/10 space-y-2">
+                                <label class="block text-[10px] font-bold text-ink-300 uppercase tracking-wider mb-1">Gudang Tujuan Produk Dikembalikan (Wajib)</label>
+                                <select wire:model.live="gudangReturId" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[40px] cursor-pointer {{ empty($gudangReturId) ? 'border-up-red/50' : '' }}">
+                                    <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
+                                    @foreach($gudangs as $g)
+                                        <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- [ANTI-FRAUD] Deteksi Cerdas Masa Garansi --}}

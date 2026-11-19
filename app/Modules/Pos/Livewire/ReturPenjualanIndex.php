@@ -80,6 +80,11 @@ class ReturPenjualanIndex extends Component
 
     public int|float|string|null $jumlahBayarSelisih = 0;
 
+    // Gudang & Rak tujuan untuk produk yang dikembalikan (retur)
+    public ?int $gudangReturId = null;
+
+    public ?int $rakReturId = null;
+
     // Modal Struk Khusus Retur
     public bool $showReceiptModal = false;
 
@@ -407,7 +412,9 @@ class ReturPenjualanIndex extends Component
         $currentTukarItems = $this->itemInputs[$itemId]['tukar_items'] ?? [];
 
         if ($stokUnitSama > 0) {
-            if (empty($currentTukarItems) || $force) {
+            // Jangan otomatis pilih; tampilkan sebagai opsi "Tukar Unit Sama" yang bisa diklik
+            // Auto-add hanya jika force=true (user klik tombol "Tukar Unit Sama")
+            if ($force) {
                 $produk = Produk::find($targetProdukId);
                 if ($produk) {
                     $hargaPengganti = (float) ($produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
@@ -427,7 +434,7 @@ class ReturPenjualanIndex extends Component
                     ];
                     $this->dispatch('alert', [
                         'type' => 'success',
-                        'message' => "Unit yang sama [{$produk->nama}] otomatis dipilih sebagai pengganti (Stok: {$stokUnitSama}).",
+                        'message' => "Unit yang sama [{$produk->nama}] dipilih sebagai pengganti (Stok: {$stokUnitSama}).",
                     ]);
                 }
             }
@@ -1045,7 +1052,8 @@ class ReturPenjualanIndex extends Component
                 $this->catatanQc,
                 $this->metodeBayarSelisih,
                 (float) $this->jumlahBayarSelisih,
-                (float) $ringkasan['kembalian']
+                  (float) $ringkasan['kembalian'],
+                  $this->gudangReturId
             );
 
             $pesan = $retur->status === 'selesai'
@@ -1195,11 +1203,15 @@ class ReturPenjualanIndex extends Component
                 ->find($this->detailReturId);
         }
 
+        $cabangId = session('cabang_id') ?: (auth()->user()?->cabangs?->first()?->id ?: 1);
+        $gudangs = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->orderBy('nama')->get();
+
         return view('modules.pos.livewire.retur-penjualan-index', [
             'returList' => $returList,
             'stats' => $stats,
             'detailRetur' => $detailRetur,
             'ringkasanFinansial' => $this->ringkasanFinansial,
+            'gudangs' => $gudangs,
         ])->layout('layouts.backoffice', ['header' => 'Manajemen Retur Konsumen']);
     }
 }
