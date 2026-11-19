@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'supplier_id', 'status_karantina', 'return_pembelian_id',
     'alasan', 'tipe_penyelesaian', 'metode_pengembalian',
     'tukar_items_payload', 'selisih_nominal', 'foto_bukti',
+    'gudang_id', 'rak_id',
 ])]
 class ReturnPenjualanItem extends Model
 {

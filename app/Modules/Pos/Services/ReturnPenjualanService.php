@@ -248,6 +248,8 @@ class ReturnPenjualanService
                     'metode_pengembalian' => $itemMetodePengembalian,
                     'foto_bukti' => $itemFoto,
                     'tukar_items' => $itemTukar,
+                    'gudang_retur_id' => $itemData['gudang_retur_id'] ?? null,
+                    'rak_retur_id' => $itemData['rak_retur_id'] ?? null,
                 ];
 
                 $totalRetur += $subtotal;
@@ -350,6 +352,8 @@ class ReturnPenjualanService
                     'metode_pengembalian' => $prep['metode_pengembalian'],
                     'tukar_items_payload' => ! empty($prep['tukar_items']) ? $prep['tukar_items'] : null,
                     'foto_bukti' => ! empty($prep['foto_bukti']) ? $prep['foto_bukti'] : null,
+                      'gudang_id' => $prep['gudang_retur_id'] ?? $gudangId,
+                      'rak_id' => $prep['rak_retur_id'] ?? null,
                 ]);
 
                 // Update status nomor seri
@@ -549,11 +553,15 @@ class ReturnPenjualanService
 
                 // HANYA barang berstatus BAGUS yang dimasukkan kembali ke stok aktif siap jual
                 if ($item->kondisi_barang === 'bagus') {
+                    $itemGudangId = $item->gudang_id ? (int) $item->gudang_id : $gudangId;
+                    $itemGudangId = $this->resolveGudangId($itemGudangId, $cabangId);
+                    $itemRakId = $item->rak_id ? (int) $item->rak_id : null;
                     // Pastikan baris stok ada sebelum dikembalikan
                     StokItem::firstOrCreate([
-                        'gudang_id' => $gudangId,
+                        'gudang_id' => $itemGudangId,
                         'produk_id' => $produkId,
                         'sku_variant_id' => $skuVariantId,
+                        'rak_id' => $itemRakId,
                     ], [
                         'jumlah' => 0,
                     ]);
@@ -561,7 +569,7 @@ class ReturnPenjualanService
                     $stokDeductionService->kembalikan(
                         produkId: $produkId,
                         skuVariantId: $skuVariantId,
-                        gudangId: $gudangId,
+                        gudangId: $itemGudangId,
                         qty: $qty,
                         jenis: 'retur_penjualan',
                         referensiTipe: ReturnPenjualan::class,
@@ -573,10 +581,13 @@ class ReturnPenjualanService
                     // Barang Rusak: masuk karantina retur supplier, tidak dijual ke pelanggan lain
                     $item->update(['status_karantina' => 'karantina']);
 
+                    $itemGudangId = $item->gudang_id ? (int) $item->gudang_id : $gudangId;
+                    $itemGudangId = $this->resolveGudangId($itemGudangId, $cabangId);
+
                     StockMutationLog::create([
                         'produk_id' => $produkId,
                         'sku_variant_id' => $skuVariantId,
-                        'gudang_id' => $gudangId,
+                        'gudang_id' => $itemGudangId,
                         'user_id' => $userId,
                         'delta' => 0,
                         'sumber' => 'retur_karantina',

@@ -589,6 +589,28 @@
                                                     </div>
                                                 </div>
 
+                                                {{-- Gudang & Rak tujuan produk yang dikembalikan --}}
+                                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                    <div>
+                                                        <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Gudang Tujuan (Wajib)</label>
+                                                        <select wire:model="itemInputs.{{ $itemId }}.gudang_retur_id" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
+                                                            <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
+                                                            @foreach($gudangs as $g)
+                                                                <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Rak Tujuan (Opsional)</label>
+                                                        <select wire:model="itemInputs.{{ $itemId }}.rak_retur_id" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
+                                                            <option value="" class="bg-ink-900 text-white">-- Tanpa Rak --</option>
+                                                            @foreach($raks as $rk)
+                                                                <option value="{{ $rk->id }}" class="bg-ink-900 text-white">{{ $rk->nama }} ({{ $rk->kode }}) - {{ $rk->gudang?->nama }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                </div>
+
                                                 <!-- Jika Item Refund: Pilihan Akun / Kas -->
                                                 @if(($itemInputs[$itemId]['tipe_penyelesaian'] ?? 'refund') === 'refund')
                                                     <div class="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-2">

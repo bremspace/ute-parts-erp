@@ -10,6 +10,7 @@ use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StokItem;
 use Carbon\Carbon;
@@ -302,6 +303,8 @@ class ReturPenjualanIndex extends Component
                 'foto_bukti' => [],
                 'tukar_items' => [],
                 'tukar_search' => '',
+                'gudang_retur_id' => null,
+                'rak_retur_id' => null,
             ];
         }
 
@@ -586,7 +589,8 @@ class ReturPenjualanIndex extends Component
             $query->where(function ($q) use ($term) {
                 $q->where('nama', 'like', "%{$term}%")
                     ->orWhere('barcode', 'like', "%{$term}%")
-                    ->orWhere('kode', 'like', "%{$term}%");
+                    ->orWhere('kode_lama', 'like', "%{$term}%")
+                    ->orWhere('slug', 'like', "%{$term}%");
             });
         }
 
@@ -991,6 +995,8 @@ class ReturPenjualanIndex extends Component
                     'sn' => $snList,
                     'foto_bukti' => $input['foto_bukti'] ?? [],
                     'tukar_items' => $itemTukarPrepared,
+                    'gudang_retur_id' => $input['gudang_retur_id'] ?? $this->gudangReturId,
+                    'rak_retur_id' => $input['rak_retur_id'] ?? $this->rakReturId,
                 ];
             }
         }
@@ -1205,6 +1211,7 @@ class ReturPenjualanIndex extends Component
 
         $cabangId = session('cabang_id') ?: (auth()->user()?->cabangs?->first()?->id ?: 1);
         $gudangs = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->orderBy('nama')->get();
+        $raks = Rak::whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId))->where('is_active', true)->orderBy('nama')->get();
 
         return view('modules.pos.livewire.retur-penjualan-index', [
             'returList' => $returList,
@@ -1212,6 +1219,7 @@ class ReturPenjualanIndex extends Component
             'detailRetur' => $detailRetur,
             'ringkasanFinansial' => $this->ringkasanFinansial,
             'gudangs' => $gudangs,
+            'raks' => $raks,
         ])->layout('layouts.backoffice', ['header' => 'Manajemen Retur Konsumen']);
     }
 }
