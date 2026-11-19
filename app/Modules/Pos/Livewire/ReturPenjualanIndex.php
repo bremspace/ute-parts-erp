@@ -303,7 +303,7 @@ class ReturPenjualanIndex extends Component
                 'foto_bukti' => [],
                 'tukar_items' => [],
                 'tukar_search' => '',
-                'gudang_retur_id' => null,
+                'gudang_retur_id' => $transaksi->gudang_id,
                 'rak_retur_id' => null,
             ];
         }
@@ -530,7 +530,7 @@ class ReturPenjualanIndex extends Component
         $term = trim($this->tukarSearch ?? '');
 
         // 1. Ambil produk yang sama persis secara definitif
-        $pSama = Produk::with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId))])
+        $pSama = Produk::with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId)), 'supplier', 'kualitas'])
             ->find($targetProdukId);
 
         $p1 = collect();
@@ -583,7 +583,7 @@ class ReturPenjualanIndex extends Component
         // 4. Query produk kandidat (stok > 0 diutamakan)
         $query = Produk::where('is_active', true)
             ->where('id', '!=', $targetProdukId)
-            ->with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId))]);
+            ->with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId)), 'supplier', 'kualitas']);
 
         // Utamakan yang ada stok di gudang ini
         $query->whereHas('stokItems', function ($q) use ($gudangId) {
@@ -842,7 +842,7 @@ class ReturPenjualanIndex extends Component
                 $q->where('nama', 'like', "%{$term}%")
                     ->orWhere('barcode', 'like', "%{$term}%");
             })
-            ->with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId))])
+            ->with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId)), 'supplier', 'kualitas'])
             ->limit(8)
             ->get();
     }

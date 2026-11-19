@@ -763,6 +763,10 @@
                                                                                         <div class="text-[10px] text-ink-400">
                                                                                             Stok: <strong class="{{ $p->stok_tersedia_val > 0 ? 'text-up-mint' : 'text-up-red' }}">{{ $p->stok_tersedia_val }}</strong> · Rp {{ number_format($p->harga_jual_val, 0, ',', '.') }}
                                                                                         </div>
+                                                                                        <div class="text-[9px] text-ink-500">
+                                                                                            @if($p->supplier?->nama) Supp: {{ $p->supplier->nama }} @endif
+                                                                                            @if($p->kualitas?->nama) · Kualitas: {{ $p->kualitas->nama }} @endif
+                                                                                        </div>
                                                                                     </div>
                                                                                     <div>
                                                                                         @if($p->is_lebih_murah)
@@ -805,6 +809,10 @@
                                                                                                 <span class="text-up-amber font-semibold">(+Rp {{ number_format($p->selisih_nominal, 0, ',', '.') }})</span>
                                                                                             @endif
                                                                                         </div>
+                                                                                        <div class="text-[9px] text-ink-500">
+                                                                                            @if($p->supplier?->nama) Supp: {{ $p->supplier->nama }} @endif
+                                                                                            @if($p->kualitas?->nama) · Kualitas: {{ $p->kualitas->nama }} @endif
+                                                                                        </div>
                                                                                     </div>
                                                                                     <div>
                                                                                         @if($p->is_lebih_murah)
@@ -841,6 +849,10 @@
                                                                                             @if($p->selisih_nominal > 0)
                                                                                                 <span class="text-up-amber font-semibold">(+Rp {{ number_format($p->selisih_nominal, 0, ',', '.') }})</span>
                                                                                             @endif
+                                                                                        </div>
+                                                                                        <div class="text-[9px] text-ink-500">
+                                                                                            @if($p->supplier?->nama) Supp: {{ $p->supplier->nama }} @endif
+                                                                                            @if($p->kualitas?->nama) · Kualitas: {{ $p->kualitas->nama }} @endif
                                                                                         </div>
                                                                                     </div>
                                                                                     <div>
