@@ -1756,6 +1756,12 @@
                             </select>
                         </div>
                     </div>
+
+                    {{-- [F-08] akun kontra eksplisit: saldo normal wajib kebalikan tipe --}}
+                    <label class="flex items-start gap-2 mt-4 text-xs font-semibold text-ink-300 cursor-pointer">
+                        <input type="checkbox" wire:model="coaForm.is_kontra" class="mt-0.5 rounded border-white/20 bg-white/5 text-up-primary focus:ring-up-primary" />
+                        <span>Akun kontra (pengurang kelompok tipe, mis. retur penjualan / akumulasi depresiasi) — saldo normal wajib kebalikan dari tipe.</span>
+                    </label>
                 </div>
 
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
