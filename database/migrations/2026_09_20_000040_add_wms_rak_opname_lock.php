@@ -1,8 +1,10 @@
 <?php
 
+use App\Modules\Akunting\Models\AkunCOA;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Activitylog\Support\ActivityLogger;
 
 return new class extends Migration
 {
@@ -41,7 +43,14 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::table('akun_coa')->where('kode', '520-08')->delete();
+        // [F-01] Guard di AWAL: hapus akun via instance model (bukan raw
+        // DB::table yang melewati guard) — guard `deleting` AkunCOA menolak
+        // bila 520-08 sudah dipakai jurnal; rollback gagal eksplisit sebelum
+        // perubahan skema. withoutLogging: saat rollback sampai titik ini,
+        // tabel activity_log (migrasi lebih baru) sudah di-drop.
+        app(ActivityLogger::class)->withoutLogging(
+            fn () => AkunCOA::where('kode', '520-08')->first()?->delete()
+        );
 
         Schema::table('stok_opname_item', fn (Blueprint $t) => $t->dropConstrainedForeignId('rak_id'));
         Schema::table('stok_opname', fn (Blueprint $t) => $t->dropConstrainedForeignId('rak_id'));

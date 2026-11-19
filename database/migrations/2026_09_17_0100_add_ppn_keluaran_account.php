@@ -46,10 +46,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Hapus baris akun 220-02 jika tidak terkait dengan data produksi.
-        // Catatan: produksi aktual harus dipertahankan; ini hanya guard non-produksi.
+        // [F-01] Hapus via instance model (guard `deleting` AkunCOA menolak
+        // bila akun sudah dipakai jurnal — rollback gagal eksplisit, bukan
+        // memusnahkan baris jurnal via FK cascade). Akun belum dipakai →
+        // tetap dihapus agar rollback reversible.
         app(ActivityLogger::class)->withoutLogging(
-            fn () => AkunCOA::where('kode', '220-02')->delete()
+            fn () => AkunCOA::where('kode', '220-02')->first()?->delete()
         );
     }
 };
