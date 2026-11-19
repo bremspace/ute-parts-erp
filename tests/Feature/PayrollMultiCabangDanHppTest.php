@@ -11,6 +11,7 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\ProdukBiayaCabang;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\AkunCoaSeeder;
@@ -218,6 +219,14 @@ class PayrollMultiCabangDanHppTest extends TestCase
         $this->assertTrue($res['sukses']);
         $produk->refresh();
 
-        $this->assertEquals(550000, (float) $produk->harga_beli);
+        // [H9] Average cabang 1 = 550.000 disimpan PER CABANG (produk_biaya_cabang),
+        // tidak lagi mengkontaminasi master global. Master = weighted-average
+        // GLOBAL yang benar: (10x500.000 + 50x500.000 + 10x600.000)/70 = 514.285,71.
+        $this->assertEquals(550000, (float) ($res['harga_beli_cabang'] ?? 0));
+        $biayaCabang1 = ProdukBiayaCabang::where('produk_id', $produk->id)
+            ->where('cabang_id', $this->cabang1->id)
+            ->firstOrFail();
+        $this->assertEquals(550000, (float) $biayaCabang1->harga_beli);
+        $this->assertEquals(514285.71, (float) $produk->harga_beli);
     }
 }

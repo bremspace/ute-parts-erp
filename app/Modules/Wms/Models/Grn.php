@@ -19,6 +19,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable([
     'no_grn', 'po_id', 'cabang_id', 'gudang_id', 'user_id', 'status',
     'total_hpp', 'akun_kas_bank', 'dibayar_oleh', 'item_qty_received', 'catatan',
+    'dpp', 'ppn_nominal', 'ppn_percent',
 ])]
 class Grn extends Model
 {
@@ -35,6 +36,9 @@ class Grn extends Model
     protected $casts = [
         'no_grn' => 'string',
         'total_hpp' => 'decimal:2',
+        'dpp' => 'decimal:2',
+        'ppn_nominal' => 'decimal:2',
+        'ppn_percent' => 'decimal:2',
         'item_qty_received' => 'array',
         'status' => 'string',
     ];

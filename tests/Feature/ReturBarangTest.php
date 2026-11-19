@@ -271,9 +271,10 @@ class ReturBarangTest extends TestCase
         $sn->refresh();
         $this->assertEquals('return', $sn->status);
 
-        // Utang subledger terpotong
+        // [H13] Utang subledger terpotong via credit-note (jumlah_dibayar), pokok tetap
         $utang->refresh();
-        $this->assertEquals(300000, (float) $utang->jumlah);
+        $this->assertEquals(500000, (float) $utang->jumlah);
+        $this->assertEquals(200000, (float) $utang->jumlah_dibayar);
 
         // Jurnal terbentuk (Debit Utang 210-01, Kredit Persediaan 130-01)
         $jurnal = JurnalHeader::where('referensi_tipe', ReturnPembelian::class)

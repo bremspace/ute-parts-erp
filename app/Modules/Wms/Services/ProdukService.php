@@ -2,12 +2,15 @@
 
 namespace App\Modules\Wms\Services;
 
+use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\ProdukBiayaCabang;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
@@ -838,15 +841,33 @@ class ProdukService
     /**
      * Hitung Moving Average Cost (MAC) dan sesuaikan harga modal/beli produk otomatis.
      * Jika margin_persen terisi, harga jual retail ikut disesuaikan otomatis.
+     *
+     * [H9] $cabangId men-scoped average ke cabang tsb (biaya per cabang disimpan
+     * di produk_biaya_cabang; master = weighted-average global yang benar).
      */
-    public function sesuaikanHargaBeliAverage(int $produkId, int $qtyMasuk, float $hargaBeliMasuk): void
+    public function sesuaikanHargaBeliAverage(int $produkId, int $qtyMasuk, float $hargaBeliMasuk, ?int $cabangId = null): void
     {
-        $this->sesuaikanHargaBeliProduk($produkId, $qtyMasuk, $hargaBeliMasuk);
+        $this->sesuaikanHargaBeliProduk($produkId, $qtyMasuk, $hargaBeliMasuk, null, null, null, $cabangId);
     }
 
     /**
      * Sesuaikan harga modal/beli produk secara terpadu berdasarkan metode harga beli master produk
      * atau opsi penentuan harga yang ditentukan (average, tertinggi, manual).
+     *
+     * [H9] Kebijakan metode (IAS 2 ¶25 hanya mengizinkan FIFO / weighted average):
+     * - 'average': weighted-average perpetual PER CABANG (produk_biaya_cabang).
+     *   Master global menerima weighted-average global yang benar — bukan average
+     *   cabang lain (kontaminasi antar-cabang ditutup). Semua varian SKU di-update.
+     *   Metode yang direkomendasikan untuk produk persediaan.
+     * - 'manual': harga beli terakhir (≈ replacement cost). BUKAN biaya historis
+     *   IAS 2 — dipertahankan sebagai kebijakan harga manual (mis. produk jasa /
+     *   non-persediaan / harga kontrak tetap). Jangan gunakan untuk persediaan
+     *   yang dinilai IAS 2 tanpa kebijakan tertulis.
+     * - 'tertinggi': harga tertinggi histori pembelian. TIDAK patuh IAS 2 —
+     *   dipertahankan hanya sebagai kebijakan pricing konservatif (mis. penetapan
+     *   harga jual minimum), bukan untuk valuasi neraca persediaan.
+     * Semantik manual/tertinggi sengaja tidak diubah drastis (keputusan kebijakan
+     * akuntansi ada di owner); lihat audit H9.
      */
     public function sesuaikanHargaBeliProduk(
         int $produkId,
@@ -870,6 +891,7 @@ class ProdukService
 
         $hargaBeliLama = (float) $produk->harga_beli;
         $hargaBeliBaru = $hargaBeliLama;
+        $hargaCabangBaru = null;
 
         if ($metodeAktif === 'average') {
             $cabangTarget = $cabangId ?? currentCabangId();
@@ -880,10 +902,28 @@ class ProdukService
             $stokTotalSekarang = (int) $stokQuery->sum('jumlah');
             $stokLama = max(0, $stokTotalSekarang - $qtyMasuk);
 
+            // [H9] Basis average cabang = biaya cabang tersimpan (bukan master
+            // global yang bisa berasal dari cabang lain).
+            $avgLama = $cabangTarget
+                ? $this->biayaCabang($produkId, $cabangTarget, $hargaBeliLama)
+                : $hargaBeliLama;
+
             if ($stokLama <= 0) {
                 $hargaBeliBaru = round($hargaBeliMasuk, 2);
             } else {
-                $hargaBeliBaru = round((($stokLama * $hargaBeliLama) + ($qtyMasuk * $hargaBeliMasuk)) / ($stokLama + $qtyMasuk), 2);
+                $hargaBeliBaru = round((($stokLama * $avgLama) + ($qtyMasuk * $hargaBeliMasuk)) / ($stokLama + $qtyMasuk), 2);
+            }
+
+            if ($cabangTarget) {
+                // [H9] Biaya cabang disimpan per cabang; master HANYA menerima
+                // weighted-average global yang benar (dihitung SEBELUM baris
+                // cabang di-upsert agar memakai biaya lama cabang ini).
+                $hargaCabangBaru = $hargaBeliBaru;
+                $hargaBeliBaru = $this->averageGlobalMasuk($produk, $qtyMasuk, $hargaBeliMasuk, $cabangTarget, $hargaBeliLama);
+                ProdukBiayaCabang::updateOrCreate(
+                    ['produk_id' => $produkId, 'cabang_id' => $cabangTarget],
+                    ['harga_beli' => $hargaCabangBaru]
+                );
             }
         } elseif ($metodeAktif === 'tertinggi') {
             // Ambil harga tertinggi dari histori pembelian produk + harga masuk saat ini
@@ -938,21 +978,278 @@ class ProdukService
 
         $produk->update($updateData);
 
-        $variant = $produk->skuVariants()->first();
-        if ($variant) {
-            $variantUpdate = ['harga_beli' => $hargaBeliBaru];
-            if (isset($updateData['harga_jual_retail'])) {
-                $variantUpdate['harga_jual_retail'] = $updateData['harga_jual_retail'];
-            }
-            $variant->update($variantUpdate);
-        }
+        // [H9] Semua varian relevan di-update — transfer & POS membaca harga
+        // varian lebih dulu dari master; hanya varian pertama = inkonsistensi.
+        $this->updateHargaBeliSemuaVarian($produk, $hargaBeliBaru, $updateData['harga_jual_retail'] ?? null);
 
         return [
             'sukses' => true,
             'harga_beli_lama' => $hargaBeliLama,
             'harga_beli_baru' => $hargaBeliBaru,
+            'harga_beli_cabang' => $hargaCabangBaru,
             'harga_jual_baru' => $hargaJualBaru,
             'metode' => $metodeAktif,
         ];
+    }
+
+    /**
+     * [H9/M7] Hitung ulang weighted-average setelah barang keluar (retur pembelian).
+     * Stok sudah dipotong caller; avgBaru = (qtySebelum x avgLama - qtyKeluar x biayaKeluar) / qtySisa.
+     * Per cabang bila $cabangId ada (biaya cabang + master global konsisten);
+     * tanpa cabang → formula global legacy. Mirror efek retail margin + HargaTier
+     * + semua varian, tanpa mengubah harga jual bila tanpa margin.
+     *
+     * @return array{sukses:bool, pesan?:string, harga_beli_lama?:float, harga_beli_baru?:float, harga_beli_cabang?:float|null}
+     */
+    public function sesuaikanAverageRetur(int $produkId, int $qtyKeluar, float $biayaKeluarPerBase, ?int $cabangId = null): array
+    {
+        if ($qtyKeluar <= 0) {
+            return ['sukses' => false, 'pesan' => 'Qty retur tidak valid'];
+        }
+
+        $produk = Produk::whereKey($produkId)->lockForUpdate()->first();
+        if (! $produk) {
+            return ['sukses' => false, 'pesan' => 'Produk tidak ditemukan'];
+        }
+        if (($produk->metode_harga_beli ?: 'manual') !== 'average') {
+            return ['sukses' => false, 'pesan' => 'Bukan metode average'];
+        }
+
+        $cabangTarget = $cabangId ?? currentCabangId();
+        $hargaLama = (float) $produk->harga_beli;
+
+        $stokQuery = StokItem::where('produk_id', $produkId);
+        if ($cabangTarget) {
+            $stokQuery->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangTarget));
+        }
+        $stokSisa = (int) $stokQuery->sum('jumlah');
+        if ($stokSisa <= 0) {
+            return ['sukses' => false, 'pesan' => 'Tidak ada sisa stok — average tidak bermakna, biarkan biaya terakhir'];
+        }
+
+        $avgLama = $cabangTarget
+            ? $this->biayaCabang($produkId, $cabangTarget, $hargaLama)
+            : $hargaLama;
+        $qtySebelum = $stokSisa + $qtyKeluar;
+        $nilaiSisa = ($qtySebelum * $avgLama) - ($qtyKeluar * $biayaKeluarPerBase);
+        $hargaCabangBaru = round($nilaiSisa / $stokSisa, 2);
+        if ($hargaCabangBaru <= 0) {
+            $hargaCabangBaru = $avgLama; // jaga biaya tetap positif
+        }
+
+        if ($cabangTarget) {
+            ProdukBiayaCabang::updateOrCreate(
+                ['produk_id' => $produkId, 'cabang_id' => $cabangTarget],
+                ['harga_beli' => $hargaCabangBaru]
+            );
+            $hargaMasterBaru = $this->averageGlobalSisa($produk, $hargaLama);
+        } else {
+            $hargaMasterBaru = $hargaCabangBaru;
+        }
+
+        $updateData = ['harga_beli' => $hargaMasterBaru];
+        $hargaJualBaru = null;
+        if ($produk->margin_persen !== null && (float) $produk->margin_persen > 0) {
+            $hargaJualBaru = round($hargaMasterBaru * (1 + ((float) $produk->margin_persen / 100)));
+            $updateData['harga_jual_retail'] = $hargaJualBaru;
+            HargaTier::where('produk_id', $produk->id)
+                ->where('tipe_konsumen', 'retail')
+                ->update(['nominal_tetap' => $hargaJualBaru, 'harga' => $hargaJualBaru]);
+        }
+        $produk->update($updateData);
+        $this->updateHargaBeliSemuaVarian($produk, $hargaMasterBaru, $hargaJualBaru);
+
+        return [
+            'sukses' => true,
+            'harga_beli_lama' => $hargaLama,
+            'harga_beli_baru' => $hargaMasterBaru,
+            'harga_beli_cabang' => $cabangTarget ? $hargaCabangBaru : null,
+        ];
+    }
+
+    /**
+     * [H9] Rekonsiliasi GL persediaan (130-01) vs subledger Σ(stok x biaya).
+     * Biaya per baris stok = biaya cabang tersimpan (produk_biaya_cabang),
+     * fallback master harga_beli. Selisih (drift pembulatan antar-GRN) dijurnal
+     * ke 520-08 Selisih Stok agar GL = subledger:
+     *   subledger > GL → Dr 130-01 / Cr 520-08; sebaliknya Dr 520-08 / Cr 130-01.
+     * Idempoten: tanpa drift (|selisih| < 0.01) tidak ada jurnal.
+     *
+     * @return array{nilai_subledger:float, nilai_gl:float, selisih:float, jurnal_diposting:bool, no_jurnal:string|null}
+     */
+    public function rekonsiliasiPersediaan(?int $cabangId = null, ?int $userId = null, bool $postJurnal = true): array
+    {
+        $stokQuery = StokItem::with(['produk', 'gudang']);
+        if ($cabangId) {
+            $stokQuery->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId));
+        }
+
+        $nilaiSubledger = 0.0;
+        foreach ($stokQuery->get() as $stok) {
+            $qty = (int) $stok->jumlah;
+            if ($qty <= 0 || ! $stok->produk) {
+                continue;
+            }
+            $master = (float) $stok->produk->harga_beli;
+            $cabangStok = $stok->gudang?->cabang_id;
+            $biaya = $cabangStok
+                ? $this->biayaCabang((int) $stok->produk_id, (int) $cabangStok, $master)
+                : $master;
+            $nilaiSubledger += $qty * $biaya;
+        }
+        $nilaiSubledger = round($nilaiSubledger, 2);
+
+        $nilaiGl = 0.0;
+        $akun = AkunCOA::where('kode', '130-01')->first();
+        if ($akun) {
+            $q = JurnalAkuntansi::where('akun_coa_id', $akun->id);
+            if ($cabangId) {
+                $q->where('cabang_id', $cabangId);
+            }
+            $nilaiGl = round((float) $q->sum('debit') - (float) $q->sum('kredit'), 2);
+        }
+
+        $selisih = round($nilaiSubledger - $nilaiGl, 2);
+        $diposting = false;
+        $noJurnal = null;
+
+        if ($postJurnal && $akun && abs($selisih) >= 0.01) {
+            $nominal = abs($selisih);
+            $lines = $selisih > 0
+                ? [
+                    ['akun_kode' => '130-01', 'debit' => $nominal, 'kredit' => 0],
+                    ['akun_kode' => '520-08', 'debit' => 0, 'kredit' => $nominal],
+                ]
+                : [
+                    ['akun_kode' => '520-08', 'debit' => $nominal, 'kredit' => 0],
+                    ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $nominal],
+                ];
+            $noJurnal = $this->jurnalService->generateNoJurnal('manual', $cabangId);
+            $this->jurnalService->post(
+                $noJurnal,
+                now(),
+                'manual',
+                $lines,
+                'Rekonsiliasi valuasi persediaan [H9] — selisih GL vs subledger',
+                $cabangId,
+                $userId
+            );
+            $diposting = true;
+        }
+
+        return [
+            'nilai_subledger' => $nilaiSubledger,
+            'nilai_gl' => $nilaiGl,
+            'selisih' => $selisih,
+            'jurnal_diposting' => $diposting,
+            'no_jurnal' => $noJurnal,
+        ];
+    }
+
+    /**
+     * [H9] Biaya cabang tersimpan, fallback bila cabang belum punya baris.
+     */
+    private function biayaCabang(int $produkId, int $cabangId, float $fallback): float
+    {
+        $tersimpan = ProdukBiayaCabang::where('produk_id', $produkId)
+            ->where('cabang_id', $cabangId)
+            ->value('harga_beli');
+
+        return $tersimpan !== null ? (float) $tersimpan : $fallback;
+    }
+
+    /**
+     * [H9] Peta stok per cabang + biaya average-nya. Cabang berstok yang belum
+     * punya baris biaya di-materialisasi dengan fallback (master saat ini) agar
+     * biaya implisitnya tidak ikut bergeser setiap master berubah (anti drift).
+     *
+     * @return array<int, array{cabang_id:int|null, qty:int, avg:float}>
+     */
+    private function petaBiayaCabang(Produk $produk, float $fallback): array
+    {
+        $rows = DB::table('stok_items')
+            ->where('stok_items.produk_id', $produk->id)
+            ->leftJoin('gudang', 'gudang.id', '=', 'stok_items.gudang_id')
+            ->groupBy('gudang.cabang_id')
+            ->selectRaw('gudang.cabang_id as cabang_id, COALESCE(SUM(stok_items.jumlah), 0) as qty')
+            ->get();
+
+        $peta = [];
+        foreach ($rows as $r) {
+            $cabangId = $r->cabang_id !== null ? (int) $r->cabang_id : null;
+            $avg = $fallback;
+            if ($cabangId !== null) {
+                $tersimpan = ProdukBiayaCabang::where('produk_id', $produk->id)
+                    ->where('cabang_id', $cabangId)
+                    ->value('harga_beli');
+                if ($tersimpan !== null) {
+                    $avg = (float) $tersimpan;
+                } elseif ((int) $r->qty > 0) {
+                    ProdukBiayaCabang::updateOrCreate(
+                        ['produk_id' => $produk->id, 'cabang_id' => $cabangId],
+                        ['harga_beli' => $avg]
+                    );
+                }
+            }
+            $peta[] = ['cabang_id' => $cabangId, 'qty' => (int) $r->qty, 'avg' => $avg];
+        }
+
+        return $peta;
+    }
+
+    /**
+     * [H9] Weighted-average GLOBAL setelah penerimaan (stok sudah termasuk qtyMasuk).
+     * Nilai = Σ(qtySebelum x avgCabang) + qtyMasuk x hargaMasuk, dibagi total qty.
+     * Cabang target memakai biaya LAMA-nya (peta dibaca sebelum upsert cabang).
+     */
+    private function averageGlobalMasuk(Produk $produk, int $qtyMasuk, float $hargaMasuk, int $cabangTarget, float $hargaLama): float
+    {
+        $peta = $this->petaBiayaCabang($produk, $hargaLama);
+        $totalQty = $qtyMasuk;
+        $totalNilai = $qtyMasuk * $hargaMasuk;
+
+        foreach ($peta as $p) {
+            $isTarget = $p['cabang_id'] === $cabangTarget;
+            $qtyPre = $isTarget ? max(0, $p['qty'] - $qtyMasuk) : $p['qty'];
+            $totalQty += $qtyPre;
+            $totalNilai += $qtyPre * $p['avg'];
+        }
+
+        return $totalQty > 0 ? round($totalNilai / $totalQty, 2) : round($hargaMasuk, 2);
+    }
+
+    /**
+     * [H9] Weighted-average GLOBAL atas stok sisa (setelah barang keluar).
+     * Dipanggil SETELAH baris biaya cabang target di-upsert.
+     */
+    private function averageGlobalSisa(Produk $produk, float $hargaLama): float
+    {
+        $peta = $this->petaBiayaCabang($produk, $hargaLama);
+        $totalQty = 0;
+        $totalNilai = 0.0;
+
+        foreach ($peta as $p) {
+            if ($p['qty'] <= 0) {
+                continue;
+            }
+            $totalQty += $p['qty'];
+            $totalNilai += $p['qty'] * $p['avg'];
+        }
+
+        return $totalQty > 0 ? round($totalNilai / $totalQty, 2) : $hargaLama;
+    }
+
+    /**
+     * [H9] Update harga beli (dan jual retail bila ada) ke SEMUA varian SKU.
+     */
+    private function updateHargaBeliSemuaVarian(Produk $produk, float $hargaBeliBaru, ?float $hargaJualBaru): void
+    {
+        foreach ($produk->skuVariants()->get() as $variant) {
+            $update = ['harga_beli' => $hargaBeliBaru];
+            if ($hargaJualBaru !== null) {
+                $update['harga_jual_retail'] = $hargaJualBaru;
+            }
+            $variant->update($update);
+        }
     }
 }

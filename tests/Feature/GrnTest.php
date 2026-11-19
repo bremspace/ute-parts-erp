@@ -997,10 +997,16 @@ class GrnTest extends TestCase
             ->value('kredit');
         $this->assertEquals(150000, (float) $kreditPersediaanRetur);
 
-        // Verifikasi Saldo Utang Terpotong (500.000 - 150.000 = 350.000)
-        $this->assertEquals(350000, (float) $utangPo->fresh()->jumlah);
-        // Verifikasi Total PO berkurang sesuai retur utang
-        $this->assertEquals(350000, (float) $po->fresh()->total);
+        // [H13] Credit-note: pokok utang TIDAK berubah; jumlah_dibayar bertambah
+        // 150.000 sehingga sisa utang = 500.000 - 150.000 = 350.000 (satu semantik AP).
+        $utangFresh = $utangPo->fresh();
+        $this->assertEquals(500000, (float) $utangFresh->jumlah);
+        $this->assertEquals(150000, (float) $utangFresh->jumlah_dibayar);
+        // [H13] Total PO tidak diubah; credit-note masuk total_dibayar agar sisa konsisten.
+        $poFresh = $po->fresh();
+        $this->assertEquals(500000, (float) $poFresh->total);
+        $this->assertEquals(150000, (float) $poFresh->total_dibayar);
+        $this->assertEquals(350000, $poFresh->sisa);
     }
 
     public function test_histori_pengadaan_tab_menampilkan_data_dan_bisa_export_csv(): void

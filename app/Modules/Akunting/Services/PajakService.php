@@ -137,6 +137,53 @@ class PajakService
     }
 
     /**
+     * [H8/F-32] Bundel pajak PEMBELIAN (PPN masukan) — definisi kanonik
+     * memakai konfigurasi cabang yang sama dengan penjualan (hitung()).
+     *
+     *   exclusive: DPP = nilai masuk (harga neto supplier), PPN ditambahkan
+     *              di atasnya → total_tagihan = DPP + PPN.
+     *   inclusive: DPP = nilai masuk / (1 + persen), PPN = selisihnya
+     *              → total_tagihan = nilai masuk (bruto).
+     *
+     * Persediaan dikapitalisasi sebesar DPP (IAS 2 ¶11: biaya perolehan
+     * neto pajak yang dapat dipulihkan); PPN masukan diposting ke 110-03.
+     * Nilai dihitung SATU KALI saat dokumen dibuat lalu disimpan (snapshot,
+     * tidak retroaktif terhadap perubahan konfigurasi).
+     *
+     * Asumsi kebijakan: cabang dengan pajak aktif membeli dari supplier PKP
+     * (faktur pajak). Supplier non-PKP tidak boleh dikenakan PPN masukan —
+     * pastikan konfigurasi pajak cabang hanya aktif bila pembelian kena PPN.
+     *
+     * @param  float  $nilai  total harga pembelian (Σ qty x harga_beli) sesuai mode cabang
+     * @return array{ppn_percent:float, ppn_nominal:float, dpp:float, enabled:bool, nama:string, mode:string, total_tagihan:float}
+     */
+    public function hitungPembelian(?int $cabangId, float $nilai): array
+    {
+        $hitung = $this->hitung($cabangId, max(0.0, $nilai));
+
+        return $hitung + [
+            'total_tagihan' => round((float) $hitung['dpp'] + (float) $hitung['ppn_nominal'], 2),
+        ];
+    }
+
+    /**
+     * [H8/F-32] Baris jurnal PPN Masukan — debit akun 110-03 (aset pajak,
+     * dapat dikreditkan terhadap PPN keluaran 220-01). Nominal <= 0 → [].
+     *
+     * @return array<int, array{akun_kode:string, debit:float, kredit:float}>
+     */
+    public function jurnalLinesMasukan(float $nominal): array
+    {
+        if ($nominal <= 0) {
+            return [];
+        }
+
+        return [
+            ['akun_kode' => '110-03', 'debit' => round($nominal, 2), 'kredit' => 0],
+        ];
+    }
+
+    /**
      * Apakah fitur Pajak Otomatis diaktifkan utk cabang ini?
      * Kunci utama: pajak_enabled.{cabang} / pajak_enabled (kontrak AC F1-2).
      * Fallback: ppn_enabled.{cabang} / ppn_enabled (konfigurasi lama — backward compat).

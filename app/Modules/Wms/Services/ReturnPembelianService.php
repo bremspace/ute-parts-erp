@@ -4,7 +4,6 @@ namespace App\Modules\Wms\Services;
 
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
-use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\ReturnPenjualanItem;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Wms\Models\Grn;
@@ -467,33 +466,39 @@ class ReturnPembelianService
         }
 
         return DB::transaction(function () use ($retur, $nilaiRealisasi, $opsiPenyelesaian, $catatan, $userId) {
-            // Pastikan stok fisik telah terpotong (jika langsung diselesaikan dari draft)
-            if ($retur->status === 'draft') {
-                $this->potongStokFisik($retur, $userId);
+            // [H13/M5] Lock + re-check status — penyelesaian ganda tidak dobel jurnal/deposit.
+            $locked = ReturnPembelian::whereKey($retur->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status === 'selesai') {
+                return $locked;
             }
 
-            $nilaiBuku = round((float) $retur->jumlah, 2);
+            // Pastikan stok fisik telah terpotong (jika langsung diselesaikan dari draft)
+            if ($locked->status === 'draft') {
+                $this->potongStokFisik($locked, $userId);
+            }
+
+            $nilaiBuku = round((float) $locked->jumlah, 2);
             $realisasi = round($nilaiRealisasi, 2);
             $selisih = round($realisasi - $nilaiBuku, 2);
 
-            $retur->update([
+            $locked->update([
                 'status' => 'selesai',
                 'metode_pengembalian' => in_array($opsiPenyelesaian, ['saldo', 'utang', 'kas'], true) ? $opsiPenyelesaian : 'saldo',
                 'nilai_realisasi' => $realisasi,
                 'selisih_klaim' => $selisih,
                 'tanggal_selesai' => now(),
-                'catatan_penyelesaian' => $catatan ?? $retur->catatan_penyelesaian,
+                'catatan_penyelesaian' => $catatan ?? $locked->catatan_penyelesaian,
             ]);
 
             // Eksekusi mutasi finansial & pembukuan jurnal
-            $this->jurnalDanFinansial($retur, $userId);
+            $this->jurnalDanFinansial($locked, $userId);
 
             // Update item karantina yang terikat menjadi sudah_diretur_supplier
-            ReturnPenjualanItem::where('return_pembelian_id', $retur->id)
+            ReturnPenjualanItem::where('return_pembelian_id', $locked->id)
                 ->where('status_karantina', '!=', 'sudah_diretur_supplier')
                 ->update(['status_karantina' => 'sudah_diretur_supplier']);
 
-            $returResult = $retur->fresh(['items.produk', 'supplier', 'gudang']);
+            $returResult = $locked->fresh(['items.produk', 'supplier', 'gudang']);
             app(TransactionActivityLogService::class)->catatReturnPembelian($returResult);
 
             return $returResult;
@@ -717,6 +722,8 @@ class ReturnPembelianService
     /**
      * [C3] Biaya GRN aktual per satuan PO untuk item retur (harga_beli pada
      * item_qty_received GRN = harga aktual saat terima, bukan harga PO).
+     * [H8] Prefer harga_net (biaya neto PPN masukan yang dikapitalisasi ke
+     * persediaan) agar kredit 130-01 sama dengan debit awal GRN — tanpa residu.
      * Null bila PO diterima tanpa GRN (jalur legacy) — fallback harga PO.
      */
     protected function hargaGrnAktual(int $poId, PurchaseOrderItem $poItem): ?float
@@ -730,7 +737,7 @@ class ReturnPembelianService
         foreach ($grn->item_qty_received ?? [] as $row) {
             $varianRow = isset($row['sku_variant_id']) && $row['sku_variant_id'] ? (int) $row['sku_variant_id'] : null;
             if ((int) ($row['produk_id'] ?? 0) === (int) $poItem->produk_id && $varianRow === $varianPo) {
-                $harga = (float) ($row['harga_beli'] ?? 0);
+                $harga = (float) ($row['harga_net'] ?? $row['harga_beli'] ?? 0);
 
                 return $harga > 0 ? $harga : null;
             }
@@ -740,71 +747,50 @@ class ReturnPembelianService
     }
 
     /**
-     * [C3/M7] Hitung ulang weighted average setelah retur (metode 'average').
-     * Barang keluar dikredit at biaya GRN aktual yang bisa berbeda dari average
-     * berjalan: avgBaru = (qtySebelum x avgLama - qtyDasar x biayaReturPerBase) / qtySisa.
-     * Mirror efek ProdukService::sesuaikanHargaBeliProduk (master + varian pertama
-     * + retail margin + HargaTier), tanpa mengubah harga jual bila tanpa margin.
+     * [C3/M7/H9] Hitung ulang weighted average setelah retur (metode 'average').
+     * Delegasi ke ProdukService::sesuaikanAverageRetur — satu definisi kanonik
+     * per cabang (biaya cabang + master global konsisten, semua varian di-update).
      */
     protected function sesuaikanAverageSetelahRetur(int $produkId, int $qtyDasar, float $biayaReturPerBase, int $cabangId): void
     {
-        $produk = Produk::whereKey($produkId)->lockForUpdate()->first();
-        if (! $produk || ($produk->metode_harga_beli ?: 'manual') !== 'average') {
-            return;
-        }
-
-        $stokSisa = (int) StokItem::where('produk_id', $produk->id)
-            ->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId))
-            ->sum('jumlah');
-        if ($stokSisa <= 0) {
-            return; // tidak ada sisa stok — average tidak bermakna, biarkan biaya terakhir
-        }
-
-        $hargaLama = (float) $produk->harga_beli;
-        $qtySebelum = $stokSisa + $qtyDasar;
-        $nilaiSisa = ($qtySebelum * $hargaLama) - ($qtyDasar * $biayaReturPerBase);
-        $hargaBaru = round($nilaiSisa / $stokSisa, 2);
-        if ($hargaBaru <= 0 || abs($hargaBaru - $hargaLama) < 0.005) {
-            return;
-        }
-
-        $updateData = ['harga_beli' => $hargaBaru];
-        if ($produk->margin_persen !== null && (float) $produk->margin_persen > 0) {
-            $hargaJualBaru = round($hargaBaru * (1 + ((float) $produk->margin_persen / 100)));
-            $updateData['harga_jual_retail'] = $hargaJualBaru;
-            HargaTier::where('produk_id', $produk->id)
-                ->where('tipe_konsumen', 'retail')
-                ->update(['nominal_tetap' => $hargaJualBaru, 'harga' => $hargaJualBaru]);
-        }
-        $produk->update($updateData);
-
-        $variant = $produk->skuVariants()->first();
-        if ($variant) {
-            $variantUpdate = ['harga_beli' => $hargaBaru];
-            if (isset($updateData['harga_jual_retail'])) {
-                $variantUpdate['harga_jual_retail'] = $updateData['harga_jual_retail'];
-            }
-            $variant->update($variantUpdate);
-        }
+        app(ProdukService::class)->sesuaikanAverageRetur($produkId, $qtyDasar, $biayaReturPerBase, $cabangId);
     }
 
     /**
      * Eksekusi mutasi finansial & pembukuan jurnal akuntansi retur pembelian.
+     *
+     * [H8] Kredit persediaan at biaya neto (harga_net GRN); PPN masukan yang
+     * terkait porsi retur dibalik (Cr 110-03) — bukan pendapatan lain-lain.
+     * [H13] Satu semantik AP: klaim dialokasikan sebagai credit-note
+     * (jumlah_dibayar), pokok utang/total PO tidak diubah; kelebihan klaim
+     * menjadi deposit supplier yang DIJURNAL (Dr 120-05 / Cr 210-01) sehingga
+     * AP tidak pernah negatif tanpa liabilitas lawan dan deposit tidak off-books.
      */
     protected function jurnalDanFinansial(ReturnPembelian $retur, ?int $userId = null): void
     {
         $cabangId = (int) $retur->cabang_id;
         $nilaiBuku = round((float) $retur->jumlah, 2);
-        $nilaiKlaim = round((float) ($retur->nilai_realisasi ?? $nilaiBuku), 2);
-        $selisihKlaim = round($nilaiKlaim - $nilaiBuku, 2);
 
-        if ($nilaiBuku > 0 && $retur->metode_pengembalian !== 'tukar_unit') {
+        // [H8] PPN masukan dibalik proporsional terhadap nilai buku neto yang diretur.
+        $ppnRetur = $this->ppnReturDariGrn($retur, $nilaiBuku);
+
+        // Klaim default = buku neto + PPN dapat dipulihkan (supplier owes bruto).
+        $nilaiKlaim = round((float) ($retur->nilai_realisasi ?? ($nilaiBuku + $ppnRetur)), 2);
+        $selisihKlaim = round($nilaiKlaim - $nilaiBuku - $ppnRetur, 2);
+
+        if (($nilaiBuku > 0 || $nilaiKlaim > 0) && $retur->metode_pengembalian !== 'tukar_unit') {
             $akunDebit = $retur->metode_pengembalian === 'kas' ? '110-01' : '210-01';
 
             $jurnalLines = [
                 ['akun_kode' => $akunDebit, 'debit' => $nilaiKlaim, 'kredit' => 0],
-                ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $nilaiBuku],
             ];
+            if ($nilaiBuku > 0) {
+                $jurnalLines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $nilaiBuku];
+            }
+            if ($ppnRetur > 0) {
+                // [H8/F-32] Balik PPN masukan atas barang yang diretur.
+                $jurnalLines[] = ['akun_kode' => '110-03', 'debit' => 0, 'kredit' => $ppnRetur];
+            }
 
             if ($selisihKlaim < 0) {
                 // Realisasi lebih rendah dari nilai buku persediaan -> Beban Selisih Klaim Retur
@@ -836,64 +822,126 @@ class ReturnPembelianService
             );
         }
 
-        // Penyelesaian Finansial Supplier (berdasarkan hak klaim riil $nilaiKlaim)
-        if ($retur->metode_pengembalian === 'saldo') {
-            $sisaAlokasi = $nilaiKlaim;
-            $supplier = $retur->supplier;
+        // [H13] Penyelesaian finansial supplier (berdasarkan hak klaim riil $nilaiKlaim)
+        if (in_array($retur->metode_pengembalian, ['saldo', 'utang'], true)) {
+            $this->alokasikanKlaimSupplier($retur, $nilaiKlaim, $cabangId, $userId, $selisihKlaim);
+        }
+    }
 
-            // 1. Jika ada utang berjalan ke supplier ini, potong utang terlebih dahulu
-            $openUtangs = Utang::where('kreditor_nama', $supplier?->nama)
-                ->where('status', '!=', 'lunas')
+    /**
+     * [H8] PPN masukan yang terkait retur: proporsional nilai buku neto x tarif
+     * PPN snapshot GRN asal. Tanpa PO/GRN ber-PPN → 0 (tidak ada reversal).
+     */
+    protected function ppnReturDariGrn(ReturnPembelian $retur, float $nilaiBuku): float
+    {
+        if ($nilaiBuku <= 0 || ! $retur->purchase_order_id) {
+            return 0.0;
+        }
+
+        $grn = Grn::where('po_id', $retur->purchase_order_id)->where('status', 'terima')->first();
+        if (! $grn || (float) $grn->ppn_nominal <= 0 || (float) $grn->ppn_percent <= 0) {
+            return 0.0;
+        }
+
+        return round($nilaiBuku * (float) $grn->ppn_percent / 100, 2);
+    }
+
+    /**
+     * [H13] Alokasi klaim retur dengan SATU semantik AP (credit-note):
+     * 1. Potong utang terbuka via jumlah_dibayar (pokok jumlah tidak diubah);
+     *    'utang' menarget Utang PO retur ini, 'saldo' semua utang supplier.
+     *    Credit-note juga menaikkan total_dibayar PO terkait agar sisa konsisten.
+     * 2. Kelebihan klaim → deposit supplier + jurnal Dr 120-05 / Cr 210-01
+     *    (on-books; menutup debit AP porsi deposit sehingga AP tidak negatif).
+     * Fail-closed: klaim deposit tanpa supplier → ValidationException (rollback).
+     */
+    protected function alokasikanKlaimSupplier(ReturnPembelian $retur, float $nilaiKlaim, int $cabangId, ?int $userId, float $selisihKlaim): void
+    {
+        $sisaAlokasi = $nilaiKlaim;
+        $supplier = $retur->supplier;
+
+        if ($retur->metode_pengembalian === 'utang' && $retur->purchase_order_id) {
+            $utangPo = Utang::where('referensi_tipe', PurchaseOrder::class)
+                ->where('referensi_id', $retur->purchase_order_id)
+                ->whereIn('status', ['belum_lunas', 'sebagian'])
+                ->first();
+            $targets = $utangPo ? collect([$utangPo]) : collect();
+        } else {
+            $targets = Utang::where('kreditor_nama', $supplier?->nama)
+                ->whereIn('status', ['belum_lunas', 'sebagian'])
                 ->orderBy('id')
                 ->get();
+        }
 
-            foreach ($openUtangs as $utang) {
-                if ($sisaAlokasi <= 0) {
-                    break;
-                }
-                $sisaTagihan = max(0, (float) $utang->jumlah - (float) $utang->jumlah_dibayar);
-                $potong = min($sisaAlokasi, $sisaTagihan);
-
-                $utang->increment('jumlah_dibayar', $potong);
-                if ((float) $utang->jumlah_dibayar >= (float) $utang->jumlah - 0.01) {
-                    $utang->update(['status' => 'lunas']);
-                } else {
-                    $utang->update(['status' => 'sebagian']);
-                }
-                $sisaAlokasi -= $potong;
+        foreach ($targets as $utang) {
+            if ($sisaAlokasi <= 0) {
+                break;
             }
-
-            // 2. Jika masih ada sisa, simpan ke saldo_deposit supplier (kredit belanja PO berikutnya)
-            if ($sisaAlokasi > 0 && $supplier) {
-                $supplier->tambahSaldoDeposit(
-                    $sisaAlokasi,
-                    "Deposit hasil Retur Pembelian {$retur->no_return}".($selisihKlaim != 0 ? ' (Realisasi Rp '.number_format($nilaiKlaim, 0, ',', '.').')' : ''),
-                    $retur,
-                    $cabangId,
-                    $userId
-                );
+            $sisaTagihan = max(0, (float) $utang->jumlah - (float) $utang->jumlah_dibayar);
+            $potong = min($sisaAlokasi, $sisaTagihan);
+            if ($potong <= 0) {
+                continue;
             }
-        } elseif ($retur->metode_pengembalian === 'utang' && $retur->purchase_order_id) {
-            $utang = Utang::where('referensi_tipe', PurchaseOrder::class)
-                ->where('referensi_id', $retur->purchase_order_id)
-                ->first();
+            $this->catatCreditNoteUtang($utang, $potong);
+            $sisaAlokasi = round($sisaAlokasi - $potong, 2);
+        }
 
-            if ($utang) {
-                $baruJumlah = max(0, (float) $utang->jumlah - $nilaiKlaim);
-                $utang->update([
-                    'jumlah' => $baruJumlah,
-                    'status' => $baruJumlah <= (float) $utang->jumlah_dibayar + 0.01 ? 'lunas' : 'sebagian',
+        if ($sisaAlokasi > 0) {
+            if (! $supplier) {
+                throw ValidationException::withMessages([
+                    'supplier' => 'Supplier retur tidak ditemukan — klaim deposit tidak dapat dicatat on-books, retur dibatalkan',
                 ]);
             }
 
-            if ($retur->purchaseOrder) {
-                $retur->purchaseOrder->decrement('total', $nilaiKlaim);
-            }
+            $supplier->tambahSaldoDeposit(
+                $sisaAlokasi,
+                "Deposit hasil Retur Pembelian {$retur->no_return}".($selisihKlaim != 0 ? ' (Realisasi Rp '.number_format($nilaiKlaim, 0, ',', '.').')' : ''),
+                $retur,
+                $cabangId,
+                $userId
+            );
+
+            // [H13] Deposit supplier ON-BOOKS: Dr 120-05 Deposit Supplier / Cr 210-01.
+            // Jurnal klaim sudah mendebit 210-01 penuh; kredit balik porsi deposit
+            // membuat AP neto hanya turun sebesar utang yang benar-benar dikompensasi.
+            $this->jurnalService->post(
+                $this->jurnalService->generateNoJurnal('retur', $cabangId),
+                now(),
+                'retur',
+                [
+                    ['akun_kode' => '120-05', 'debit' => $sisaAlokasi, 'kredit' => 0],
+                    ['akun_kode' => '210-01', 'debit' => 0, 'kredit' => $sisaAlokasi],
+                ],
+                "Deposit supplier Retur Pembelian {$retur->no_return}",
+                $cabangId,
+                $userId,
+                ReturnPembelian::class,
+                $retur->id
+            );
+        }
+    }
+
+    /**
+     * [H13] Credit-note AP: tambah jumlah_dibayar (bukan potong pokok jumlah),
+     * sinkronkan total_dibayar PO terkait agar sisa tagihan konsisten antar-jalur.
+     */
+    protected function catatCreditNoteUtang(Utang $utang, float $potong): void
+    {
+        $baruDibayar = round((float) $utang->jumlah_dibayar + $potong, 2);
+        $utang->update([
+            'jumlah_dibayar' => $baruDibayar,
+            'status' => $baruDibayar >= (float) $utang->jumlah - 0.01 ? 'lunas' : 'sebagian',
+        ]);
+
+        if ($utang->referensi_tipe === PurchaseOrder::class) {
+            PurchaseOrder::whereKey($utang->referensi_id)->increment('total_dibayar', $potong);
         }
     }
 
     /**
      * Finalisasi eksekusi retur pembelian: potong stok fisik & sesuaikan saldo/utang/kas.
+     * [H13/M5] Lock baris retur + re-check status di dalam transaksi — eksekusi
+     * bersamaan tidak menggandakan stok keluar, jurnal, maupun deposit supplier.
      */
     public function eksekusiRetur(ReturnPembelian $retur, ?int $userId = null): void
     {
@@ -902,9 +950,17 @@ class ReturnPembelianService
         }
 
         DB::transaction(function () use ($retur, $userId) {
-            $this->potongStokFisik($retur, $userId);
-            $this->jurnalDanFinansial($retur, $userId);
-            $retur->update(['status' => 'selesai']);
+            $locked = ReturnPembelian::whereKey($retur->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status === 'selesai') {
+                $retur->setRawAttributes($locked->getAttributes(), true);
+
+                return;
+            }
+
+            $this->potongStokFisik($locked, $userId);
+            $this->jurnalDanFinansial($locked, $userId);
+            $locked->update(['status' => 'selesai']);
+            $retur->setRawAttributes($locked->getAttributes(), true);
         });
     }
 

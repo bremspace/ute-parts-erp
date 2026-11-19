@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\PembayaranSupplier;
 use App\Modules\Wms\Models\PurchaseOrder;
@@ -67,6 +68,8 @@ class PurchaseOrderService
             }
 
             $totalHpp = 0;
+            $cabangId = $po->gudangTujuan?->cabang_id;
+            $valuasiItems = [];
 
             foreach ($po->items as $item) {
                 $konversi = max(0.0001, (float) ($item->konversi ?? 1));
@@ -99,31 +102,57 @@ class PurchaseOrderService
                     smlReferensiId: $po->id
                 );
 
-                $this->produkService->sesuaikanHargaBeliAverage($item->produk_id, $qtyDasar, $hargaPerBaseUnit);
+                $valuasiItems[] = [
+                    'produk_id' => (int) $item->produk_id,
+                    'qty_dasar' => $qtyDasar,
+                    'harga_per_base' => $hargaPerBaseUnit,
+                ];
 
                 $totalHpp += $subtotalItem;
             }
 
-            // Jurnal
+            // [H8/F-32] Snapshot PPN masukan (tidak retroaktif) — persediaan
+            // dikapitalisasi neto (DPP), PPN masukan dipisah ke akun 110-03.
             $totalHpp = round($totalHpp, 2);
+            $pajak = app(PajakService::class)->hitungPembelian($cabangId, $totalHpp);
+            $dpp = (float) $pajak['dpp'];
+            $ppnMasukan = (float) $pajak['ppn_nominal'];
+            $totalTagihan = (float) $pajak['total_tagihan'];
+            $rasioNeto = ($totalHpp > 0 && $ppnMasukan > 0) ? ($dpp / $totalHpp) : 1.0;
+
+            // Valuasi average memakai biaya neto + scope cabang tujuan PO
+            // (bukan session) agar tidak kontaminasi antar-cabang [H9].
+            foreach ($valuasiItems as $v) {
+                $this->produkService->sesuaikanHargaBeliAverage(
+                    $v['produk_id'],
+                    $v['qty_dasar'],
+                    round($v['harga_per_base'] * $rasioNeto, 2),
+                    $cabangId
+                );
+            }
+
+            // Jurnal
             $akunKas = $po->akun_kas_bank ?: '110-01';
-            $jurnalLines = [
-                ['akun_kode' => '130-01', 'debit' => $totalHpp, 'kredit' => 0], // Persediaan
-            ];
+            $jurnalLines = array_merge(
+                [
+                    ['akun_kode' => '130-01', 'debit' => $dpp, 'kredit' => 0], // Persediaan neto
+                ],
+                app(PajakService::class)->jurnalLinesMasukan($ppnMasukan), // [H8/F-32] PPN masukan
+            );
 
             if ($po->metode_bayar === 'kredit') {
-                $jurnalLines[] = ['akun_kode' => '210-01', 'debit' => 0, 'kredit' => $totalHpp]; // Utang Usaha
+                $jurnalLines[] = ['akun_kode' => '210-01', 'debit' => 0, 'kredit' => $totalTagihan]; // Utang Usaha
             } else {
-                $jurnalLines[] = ['akun_kode' => $akunKas, 'debit' => 0, 'kredit' => $totalHpp]; // Kas/Bank
+                $jurnalLines[] = ['akun_kode' => $akunKas, 'debit' => 0, 'kredit' => $totalTagihan]; // Kas/Bank
             }
 
             $this->jurnalService->post(
-                $this->jurnalService->generateNoJurnal('beli', $po->gudangTujuan?->cabang_id),
+                $this->jurnalService->generateNoJurnal('beli', $cabangId),
                 now(),
                 'pembelian',
                 $jurnalLines,
                 "PO {$po->no_po} diterima ({$po->metode_bayar})",
-                $po->gudangTujuan?->cabang_id,
+                $cabangId,
                 $userId,
                 // [B-10b/P1-6] Jurnal tanpa referensi tidak bisa ditelusuri balik ke
                 // PO (drill-down audit & rekonsiliasi AP) — stamp PurchaseOrder.
@@ -145,9 +174,9 @@ class PurchaseOrderService
                         'referensi_id' => $po->id,
                         // [B-10b/P1-6] Utang tanpa cabang_id tidak muncul di Laporan
                         // Utang per cabang (scoping wajib cabang_id).
-                        'cabang_id' => $po->gudangTujuan?->cabang_id,
+                        'cabang_id' => $cabangId,
                         'kreditor_nama' => $po->supplier?->nama,
-                        'jumlah' => $totalHpp,
+                        'jumlah' => $totalTagihan,
                         'jumlah_dibayar' => 0,
                         'jatuh_tempo' => $po->jatuh_tempo,
                         'status' => 'belum_lunas',
@@ -156,7 +185,13 @@ class PurchaseOrderService
                 }
             }
 
-            $po->update(['status' => 'diterima', 'total' => $totalHpp]);
+            $po->update([
+                'status' => 'diterima',
+                'total' => $totalTagihan,
+                'dpp' => $dpp,
+                'ppn_nominal' => $ppnMasukan,
+                'ppn_percent' => $pajak['ppn_percent'],
+            ]);
 
             return $po;
         });
