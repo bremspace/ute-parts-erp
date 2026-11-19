@@ -10,6 +10,7 @@ use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
+use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Reseller\Models\Komisi;
@@ -43,7 +44,47 @@ class TransaksiVoidService
 
         return DB::transaction(function () use ($transaksi, $authorizerUser, $alasan) {
             $cabangId = (int) $transaksi->cabang_id;
-            $gudangId = (int) ($transaksi->gudang_id ?? 1);
+            $jurnalService = app(JurnalService::class);
+
+            // [H5] Guard retur (fail-closed): void me-restore qty penuh semua item,
+            // sehingga retur yang sudah aktif/selesai akan menghasilkan stok phantom
+            // dan pendapatan negatif. Tolak void bila ada retur selain 'ditolak'.
+            $returTerlibat = ReturnPenjualan::where('transaksi_id', $transaksi->id)
+                ->whereIn('status', ['draft', 'disetujui', 'selesai'])
+                ->get();
+            if ($returTerlibat->isNotEmpty()) {
+                throw new \Exception(
+                    "Transaksi {$transaksi->no_transaksi} tidak dapat di-void karena sudah memiliki retur penjualan (".
+                    $returTerlibat->pluck('no_return')->implode(', ').
+                    '). Batalkan retur tersebut terlebih dahulu atau proses retur penuh, agar stok dan pendapatan tidak terhitung ganda.'
+                );
+            }
+
+            // [H5] Transaksi tukar barang: jurnal pendapatannya ber-referensi
+            // ReturnPenjualan, bukan transaksi ini — void langsung akan me-restore
+            // stok tanpa membalik pendapatan. Arahkan ke pembatalan retur terkait.
+            if ($transaksi->metode_bayar === 'tukar_barang') {
+                throw new \Exception(
+                    "Transaksi {$transaksi->no_transaksi} adalah transaksi tukar barang dan tidak dapat di-void langsung. ".
+                    'Batalkan melalui retur penjualan terkait.'
+                );
+            }
+
+            // [B-2] Guard piutang: kasbon yang sudah dibayar (sebagian/penuh) tidak
+            // boleh di-void tanpa membalik penerimaan — tolak fail-closed.
+            $piutang = Piutang::where('transaksi_id', $transaksi->id)->first();
+            if ($piutang && (float) $piutang->jumlah_dibayar > 0) {
+                throw new \Exception(
+                    "Transaksi {$transaksi->no_transaksi} tidak dapat di-void karena piutang {$piutang->no_piutang} sudah dibayar ".
+                    'Rp '.number_format((float) $piutang->jumlah_dibayar, 0, ',', '.').
+                    '. Batalkan/reversal penerimaan piutang terlebih dahulu.'
+                );
+            }
+
+            // [H5] Gudang wajib sesuai transaksi asal: checkout tanpa gudang tidak
+            // memotong stok, maka void tanpa gudang tidak boleh me-restore stok
+            // (dulu fallback ?? 1 menciptakan stok phantom di gudang 1).
+            $gudangId = $transaksi->gudang_id ? (int) $transaksi->gudang_id : null;
             $stokService = app(StokDeductionService::class);
             $nomorSeriService = app(NomorSeriService::class);
 
@@ -56,7 +97,7 @@ class TransaksiVoidService
                 $konversi = max(0.0001, (float) ($item->konversi ?? 1));
                 $qtyDasar = (int) round($qty * $konversi);
 
-                if ($qtyDasar > 0) {
+                if ($gudangId !== null && $qtyDasar > 0) {
                     $stokService->kembalikan(
                         $produkId,
                         $skuVariantId,
@@ -77,52 +118,26 @@ class TransaksiVoidService
                 }
             }
 
-            // 2. Reversal Jurnal Akuntansi (Double-Entry Reversal)
-            $jurnalLama = JurnalAkuntansi::with('akun')
-                ->where('referensi_tipe', Transaksi::class)
+            // 2. Reversal Jurnal Akuntansi via jalur resmi JurnalService::reversalJurnal
+            // [F-10/B-2] Menandai header asal is_reversed + reversed_by_no_jurnal,
+            // jurnal pembalik bersumber 'reversal' + reversal_of_no_jurnal, alasan
+            // wajib terstruktur, dan anti-reversal-ganda. Baris tanpa akun tidak
+            // dibuang diam-diam: post() gagal eksplisit (fail-closed).
+            $nomorJurnalAsal = JurnalAkuntansi::where('referensi_tipe', Transaksi::class)
                 ->where('referensi_id', $transaksi->id)
-                ->get();
+                ->pluck('no_jurnal')
+                ->unique();
 
-            if ($jurnalLama->isNotEmpty()) {
-                $jurnalService = app(JurnalService::class);
-                $noJurnalVoid = $jurnalService->generateNoJurnal('pos', $cabangId);
-
-                // Buat entri pembalik: apa yang tadinya debit jadi kredit, yang kredit jadi debit
-                $lines = [];
-                foreach ($jurnalLama as $j) {
-                    $akunKode = $j->akun?->kode;
-                    if (! $akunKode) {
-                        continue;
-                    }
-
-                    $debitLama = (float) $j->debit;
-                    $kreditLama = (float) $j->kredit;
-
-                    // Balikkan
-                    $lines[] = [
-                        'akun_kode' => $akunKode,
-                        'debit' => $kreditLama,
-                        'kredit' => $debitLama,
-                    ];
-                }
-
-                if (! empty($lines)) {
-                    $jurnalService->post(
-                        $noJurnalVoid,
-                        now(),
-                        'pos',
-                        $lines,
-                        "Pembalik Jurnal Void POS {$transaksi->no_transaksi} — {$alasan}",
-                        $cabangId,
-                        $authorizerUser->id,
-                        Transaksi::class,
-                        $transaksi->id
-                    );
-                }
+            foreach ($nomorJurnalAsal as $noJurnalAsal) {
+                $jurnalService->reversalJurnal(
+                    $noJurnalAsal,
+                    $cabangId,
+                    $authorizerUser->id,
+                    "Void POS {$transaksi->no_transaksi}: {$alasan}"
+                );
             }
 
             // 3. Batalkan Piutang Pelanggan (jika transaksi kasbon / piutang)
-            $piutang = Piutang::where('transaksi_id', $transaksi->id)->first();
             if ($piutang) {
                 $piutang->update([
                     'status' => 'lunas', // Ditutup karena transaksi di-void
@@ -143,13 +158,43 @@ class TransaksiVoidService
 
                 // Jika sudah disetujui dan ada entri utang belum lunas, batalkan utangnya
                 if ($komisi->status === Komisi::STATUS_DISETUJUI) {
-                    Utang::where('referensi_tipe', 'komisi')
+                    $utangKomisi = Utang::where('referensi_tipe', 'komisi')
                         ->where('referensi_id', $komisi->id)
-                        ->where('status', 'belum_lunas')
-                        ->update([
+                        ->first();
+
+                    // [B-2/B-4] Utang komisi yang sudah dibayar sebagian tidak boleh
+                    // dibatalkan diam-diam — penerimaan harus dibalik dulu (fail-closed).
+                    if ($utangKomisi && (float) $utangKomisi->jumlah_dibayar > 0) {
+                        throw new \DomainException(
+                            "Transaksi {$transaksi->no_transaksi} tidak dapat dibatalkan (void) karena utang komisi {$komisi->no_komisi} ".
+                            'sudah dibayar Rp '.number_format((float) $utangKomisi->jumlah_dibayar, 0, ',', '.').
+                            '. Batalkan pembayaran komisi terlebih dahulu.'
+                        );
+                    }
+
+                    if ($utangKomisi && $utangKomisi->status === 'belum_lunas') {
+                        // [B-4] 'batal' adalah nilai enum valid sejak migrasi
+                        // 2026_11_20_000004 (sebelumnya ditolak MySQL STRICT).
+                        $utangKomisi->update([
                             'status' => 'batal',
-                            'keterangan' => trim(($komisi->keterangan ?? '')." [Batal void transaksi {$transaksi->no_transaksi}]"),
+                            'keterangan' => trim(($utangKomisi->keterangan ?? '')." [Batal void transaksi {$transaksi->no_transaksi}]"),
                         ]);
+                    }
+
+                    // [B-4] Balik jurnal akrual komisi (510-01 / 210-03) agar GL
+                    // utang komisi tidak menggantung setelah subledger dibatalkan.
+                    $nomorJurnalKomisi = JurnalAkuntansi::where('referensi_tipe', Komisi::class)
+                        ->where('referensi_id', $komisi->id)
+                        ->pluck('no_jurnal')
+                        ->unique();
+                    foreach ($nomorJurnalKomisi as $noJurnalKomisi) {
+                        $jurnalService->reversalJurnal(
+                            $noJurnalKomisi,
+                            $cabangId,
+                            $authorizerUser->id,
+                            "Void POS {$transaksi->no_transaksi} — batal komisi {$komisi->no_komisi}: {$alasan}"
+                        );
+                    }
                 }
 
                 $komisi->update([
