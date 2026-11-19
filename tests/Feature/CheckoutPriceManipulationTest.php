@@ -109,7 +109,12 @@ class CheckoutPriceManipulationTest extends TestCase
         );
 
         $item = $transaksi->items->first();
-        $this->assertEquals(135000.0, (float) $item->harga_satuan, 'Harga per pcs harus dari harga box server (1.620.000/12)');
-        $this->assertEquals(3240000.0, (float) $transaksi->subtotal, 'Subtotal 24 pcs x 135.000');
+        // [C1] Kontrak POS-native: jumlah = qty satuan (2 box), konversi = 12,
+        // harga_satuan per box (1.620.000 server-side, bukan harga client).
+        $this->assertEquals(2, (int) $item->jumlah);
+        $this->assertEquals('box', $item->satuan);
+        $this->assertEquals(12.0, (float) $item->konversi);
+        $this->assertEquals(1620000.0, (float) $item->harga_satuan, 'Harga per box harus dari data produk server (1.620.000), bukan harga client');
+        $this->assertEquals(3240000.0, (float) $transaksi->subtotal, 'Subtotal 2 box x 1.620.000 (= 24 pcs x 135.000)');
     }
 }

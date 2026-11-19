@@ -54,7 +54,10 @@ class OrderService
 
             foreach ($items as $item) {
                 $produk = Produk::findOrFail($item['produk_id']);
-                $qty = (int) $item['jumlah'];
+                // Semantik input cart/API: 'jumlah' dalam BASE unit (pcs) —
+                // CartService.qty & ShopPage.addToCart (rawQty x faktor) sudah
+                // mengonversi qty satuan terpilih ke base sebelum checkout.
+                $qtyDasar = (int) $item['jumlah'];
                 $variant = isset($item['sku_variant_id']) ? SkuVariant::find($item['sku_variant_id']) : null;
 
                 // Checkout harus memakai stok cabang order, bukan agregat semua cabang.
@@ -67,7 +70,9 @@ class OrderService
                     lock: true
                 );
 
-                if ($qty <= 0 || $stokTersedia < $qty) {
+                // [C1] Cek stok SELALU base unit: stokTersedia vs qtyDasar
+                // (= jumlah satuan x konversi), bukan qty satuan jual — oversell box.
+                if ($qtyDasar <= 0 || $stokTersedia < $qtyDasar) {
                     throw new \Exception("Stok {$produk->nama} tidak mencukupi di cabang yang dipilih (tersedia: {$stokTersedia})");
                 }
 
@@ -76,50 +81,166 @@ class OrderService
                 // Nominal dijamin identik dengan cart karena memakai resolver yang sama.
                 $satuanInfo = $this->pricingService->resolveHargaSatuan($produk, $pelanggan, $variant, $item['satuan'] ?? null);
                 $pricing = $satuanInfo['pricing'];
-                $harga = (float) $satuanInfo['harga'];
+                $harga = (float) $satuanInfo['harga']; // per BASE unit
                 $diskonPerUnit = (float) ($pricing['diskon_nominal'] ?? 0);
                 $potensiKomisiPerUnit = (float) ($pricing['potensi_komisi'] ?? 0);
                 $modeRewardMitra = $pricing['mode_reward'] ?? 'diskon_langsung';
 
-                // Campuran box + pcs: hitung subtotal dari komponen (box + pcs) bukan harga per base
-                $sisaPcs = (int) ($item['sisa_pcs'] ?? 0);
-                if ($sisaPcs > 0 && ($item['satuan'] ?? 'pcs') !== 'pcs') {
-                    $faktor = (float) $satuanInfo['faktor_konversi'];
-                    if ($faktor <= 0) {
-                        $faktor = 1.0;
-                    }
-                    $faktorInt = (int) round($faktor);
-                    $boxCount = (int) floor($qty / $faktorInt);
-                    $boxPrice = 0.0;
-                    foreach ($produk->getDaftarSatuan() as $s) {
-                        if (strcasecmp($s['satuan_kode'], 'box') === 0) {
-                            $boxPrice = (float) ($s['harga_jual'] ?? 0);
-                            break;
-                        }
-                    }
-                    if ($boxPrice <= 0) {
-                        $boxPrice = $harga * $faktor;
-                    }
-                    $pcsPrice = (float) $produk->harga_jual_retail;
-                    $total = ($boxCount * $boxPrice) + ($sisaPcs * $pcsPrice);
-                    $lineSubtotal = round($total, 2);
-                    $harga = round($total / $qty, 2);
-                } else {
-                    $lineSubtotal = round($harga * $qty, 2);
+                // [C1] Kontrak satuan POS-native (PosCheckoutService/TransaksiVoidService):
+                // TransaksiItem.jumlah = qty SATUAN jual (box count), konversi = faktor
+                // ke base, harga_satuan & hpp = per SATUAN. qtyDasar = jumlah x konversi;
+                // processor (Duitku/pickup) memotong stok & menjurnal HPP dari qtyDasar.
+                $konversi = (float) $satuanInfo['faktor_konversi'];
+                if ($konversi <= 0) {
+                    $konversi = 1.0;
                 }
-                $subtotal += $lineSubtotal;
-                $totalKomisiMitra += round($potensiKomisiPerUnit * $qty, 2);
+                $satuanLabel = $satuanInfo['satuan'];
+                $baseSatuan = $produk->satuan ?: 'pcs';
+                $isSatuanKonversi = $konversi > 1 && strcasecmp($satuanLabel, $baseSatuan) !== 0;
+                $hppBase = (float) $produk->harga_beli;
+                $catatan = $item['catatan'] ?? null;
 
+                $diskonItem = round($diskonPerUnit * $qtyDasar, 2);
+                $komisiItem = round($potensiKomisiPerUnit * $qtyDasar, 2);
+                $totalKomisiMitra += $komisiItem;
+
+                if (! $isSatuanKonversi) {
+                    // Satuan dasar: 1 baris, konversi 1, hpp per base = per satuan.
+                    $lineSubtotal = round($harga * $qtyDasar, 2);
+                    $subtotal += $lineSubtotal;
+                    $rows[] = [
+                        'produk' => $produk,
+                        'sku_variant_id' => $variant?->id,
+                        'qty' => $qtyDasar, // base qty utk tier partai (semantik pcs)
+                        'jumlah' => $qtyDasar,
+                        'satuan' => $satuanLabel,
+                        'konversi' => 1.0,
+                        'harga_satuan' => $harga,
+                        'diskon_nominal' => $diskonItem,
+                        'potensi_komisi' => $komisiItem,
+                        'hpp' => $hppBase,
+                        'subtotal' => $lineSubtotal,
+                        'catatan' => $catatan,
+                    ];
+
+                    continue;
+                }
+
+                $faktorInt = max(1, (int) round($konversi));
+                $boxCount = intdiv($qtyDasar, $faktorInt);
+                $rem = $qtyDasar - ($boxCount * $faktorInt);
+                // Harga per satuan terpilih = harga base x faktor (= harga_jual
+                // master satuan bila ada, karena resolver menurunkan harga base
+                // dari harga_jual/faktor).
+                $hargaPerSatuan = round($harga * $konversi, 2);
+                $sisaPcs = (int) ($item['sisa_pcs'] ?? 0);
+
+                if ($sisaPcs > 0 && $boxCount > 0) {
+                    // Campuran box + pcs (cart updateQty): box dihargai harga satuan
+                    // master, sisa pcs dihargai retail. Sisa pcs diturunkan dari
+                    // qtyDasar agar jumlah baris x konversi selalu = qtyDasar.
+                    $pcsPrice = (float) $produk->harga_jual_retail;
+                    $lineSubtotal = round(($boxCount * $hargaPerSatuan) + ($rem * $pcsPrice), 2);
+                    $subtotal += $lineSubtotal;
+                    $boxSubtotal = round($boxCount * $hargaPerSatuan, 2);
+                    $boxQtyDasar = $boxCount * $faktorInt;
+                    $boxDiskon = round($diskonPerUnit * $boxQtyDasar, 2);
+                    $boxKomisi = round($potensiKomisiPerUnit * $boxQtyDasar, 2);
+                    $rows[] = [
+                        'produk' => $produk,
+                        'sku_variant_id' => $variant?->id,
+                        'qty' => $boxQtyDasar,
+                        'jumlah' => $boxCount,
+                        'satuan' => $satuanLabel,
+                        'konversi' => $konversi,
+                        'harga_satuan' => $hargaPerSatuan,
+                        'diskon_nominal' => $boxDiskon,
+                        'potensi_komisi' => $boxKomisi,
+                        'hpp' => $hppBase * $konversi,
+                        'subtotal' => $boxSubtotal,
+                        'catatan' => $catatan,
+                    ];
+                    if ($rem > 0) {
+                        $rows[] = [
+                            'produk' => $produk,
+                            'sku_variant_id' => $variant?->id,
+                            'qty' => $rem,
+                            'jumlah' => $rem,
+                            'satuan' => $baseSatuan,
+                            'konversi' => 1.0,
+                            'harga_satuan' => $pcsPrice,
+                            'diskon_nominal' => round($diskonItem - $boxDiskon, 2),
+                            'potensi_komisi' => round($komisiItem - $boxKomisi, 2),
+                            'hpp' => $hppBase,
+                            'subtotal' => round($lineSubtotal - $boxSubtotal, 2),
+                            'catatan' => $catatan,
+                        ];
+                    }
+
+                    continue;
+                }
+
+                // Satuan konversi tanpa sisa eksplisit: nominal tetap harga base x
+                // qtyDasar (identik dgn perhitungan lama & tampilan cart).
+                $lineSubtotal = round($harga * $qtyDasar, 2);
+                $subtotal += $lineSubtotal;
+
+                if ($rem === 0 && $boxCount > 0) {
+                    // Box murni: 1 baris, jumlah = box count, hpp per box.
+                    $rows[] = [
+                        'produk' => $produk,
+                        'sku_variant_id' => $variant?->id,
+                        'qty' => $qtyDasar,
+                        'jumlah' => $boxCount,
+                        'satuan' => $satuanLabel,
+                        'konversi' => $konversi,
+                        'harga_satuan' => $hargaPerSatuan,
+                        'diskon_nominal' => $diskonItem,
+                        'potensi_komisi' => $komisiItem,
+                        'hpp' => $hppBase * $konversi,
+                        'subtotal' => $lineSubtotal,
+                        'catatan' => $catatan,
+                    ];
+
+                    continue;
+                }
+
+                // Tidak habis dibagi (cart lama tanpa sisa_pcs / API): pecah menjadi
+                // baris box + pcs dengan harga per-base yang sama agar nominal dan
+                // qtyDasar identik; jumlah per baris tetap integer (kontrak model).
+                $boxQtyDasar = $boxCount * $faktorInt;
+                $boxSubtotal = round($harga * $boxQtyDasar, 2);
+                $boxDiskon = round($diskonPerUnit * $boxQtyDasar, 2);
+                $boxKomisi = round($potensiKomisiPerUnit * $boxQtyDasar, 2);
+                if ($boxCount > 0) {
+                    $rows[] = [
+                        'produk' => $produk,
+                        'sku_variant_id' => $variant?->id,
+                        'qty' => $boxQtyDasar,
+                        'jumlah' => $boxCount,
+                        'satuan' => $satuanLabel,
+                        'konversi' => $konversi,
+                        'harga_satuan' => $hargaPerSatuan,
+                        'diskon_nominal' => $boxDiskon,
+                        'potensi_komisi' => $boxKomisi,
+                        'hpp' => $hppBase * $konversi,
+                        'subtotal' => $boxSubtotal,
+                        'catatan' => $catatan,
+                    ];
+                }
                 $rows[] = [
                     'produk' => $produk,
                     'sku_variant_id' => $variant?->id,
-                    'jumlah' => $qty,
-                    'harga_satuan' => $harga,
-                    'diskon_nominal' => round($diskonPerUnit * $qty, 2),
-                    'potensi_komisi' => round($potensiKomisiPerUnit * $qty, 2),
-                    'hpp' => (float) $produk->harga_beli,
-                    'subtotal' => $lineSubtotal,
-                    'catatan' => $item['catatan'] ?? null,
+                    'qty' => $rem,
+                    'jumlah' => $rem,
+                    'satuan' => $baseSatuan,
+                    'konversi' => 1.0,
+                    'harga_satuan' => round($harga, 2),
+                    'diskon_nominal' => round($diskonItem - $boxDiskon, 2),
+                    'potensi_komisi' => round($komisiItem - $boxKomisi, 2),
+                    'hpp' => $hppBase,
+                    'subtotal' => round($lineSubtotal - $boxSubtotal, 2),
+                    'catatan' => $catatan,
                 ];
             }
 
@@ -166,15 +287,18 @@ class OrderService
             ]);
 
             foreach ($rows as $row) {
+                // [C1] jumlah = qty SATUAN jual; konversi = faktor ke base;
+                // harga_satuan & hpp per SATUAN (kontrak POS-native). Processor
+                // menghitung qtyDasar = jumlah x konversi utk stok & HPP.
                 TransaksiItem::create([
                     'transaksi_id' => $transaksi->id,
                     'produk_id' => $row['produk']->id,
                     'sku_variant_id' => $row['sku_variant_id'],
                     'jumlah' => $row['jumlah'],
-                    'satuan' => $row['satuan'] ?? ($row['produk']->satuan ?: 'pcs'),
-                    'konversi' => $row['konversi'] ?? 1,
+                    'satuan' => $row['satuan'],
+                    'konversi' => $row['konversi'],
                     'harga_satuan' => $row['harga_satuan'],
-                    'diskon_nominal' => $row['diskon_nominal'] ?? 0,
+                    'diskon_nominal' => $row['diskon_nominal'],
                     'subtotal' => $row['subtotal'],
                     'hpp' => $row['hpp'],
                     'catatan' => $row['catatan'] ?? null,
