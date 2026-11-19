@@ -163,7 +163,7 @@ npm run build
   - `main` diproteksi di GitHub (Require Pull Request aktif; non-admin otomatis ditolak push langsung).
   - Deteksi branch aktif sebelum bekerja (`git branch --show-current`).
   - **Branch harian `brem`**:
-    - Sebelum ubah kode, tarik update: `git fetch origin && git pull origin main && git pull origin brem`
+    - Sebelum ubah kode & sebelum push, tarik update dari `main` + `Unas` + `brem` (lihat "Sinkronisasi Antar-Branch Sebelum Push"): `git fetch origin && git pull origin main && git pull origin Unas && git pull origin brem`
     - Push harian ke `origin/brem`.
   - **Branch kolaborator (misal `Unas` atau fitur)**:
     - Sebelum ubah kode, tarik update: `git fetch origin && git pull origin main && git pull origin <branch>`
@@ -214,6 +214,26 @@ npm run build
   git push origin Unas
   ```
 - Penggabungan ke main wajib melalui Pull Request (PR) dari Unas ke main dan menunggu review/merge dari pemilik repositori (tim branch brem).
+
+### Sinkronisasi Antar-Branch Sebelum Push (WAJIB — user-mandated 2026-11-19)
+Tujuan: setiap branch selalu mendapat patch terbaik & terupdate, dan mengurangi noise/conflict saat dikerjakan terpisah.
+- **Sebelum push ke `Unas`**: tarik dulu commit terbaru dari `brem` DAN `main`, lalu merge ke Unas:
+  ```sh
+  git fetch origin
+  git pull origin main
+  git pull origin brem
+  git pull origin Unas
+  ```
+- **Sebelum push ke `brem`**: tarik dulu commit terbaru dari `main` DAN `Unas`, lalu merge ke brem:
+  ```sh
+  git fetch origin
+  git pull origin main
+  git pull origin Unas
+  git pull origin brem
+  ```
+- **Review setiap merge**: pastikan merge TIDAK merusak arsitektur. Ambil yang TERBAIK dari tiap perubahan untuk digabungkan — bukan sekadar menimpa salah satu sisi. Bila dua sisi mengubah region yang sama dengan pendekatan berbeda, rekonsiliasi manual agar hasil akhir paling benar & aman; jangan blind-merge. Verifikasi dengan test + PHPStan + Pint setelah merge.
+- **Push ke `main` HANYA dari `brem`** yang diijinkan. Branch lain (Unas/fitur) dilarang push/merge langsung ke `main`; harus lewat brem.
+- **CI/CD WAJIB hijau** sebelum merge naik ke `main`. Jangan merge ke `main` jika CI/CD masih merah.
 
 ## Agent Skills (configured in docs/agents/)
 ### Issue tracker

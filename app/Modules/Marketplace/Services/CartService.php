@@ -67,7 +67,9 @@ class CartService
                 $needSave = true;
             }
             $fk = (float) ($cart[$k]['faktor_konversi'] ?? 1.0);
-            if ($fk <= 0) { $fk = 1.0; }
+            if ($fk <= 0) {
+                $fk = 1.0;
+            }
 
             // harga per base unit yang efektif
             if (! isset($it['harga']) || (float) $it['harga'] <= 0) {
@@ -78,7 +80,9 @@ class CartService
 
             if (! isset($it['qty_satuan'])) {
                 $cart[$k]['qty_satuan'] = (int) round(($it['qty'] ?? 1) / $fk);
-                if ($cart[$k]['qty_satuan'] < 1) { $cart[$k]['qty_satuan'] = 1; }
+                if ($cart[$k]['qty_satuan'] < 1) {
+                    $cart[$k]['qty_satuan'] = 1;
+                }
                 $needSave = true;
             }
             if (! isset($it['harga_satuan'])) {
@@ -158,7 +162,7 @@ class CartService
                         $cart[$key]['potensi_komisi'] = $potensiKomisi;
                         $cart[$key]['mode_reward'] = $pricing['mode_reward'] ?? 'diskon_langsung';
                         $cart[$key]['tier_nama'] = $pricing['tier'] ?? null;
-                        $cart[$key]['alasan_harga'] = $pricing['alasan'] ?? null;
+                        $cart[$key]['alasan_harga'] = $pricing['alasan'];
                         $changed = true;
                     }
                 }
@@ -274,9 +278,13 @@ class CartService
         $item = $cart[$key];
         $satuan = $item['satuan'] ?? 'pcs';
         $faktor = (float) ($item['faktor_konversi'] ?? 1.0);
-        if ($faktor <= 0) { $faktor = 1.0; }
+        if ($faktor <= 0) {
+            $faktor = 1.0;
+        }
         $faktorInt = (int) round($faktor);
-        if ($faktorInt < 1) { $faktorInt = 1; }
+        if ($faktorInt < 1) {
+            $faktorInt = 1;
+        }
 
         $produk = ! empty($item['product_id']) ? Produk::find($item['product_id']) : null;
         $baseSatuan = $produk?->satuan ?: 'pcs';
@@ -312,7 +320,9 @@ class CartService
                 }
             }
         }
-        if ($boxPrice <= 0) { $boxPrice = (float) ($item['harga'] ?? 0) * $faktor; }
+        if ($boxPrice <= 0) {
+            $boxPrice = (float) ($item['harga'] ?? 0) * $faktor;
+        }
         $pcsPrice = (float) ($produk?->harga_jual_retail ?? $item['harga_retail'] ?? $item['harga'] ?? 0);
 
         $customer = auth('customer')->user();
@@ -331,7 +341,7 @@ class CartService
             $cart[$key]['harga'] = $effectiveBase;
             $cart[$key]['diskon_tier'] = 0.0;
             $cart[$key]['sisa_pcs'] = $rem;
-            $cart[$key]['breakdown'] = $boxes . ' box' . ($rem > 0 ? ' + ' . $rem . ' pcs' : '');
+            $cart[$key]['breakdown'] = $boxes.' box'.($rem > 0 ? ' + '.$rem.' pcs' : '');
         } elseif ($satuan !== 'pcs' && $qty < $faktorInt) {
             // Tidak cukup untuk 1 box -> revert ke pcs
             $cart[$key]['satuan'] = $baseSatuan;
@@ -340,13 +350,15 @@ class CartService
             $cart[$key]['harga_satuan'] = $pcsPrice;
             $cart[$key]['sisa_pcs'] = 0;
             $cart[$key]['breakdown'] = '';
-            if ($customer) {
-                $pricing = app(\App\Modules\Pos\Services\PricingService::class)->resolve($produk, $customer);
+            if ($customer && $produk) {
+                $pricing = app(PricingService::class)->resolve($produk, $customer);
                 $cart[$key]['harga'] = (float) $pricing['harga'];
-                $cart[$key]['diskon_tier'] = (float) ($pricing['diskon_nominal'] ?? 0);
-                $cart[$key]['alasan_harga'] = $pricing['alasan'] ?? $cart[$key]['alasan_harga'];
+                $cart[$key]['diskon_tier'] = (float) $pricing['diskon_nominal'];
+                $cart[$key]['alasan_harga'] = $pricing['alasan'];
                 $cart[$key]['tier_nama'] = $pricing['tier'] ?? $cart[$key]['tier_nama'];
             } else {
+                // [FIX] $produk null (produk dihapus) -> jangan panggil resolve() (TypeError);
+                // fallback ke harga pcs yang sudah dihitung di atas.
                 $cart[$key]['harga'] = $pcsPrice;
                 $cart[$key]['diskon_tier'] = 0.0;
             }
