@@ -84,8 +84,10 @@ class OrderService
                 // Campuran box + pcs: hitung subtotal dari komponen (box + pcs) bukan harga per base
                 $sisaPcs = (int) ($item['sisa_pcs'] ?? 0);
                 if ($sisaPcs > 0 && ($item['satuan'] ?? 'pcs') !== 'pcs') {
-                    $faktor = (float) ($satuanInfo['faktor_konversi'] ?? 1.0);
-                    if ($faktor <= 0) { $faktor = 1.0; }
+                    $faktor = (float) $satuanInfo['faktor_konversi'];
+                    if ($faktor <= 0) {
+                        $faktor = 1.0;
+                    }
                     $faktorInt = (int) round($faktor);
                     $boxCount = (int) floor($qty / $faktorInt);
                     $boxPrice = 0.0;
@@ -95,11 +97,13 @@ class OrderService
                             break;
                         }
                     }
-                    if ($boxPrice <= 0) { $boxPrice = $harga * $faktor; }
+                    if ($boxPrice <= 0) {
+                        $boxPrice = $harga * $faktor;
+                    }
                     $pcsPrice = (float) $produk->harga_jual_retail;
                     $total = ($boxCount * $boxPrice) + ($sisaPcs * $pcsPrice);
                     $lineSubtotal = round($total, 2);
-                    $harga = $qty > 0 ? round($total / $qty, 2) : $harga;
+                    $harga = round($total / $qty, 2);
                 } else {
                     $lineSubtotal = round($harga * $qty, 2);
                 }
