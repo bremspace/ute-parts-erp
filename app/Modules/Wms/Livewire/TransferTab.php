@@ -235,12 +235,37 @@ class TransferTab extends Component
             return;
         }
 
-        if ($idx !== null && isset($this->transferItems[$idx]) && $produkId) {
+        if ($idx !== null && $produkId) {
             $produk = Produk::find($produkId);
-            if ($produk) {
+            if (! $produk) {
+                return;
+            }
+
+            // Jika baris target sudah terisi produk, buat baris baru (jangan timpa)
+            if (isset($this->transferItems[$idx]) && ! empty($this->transferItems[$idx]['produk_id']) && (int) $this->transferItems[$idx]['produk_id'] !== (int) $produkId) {
+                $this->transferItems[] = [
+                    'produk_id' => $produkId,
+                    'produk_nama' => $produk->nama,
+                    'sku_variant_id' => $produk->skuVariants()->first()?->id,
+                    'rak_id' => null,
+                    'jumlah' => 1,
+                ];
+                $newIdx = count($this->transferItems) - 1;
+                $this->transferProdukDipilih($newIdx);
+            } elseif (isset($this->transferItems[$idx])) {
                 $this->transferItems[$idx]['produk_id'] = $produkId;
                 $this->transferItems[$idx]['produk_nama'] = $produk->nama;
                 $this->transferProdukDipilih($idx);
+            } else {
+                // targetIndex tidak valid -> tambah baris baru
+                $this->transferItems[] = [
+                    'produk_id' => $produkId,
+                    'produk_nama' => $produk->nama,
+                    'sku_variant_id' => $produk->skuVariants()->first()?->id,
+                    'rak_id' => null,
+                    'jumlah' => 1,
+                ];
+                $this->transferProdukDipilih(count($this->transferItems) - 1);
             }
         }
     }
@@ -363,6 +388,14 @@ class TransferTab extends Component
     public function saveTransfer()
     {
         if (! $this->boleh('wms.transfer', 'Anda tidak memiliki izin menyimpan transfer stok.')) {
+            return;
+        }
+
+        // Bersihkan baris kosong agar tidak memblokir penyimpanan
+        $this->transferItems = array_values(array_filter($this->transferItems, fn ($r) => ! empty($r['produk_id'])));
+
+        if (empty($this->transferItems)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tambahkan minimal 1 produk untuk transfer.']);
             return;
         }
 

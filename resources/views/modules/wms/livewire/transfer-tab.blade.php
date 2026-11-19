@@ -219,7 +219,7 @@
                         @php
                             $trfInfo = $transferStokRows[$index] ?? null;
                         @endphp
-                        <div class="p-3 sm:p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition">
+                        <div class="p-3 sm:p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition" wire:key="trf-item-{{ $index }}">
                             <!-- Desktop & Mobile Unified Row -->
                             <div class="flex flex-col sm:flex-row gap-2.5 sm:gap-3 sm:items-center">
                                 <!-- Pilih Produk Input -->
