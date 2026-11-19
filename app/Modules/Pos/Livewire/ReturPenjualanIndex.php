@@ -10,8 +10,8 @@ use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
-use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\StokItem;
 use Carbon\Carbon;
 use Livewire\Component;
@@ -166,11 +166,13 @@ class ReturPenjualanIndex extends Component
         }
         if ($qty < 2) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Minimal 2 unit untuk dipecah.']);
+
             return;
         }
         $qty = min($qty, (int) ($itemInfo['sisa_bisa_diretur'] ?? $qty));
         if ($qty < 2) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Minimal 2 unit untuk dipecah.']);
+
             return;
         }
 
@@ -501,7 +503,7 @@ class ReturPenjualanIndex extends Component
             if ($value === 'bagus') {
                 // Auto-detect gudang & rak asal untuk barang normal (reset saat toggle)
                 $asalGudangId = $this->asalGudangId
-                    ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang?->id));
+                    ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang->first()?->id));
                 if ($asalGudangId) {
                     $this->itemInputs[$itemId]['gudang_retur_id'] = $asalGudangId;
                     $this->itemInputs[$itemId]['rak_retur_id'] = $this->detectAsalRak(
@@ -621,7 +623,7 @@ class ReturPenjualanIndex extends Component
     /**
      * Buka / tutup panel picker produk pengganti untuk item tertentu.
      */
-    public function updatedTukarSearch($value): void
+    public function updatedTukarSearch(string $value): void
     {
         if ($this->activeTukarItemId) {
             $this->itemInputs[$this->activeTukarItemId]['tukar_search'] = $value;
@@ -670,7 +672,7 @@ class ReturPenjualanIndex extends Component
                 ?? Gudang::value('id');
         }
 
-        $term = trim($this->tukarSearch ?? '');
+        $term = trim($this->tukarSearch);
 
         // 1. Ambil produk yang sama persis secara definitif
         $pSama = Produk::with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId)), 'supplier', 'kualitas'])
@@ -1123,7 +1125,7 @@ class ReturPenjualanIndex extends Component
 
                 $kondisiItem = $input['kondisi_barang'] ?? 'rusak';
                 if ($kondisiItem === 'rusak' && empty($input['gudang_retur_id'])) {
-                    $this->addError("itemInputs.{$itemId}.gudang_retur_id", "Barang cacat wajib masuk gudang & rak karantina.");
+                    $this->addError("itemInputs.{$itemId}.gudang_retur_id", 'Barang cacat wajib masuk gudang & rak karantina.');
                     $hasGudangError = true;
                 }
 
@@ -1190,8 +1192,6 @@ class ReturPenjualanIndex extends Component
             return;
         }
 
-
-
         if ($totalReturQty <= 0 || empty($items)) {
             $this->addError('items', 'Belum ada barang yang dipilih untuk diretur. Masukkan kuantiti retur minimal 1 pada salah satu barang.');
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Belum memilih barang untuk diretur (kuantiti masih 0 semua). Masukkan kuantiti retur > 0.']);
@@ -1223,8 +1223,8 @@ class ReturPenjualanIndex extends Component
                 $this->catatanQc,
                 $this->metodeBayarSelisih,
                 (float) $this->jumlahBayarSelisih,
-                  (float) $ringkasan['kembalian'],
-                  $this->gudangReturId
+                (float) $ringkasan['kembalian'],
+                $this->gudangReturId
             );
 
             $pesan = $retur->status === 'selesai'

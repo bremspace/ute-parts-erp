@@ -663,7 +663,7 @@ class PosController extends Controller
             'printers' => $printers,
             'os' => PHP_OS,
             'count' => count($printers),
-        ], count($printers) > 0 ? 'Printer terdeteksi: ' . count($printers) : 'Tidak ada printer terdeteksi');
+        ], count($printers) > 0 ? 'Printer terdeteksi: '.count($printers) : 'Tidak ada printer terdeteksi');
     }
 
     public function printRaw(Request $request): JsonResponse
@@ -698,6 +698,7 @@ class PosController extends Controller
             if (stripos($errMsg, 'not found') !== false || stripos($errMsg, 'command not found') !== false) {
                 return $this->error('Perintah CUPS (lp) tidak ditemukan. Pastikan CUPS terinstall dan berjalan.', 500);
             }
+
             return $this->error('CUPS print gagal: '.$errMsg, 500);
         }
 

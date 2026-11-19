@@ -169,6 +169,9 @@ class Produk extends Model
         'kena_pajak' => 'boolean',
     ];
 
+    /**
+     * @return HasMany<SkuVariant, $this>
+     */
     public function skuVariants(): HasMany
     {
         return $this->hasMany(SkuVariant::class)->orderBy('is_active', 'desc');

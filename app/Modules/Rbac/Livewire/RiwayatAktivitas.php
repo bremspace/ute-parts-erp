@@ -254,7 +254,7 @@ class RiwayatAktivitas extends Component
             'kpi_hasil' => $model->karyawan?->nama.' · '.$model->periode,
             'shift_jadwal' => $model->karyawan?->nama.' · '.$model->tanggal.' ('.$model->shift?->nama.')',
             'komisi_teknisi' => $model->jenis.' · '.$model->jabatan_target,
-            'stok' => ($model->produk?->nama ?? 'Produk').' · '.($model->gudang?->nama ?? 'Gudang'),
+            'stok' => (($model instanceof StokItem ? $model->produk?->nama : null) ?? 'Produk').' · '.(($model instanceof StokItem ? $model->gudang?->nama : null) ?? 'Gudang'),
             default => '#'.$model->getKey(),
         };
     }

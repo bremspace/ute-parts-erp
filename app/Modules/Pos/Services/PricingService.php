@@ -27,4 +27,44 @@ class PricingService
     {
         return app(PelangganService::class)->resolveHarga($produk, $pelanggan, $variant, $overrideModeReward);
     }
+
+    /**
+     * [SECURITY] Resolusi harga server-side per satuan terpilih (pcs/box/dll).
+     * Harga SELALU diturunkan dari data produk (daftar satuan + pricing tier),
+     * TIDAK PERNAH dari input client — mencegah manipulasi harga checkout.
+     * Satu sumber kebenaran dipakai CartService (tampilan) & OrderService (tagihan),
+     * sehingga nominal cart dan checkout tidak pernah berbeda.
+     *
+     * Harga dikembalikan per satuan DASAR (base unit); untuk satuan konversi (mis. box)
+     * harga = harga_jual satuan / faktor_konversi. Satuan tak dikenal -> harga dasar.
+     *
+     * @return array{harga: float, faktor_konversi: float, satuan: string, pricing: array}
+     */
+    public function resolveHargaSatuan(Produk $produk, ?Pelanggan $pelanggan = null, ?SkuVariant $variant = null, ?string $satuan = null): array
+    {
+        $pricing = $this->resolve($produk, $pelanggan, $variant);
+        $baseSatuan = $produk->satuan ?: 'pcs';
+        $cleanSatuan = $satuan !== null ? trim($satuan) : '';
+        $faktor = 1.0;
+        $hargaPerBase = (float) $pricing['harga'];
+
+        if ($cleanSatuan !== '' && strcasecmp($cleanSatuan, $baseSatuan) !== 0) {
+            foreach ($produk->getDaftarSatuan() as $s) {
+                if (strcasecmp($s['satuan_kode'], $cleanSatuan) === 0) {
+                    $faktor = (float) ($s['faktor_konversi'] ?? 1.0);
+                    if (! empty($s['harga_jual'])) {
+                        $hargaPerBase = (float) $s['harga_jual'] / max(0.0001, $faktor);
+                    }
+                    break;
+                }
+            }
+        }
+
+        return [
+            'harga' => $hargaPerBase,
+            'faktor_konversi' => $faktor,
+            'satuan' => $cleanSatuan !== '' ? $cleanSatuan : $baseSatuan,
+            'pricing' => $pricing,
+        ];
+    }
 }

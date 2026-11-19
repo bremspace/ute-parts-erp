@@ -71,11 +71,12 @@ class OrderService
                     throw new \Exception("Stok {$produk->nama} tidak mencukupi di cabang yang dipilih (tersedia: {$stokTersedia})");
                 }
 
-                $pricing = $this->pricingService->resolve($produk, $pelanggan, $variant);
-                // Hormati harga per satuan yang disimpan di keranjang (mis. per box)
-                $harga = isset($item['harga']) && (float) $item['harga'] > 0
-                    ? (float) $item['harga']
-                    : $pricing['harga'];
+                // [SECURITY] Harga dihitung server-side dari satuan terpilih (pcs/box).
+                // ABAIKAN $item['harga'] dari client — itu vektor manipulasi harga checkout.
+                // Nominal dijamin identik dengan cart karena memakai resolver yang sama.
+                $satuanInfo = $this->pricingService->resolveHargaSatuan($produk, $pelanggan, $variant, $item['satuan'] ?? null);
+                $pricing = $satuanInfo['pricing'];
+                $harga = (float) $satuanInfo['harga'];
                 $diskonPerUnit = (float) ($pricing['diskon_nominal'] ?? 0);
                 $potensiKomisiPerUnit = (float) ($pricing['potensi_komisi'] ?? 0);
                 $modeRewardMitra = $pricing['mode_reward'] ?? 'diskon_langsung';

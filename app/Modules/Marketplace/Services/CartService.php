@@ -110,7 +110,10 @@ class CartService
             ? SkuVariant::find($variantId)
             : null;
 
-        $pricing = $this->pricingService->resolve($produk, $customer, $variant);
+        // [SECURITY] Harga per satuan dihitung server-side via resolver yang sama
+        // dengan checkout (OrderService) — cart & tagihan dijamin identik.
+        $satuanInfo = $this->pricingService->resolveHargaSatuan($produk, $customer, $variant, $cleanSatuan);
+        $pricing = $satuanInfo['pricing'];
         $hargaRetail = $variant && $variant->harga_jual_retail !== null
             ? (float) $variant->harga_jual_retail
             : (float) $produk->harga_jual_retail;
@@ -118,24 +121,13 @@ class CartService
 
         // Harga & qty per satuan yang dipilih (untuk tampilan & subtotal per satuan)
         $baseSatuan = $produk->satuan ?: 'pcs';
-        $faktorKonversi = 1.0;
-        $hargaSatuanPilih = (float) $pricing['harga']; // per base unit
-        if ($cleanSatuan && strcasecmp($cleanSatuan, $baseSatuan) !== 0) {
-            foreach ($produk->getDaftarSatuan() as $s) {
-                if (strcasecmp($s['satuan_kode'], $cleanSatuan) === 0) {
-                    $faktorKonversi = (float) ($s['faktor_konversi'] ?? 1.0);
-                    if (! empty($s['harga_jual'])) {
-                        $hargaSatuanPilih = (float) $s['harga_jual'] / max(0.0001, $faktorKonversi); // per base unit
-                    } else {
-                        $hargaSatuanPilih = (float) $pricing['harga']; // tetap base
-                    }
-                    break;
-                }
-            }
-        }
+        $faktorKonversi = (float) $satuanInfo['faktor_konversi'];
+        $hargaSatuanPilih = (float) $satuanInfo['harga']; // per base unit
         // qty_satuan = jumlah satuan yang dibeli (bukan base unit)
         $qtySatuan = (int) round($newQty / max(0.0001, $faktorKonversi));
-        if ($qtySatuan < 1) { $qtySatuan = 1; }
+        if ($qtySatuan < 1) {
+            $qtySatuan = 1;
+        }
 
         $cart[$key] = [
             'key' => $key,

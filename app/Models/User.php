@@ -5,11 +5,13 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Models\CabangUserPivot;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
@@ -79,9 +81,13 @@ class User extends Authenticatable
         ];
     }
 
-    public function cabangs()
+    /**
+     * @return BelongsToMany<Cabang, $this, CabangUserPivot>
+     */
+    public function cabangs(): BelongsToMany
     {
         return $this->belongsToMany(Cabang::class, 'user_cabang')
+            ->using(CabangUserPivot::class)
             ->withPivot('is_default')
             ->withTimestamps();
     }

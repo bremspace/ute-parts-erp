@@ -38,6 +38,9 @@ class ReturnPenjualanItem extends Model
         return $this->belongsTo(ReturnPenjualan::class);
     }
 
+    /**
+     * @return BelongsTo<Produk, $this>
+     */
     public function produk(): BelongsTo
     {
         return $this->belongsTo(Produk::class);

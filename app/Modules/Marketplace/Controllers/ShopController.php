@@ -187,6 +187,7 @@ class ShopController extends Controller
             'items.*.produk_id' => 'required|exists:produk,id',
             'items.*.sku_variant_id' => 'nullable|exists:sku_variants,id',
             'items.*.jumlah' => 'required|integer|min:1',
+            'items.*.satuan' => 'nullable|string|max:50',
             'cabang_id' => 'required|exists:cabang,id',
             'metode_ambil' => 'required|in:ambil_ke_toko,pengiriman',
             'catatan' => 'nullable|string',

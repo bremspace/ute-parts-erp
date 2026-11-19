@@ -845,7 +845,7 @@ class SettingsRbac extends Component
         $this->printerDetecting = false;
 
         if (count($this->detectedPrinters) > 0) {
-            $this->dispatch('alert', ['type' => 'success', 'message' => count($this->detectedPrinters) . ' printer terdeteksi.']);
+            $this->dispatch('alert', ['type' => 'success', 'message' => count($this->detectedPrinters).' printer terdeteksi.']);
         } else {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tidak ada printer terdeteksi. Pastikan printer terinstall dan aktif.']);
         }

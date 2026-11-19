@@ -481,7 +481,7 @@ class ProdukService
                 $curBarcode = $cleanBarcode !== null ? $cleanBarcode : ($produk->barcode ?? null);
                 $curAlt = $barcodeAlt !== null ? $cleanBarcodeAlt : ($produk->barcode_alt ?? []);
                 $allToSync = array_merge($curBarcode ? [$curBarcode] : [], is_array($curAlt) ? array_values($curAlt) : []);
-                $targetSku = $variant?->sku ?? $cleanSku;
+                $targetSku = $variant->sku;
                 $produk->syncBarcodes($allToSync, $targetSku);
             }
 

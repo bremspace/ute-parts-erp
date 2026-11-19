@@ -147,6 +147,7 @@ class CartCheckout extends Component
                 'produk_id' => $item['product_id'],
                 'sku_variant_id' => $item['variant_id'],
                 'jumlah' => $item['qty'],
+                'satuan' => $item['satuan'] ?? null,
                 'catatan' => $item['catatan'] ?? null,
             ];
         }

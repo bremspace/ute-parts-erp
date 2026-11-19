@@ -220,7 +220,10 @@ class SmartSearchService
 
         // Untuk pencarian frase panjang (>=4 kata), batasi hasil ke produk yang memuat
         // frasa lengkap (dengan toleransi spasi ganda) agar tidak terlalu banyak hasil.
-        $wordCount = count($tokenGroups);
+        // [FIX] Hitung kata berdasarkan spasi, bukan tokenGroups (yang juga memecah tanda
+        // hubung). Barcode spt 'QR-VIVO-SUPP-99' = 1 kata; restriksi frasa-nama tidak boleh
+        // menyingkirkan hasil pencarian barcode.
+        $wordCount = count(explode(' ', $term));
         if ($wordCount >= 4) {
             $query->whereRaw("LOWER(REPLACE(produk.nama, '  ', ' ')) LIKE LOWER(?)", ['%'.$term.'%']);
         }

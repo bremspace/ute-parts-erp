@@ -79,7 +79,14 @@ class ReturnPenjualanService
      *     jumlah: int|float,
      *     sn?: array<int, string>,
      *     kondisi_barang?: string,
-     *     supplier_id?: int|null
+     *     supplier_id?: int|null,
+     *     gudang_retur_id?: int|null,
+     *     rak_retur_id?: int|null,
+     *     alasan?: string,
+     *     tipe_penyelesaian?: string,
+     *     metode_pengembalian?: string,
+     *     foto_bukti?: array<int, string>,
+     *     tukar_items?: array<int, array{produk_id: int, sku_variant_id?: int|null, jumlah: int|float, harga_satuan?: float}>
      * }>  $items
      * @param  array<int, array{
      *     produk_id: int,
@@ -223,8 +230,8 @@ class ReturnPenjualanService
                     ? ($itemData['metode_pengembalian'] ?? $metodePengembalian)
                     : $metodePengembalian;
                 $itemAlasan = ! empty($itemData['alasan']) ? (string) $itemData['alasan'] : $alasan;
-                $itemFoto = ! empty($itemData['foto_bukti']) && is_array($itemData['foto_bukti']) ? $itemData['foto_bukti'] : [];
-                $itemTukar = ! empty($itemData['tukar_items']) && is_array($itemData['tukar_items']) ? $itemData['tukar_items'] : [];
+                $itemFoto = is_array($itemData['foto_bukti'] ?? null) ? $itemData['foto_bukti'] : [];
+                $itemTukar = is_array($itemData['tukar_items'] ?? null) ? $itemData['tukar_items'] : [];
 
                 if ($itemTipe === 'tukar_produk' && ! empty($itemTukar)) {
                     foreach ($itemTukar as $it) {
@@ -352,8 +359,8 @@ class ReturnPenjualanService
                     'metode_pengembalian' => $prep['metode_pengembalian'],
                     'tukar_items_payload' => ! empty($prep['tukar_items']) ? $prep['tukar_items'] : null,
                     'foto_bukti' => ! empty($prep['foto_bukti']) ? $prep['foto_bukti'] : null,
-                      'gudang_id' => $prep['gudang_retur_id'] ?? $gudangId,
-                      'rak_id' => $prep['rak_retur_id'] ?? null,
+                    'gudang_id' => $prep['gudang_retur_id'] ?? $gudangId,
+                    'rak_id' => $prep['rak_retur_id'] ?? null,
                 ]);
 
                 // Update status nomor seri
@@ -434,7 +441,7 @@ class ReturnPenjualanService
                 ]);
             }
 
-            $harga = isset($tItem['harga_satuan']) ? (float) $tItem['harga_satuan'] : (float) ($stok?->produk?->harga_jual_retail ?? $stok?->produk?->harga_jual ?? 0);
+            $harga = isset($tItem['harga_satuan']) ? (float) $tItem['harga_satuan'] : (float) ($stok?->produk?->harga_jual_retail ?? 0);
             $subtotal = round($harga * $qty, 2);
 
             $preparedTukar[] = [

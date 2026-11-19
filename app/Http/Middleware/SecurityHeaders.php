@@ -80,7 +80,12 @@ class SecurityHeaders
 
         $directives = [
             "default-src 'self'",
-            "script-src 'self' 'nonce-{$nonce}' 'unsafe-eval' 'unsafe-inline'",
+            // [SECURITY] Inline <script> wajib nonce; 'unsafe-inline' dibuang (redundan bila
+            // nonce ada, dan melonggarkan XSS). 'unsafe-eval' masih diperlukan Alpine.js.
+            "script-src 'self' 'nonce-{$nonce}' 'unsafe-eval'",
+            // Catatan: script-src-attr 'unsafe-inline' sementara dipertahankan karena masih
+            // ada ~59 inline event handler (onclick=window.print() dll) di halaman print/error/2FA.
+            // Untuk menghapusnya, migrasikan handler tsb ke addEventListener + nonce.
             "script-src-attr 'unsafe-inline'",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com https://fonts.bunny.net",

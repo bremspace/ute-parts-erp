@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * @property-read CabangUserPivot $pivot Pivot saat Cabang dimuat sebagai related model belongsToMany (User::cabangs).
+ */
 #[Fillable(['nama', 'alamat', 'telepon', 'kode', 'is_active'])]
 class Cabang extends Model
 {
@@ -29,6 +32,9 @@ class Cabang extends Model
         'is_active' => 'boolean',
     ];
 
+    /**
+     * @return HasMany<Gudang, $this>
+     */
     public function gudang(): HasMany
     {
         return $this->hasMany(Gudang::class);

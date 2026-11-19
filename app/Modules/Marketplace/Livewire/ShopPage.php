@@ -663,7 +663,9 @@ class ShopPage extends Component
             }
         }
         $itemQty = (int) ceil($rawQty * $faktor);
-        if ($itemQty < 1) { $itemQty = 1; }
+        if ($itemQty < 1) {
+            $itemQty = 1;
+        }
         $catatan = (! $produkId || ($this->productDetail && $produkId === $this->productDetail->id)) && $this->selectedGadgetModel
             ? "Model: {$this->selectedGadgetModel}"
             : null;
@@ -716,7 +718,9 @@ class ShopPage extends Component
             }
         }
         $itemQtyBl = (int) ceil($rawQtyBl * $faktorBl);
-        if ($itemQtyBl < 1) { $itemQtyBl = 1; }
+        if ($itemQtyBl < 1) {
+            $itemQtyBl = 1;
+        }
 
         try {
             app(CartService::class)->isi(

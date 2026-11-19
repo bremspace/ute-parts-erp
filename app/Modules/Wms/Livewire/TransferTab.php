@@ -396,6 +396,7 @@ class TransferTab extends Component
 
         if (empty($this->transferItems)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tambahkan minimal 1 produk untuk transfer.']);
+
             return;
         }
 

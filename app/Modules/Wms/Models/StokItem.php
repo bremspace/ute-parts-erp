@@ -25,6 +25,9 @@ class StokItem extends Model
         'jumlah_minimum' => 'integer',
     ];
 
+    /**
+     * @return BelongsTo<Produk, $this>
+     */
     public function produk(): BelongsTo
     {
         return $this->belongsTo(Produk::class);
@@ -35,6 +38,9 @@ class StokItem extends Model
         return $this->belongsTo(SkuVariant::class);
     }
 
+    /**
+     * @return BelongsTo<Gudang, $this>
+     */
     public function gudang(): BelongsTo
     {
         return $this->belongsTo(Gudang::class);

@@ -92,6 +92,9 @@ class ReturnPenjualan extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @return HasMany<ReturnPenjualanItem, $this>
+     */
     public function items(): HasMany
     {
         return $this->hasMany(ReturnPenjualanItem::class, 'return_penjualan_id');
