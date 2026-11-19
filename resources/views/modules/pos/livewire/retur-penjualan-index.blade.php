@@ -590,10 +590,10 @@
                                                 </div>
 
                                                 {{-- Gudang & Rak tujuan produk yang dikembalikan --}}
-                                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" x-data="{ gudangId: '{{ $itemInputs[$itemId]['gudang_retur_id'] ?? '' }}' }">
                                                     <div>
                                                         <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Gudang Tujuan (Wajib)</label>
-                                                        <select wire:model="itemInputs.{{ $itemId }}.gudang_retur_id" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
+                                                        <select wire:model="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value; $wire.set('itemInputs.{{ $itemId }}.rak_retur_id', null)" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
                                                             <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
                                                             @foreach($gudangs as $g)
                                                                 <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
@@ -604,13 +604,8 @@
                                                         <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Rak Tujuan (Opsional)</label>
                                                         <select wire:model="itemInputs.{{ $itemId }}.rak_retur_id" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
                                                             <option value="" class="bg-ink-900 text-white">-- Tanpa Rak --</option>
-                                                            @php
-                                                                $selectedGudangId = $itemInputs[$itemId]['gudang_retur_id'] ?? null;
-                                                            @endphp
                                                             @foreach($raks as $rk)
-                                                                @if(empty($selectedGudangId) || (int)$rk->gudang_id === (int)$selectedGudangId)
-                                                                    <option value="{{ $rk->id }}" class="bg-ink-900 text-white">{{ $rk->nama }} ({{ $rk->kode }})</option>
-                                                                @endif
+                                                                <option value="{{ $rk->id }}" data-gudang="{{ $rk->gudang_id }}" x-show="gudangId === '' || gudangId == '{{ $rk->gudang_id }}'" class="bg-ink-900 text-white">{{ $rk->nama }} ({{ $rk->kode }})</option>
                                                             @endforeach
                                                         </select>
                                                     </div>
