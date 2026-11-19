@@ -174,11 +174,15 @@
                                             <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
                                                 <span class="text-ink-400 font-semibold">
                                                     @if(($item['satuan'] ?? 'pcs') !== 'pcs')
-                                                        {{ (int) ($item['qty_satuan'] ?? $item['qty'] ?? 1) }} {{ $item['satuan'] }} ({{ $item['qty'] }} pcs) × Rp {{ number_format((float) ($item['harga_satuan'] ?? $item['harga'] ?? 0), 0, ',', '.') }}
+                                                        @if(!empty($item['breakdown']))
+                                                            {{ $item['breakdown'] }}
+                                                        @else
+                                                            {{ (int) ($item['qty_satuan'] ?? 1) }} {{ $item['satuan'] }}
+                                                        @endif
+                                                        ({{ $item['qty'] }} pcs) × Rp {{ number_format((float) ($item['harga_satuan'] ?? $item['harga'] ?? 0), 0, ',', '.') }}
                                                         @php
-                                                            $baseSatuan = $item['satuan'] ?? 'pcs';
                                                             $boxSaving = 0;
-                                                            if ($baseSatuan !== 'pcs' && isset($item['harga_satuan']) && isset($item['harga'])) {
+                                                            if (isset($item['harga_satuan']) && isset($item['harga']) && (float)($item['faktor_konversi'] ?? 1) > 0) {
                                                                 $boxSaving = max(0, round(((float) $item['harga'] * (float) ($item['faktor_konversi'] ?? 1)) - (float) $item['harga_satuan'], 2));
                                                             }
                                                         @endphp
