@@ -206,12 +206,15 @@ class ReturnPenjualanService
 
                 $konversiTrx = (float) ($trxItem->konversi ?? 1);
                 if ($konversiTrx <= 0) { $konversiTrx = 1; }
-                $qtyBaseRetur = $qtyRetur * $konversiTrx;
 
-                $hargaSatuan = (float) ($trxItem->harga_final ?? $trxItem->harga_satuan ?? 0);
-                $subtotal = round($hargaSatuan * $qtyRetur, 2);
-                $hppSatuan = (float) ($trxItem->hpp ?? $trxItem->produk?->harga_beli ?? 0);
-                $subtotalHpp = round($hppSatuan * $qtyBaseRetur, 2);
+                // qtyRetur sekarang dalam base unit (pcs); harga_satuan per base unit
+                $hargaSatuanBase = (float) ($trxItem->harga_final ?? $trxItem->harga_satuan ?? 0) / $konversiTrx;
+                $hppSatuanBase = (float) ($trxItem->hpp ?? $trxItem->produk?->harga_beli ?? 0) / $konversiTrx;
+
+                $hargaSatuan = $hargaSatuanBase;
+                $subtotal = round($hargaSatuanBase * $qtyRetur, 2);
+                $hppSatuan = $hppSatuanBase;
+                $subtotalHpp = round($hppSatuanBase * $qtyRetur, 2);
 
                 // Resolusi Supplier asal barang (dari input, atau PO terakhir, atau supplier aktif)
                 $supplierId = $itemData['supplier_id'] ?? null;
@@ -365,8 +368,8 @@ class ReturnPenjualanService
                     'foto_bukti' => ! empty($prep['foto_bukti']) ? $prep['foto_bukti'] : null,
                     'gudang_id' => $prep['gudang_retur_id'] ?? $gudangId,
                     'rak_id' => $prep['rak_retur_id'] ?? null,
-                    'satuan' => $prep['trx_item']->satuan ?? 'pcs',
-                    'konversi' => $prep['trx_item']->konversi ?? 1,
+                    'satuan' => 'pcs',
+                    'konversi' => 1,
                 ]);
 
                 // Update status nomor seri
