@@ -32,6 +32,7 @@ class TiketServisEstimasiItem extends Model
         return $this->belongsTo(JenisServis::class);
     }
 
+    /** @return BelongsTo<Produk, $this> */
     public function produk(): BelongsTo
     {
         return $this->belongsTo(Produk::class);

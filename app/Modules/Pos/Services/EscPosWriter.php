@@ -505,7 +505,7 @@ class EscPosWriter
     }
 
     /** Angka mentah tanpa "Rp" — kolom kanan baris item (senilai contoh pengaturan). */
-    private function numberOnly($v): string
+    private function numberOnly(string|int|float $v): string
     {
         return number_format((float) $v, 0, ',', '.');
     }
@@ -537,21 +537,5 @@ class EscPosWriter
     private function ascii(string $text): string
     {
         return preg_replace('/[^\x20-\x7E]/', '', strtr($text, self::TRANSLIT));
-    }
-
-    /** Check if printer supports ESC B (strikethrough). Most modern thermal printers do. */
-    private function supportsStrikethrough(): bool
-    {
-        return true;
-    }
-
-    /** Print line with strikethrough via ESC B (ESC B 1 = on, ESC B 0 = off). */
-    private function textStrikethrough(string $text): self
-    {
-        $this->buf .= "\x1b\x42\x01"; // ESC B 1 = strikethrough on
-        $this->buf .= $this->ascii($text)."\n";
-        $this->buf .= "\x1b\x42\x00"; // ESC B 0 = strikethrough off
-
-        return $this;
     }
 }

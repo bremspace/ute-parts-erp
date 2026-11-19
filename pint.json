@@ -1,0 +1,10 @@
+{
+    "preset": "laravel",
+    "exclude": [
+        "dist",
+        "tools",
+        "storage",
+        "bootstrap/cache",
+        "public/build"
+    ]
+}

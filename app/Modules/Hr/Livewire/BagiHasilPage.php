@@ -182,7 +182,6 @@ class BagiHasilPage extends Component
     {
         $this->periodeList = BagiHasilPeriode::withoutCabangScope()
             ->orderByDesc('periode')
-            ->get()
             ->pluck('periode', 'id')
             ->toArray();
     }
@@ -314,7 +313,7 @@ class BagiHasilPage extends Component
             ->when($this->filterStatus !== 'semua', fn ($q) => $q->where('status', $this->filterStatus))
             ->orderByDesc('id');
 
-        $transaksis = $transaksiQuery->get()->map(fn ($t) => [
+        $transaksis = $transaksiQuery->get()->map(fn (BagiHasil $t) => [
             'id' => $t->id,
             'no_bagi_hasil' => $t->no_bagi_hasil,
             'no_tiket' => $t->tiketServis?->no_tiket ?? '-',

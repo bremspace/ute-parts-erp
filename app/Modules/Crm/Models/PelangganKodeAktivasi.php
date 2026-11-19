@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Models;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -36,7 +37,7 @@ class PelangganKodeAktivasi extends Model
         return $this->belongsTo(User::class, 'dibuat_oleh');
     }
 
-    public function scopeAktif($query)
+    public function scopeAktif(Builder $query): Builder
     {
         return $query->whereNull('dipakai_at')->where('kedaluwarsa_at', '>', now());
     }

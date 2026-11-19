@@ -1020,9 +1020,9 @@ class RiwayatTransaksiIndex extends Component
                 'telepon' => $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? null,
                 'items' => array_map(fn ($it) => [
                     'nama' => $it['nama'],
-                    'qty' => (int) ($it['qty'] ?? 1),
-                    'harga' => (float) ($it['harga'] ?? 0),
-                    'subtotal' => (float) ($it['subtotal'] ?? 0),
+                    'qty' => (int) $it['qty'],
+                    'harga' => (float) $it['harga'],
+                    'subtotal' => (float) $it['subtotal'],
                 ], $rincian['items']),
                 'subtotal' => (float) $rincian['total'],
                 'diskon' => 0.0,

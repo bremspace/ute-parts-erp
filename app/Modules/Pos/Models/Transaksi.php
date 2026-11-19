@@ -19,6 +19,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * @property string $no_transaksi
+ */
 #[Fillable([
     'no_transaksi', 'cabang_id', 'kasir_id', 'pelanggan_id', 'tiket_servis_id', 'gudang_id',
     'sumber', 'subtotal', 'diskon_persen', 'diskon_nominal', 'diskon_poin', 'poin_ditukar', 'diskon_partai',
@@ -81,11 +84,17 @@ class Transaksi extends Model
         return $this->belongsTo(Cabang::class);
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function kasir(): BelongsTo
     {
         return $this->belongsTo(User::class, 'kasir_id');
     }
 
+    /**
+     * @return BelongsTo<Pelanggan, $this>
+     */
     public function pelanggan(): BelongsTo
     {
         return $this->belongsTo(Pelanggan::class);
@@ -96,6 +105,9 @@ class Transaksi extends Model
         return $this->belongsTo(Gudang::class);
     }
 
+    /**
+     * @return HasMany<TransaksiItem, $this>
+     */
     public function items(): HasMany
     {
         return $this->hasMany(TransaksiItem::class);
@@ -116,6 +128,9 @@ class Transaksi extends Model
         return $this->hasOne(ChannelOrder::class, 'transaksi_id');
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function voidBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'void_by_id');

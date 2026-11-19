@@ -110,7 +110,7 @@ class WmsDashboardSplitTest extends TestCase
 
         Livewire::test(TransferTab::class)
             ->assertSee('No. Transfer')
-            ->assertSee('Belum ada riwayat transfer antar gudang');
+            ->assertSee('Belum Ada Riwayat Transfer');
     }
 
     public function test_tab_opname_merender(): void
@@ -119,7 +119,7 @@ class WmsDashboardSplitTest extends TestCase
 
         Livewire::test(OpnameTab::class)
             ->assertSee('No. Opname')
-            ->assertSee('Belum ada riwayat stock opname');
+            ->assertSee('Belum Ada Riwayat Stock Opname');
     }
 
     public function test_tab_po_merender(): void

@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * @property string|null $kode_lama
+ */
 #[Fillable([
     'produk_id', 'sku', 'barcode', 'nama_varian', 'satuan_kode', 'atribut', 'harga_beli',
     'harga_jual_retail', 'is_active',

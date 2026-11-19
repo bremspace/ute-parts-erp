@@ -82,46 +82,55 @@ class TiketServis extends Model
         'kunci_terenkripsi' => 'encrypted', // [T-19] terenkripsi at-rest
     ];
 
+    /** @return BelongsTo<Cabang, $this> */
     public function cabang(): BelongsTo
     {
         return $this->belongsTo(Cabang::class);
     }
 
+    /** @return BelongsTo<JenisServis, $this> */
     public function jenisServis(): BelongsTo
     {
         return $this->belongsTo(JenisServis::class);
     }
 
+    /** @return BelongsTo<Pelanggan, $this> */
     public function pelanggan(): BelongsTo
     {
         return $this->belongsTo(Pelanggan::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function teknisi(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teknisi_id');
     }
 
+    /** @return HasMany<ServisStatusLog, $this> */
     public function statusLogs(): HasMany
     {
         return $this->hasMany(ServisStatusLog::class)->latest();
     }
 
+    /** @return HasOne<Garansi, $this> */
     public function garansi(): HasOne
     {
         return $this->hasOne(Garansi::class);
     }
 
+    /** @return BelongsTo<TiketServis, $this> */
     public function tiketLama(): BelongsTo
     {
         return $this->belongsTo(TiketServis::class, 'tiket_servis_lama_id');
     }
 
+    /** @return HasMany<ServisSparepart, $this> */
     public function spareparts(): HasMany
     {
         return $this->hasMany(ServisSparepart::class);
     }
 
+    /** @return HasMany<TiketServisItem, $this> */
     public function items(): HasMany
     {
         return $this->hasMany(TiketServisItem::class); // [T-17] split part & jasa
@@ -150,11 +159,13 @@ class TiketServis extends Model
             || $this->spareparts()->exists();
     }
 
+    /** @return HasMany<TiketServisEstimasiItem, $this> */
     public function estimasiItems(): HasMany
     {
         return $this->hasMany(TiketServisEstimasiItem::class);
     }
 
+    /** @return HasMany<TiketServisProgress, $this> */
     public function progressList(): HasMany
     {
         return $this->hasMany(TiketServisProgress::class)->latest();
@@ -226,6 +237,7 @@ class TiketServis extends Model
         ];
     }
 
+    /** @return BelongsTo<Transaksi, $this> */
     public function transaksi(): BelongsTo
     {
         return $this->belongsTo(Transaksi::class, 'transaksi_id');
@@ -379,7 +391,7 @@ class TiketServis extends Model
         foreach ($penagihanPart as $p) {
             // Item yang berasal dari estimasi itu sendiri tidak mungkin
             // "di luar estimasi" — yang dibandingkan adalah catatan teknisi.
-            if (($p['sumber'] ?? '') === 'estimasi') {
+            if ($p['sumber'] === 'estimasi') {
                 continue;
             }
 
@@ -574,6 +586,7 @@ class TiketServis extends Model
         ];
     }
 
+    /** @return HasMany<WebReview, $this> */
     public function reviews(): HasMany
     {
         return $this->hasMany(WebReview::class, 'tiket_servis_id');

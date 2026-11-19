@@ -2,8 +2,8 @@
 
 namespace App\Modules\Rbac\Traits;
 
+use App\Modules\Rbac\Models\AktivitasLog;
 use App\Modules\Rbac\Services\AktivitasCabang;
-use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
@@ -50,10 +50,8 @@ trait CatatAktivitas
 
     /**
      * Hook Spatie — dipanggil tepat sebelum baris activity disimpan.
-     *
-     * @param  Model  $activity
      */
-    public function beforeActivityLogged($activity, string $event): void
+    public function beforeActivityLogged(AktivitasLog $activity, string $event): void
     {
         $cabangId = AktivitasCabang::untuk($this);
 

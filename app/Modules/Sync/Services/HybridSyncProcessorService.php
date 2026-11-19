@@ -353,21 +353,17 @@ class HybridSyncProcessorService
                     $skuVariantId = $item['sku_variant_id'] ?? null;
 
                     if ($produkId && $qty > 0) {
-                        if (method_exists($stokService, 'kurangiDariGudangTersedia')) {
-                            $stokService->kurangiDariGudangTersedia(
-                                $produkId,
-                                $skuVariantId,
-                                $qty,
-                                $cabangId,
-                                'penjualan',
-                                Transaksi::class,
-                                $transaksi?->id ?? 0,
-                                null,
-                                "Pesanan Online Lunas {$nomorOrder}"
-                            );
-                        } elseif (method_exists($stokService, 'deductStock')) {
-                            $stokService->deductStock($produkId, $cabangId, $qty, "Order Online {$nomorOrder}");
-                        }
+                        $stokService->kurangiDariGudangTersedia(
+                            $produkId,
+                            $skuVariantId,
+                            $qty,
+                            $cabangId,
+                            'penjualan',
+                            Transaksi::class,
+                            $transaksi?->id ?? 0,
+                            null,
+                            "Pesanan Online Lunas {$nomorOrder}"
+                        );
                     }
                 }
             } catch (\Throwable $e) {
@@ -393,7 +389,7 @@ class HybridSyncProcessorService
                     "Jurnal otomatis pesanan online {$nomorOrder}",
                     $cabangId,
                     null,
-                    false
+                    null
                 );
             } catch (\Throwable $e) {
                 Log::warning('[HybridSync] Warning catat jurnal online: '.$e->getMessage());

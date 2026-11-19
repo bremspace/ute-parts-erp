@@ -55,6 +55,9 @@ class StokLog extends Model
         'jumlah_setelah' => 'integer',
     ];
 
+    /**
+     * @return BelongsTo<Gudang, $this>
+     */
     public function gudang(): BelongsTo
     {
         return $this->belongsTo(Gudang::class);

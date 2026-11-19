@@ -3,6 +3,7 @@
 namespace App\Modules\Servis\Livewire;
 
 use App\Modules\Servis\Models\TiketServis;
+use Illuminate\View\View;
 use Livewire\Component;
 
 /**
@@ -13,7 +14,7 @@ class KomplainDashboard extends Component
 {
     public string $rentang = '30_hari';
 
-    public function render()
+    public function render(): View
     {
         $cabangId = session('cabang_id');
 
@@ -34,9 +35,9 @@ class KomplainDashboard extends Component
 
         // Komplain berulang: tiket servis asal yang mempunyai >1 komplain
         $berulangTeknisi = $semua
-            ->groupBy(fn ($t) => $t->tiketLama?->teknisi?->name ?? 'Tanpa teknisi')
+            ->groupBy(fn (TiketServis $t) => $t->tiketLama?->teknisi?->name ?? 'Tanpa teknisi')
             ->map(fn ($rows) => [
-                'nama' => $rows->first()->tiketLama?->teknisi?->name ?? 'Tanpa teknisi',
+                'nama' => $rows->first()?->tiketLama?->teknisi?->name ?? 'Tanpa teknisi',
                 'jumlah' => $rows->count(),
             ])
             ->filter(fn ($r) => $r['jumlah'] > 1)
@@ -44,7 +45,7 @@ class KomplainDashboard extends Component
             ->values();
 
         $perJenis = $semua->groupBy('jenis_hp')
-            ->map(fn ($rows) => ['nama' => $rows->first()->jenis_hp, 'jumlah' => $rows->count()])
+            ->map(fn ($rows) => ['nama' => $rows->first()?->jenis_hp, 'jumlah' => $rows->count()])
             ->sortByDesc('jumlah')
             ->values();
 
@@ -57,8 +58,8 @@ class KomplainDashboard extends Component
         return view('modules.servis.komplain-dashboard', [
             'total' => $semua->count(),
             'garansiBerlaku' => $semua->where('garansi_berlaku', true)->count(),
-            'gratisDisetujui' => $semua->filter(fn ($t) => $t->komplain_gratis_approved_at)->count(),
-            'goodwillDisetujui' => $semua->filter(fn ($t) => $t->goodwill_approved_at)->count(),
+            'gratisDisetujui' => $semua->filter(fn (TiketServis $t) => $t->komplain_gratis_approved_at !== null)->count(),
+            'goodwillDisetujui' => $semua->filter(fn (TiketServis $t) => $t->goodwill_approved_at !== null)->count(),
             'overdue' => $overdue->count(),
             'eskalasi' => $semua->filter(fn ($t) => $t->komplain_eskalasi_at !== null)->count(),
             'berulangTeknisi' => $berulangTeknisi,

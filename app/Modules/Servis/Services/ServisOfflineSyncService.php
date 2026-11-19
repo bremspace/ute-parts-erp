@@ -42,7 +42,7 @@ class ServisOfflineSyncService
 
         return $tickets->map(function (TiketServis $t) {
             $rincian = $t->getRincianBiayaLengkap();
-            $totalBiaya = (float) ($rincian['total'] ?? $t->estimasi_biaya ?? 0);
+            $totalBiaya = (float) $rincian['total'];
             $sisaTagihan = $t->status_pembayaran === 'lunas' ? 0.0 : $totalBiaya;
 
             return [
@@ -97,7 +97,7 @@ class ServisOfflineSyncService
         $user = User::find($userId) ?? User::first();
 
         foreach ($pickups as $item) {
-            $uuid = (string) ($item['pickup_uuid'] ?? '');
+            $uuid = (string) $item['pickup_uuid'];
             $noTiket = (string) ($item['no_tiket'] ?? '');
             $tiketId = isset($item['tiket_id']) ? (int) $item['tiket_id'] : null;
             $namaPengambil = (string) ($item['nama_pengambil'] ?? 'Pelanggan Langsung');

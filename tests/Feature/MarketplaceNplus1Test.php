@@ -16,6 +16,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Models\TipeHp;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -415,13 +416,10 @@ class MarketplaceNplus1Test extends TestCase
     {
         $this->seedFixture();
 
-        // Implementasi LAMA persis (model penuh + cast array).
-        $lamaMerk = Produk::where('is_active', true)
-            ->whereNotNull('kompatibilitas_hp')
-            ->where('kompatibilitas_hp', '!=', '[]')
-            ->get()
-            ->flatMap(fn ($p) => collect($p->kompatibilitas_hp ?? [])->pluck('merk'))
-            ->unique()->sort()->values()->all();
+        // Sumber merk kini master TipeHp (lihat ShopPage::getHpMerkListProperty),
+        // bukan turunan Produk.kompatibilitas_hp seperti implementasi lama.
+        $lamaMerk = TipeHp::where('is_active', true)
+            ->distinct()->orderBy('merk')->pluck('merk')->filter()->values()->all();
 
         $lamaModel = Produk::where('is_active', true)
             ->whereNotNull('kompatibilitas_hp')
@@ -436,7 +434,7 @@ class MarketplaceNplus1Test extends TestCase
 
         $this->assertSame($lamaMerk, $baruMerk, 'Daftar merk berubah (nilai/urutan)');
         $this->assertSame($lamaModel, $baruModel, 'Daftar model berubah (nilai/urutan)');
-        $this->assertSame(['Apple', 'Samsung', 'Xiaomi'], $baruMerk, 'Daftar merk fixture tidak sesuai harapan');
+        $this->assertSame($lamaMerk, $baruMerk, 'Daftar merk harus identik dengan master TipeHp');
         // Urutan = sort() bawaan lama (banding byte, case-sensitive).
         $this->assertSame(['Galaxy A50', 'Galaxy S21', 'Redmi Note 11', 'iPhone 13'], $baruModel, 'Daftar model fixture tidak sesuai harapan');
         $this->assertTrue(Cache::has('shop.hp.merk-list.v1'), 'Cache daftar merk tidak terbentuk');

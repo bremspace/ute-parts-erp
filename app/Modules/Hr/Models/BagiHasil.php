@@ -42,11 +42,17 @@ class BagiHasil extends Model
         'paid_at' => 'datetime',
     ];
 
+    /**
+     * @return BelongsTo<Karyawan, $this>
+     */
     public function karyawan(): BelongsTo
     {
         return $this->belongsTo(Karyawan::class);
     }
 
+    /**
+     * @return BelongsTo<TiketServis, $this>
+     */
     public function tiketServis(): BelongsTo
     {
         return $this->belongsTo(TiketServis::class);

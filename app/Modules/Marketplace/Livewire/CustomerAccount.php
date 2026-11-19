@@ -5,10 +5,12 @@ namespace App\Modules\Marketplace\Livewire;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\PelangganService;
+use App\Modules\Marketplace\Models\PelangganDeviceSession;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Services\SessionManagementService;
 use App\Modules\Servis\Models\TiketServis;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -18,6 +20,8 @@ use Livewire\WithFileUploads;
  * Dashboard pelanggan marketplace (ACCOUNT-01..05):
  * riwayat order, tracking servis, komisi reseller, status membership, poin loyalty,
  * serta manajemen profil konsumen (ganti username, profil picture, & password).
+ *
+ * @property-read Collection<int, PelangganDeviceSession> $perangkat
  */
 class CustomerAccount extends Component
 {
@@ -268,7 +272,10 @@ class CustomerAccount extends Component
 
     // ===== MANAJEMEN SESI PERANGKAT (ISO 27001 A.9.4.2) =====
 
-    public function getPerangkatProperty()
+    /**
+     * @return Collection<int, PelangganDeviceSession>
+     */
+    public function getPerangkatProperty(): Collection
     {
         $customer = auth('customer')->user();
         if (! $customer) {

@@ -17,6 +17,11 @@ use Illuminate\Notifications\Notifiable;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * @property string $nama
+ * @property string|null $telepon
+ * @property string|null $alamat
+ */
 #[Fillable(['nama', 'username', 'telepon', 'email', 'avatar', 'alamat', 'tanggal_lahir', 'tier_membership_id', 'is_reseller', 'kode_agen', 'referral_kode', 'tipe_konsumen', 'mode_reward_mitra', 'total_belanja_12bulan', 'poin_loyalty', 'saldo_piutang', 'max_piutang', 'password', 'status', 'catatan_approval', 'approved_at', 'approved_by'])]
 #[Hidden(['password', 'remember_token'])]
 class Pelanggan extends Model implements Authenticatable

@@ -58,11 +58,17 @@ class ReturnPenjualan extends Model
         return $this->belongsTo(Transaksi::class, 'tukar_transaksi_id');
     }
 
+    /**
+     * @return BelongsTo<Transaksi, $this>
+     */
     public function transaksi(): BelongsTo
     {
         return $this->belongsTo(Transaksi::class);
     }
 
+    /**
+     * @return BelongsTo<Pelanggan, $this>
+     */
     public function pelanggan(): BelongsTo
     {
         return $this->belongsTo(Pelanggan::class);
@@ -78,6 +84,9 @@ class ReturnPenjualan extends Model
         return $this->belongsTo(Gudang::class);
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

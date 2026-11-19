@@ -12,6 +12,7 @@ use App\Modules\Rbac\Providers\RbacServiceProvider;
 use App\Modules\Report\Providers\ReportServiceProvider;
 use App\Modules\Reseller\Providers\ResellerServiceProvider;
 use App\Modules\Servis\Providers\ServisServiceProvider;
+use App\Modules\Sync\Providers\SyncServiceProvider;
 use App\Modules\Webhook\Providers\WebhookServiceProvider;
 use App\Modules\Wms\Providers\WmsServiceProvider;
 use App\Modules\Workflow\Providers\WorkflowServiceProvider;
@@ -34,5 +35,5 @@ return [
     WebhookServiceProvider::class,
     WmsServiceProvider::class,
     WorkflowServiceProvider::class,
-    \App\Modules\Sync\Providers\SyncServiceProvider::class,
+    SyncServiceProvider::class,
 ];
