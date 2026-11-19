@@ -218,6 +218,13 @@ class SmartSearchService
                 ->all();
         }) : [];
 
+        // Untuk pencarian frase panjang (>=4 kata), batasi hasil ke produk yang memuat
+        // frasa lengkap (dengan toleransi spasi ganda) agar tidak terlalu banyak hasil.
+        $wordCount = count($tokenGroups);
+        if ($wordCount >= 4) {
+            $query->whereRaw("LOWER(REPLACE(produk.nama, '  ', ' ')) LIKE LOWER(?)", ['%'.$term.'%']);
+        }
+
         return $query->where(function ($sub) use ($term, $tokenGroups, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds, $matchingSupplierIds) {
             // 1. Exact match Barcode utama produk & multi barcode terindeks (barcode_1 .. barcode_N)
             $sub->where('produk.barcode', $term)
