@@ -334,6 +334,10 @@ class EscPos {
       this.text(this.pad('Subtotal:', this.money(subtotal ?? total)));
     }
 
+    if (diskon_box && Number(diskon_box) > 0) {
+      this.text(this.pad('Diskon Box/Kemasan:', '-' + this.money(diskon_box)));
+    }
+
     if (diskon_partai && Number(diskon_partai) > 0) {
       this.text(this.pad('Diskon Partai:', '-' + this.money(diskon_partai)));
     }
@@ -617,6 +621,11 @@ class EscPos {
         <span style="color: #4b5563;">${tier && tier !== 'Retail' ? 'Pot ' + esc(tier) + ':' : 'Pot Mitra:'}</span>
         <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_tier)}</span>
       </div>
+      ${diskon_box && Number(diskon_box) > 0 ? `
+      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
+        <span style="color: #4b5563;">Diskon Box/Kemasan:</span>
+        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_box)}</span>
+      </div>` : ''}
       <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
         <span style="color: #4b5563;">Subtotal:</span>
         <span style="white-space: nowrap; flex-shrink: 0;">${money(subtotal ?? total)}</span>

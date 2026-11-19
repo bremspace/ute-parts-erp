@@ -2714,7 +2714,13 @@ class PosKasir extends Component
                 }, array_values($this->cart));
 
                 $totalRetail = array_sum(array_column($itemsReceipt, 'subtotal_retail'));
-                $totalDiskonTier = max(0, $totalRetail - $this->subtotal);
+                // Potongan Tier (member) dihitung dari diskon item, bukan selisih retail-subtotal
+                // (selisih retail-subtotal juga mencakup diskon satuan box/kemasan).
+                $totalDiskonTier = (float) array_sum(array_map(
+                    fn ($it) => ((float) ($it['diskon'] ?? 0)) * ((int) ($it['qty'] ?? 1)),
+                    $itemsReceipt
+                ));
+                $diskonBoxStruk = max(0.0, $totalRetail - $this->subtotal - $totalDiskonTier);
 
                 $sisaPoin = $saldoPoin;
                 $diskonTierStruk = ($this->modeRewardMitra === 'komisi_akumulasi' ? 0.0 : $totalDiskonTier);
@@ -2745,6 +2751,7 @@ class PosKasir extends Component
                     'items' => $itemsReceipt,
                     'subtotal_retail' => $totalRetail,
                     'diskon_tier' => $diskonTierStruk,
+                    'diskon_box' => $diskonBoxStruk,
                     'subtotal' => $this->subtotal,
                     'diskon' => $diskonKasirLangsung,
                     'diskon_nominal' => $this->diskonNominal,
