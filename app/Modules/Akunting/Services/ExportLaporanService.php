@@ -13,6 +13,7 @@ use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\StokItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -26,6 +27,94 @@ use Maatwebsite\Excel\Facades\Excel;
  */
 class ExportLaporanService
 {
+    /**
+     * [A-1/F-02] Filter laporan: hanya baris jurnal yang entri-nya DISETUJUI
+     * (header status_approval='disetujui') atau baris legacy tanpa header.
+     * Jurnal pending/ditolak tidak boleh mengubah laporan keuangan
+     * (maker-checker). Cocok untuk Eloquent Builder maupun DB query builder
+     * karena berupa klausa WHERE EXISTS statis (tanpa binding).
+     *
+     * @template TBuilder of \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder
+     *
+     * @param  TBuilder  $query
+     * @return TBuilder
+     */
+    public static function hanyaDisetujui($query)
+    {
+        return $query->whereRaw(
+            "NOT EXISTS (SELECT 1 FROM jurnal_header h
+                WHERE h.no_jurnal = jurnal_akuntansi.no_jurnal
+                AND h.cabang_key = COALESCE(jurnal_akuntansi.cabang_id, 0)
+                AND h.status_approval != 'disetujui')"
+        );
+    }
+
+    /**
+     * [A-6] Versioned cache key laporan: semua key laporan per cabang
+     * (laba rugi, neraca, arus kas, trial balance, pajak — semua periode)
+     * diakhiri versi. Posting/approval cukup menaikkan versi untuk
+     * menginvalidasi SELURUH cache laporan cabang itu + konsolidasi,
+     * tanpa perlu enumerasi key per periode. Entri lama kedaluwarsa via TTL.
+     */
+    public static function keyVersiLaporan(?int $cabangId): string
+    {
+        return 'laporan-versi-'.($cabangId ?? 'konsolidasi');
+    }
+
+    public static function versiCacheLaporan(?int $cabangId): int
+    {
+        return max(1, (int) Cache::get(self::keyVersiLaporan($cabangId), 1));
+    }
+
+    public static function bumpVersiCacheLaporan(?int $cabangId): void
+    {
+        Cache::forever(self::keyVersiLaporan($cabangId), self::versiCacheLaporan($cabangId) + 1);
+    }
+
+    /** Bungkus key cache laporan lama dengan versi aktif cabang/konsolidasi. */
+    public static function keyCacheLaporan(string $baseKey, ?int $cabangId): string
+    {
+        return $baseKey.'-v'.self::versiCacheLaporan($cabangId);
+    }
+
+    /** @var array<string,true> dedupe invalidasi per no_jurnal (proses panjang di-cap 500) */
+    private static array $invalidasiTerjadwal = [];
+
+    /**
+     * [A-6] Dipanggil saat baris jurnal ter-post (model created) — invalidasi
+     * semua cache laporan cabang terkait + konsolidasi SETELAH commit,
+     * supaya pembaca tidak mengisi cache baru dengan data pra-commit.
+     */
+    public static function invalidasiCachePosting(?int $cabangId, string $noJurnal): void
+    {
+        // Cache di-flush (mis. setUp uji dengan DB segar) → nomor jurnal bisa
+        // berulang; dedupe lama tidak boleh menahan invalidasi.
+        if (self::$invalidasiTerjadwal !== [] && ! Cache::has(self::keyVersiLaporan(null))) {
+            self::$invalidasiTerjadwal = [];
+        }
+
+        $key = ($cabangId ?? 0).'|'.$noJurnal;
+        if (isset(self::$invalidasiTerjadwal[$key])) {
+            return;
+        }
+        if (count(self::$invalidasiTerjadwal) >= 500) {
+            self::$invalidasiTerjadwal = [];
+        }
+        self::$invalidasiTerjadwal[$key] = true;
+
+        // Bump langsung: versi baru berlaku seketika (juga di dalam transaksi —
+        // RefreshDatabase menguji dalam transaksi yang tidak pernah commit).
+        self::bumpVersiCacheLaporan($cabangId);
+        self::bumpVersiCacheLaporan(null);
+
+        // Bump ulang SETELAH commit: buang cache yang sempat terisi data
+        // pra-commit di jendela antara insert dan commit transaksi posting.
+        DB::afterCommit(function () use ($cabangId): void {
+            self::bumpVersiCacheLaporan($cabangId);
+            self::bumpVersiCacheLaporan(null);
+        });
+    }
+
     /**
      * [P2-10] Filename export selalu di-prefix {userId}_ (ownership download ACC-11b).
      * $userId eksplisit > auth() (konteks request); fallback 0 bila tak dikenal —
@@ -137,7 +226,8 @@ class ExportLaporanService
 
     private function dataLabaRugi(string $dari, string $sampai, ?int $cabangId): array
     {
-        $j = $this->jurnals($dari, $sampai, $cabangId);
+        // [A-2] ayat penutup (tutup_buku) bukan transaksi periode — kecualikan.
+        $j = $this->jurnals($dari, $sampai, $cabangId, true);
         $rows = [['LAPORAN LABA RUGI', $dari.' s.d. '.$sampai], []];
 
         $pendapatanRows = [];
@@ -303,7 +393,9 @@ class ExportLaporanService
         $rows = [['BUKU BESAR: '.($akun?->kode.' '.$akun?->nama ?? 'Semua')], []];
         $rows[] = ['TANGGAL', 'NO JURNAL', 'DESKRIPSI', 'DEBIT', 'KREDIT'];
 
-        $query = JurnalAkuntansi::with('akun')->whereDate('tanggal', '>=', $dari)->whereDate('tanggal', '<=', $sampai);
+        $query = self::hanyaDisetujui(
+            JurnalAkuntansi::with('akun')->whereDate('tanggal', '>=', $dari)->whereDate('tanggal', '<=', $sampai)
+        );
         if ($akunId) {
             $query->where('akun_coa_id', $akunId);
         }
@@ -319,33 +411,185 @@ class ExportLaporanService
     }
 
     /**
-     * Arus kas sederhana (metode langsung): per hari, kas masuk (debit 110-01)
-     * vs kas keluar (kredit 110-01) dari jurnal pada periode. [T-24]
+     * [A-1/A-2] Agregasi jurnal per akun COA langsung di SQL — sumber tunggal
+     * utk laba rugi & arus kas (UI dashboard, API, export). Hanya jurnal
+     * DISETUJUI dan TANPA ayat penutup (tutup_buku): penutup adalah transfer
+     * saldo, bukan transaksi periode (P&L tidak boleh ±0 setelah tutup buku).
+     *
+     * Satu query memuat DUA basis (hemat query utk server RAM 1GB):
+     *  - total_debit/kredit = mutasi PERIODE ($dari..$sampai, conditional SUM);
+     *  - kumulatif_debit/kredit = mutasi sejak awal pembukuan s/d $sampai
+     *    (dipakai arus kas menghitung saldo awal kas = kumulatif - periode).
+     * Akun yang hanya bergerak SEBELUM periode ikut terbawa (total periode 0)
+     * demi saldo awal kas; pemakai laporan periode menyaring total 0.
+     * `MIN(id) conditional` menjaga urutan tampil akun sesuai jurnal pertama
+     * dalam periode.
+     *
+     * @return Collection<int,array{akun_coa_id:int,kode:string,nama:string,tipe:string,kelompok:string,saldo_normal:string,total_debit:float,total_kredit:float,kumulatif_debit:float,kumulatif_kredit:float}>
+     */
+    public function agregatJurnalPeriode(?int $cabangId, string $dari, string $sampai): Collection
+    {
+        $query = DB::table('jurnal_akuntansi')
+            ->join('akun_coa', 'akun_coa.id', '=', 'jurnal_akuntansi.akun_coa_id');
+
+        if ($cabangId !== null) {
+            $query->where('jurnal_akuntansi.cabang_id', $cabangId);
+        }
+
+        $query = self::hanyaDisetujui($query);
+
+        return $query->where('jurnal_akuntansi.sumber', '!=', 'tutup_buku')
+            ->whereDate('jurnal_akuntansi.tanggal', '<=', $sampai)
+            ->select('jurnal_akuntansi.akun_coa_id')
+            ->selectRaw('akun_coa.kode, akun_coa.nama, akun_coa.tipe, akun_coa.kelompok, akun_coa.saldo_normal')
+            ->selectRaw(
+                'SUM(CASE WHEN date(jurnal_akuntansi.tanggal) >= ? THEN jurnal_akuntansi.debit ELSE 0 END) as total_debit, '
+                .'SUM(CASE WHEN date(jurnal_akuntansi.tanggal) >= ? THEN jurnal_akuntansi.kredit ELSE 0 END) as total_kredit',
+                [$dari, $dari]
+            )
+            ->selectRaw('SUM(jurnal_akuntansi.debit) as kumulatif_debit, SUM(jurnal_akuntansi.kredit) as kumulatif_kredit')
+            ->selectRaw('MIN(CASE WHEN date(jurnal_akuntansi.tanggal) >= ? THEN jurnal_akuntansi.id END) as urut_pertama', [$dari])
+            ->groupBy(
+                'jurnal_akuntansi.akun_coa_id',
+                'akun_coa.kode',
+                'akun_coa.nama',
+                'akun_coa.tipe',
+                'akun_coa.kelompok',
+                'akun_coa.saldo_normal',
+            )
+            ->orderBy('urut_pertama')
+            ->get()
+            ->map(fn (\stdClass $a): array => [
+                'akun_coa_id' => (int) $a->akun_coa_id,
+                'kode' => (string) $a->kode,
+                'nama' => (string) $a->nama,
+                'tipe' => (string) $a->tipe,
+                'kelompok' => (string) $a->kelompok,
+                'saldo_normal' => (string) $a->saldo_normal,
+                'total_debit' => (float) $a->total_debit,
+                'total_kredit' => (float) $a->total_kredit,
+                'kumulatif_debit' => (float) $a->kumulatif_debit,
+                'kumulatif_kredit' => (float) $a->kumulatif_kredit,
+            ]);
+    }
+
+    /**
+     * [A-4/A-5] Arus kas metode TIDAK LANGSUNG — sumber tunggal UI dashboard,
+     * API ACC-04b, dan export (sebelumnya export memakai metode langsung per
+     * hari sehingga angka berbeda untuk laporan yang sama).
+     *
+     * Perbaikan atas formula lama:
+     *  - add-back beban non-kas (depresiasi/amortisasi, kelompok beban_depresiasi);
+     *  - delta piutang berbasis kelompok `piutang` (120-01..04, termasuk channel
+     *    marketplace), bukan hanya kode 120-01;
+     *  - delta utang = SEMUA akun kewajiban (utang usaha/gaji/komisi/lain, pajak),
+     *    bukan hanya 210-01+210-03;
+     *  - akun di luar bucket dikenal (PPN masukan, RAK, kelompok kustom) masuk
+     *    `perubahan_akun_lain` agar neto rekonsiliasi ke kas; akumulasi
+     *    depresiasi (130-02) dikecualikan karena pasangannya sudah di-add-back;
+     *  - blok rekonsiliasi: saldo awal kas/bank + perubahan aktual = saldo akhir,
+     *    dibandingkan dengan kenaikan_kas_neto (kontrol PSAK 2).
+     *
+     * @return array<string,mixed>
+     */
+    public function arusKasTidakLangsung(?int $cabangId, string $dari, string $sampai): array
+    {
+        $akun = $this->agregatJurnalPeriode($cabangId, $dari, $sampai);
+
+        $delta = fn (callable $filter): float => round(
+            $akun->filter($filter)->sum(fn (array $a) => $a['total_debit'] - $a['total_kredit']),
+            2
+        );
+
+        $labaBersih = round(
+            $akun->where('tipe', 'pendapatan')->sum(fn (array $a) => $a['total_kredit'] - $a['total_debit'])
+            - $akun->where('tipe', 'beban')->sum(fn (array $a) => $a['total_debit'] - $a['total_kredit']),
+            2
+        );
+
+        $addBackNonKas = $delta(fn (array $a) => $a['tipe'] === 'beban'
+            && in_array($a['kelompok'], ['beban_depresiasi', 'beban_amortisasi'], true));
+        $piutangDelta = $delta(fn (array $a) => $a['kelompok'] === 'piutang');
+        $persediaanDelta = $delta(fn (array $a) => $a['kelompok'] === 'persediaan');
+        $utangDelta = round($akun->where('tipe', 'kewajiban')->sum(fn (array $a) => $a['total_kredit'] - $a['total_debit']), 2);
+        $arusInvestasi = round(-$akun->whereIn('kelompok', ['aset_tetap', 'peralatan', 'perlengkapan'])
+            ->sum(fn (array $a) => $a['total_debit'] - $a['total_kredit']), 2);
+        $arusPendanaan = round($akun->whereIn('kelompok', ['modal', 'laba_ditahan'])
+            ->sum(fn (array $a) => $a['total_kredit'] - $a['total_debit']), 2);
+
+        $lainDelta = $delta(function (array $a): bool {
+            if (in_array($a['kelompok'], [
+                'kas', 'bank', 'piutang', 'persediaan', 'aset_tetap', 'peralatan',
+                'perlengkapan', 'modal', 'laba_ditahan', 'akumulasi_depresiasi',
+            ], true)) {
+                return false;
+            }
+
+            return ! in_array($a['tipe'], ['pendapatan', 'beban', 'kewajiban'], true);
+        });
+
+        $arusKasOperasi = round($labaBersih + $addBackNonKas - $piutangDelta - $persediaanDelta + $utangDelta - $lainDelta, 2);
+        $kenaikanNeto = round($arusKasOperasi + $arusInvestasi + $arusPendanaan, 2);
+
+        // Kontrol kas riil: mutasi akun kelompok kas/bank + saldo awal
+        // (kumulatif s/d akhir periode dikurangi mutasi periode — satu query).
+        $kasRows = $akun->filter(fn (array $a) => in_array($a['kelompok'], ['kas', 'bank'], true));
+        $perubahanKas = round($kasRows->sum(fn (array $a) => $a['total_debit'] - $a['total_kredit']), 2);
+        $saldoAwalKas = round($kasRows->sum(fn (array $a) => ($a['kumulatif_debit'] - $a['kumulatif_kredit']) - ($a['total_debit'] - $a['total_kredit'])), 2);
+        $saldoAkhirKas = round($saldoAwalKas + $perubahanKas, 2);
+        $selisih = round($kenaikanNeto - $perubahanKas, 2);
+
+        return [
+            'metode' => 'tidak_langsung',
+            'laba_bersih' => $labaBersih,
+            'penyesuaian' => [
+                'beban_depresiasi' => $addBackNonKas,
+                'kenaikan_piutang' => round(-$piutangDelta, 2),
+                'kenaikan_persediaan' => round(-$persediaanDelta, 2),
+                'kenaikan_utang' => $utangDelta,
+                'perubahan_akun_lain' => round(-$lainDelta, 2),
+            ],
+            'arus_kas_operasi' => $arusKasOperasi,
+            'arus_kas_investasi' => $arusInvestasi,
+            'arus_kas_pendanaan' => $arusPendanaan,
+            'kenaikan_kas_neto' => $kenaikanNeto,
+            'rekonsiliasi' => [
+                'saldo_awal_kas' => $saldoAwalKas,
+                'perubahan_kas_aktual' => $perubahanKas,
+                'saldo_akhir_kas' => $saldoAkhirKas,
+                'selisih' => $selisih,
+                'cocok' => abs($selisih) < 0.01,
+            ],
+        ];
+    }
+
+    /**
+     * [A-5] Export arus kas = metode tidak langsung, angka SAMA dengan UI/API
+     * (satu sumber: arusKasTidakLangsung), plus blok rekonsiliasi ke kas/bank.
      */
     private function dataArusKas(string $dari, string $sampai, ?int $cabangId): array
     {
-        $rows = [['LAPORAN ARUS KAS', $dari.' s.d. '.$sampai], []];
-        $rows[] = ['TANGGAL', 'MASUK (Rp)', 'KELUAR (Rp)', 'SELISIH (Rp)'];
+        $ak = $this->arusKasTidakLangsung($cabangId, $dari, $sampai);
 
-        $perHari = $this->jurnals($dari, $sampai, $cabangId)
-            ->filter(fn ($j) => $j->akun && $j->akun->tipe === 'aset' && (
-                in_array($j->akun->kelompok, ['kas', 'bank'], true)
-                || in_array($j->akun->kode, ['110-01', '110-02', '110-04'], true)
-            ))
-            ->groupBy(fn ($j) => $j->tanggal->toDateString());
-
-        $totalMasuk = 0.0;
-        $totalKeluar = 0.0;
-        foreach ($perHari as $tgl => $baris) {
-            $masuk = round((float) $baris->sum('debit'), 2);
-            $keluar = round((float) $baris->sum('kredit'), 2);
-            $totalMasuk += $masuk;
-            $totalKeluar += $keluar;
-            $rows[] = [$tgl, $masuk, $keluar, round($masuk - $keluar, 2)];
-        }
-
+        $rows = [['LAPORAN ARUS KAS (METODE TIDAK LANGSUNG)', $dari.' s.d. '.$sampai], []];
+        $rows[] = ['KOMPONEN', 'JUMLAH (Rp)'];
+        $rows[] = ['Laba bersih', $ak['laba_bersih']];
+        $rows[] = ['Penyesuaian: beban depresiasi & amortisasi (non-kas)', $ak['penyesuaian']['beban_depresiasi']];
+        $rows[] = ['Penyesuaian: kenaikan piutang', $ak['penyesuaian']['kenaikan_piutang']];
+        $rows[] = ['Penyesuaian: kenaikan persediaan', $ak['penyesuaian']['kenaikan_persediaan']];
+        $rows[] = ['Penyesuaian: kenaikan utang', $ak['penyesuaian']['kenaikan_utang']];
+        $rows[] = ['Penyesuaian: perubahan akun lain', $ak['penyesuaian']['perubahan_akun_lain']];
+        $rows[] = ['ARUS KAS OPERASI', $ak['arus_kas_operasi']];
+        $rows[] = ['ARUS KAS INVESTASI', $ak['arus_kas_investasi']];
+        $rows[] = ['ARUS KAS PENDANAAN', $ak['arus_kas_pendanaan']];
+        $rows[] = ['KENAIKAN KAS NETO', $ak['kenaikan_kas_neto']];
         $rows[] = [];
-        $rows[] = ['TOTAL', $totalMasuk, $totalKeluar, round($totalMasuk - $totalKeluar, 2)];
+        $rows[] = ['REKONSILIASI KE KAS/BANK', ''];
+        $rows[] = ['Saldo awal kas/bank', $ak['rekonsiliasi']['saldo_awal_kas']];
+        $rows[] = ['Perubahan kas/bank aktual (GL)', $ak['rekonsiliasi']['perubahan_kas_aktual']];
+        $rows[] = ['Saldo akhir kas/bank', $ak['rekonsiliasi']['saldo_akhir_kas']];
+        $rows[] = ['Selisih (neto - aktual)', $ak['rekonsiliasi']['selisih']];
+        $rows[] = ['STATUS', $ak['rekonsiliasi']['cocok'] ? 'COCOK' : 'SELISIH'];
 
         return $rows;
     }
@@ -525,12 +769,16 @@ class ExportLaporanService
         return $rows;
     }
 
-    private function jurnals(string $dari, string $sampai, ?int $cabangId): Collection
+    private function jurnals(string $dari, string $sampai, ?int $cabangId, bool $tanpaPenutup = false): Collection
     {
-        return $this->queryJurnal($cabangId)
+        $q = $this->queryJurnal($cabangId)
             ->whereDate('tanggal', '>=', $dari)
-            ->whereDate('tanggal', '<=', $sampai)
-            ->get();
+            ->whereDate('tanggal', '<=', $sampai);
+        if ($tanpaPenutup) {
+            $q->where('sumber', '!=', 'tutup_buku');
+        }
+
+        return $q->get();
     }
 
     /**
@@ -569,12 +817,14 @@ class ExportLaporanService
             $query->where('jurnal_akuntansi.cabang_id', $cabangId);
         }
 
-        return $query->get();
+        // [A-1/F-02] hanya jurnal disetujui (atau baris legacy tanpa header).
+        return self::hanyaDisetujui($query)->get();
     }
 
     private function queryJurnal(?int $cabangId): Builder
     {
-        $q = JurnalAkuntansi::with('akun');
+        // [A-1/F-02] hanya jurnal disetujui (atau baris legacy tanpa header).
+        $q = self::hanyaDisetujui(JurnalAkuntansi::with('akun'));
 
         // [F2-5] cabang scoping — jangan bocorkan jurnal cabang lain
         if ($cabangId) {
@@ -653,10 +903,12 @@ class ExportLaporanService
         $masukanAkun = AkunCOA::where('kode', '110-03')->first();
         $totalMasukan = 0.0;
         if ($masukanAkun) {
-            $jMasukan = JurnalAkuntansi::with('akun')
-                ->where('akun_coa_id', $masukanAkun->id)
-                ->whereDate('tanggal', '>=', $dari)
-                ->whereDate('tanggal', '<=', $sampai);
+            $jMasukan = self::hanyaDisetujui(
+                JurnalAkuntansi::with('akun')
+                    ->where('akun_coa_id', $masukanAkun->id)
+                    ->whereDate('tanggal', '>=', $dari)
+                    ->whereDate('tanggal', '<=', $sampai)
+            );
             if ($cabangId) {
                 $jMasukan->where('cabang_id', $cabangId);
             }
@@ -685,7 +937,11 @@ class ExportLaporanService
      */
     public function neracaSaldo4Kolom(?int $cabangId, string $dari, string $sampai): array
     {
-        $akuns = AkunCOA::where('is_active', true)->orderBy('kode')->get();
+        // [A-3] Semua akun (termasuk NONAKTIF) — hapusCoa menonaktifkan akun
+        // ber-riwayat; saldo akun itu wajib tetap tampil agar trial balance
+        // balance dan konsisten dengan neraca. Akun idle (semua komponen 0)
+        // tetap dilewati di loop bawah.
+        $akuns = AkunCOA::orderBy('kode')->get();
 
         // 1. Saldo Awal: akumulasi baris jurnal sebelum tanggal $dari (< $dari)
         $qAwal = $this->queryJurnal($cabangId)->whereDate('tanggal', '<', $dari);

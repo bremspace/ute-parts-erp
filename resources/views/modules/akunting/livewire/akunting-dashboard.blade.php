@@ -220,6 +220,10 @@
                                 <span class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($arusKas['laba_bersih'], 0, ',', '.') }}</span>
                             </div>
                             <div class="flex justify-between">
+                                <span class="text-ink-500 dark:text-ink-400">Beban depresiasi (non-kas)</span>
+                                <span class="font-semibold text-up-mint tabular-nums">+{{ number_format($arusKas['penyesuaian']['beban_depresiasi'], 0, ',', '.') }}</span>
+                            </div>
+                            <div class="flex justify-between">
                                 <span class="text-ink-500 dark:text-ink-400">Kenaikan piutang</span>
                                 <span class="font-semibold text-up-red tabular-nums">({{ number_format($arusKas['penyesuaian']['kenaikan_piutang'], 0, ',', '.') }})</span>
                             </div>
@@ -230,6 +234,10 @@
                             <div class="flex justify-between">
                                 <span class="text-ink-500 dark:text-ink-400">Kenaikan utang</span>
                                 <span class="font-semibold text-up-mint tabular-nums">+{{ number_format($arusKas['penyesuaian']['kenaikan_utang'], 0, ',', '.') }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-ink-500 dark:text-ink-400">Perubahan akun lain</span>
+                                <span class="font-semibold text-ink-900 dark:text-white tabular-nums">{{ number_format($arusKas['penyesuaian']['perubahan_akun_lain'], 0, ',', '.') }}</span>
                             </div>
                             <div class="flex justify-between pt-2 border-t border-black/10 dark:border-white/10 font-bold mt-2">
                                 <span class="text-up-mint">Kas dari operasi</span>
@@ -268,6 +276,31 @@
                     <span class="text-2xl font-black tabular-nums {{ $arusKas['kenaikan_kas_neto'] >= 0 ? 'text-up-mint' : 'text-up-red' }}">
                         {{ $arusKas['kenaikan_kas_neto'] >= 0 ? '+' : '-' }} Rp {{ number_format(abs($arusKas['kenaikan_kas_neto']), 0, ',', '.') }}
                     </span>
+                </div>
+
+                {{-- [A-4] Rekonsiliasi ke saldo kas/bank riil (PSAK 2) --}}
+                <div class="mt-3 p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/10 dark:border-white/5">
+                    <p class="text-[10px] text-ink-500 dark:text-ink-400 uppercase font-bold mb-2">Rekonsiliasi Kas/Bank</p>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                        <div>
+                            <p class="text-ink-500 dark:text-ink-400">Saldo awal</p>
+                            <p class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($arusKas['rekonsiliasi']['saldo_awal_kas'], 0, ',', '.') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-ink-500 dark:text-ink-400">Mutasi kas aktual (GL)</p>
+                            <p class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($arusKas['rekonsiliasi']['perubahan_kas_aktual'], 0, ',', '.') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-ink-500 dark:text-ink-400">Saldo akhir</p>
+                            <p class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($arusKas['rekonsiliasi']['saldo_akhir_kas'], 0, ',', '.') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-ink-500 dark:text-ink-400">Selisih neto vs aktual</p>
+                            <p class="font-bold tabular-nums {{ $arusKas['rekonsiliasi']['cocok'] ? 'text-up-mint' : 'text-up-red' }}">
+                                {{ $arusKas['rekonsiliasi']['cocok'] ? 'COCOK' : 'Rp '.number_format($arusKas['rekonsiliasi']['selisih'], 0, ',', '.') }}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </x-prism.glass-card>
         </div>

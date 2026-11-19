@@ -3,6 +3,7 @@
 namespace App\Modules\Akunting\Models;
 
 use App\Models\User;
+use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -60,6 +61,13 @@ class JurnalAkuntansi extends Model
      */
     protected static function booted(): void
     {
+        // [A-6] Setiap baris jurnal ter-post menginvalidasi SELuruh cache
+        // laporan cabang terkait + konsolidasi (versioned key, setelah commit)
+        // — mencakup semua jalur posting (POS, servis, payroll, manual, API).
+        static::created(function (self $jurnal): void {
+            ExportLaporanService::invalidasiCachePosting($jurnal->cabang_id, $jurnal->no_jurnal);
+        });
+
         static::updating(function () {
             throw new \DomainException('Baris jurnal akuntansi bersifat immutable (tidak dapat diubah) demi kepatuhan ISO/audit. Gunakan jurnal pembalik (reversal) untuk koreksi.');
         });

@@ -50,6 +50,8 @@ class LaporanPajak extends Component
     {
         $cabangId = session('cabang_id');
         $cacheKey = sprintf('laporan-pajak:%s:%s:%s', $cabangId ?? 'all', $this->periodeDari, $this->periodeSampai);
+        // [A-6] key berversi — posting/approval menaikkan versi cabang.
+        $cacheKey = ExportLaporanService::keyCacheLaporan($cacheKey, $cabangId ? (int) $cabangId : null);
 
         return Cache::remember($cacheKey, now()->addMinutes(15), function () use ($cabangId) {
             $dpp = 0.0;
@@ -73,9 +75,12 @@ class LaporanPajak extends Component
             $masukan = 0.0;
             $akunMasukan = AkunCOA::where('kode', '110-03')->first();
             if ($akunMasukan) {
-                $j = JurnalAkuntansi::where('akun_coa_id', $akunMasukan->id)
-                    ->whereDate('tanggal', '>=', $this->periodeDari)
-                    ->whereDate('tanggal', '<=', $this->periodeSampai);
+                // [A-1/F-02] hanya jurnal disetujui (atau baris legacy tanpa header).
+                $j = ExportLaporanService::hanyaDisetujui(
+                    JurnalAkuntansi::where('akun_coa_id', $akunMasukan->id)
+                        ->whereDate('tanggal', '>=', $this->periodeDari)
+                        ->whereDate('tanggal', '<=', $this->periodeSampai)
+                );
                 if ($cabangId) {
                     $j->where('cabang_id', $cabangId);
                 }
@@ -106,6 +111,8 @@ class LaporanPajak extends Component
     {
         $cabangId = session('cabang_id');
         $cacheKey = sprintf('laporan-pajak-rows:%s:%s:%s', $cabangId ?? 'all', $this->periodeDari, $this->periodeSampai);
+        // [A-6] key berversi — posting/approval menaikkan versi cabang.
+        $cacheKey = ExportLaporanService::keyCacheLaporan($cacheKey, $cabangId ? (int) $cabangId : null);
 
         return Cache::remember($cacheKey, now()->addMinutes(15), function () use ($cabangId) {
             $q = Transaksi::whereDate('created_at', '>=', $this->periodeDari)

@@ -331,10 +331,16 @@ class AkuntingController extends Controller
         $cacheKey = $cabangId !== null
             ? "laporan-labarugi-{$cabangId}-{$dari}-{$sampai}"
             : "laporan-labarugi-konsolidasi-{$dari}-{$sampai}";
+        // [A-6] key berversi — posting/approval menaikkan versi cabang.
+        $cacheKey = ExportLaporanService::keyCacheLaporan($cacheKey, $cabangId);
 
         $laporan = Cache::remember($cacheKey, 900, function () use ($dari, $sampai, $cabangId) {
-            $query = JurnalAkuntansi::whereDate('tanggal', '>=', $dari)
-                ->whereDate('tanggal', '<=', $sampai);
+            // [A-1/F-02] hanya jurnal disetujui; [A-2] tanpa ayat penutup.
+            $query = ExportLaporanService::hanyaDisetujui(
+                JurnalAkuntansi::whereDate('tanggal', '>=', $dari)
+                    ->whereDate('tanggal', '<=', $sampai)
+                    ->where('sumber', '!=', 'tutup_buku')
+            );
 
             if ($cabangId !== null) {
                 $query->where('cabang_id', $cabangId);
@@ -384,6 +390,8 @@ class AkuntingController extends Controller
         $cacheKey = $cabangId !== null
             ? "laporan-neraca-{$cabangId}-{$sampai}"
             : "laporan-neraca-konsolidasi-{$sampai}";
+        // [A-6] key berversi — posting/approval menaikkan versi cabang.
+        $cacheKey = ExportLaporanService::keyCacheLaporan($cacheKey, $cabangId);
 
         // [B-10e / P1-7] Sumber tunggal dgn export Excel:
         // ExportLaporanService::neracaSaldo() → SALDO KUMULATIF s/d $sampai
@@ -414,6 +422,8 @@ class AkuntingController extends Controller
         $cacheKey = $cabangId !== null
             ? "laporan-neracasaldo-{$cabangId}-{$dari}-{$sampai}"
             : "laporan-neracasaldo-konsolidasi-{$dari}-{$sampai}";
+        // [A-6] key berversi — posting/approval menaikkan versi cabang.
+        $cacheKey = ExportLaporanService::keyCacheLaporan($cacheKey, $cabangId);
 
         $hasil = cache()->remember(
             $cacheKey,
@@ -497,8 +507,10 @@ class AkuntingController extends Controller
         $cabangId = $this->cabangScopeId();
 
         // Hitung saldo awal kumulatif sebelum periode $dari
-        $queryAwal = JurnalAkuntansi::where('akun_coa_id', $akunId)
-            ->whereDate('tanggal', '<', $dari);
+        // [A-1/F-02] hanya jurnal disetujui (atau baris legacy tanpa header).
+        $queryAwal = ExportLaporanService::hanyaDisetujui(
+            JurnalAkuntansi::where('akun_coa_id', $akunId)->whereDate('tanggal', '<', $dari)
+        );
         if ($cabangId !== null) {
             $queryAwal->where('cabang_id', $cabangId);
         }
@@ -507,11 +519,13 @@ class AkuntingController extends Controller
         $kreAwal = (float) ($mutasiAwal->kre ?? 0);
         $saldoAwal = $akun->saldo_normal === 'debit' ? ($debAwal - $kreAwal) : ($kreAwal - $debAwal);
 
-        $jurnals = JurnalAkuntansi::with(['cabang', 'user'])
-            ->where('akun_coa_id', $akunId)
-            ->where('cabang_id', $cabangId)
-            ->whereDate('tanggal', '>=', $dari)
-            ->whereDate('tanggal', '<=', $sampai)
+        $jurnals = ExportLaporanService::hanyaDisetujui(
+            JurnalAkuntansi::with(['cabang', 'user'])
+                ->where('akun_coa_id', $akunId)
+                ->where('cabang_id', $cabangId)
+                ->whereDate('tanggal', '>=', $dari)
+                ->whereDate('tanggal', '<=', $sampai)
+        )
             ->orderBy('tanggal')
             ->orderBy('id')
             ->get();
@@ -755,61 +769,16 @@ class AkuntingController extends Controller
         $sampai = $request->query('sampai', now()->toDateString());
         $cabangId = $this->resolveCabangScope($request);
 
-        $query = JurnalAkuntansi::whereDate('tanggal', '>=', $dari)
-            ->whereDate('tanggal', '<=', $sampai);
-
-        if ($cabangId !== null) {
-            $query->where('cabang_id', $cabangId);
-        }
-
-        $jurnals = $query->with('akun')->get();
-
-        // Laba bersih = total pendapatan - total beban (metode tidak langsung)
-        $labaBersih = round(
-            $jurnals->where('akun.tipe', 'pendapatan')->sum(fn ($j) => (float) $j->kredit - (float) $j->debit)
-            - $jurnals->where('akun.tipe', 'beban')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit),
-            2
-        );
-
-        // Perubahan modal kerja dari saldo akun (kenaikan = arus keluar untuk aset, arus masuk untuk kewajiban)
-        // Delta periode: total pergerakan POSITIF (debit untuk aset = kenaikan → pengurang arus kas operasi)
-        $piutangDelta = round($jurnals->where('akun.kode', '120-01')->sum('debit') - $jurnals->where('akun.kode', '120-01')->sum('kredit'), 2);
-        $persediaanDelta = round($jurnals->where('akun.kode', '130-01')->sum('debit') - $jurnals->where('akun.kode', '130-01')->sum('kredit'), 2);
-        $utangDelta = round($jurnals->where('akun.kode', '210-01')->sum('kredit') - $jurnals->where('akun.kode', '210-01')->sum('debit')
-            + $jurnals->where('akun.kode', '210-03')->sum('kredit') - $jurnals->where('akun.kode', '210-03')->sum('debit'), 2);
-
-        $arusKasOperasi = round($labaBersih - $piutangDelta - $persediaanDelta + $utangDelta, 2);
-
-        // Arus investasi (asets non-modal kerja) & pendanaan (ekuitas/modal)
-        $arusInvestasi = round(
-            -$jurnals->where('akun.kelompok', 'aset_tetap')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit)
-            - $jurnals->where('akun.kelompok', 'peralatan')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit)
-            - $jurnals->where('akun.kelompok', 'perlengkapan')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit),
-            2
-        );
-        $arusPendanaan = round(
-            $jurnals->where('akun.kelompok', 'modal')->sum(fn ($j) => (float) $j->kredit - (float) $j->debit)
-            + $jurnals->where('akun.kelompok', 'laba_ditahan')->sum(fn ($j) => (float) $j->kredit - (float) $j->debit),
-            2
-        );
-
-        $kasNeto = round($arusKasOperasi + $arusInvestasi + $arusPendanaan, 2);
+        // [A-4/A-5] Sumber tunggal dgn UI dashboard & export: add-back non-kas,
+        // delta kelompok akun, rekonsiliasi ke kas/bank (bukan formula terpisah).
+        $hasil = app(ExportLaporanService::class)->arusKasTidakLangsung($cabangId, (string) $dari, (string) $sampai);
 
         return $this->success([
             'dari' => $dari,
             'sampai' => $sampai,
             'cakupan' => $cabangId !== null ? 'cabang' : 'konsolidasi',
             'cabang_id' => $cabangId,
-            'laba_bersih' => $labaBersih,
-            'penyesuaian' => [
-                'kenaikan_piutang' => -$piutangDelta,
-                'kenaikan_persediaan' => -$persediaanDelta,
-                'kenaikan_utang' => $utangDelta,
-            ],
-            'arus_kas_operasi' => $arusKasOperasi,
-            'arus_kas_investasi' => $arusInvestasi,
-            'arus_kas_pendanaan' => $arusPendanaan,
-            'kenaikan_kas_neto' => $kasNeto,
+            ...$hasil,
         ], 'Laporan Arus Kas (metode tidak langsung) berhasil diambil');
     }
 }
