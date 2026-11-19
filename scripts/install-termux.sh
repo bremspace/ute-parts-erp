@@ -145,10 +145,13 @@ fi
 # ------------------------------------------------------------------------------
 if [ ! -f "artisan" ]; then
     echo "ℹ [AUTO-SETUP] Mengunduh inti aplikasi Bremspace ke smartphone..."
-    GH_TOKEN_OBF="dHZndWhvX2NuZ18xMU83VDdLVFYwRkg3WWtqS3VBNmJLX1V4dmN4UUl4czh0MUtGRVRXYmdoWGxZZnZrZ1RXOWlUaUdXc0NqSVZYdzgzUEJHRUVNNnhJN1ljYjRp"
-    GH_PAT=$(echo "$GH_TOKEN_OBF" | base64 -d 2>/dev/null | tr 'A-Za-z' 'N-ZA-Mn-za-m' || true)
-    
-    if curl -sL -H "Authorization: Bearer $GH_PAT" \
+    # [SECURITY] Token TIDAK di-hardcode (nilai lama bocor & wajib direvokasi di GitHub).
+    # Ambil dari env BREMSPACE_INSTALL_TOKEN: fine-grained PAT read-only Contents repo ini.
+    GH_PAT="${BREMSPACE_INSTALL_TOKEN:-}"
+    if [ -z "$GH_PAT" ]; then
+        echo "⚠ [SKIP] BREMSPACE_INSTALL_TOKEN belum di-set — inti aplikasi tidak diunduh."
+        echo "  Set env token read-only repo lalu jalankan ulang installer."
+    elif curl -sL -H "Authorization: Bearer ***" \
         -H "Accept: application/vnd.github.v3+json" \
         "https://api.github.com/repos/bremspace/ute-parts-erp/tarball/main" -o /tmp/bremspace_core.tar.gz; then
         tar -xzf /tmp/bremspace_core.tar.gz --strip-components=1 2>/dev/null || true
