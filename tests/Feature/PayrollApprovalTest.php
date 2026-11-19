@@ -125,7 +125,7 @@ class PayrollApprovalTest extends TestCase
 
         // Periode tetap draft; belum ada jurnal — finalisasi gagal total
         $this->assertEquals(PayrollPeriode::STATUS_DRAFT, PayrollPeriode::where('periode', '2026-09')->value('status'));
-        $this->assertSame(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-2026-09')->count());
+        $this->assertSame(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-X-2026-09')->count());
     }
 
     /** @test */
@@ -161,9 +161,9 @@ class PayrollApprovalTest extends TestCase
 
         // Periode selesai (enum DB: draft/diproses/selesai/dibayar) + jurnal payroll
         // terposting + slip status approved
-        $this->assertEquals('JRL-PR-2026-09', $hasil['no_jurnal']);
+        $this->assertEquals('JRL-PR-X-2026-09', $hasil['no_jurnal']);
         $this->assertEquals(PayrollPeriode::STATUS_SELESAI, PayrollPeriode::where('periode', '2026-09')->value('status'));
-        $this->assertGreaterThan(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-2026-09')->count());
+        $this->assertGreaterThan(0, JurnalAkuntansi::where('no_jurnal', 'JRL-PR-X-2026-09')->count());
         $this->assertEquals('approved', PayrollSlip::where('payroll_periode_id', $periodeId)->first()->status);
     }
 }

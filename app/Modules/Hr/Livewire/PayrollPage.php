@@ -310,6 +310,19 @@ class PayrollPage extends Component
             return;
         }
 
+        // [AUDIT-FIX F-01] Bayar hanya periode 'selesai' (sudah accrual).
+        // Guard otoritatif ada di PayrollService::bayarPayroll (fail-closed).
+        $cabangId = $this->cabangFilter !== 'semua' ? (int) $this->cabangFilter : currentCabangId();
+        $periodeRecord = PayrollPeriode::withoutCabangScope()
+            ->where('periode', $this->periode)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId), fn ($q) => $q->whereNull('cabang_id'))
+            ->first();
+        if (! $periodeRecord || $periodeRecord->status !== PayrollPeriode::STATUS_SELESAI) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Payroll periode '.$this->periode.' belum difinalisasi (jurnal accrual belum ada). Tidak dapat dibayar.']);
+
+            return;
+        }
+
         $this->showBayarModal = true;
     }
 

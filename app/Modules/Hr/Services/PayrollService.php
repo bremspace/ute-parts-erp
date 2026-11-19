@@ -48,6 +48,14 @@ class PayrollService
             throw new \DomainException("Periode {$periode} sudah dibayar. Tidak dapat dihitung ulang.");
         }
 
+        // [AUDIT-FIX F-02] Periode 'selesai' sudah dijurnal (accrual). Menghitung
+        // ulang slip mengubah nominal tanpa repost jurnal → GL ≠ slip dan
+        // pembayaran ≠ accrual. Fail-closed: tolak; koreksi wajib lewat jalur
+        // penyesuaian eksplisit, bukan overwrite slip.
+        if ($periodeRecord && $periodeRecord->status === PayrollPeriode::STATUS_SELESAI) {
+            throw new \DomainException("Periode {$periode} sudah difinalisasi (jurnal accrual sudah ada). Tidak dapat dihitung ulang.");
+        }
+
         // [BH] Teknisi non-gaji (bagi hasil) bukan bagian dari payroll —
         // penghasilannya dibayarkan lewat modul Bagi Hasil Jasa.
         $karyawans = Karyawan::where('status_aktif', true)
@@ -173,7 +181,10 @@ class PayrollService
             ['akun_kode' => '210-02', 'debit' => 0, 'kredit' => $totalGaji],
         ];
 
-        $noJurnal = sprintf('JRL-PR-%s', $periode);
+        // [AUDIT-FIX F-03] Nomor jurnal menyertakan cabang — guard idempotensi
+        // JurnalService bersifat global per no_jurnal, sehingga nomor tanpa
+        // cabang membuat cabang kedua dengan periode sama selalu ditolak.
+        $noJurnal = sprintf('JRL-PR-%s-%s', $targetCabangId ?? 'X', $periode);
         $jurnalRows = $this->jurnalService->post(
             $noJurnal,
             now(),
@@ -211,6 +222,14 @@ class PayrollService
             throw new \DomainException("Periode {$periode} sudah dibayar sebelumnya.");
         }
 
+        // [AUDIT-FIX F-01] Bayar hanya periode 'selesai' (jurnal accrual sudah
+        // ada). Tanpa guard ini periode draft bisa dibayar: D 210-02 tanpa
+        // kredit accrual → utang gaji negatif & beban gaji hilang. Fail-closed,
+        // samakan dengan BagiHasilService::bayarPeriode.
+        if (! $periodeRecord || $periodeRecord->status !== PayrollPeriode::STATUS_SELESAI) {
+            throw new \DomainException("Periode {$periode} belum difinalisasi (jurnal accrual belum ada). Tidak dapat dibayar.");
+        }
+
         return DB::transaction(function () use ($periode, $periodeId, $akunKasKode, $targetCabangId) {
             // Jurnal pembayaran: debit Utang Gaji (210-02) / kredit Kas ($akunKasKode)
             $slips = PayrollSlip::where('payroll_periode_id', $periodeId)->get();
@@ -221,7 +240,8 @@ class PayrollService
                 ['akun_kode' => $akunKasKode, 'debit' => 0, 'kredit' => $total],
             ];
 
-            $noJurnal = sprintf('JRL-PR-BAYAR-%s', $periode);
+            // [AUDIT-FIX F-03] Nomor jurnal pembayaran per cabang (lihat approvePayroll).
+            $noJurnal = sprintf('JRL-PR-BAYAR-%s-%s', $targetCabangId ?? 'X', $periode);
             $this->jurnalService->post(
                 $noJurnal,
                 now(),
@@ -241,12 +261,16 @@ class PayrollService
 
             PayrollPeriode::where('id', $periodeId)->update(['status' => 'dibayar']);
 
-            // Tandai komisi internal periode ini sebagai cair/dibayar
-            $mulai = $periode.'-01 00:00:00';
-            $selesai = date('Y-m-t', strtotime($periode.'-01')).' 23:59:59';
-            Komisi::where('aktor_tipe', 'karyawan')
+            // [AUDIT-FIX F-04] Tandai cair HANYA komisi yang tercantum pada slip
+            // periode+cabang yang dibayar (via payroll_komisi_detail.komisi_id).
+            // Sebelumnya window created_at global menandai cair semua komisi
+            // karyawan semua cabang — termasuk yang tidak masuk slip mana pun.
+            $slipIds = PayrollSlip::where('payroll_periode_id', $periodeId)->pluck('id');
+            $komisiIds = PayrollKomisiDetail::whereIn('slip_id', $slipIds)
+                ->whereNotNull('komisi_id')
+                ->pluck('komisi_id');
+            Komisi::whereIn('id', $komisiIds)
                 ->whereIn('status', [Komisi::STATUS_PENDING, Komisi::STATUS_DISETUJUI])
-                ->whereBetween('created_at', [$mulai, $selesai])
                 ->update([
                     'status' => Komisi::STATUS_CAIR,
                     'paid_at' => now(),
@@ -348,6 +372,8 @@ class PayrollService
         foreach ($resKomisi['items'] as $item) {
             PayrollKomisiDetail::create([
                 'slip_id' => $slip->id,
+                // [AUDIT-FIX F-04] tautan ke komisi sumber — dasar scope pencairan.
+                'komisi_id' => $item['komisi_id'] ?? null,
                 'tiket_servis_id' => $item['tiket_id'],
                 'teknisi_id' => $karyawan->id,
                 'jenis' => $item['jenis'],
@@ -422,6 +448,7 @@ class PayrollService
             $nom = (float) $kom->nominal_komisi;
             $total += $nom;
             $items[] = [
+                'komisi_id' => $kom->id,
                 'tiket_id' => $kom->tiket_servis_id,
                 'jenis' => $kom->tiket_servis_id ? 'servis' : ($kom->lead_id ? 'lead_won' : 'penjualan'),
                 'nominal' => $nom,

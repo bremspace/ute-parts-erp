@@ -3,6 +3,7 @@
 namespace App\Modules\Hr\Services;
 
 use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Hr\Models\BagiHasil;
 use App\Modules\Hr\Models\BagiHasilPeriode;
@@ -141,15 +142,92 @@ class BagiHasilService
     /**
      * Batalkan bagi hasil yang sudah diakui saat tiket selesai lalu dibatalkan/ditolak.
      * Baris yang sudah cair TIDAK disentuh (pembatalan setelah cair = pengembalian dana manual).
+     *
+     * [AUDIT-FIX F-15] Baris 'disetujui' sudah masuk jurnal accrual periode.
+     * Membatalkan tanpa pembalik membuat beban & utang overstated, dan bayar
+     * tetap membayar total lama. Maka: posting jurnal pembalik proporsional
+     * (D 210-06 / K 520-11) dan kurangi total periode. Baris 'pending' belum
+     * dijurnal → cukup flip status.
      */
     public function reversal(TiketServis $tiket): void
     {
-        BagiHasil::where('tiket_servis_id', $tiket->id)
+        $rows = BagiHasil::where('tiket_servis_id', $tiket->id)
             ->whereIn('status', [BagiHasil::STATUS_PENDING, BagiHasil::STATUS_DISETUJUI])
-            ->update([
-                'status' => BagiHasil::STATUS_DIBATALKAN,
-                'keterangan' => 'Dibatalkan — tiket '.$tiket->no_tiket.' batal/ditolak',
-            ]);
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        DB::transaction(function () use ($rows, $tiket) {
+            foreach ($rows as $row) {
+                if ($row->status === BagiHasil::STATUS_DISETUJUI) {
+                    $this->reversalBarisDisetujui($row, $tiket);
+                }
+
+                $row->update([
+                    'status' => BagiHasil::STATUS_DIBATALKAN,
+                    'keterangan' => 'Dibatalkan — tiket '.$tiket->no_tiket.' batal/ditolak',
+                ]);
+            }
+        }, 3);
+    }
+
+    /**
+     * [AUDIT-FIX F-15] Pembalik proporsional untuk baris yang sudah accrual.
+     * Fail-closed: hanya periode 'selesai' (accrual terposting, belum dibayar)
+     * yang boleh dibalik otomatis; kondisi lain wajib penyesuaian manual.
+     */
+    protected function reversalBarisDisetujui(BagiHasil $row, TiketServis $tiket): void
+    {
+        $periodeRecord = BagiHasilPeriode::withoutCabangScope()
+            ->where('periode', $row->periode)
+            ->when(
+                $row->cabang_id,
+                fn ($q) => $q->where('cabang_id', $row->cabang_id),
+                fn ($q) => $q->whereNull('cabang_id')
+            )
+            ->first();
+
+        if (! $periodeRecord || $periodeRecord->status !== BagiHasilPeriode::STATUS_SELESAI) {
+            throw new \DomainException(
+                "Bagi hasil tiket {$tiket->no_tiket} sudah masuk periode yang tidak berstatus selesai "
+                .'(sudah dibayar atau tanpa accrual). Pembatalan wajib penyesuaian manual terdokumentasi.'
+            );
+        }
+
+        $nominal = (float) $row->nominal;
+        if ($nominal > 0) {
+            $this->pastikanCoa();
+
+            $noReversal = $this->jurnalService->generateNoJurnal('reversal', $row->cabang_id);
+            $this->jurnalService->post(
+                noJurnal: $noReversal,
+                tanggal: now(),
+                sumber: 'reversal',
+                lines: [
+                    ['akun_kode' => self::AKUN_UTANG, 'debit' => $nominal, 'kredit' => 0],
+                    ['akun_kode' => self::AKUN_BEBAN, 'debit' => 0, 'kredit' => $nominal],
+                ],
+                deskripsi: "Pembalik bagi hasil batal — tiket {$tiket->no_tiket} (periode {$row->periode})",
+                cabangId: $row->cabang_id,
+                userId: auth()->id(),
+                referensiTipe: BagiHasil::class,
+                referensiId: $row->id,
+                idempotencyKey: 'bagi-hasil-reversal:'.$row->id,
+            );
+
+            // Tautkan pembalik ke jurnal accrual asal untuk jejak audit.
+            JurnalHeader::where('no_jurnal', $noReversal)
+                ->where('cabang_key', (int) ($row->cabang_id ?? 0))
+                ->update(['reversal_of_no_jurnal' => $periodeRecord->no_jurnal_accrue]);
+        }
+
+        // Recompute total periode — tidak lagi memuat baris yang dibatalkan.
+        $periodeRecord->update([
+            'total' => max(0, (float) $periodeRecord->total - $nominal),
+            'jumlah_tiket' => max(0, (int) $periodeRecord->jumlah_tiket - 1),
+        ]);
     }
 
     public function getOrCreatePeriode(string $periode, ?int $cabangId = null): BagiHasilPeriode
@@ -187,6 +265,12 @@ class BagiHasilService
 
         if ($periodeRecord->status === BagiHasilPeriode::STATUS_DIBAYAR) {
             throw new \DomainException("Periode {$periode} sudah dibayar. Tidak dapat dihitung ulang.");
+        }
+
+        // [AUDIT-FIX F-15/F-16] Periode 'selesai' sudah dijurnal accrual —
+        // hitung ulang mengubah total tanpa repost jurnal (bayar ≠ accrual).
+        if ($periodeRecord->status === BagiHasilPeriode::STATUS_SELESAI) {
+            throw new \DomainException("Periode {$periode} sudah diproses (jurnal accrual sudah ada). Tidak dapat dihitung ulang.");
         }
 
         $rows = $this->queryPendingPeriode($periode, $target)->get();
@@ -276,7 +360,10 @@ class BagiHasilService
         return DB::transaction(function () use ($periode, $periodeRecord, $target, $total) {
             $this->pastikanCoa();
 
-            $noJurnal = 'JRL-BH-'.$periode;
+            // [AUDIT-FIX F-03] Nomor jurnal per cabang — guard idempotensi
+            // JurnalService global per no_jurnal; tanpa cabang, cabang kedua
+            // dengan periode sama selalu ditolak.
+            $noJurnal = 'JRL-BH-'.($target ?? 'X').'-'.$periode;
 
             $this->jurnalService->post(
                 noJurnal: $noJurnal,
@@ -323,12 +410,22 @@ class BagiHasilService
             throw new \DomainException("Periode {$periode} belum diproses (jurnal accrual belum ada).");
         }
 
-        $total = (float) $periodeRecord->total;
+        // [AUDIT-FIX F-15] Bayar hanya baris yang MASIH disetujui saat pembayaran
+        // (baris yang dibatalkan pasca-accrual sudah dibalik jurnalnya dan tidak
+        // boleh ikut dibayar). Total live, bukan periode.total yang bisa basi.
+        $total = (float) BagiHasil::where('periode', $periode)
+            ->when($target, fn ($q) => $q->where('cabang_id', $target), fn ($q) => $q->whereNull('cabang_id'))
+            ->where('status', BagiHasil::STATUS_DISETUJUI)
+            ->sum('nominal');
+        if ($total <= 0) {
+            throw new \DomainException("Tidak ada bagi hasil berstatus disetujui pada periode {$periode}. Tidak ada yang dapat dibayar.");
+        }
 
         return DB::transaction(function () use ($periode, $periodeRecord, $target, $total, $akunKasKode) {
             $this->pastikanCoa();
 
-            $noJurnal = 'JRL-BH-BAYAR-'.$periode;
+            // [AUDIT-FIX F-03] Nomor jurnal pembayaran per cabang (lihat prosesPeriode).
+            $noJurnal = 'JRL-BH-BAYAR-'.($target ?? 'X').'-'.$periode;
 
             $this->jurnalService->post(
                 noJurnal: $noJurnal,
@@ -353,6 +450,7 @@ class BagiHasilService
 
             $periodeRecord->update([
                 'status' => BagiHasilPeriode::STATUS_DIBAYAR,
+                'total' => $total,
                 'no_jurnal_bayar' => $noJurnal,
                 'paid_at' => now(),
             ]);
