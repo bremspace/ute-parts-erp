@@ -289,6 +289,27 @@ class CartService
         $produk = ! empty($item['product_id']) ? Produk::find($item['product_id']) : null;
         $baseSatuan = $produk?->satuan ?: 'pcs';
 
+        // Jika satuan pcs tapi qty mencukupi 1 box, coba konversi ke box
+        if ($satuan === 'pcs' && $produk) {
+            $boxFaktor = 0;
+            $boxPrice = 0;
+            foreach ($produk->getDaftarSatuan() as $s) {
+                if (strcasecmp($s['satuan_kode'], 'box') === 0) {
+                    $boxFaktor = (int) round((float) ($s['faktor_konversi'] ?? 1.0));
+                    $boxPrice = (float) ($s['harga_jual'] ?? 0);
+                    break;
+                }
+            }
+            if ($boxFaktor >= 2 && $qty >= $boxFaktor) {
+                $satuan = 'box';
+                $faktor = (float) $boxFaktor;
+                $faktorInt = $boxFaktor;
+                // pastikan faktor_konversi tersimpan
+                $cart[$key]['faktor_konversi'] = $faktor;
+                $cart[$key]['harga_satuan'] = $boxPrice > 0 ? $boxPrice : (float) ($item['harga'] ?? 0) * $faktor;
+            }
+        }
+
         // Harga per box & per pcs dari master
         $boxPrice = (float) ($item['harga_satuan'] ?? 0);
         if ($boxPrice <= 0 && $produk) {
