@@ -325,8 +325,8 @@ class ReturPenjualanIndex extends Component
                 'foto_bukti' => [],
                 'tukar_items' => [],
                 'tukar_search' => '',
-                'gudang_retur_id' => $this->asalGudangId ?? $transaksi->gudang_id,
-                'rak_retur_id' => $this->detectAsalRak($item->produk_id ?? null, $this->asalGudangId ?? $transaksi->gudang_id),
+                'gudang_retur_id' => null,
+                'rak_retur_id' => null,
             ];
         }
 
@@ -412,13 +412,23 @@ class ReturPenjualanIndex extends Component
         if (str_ends_with($key, '.kondisi_barang')) {
             $parts = explode('.', $key);
             $itemId = (int) $parts[0];
-            // Auto-detect gudang asal untuk barang normal (bagus) yang dikembalikan ke stok
-            if ($value === 'bagus' && empty($this->itemInputs[$itemId]['gudang_retur_id'])) {
-                $asalGudangId = $this->asalGudangId
-                    ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang?->id));
-                if ($asalGudangId) {
-                    $this->itemInputs[$itemId]['gudang_retur_id'] = $asalGudangId;
+            if ($value === 'bagus') {
+                // Auto-detect gudang & rak asal untuk barang normal
+                if (empty($this->itemInputs[$itemId]['gudang_retur_id'])) {
+                    $asalGudangId = $this->asalGudangId
+                        ?: (session('gudang_id') ?: (auth()->user()?->cabangs?->first()?->gudang?->id));
+                    if ($asalGudangId) {
+                        $this->itemInputs[$itemId]['gudang_retur_id'] = $asalGudangId;
+                        $this->itemInputs[$itemId]['rak_retur_id'] = $this->detectAsalRak(
+                            (int) ($this->transaksiItemData[$itemId]['produk_id'] ?? 0),
+                            $asalGudangId
+                        );
+                    }
                 }
+            } else {
+                // Cacat/rusak: wajib pindah gudang -> kosongkan agar user pilih gudang lain
+                $this->itemInputs[$itemId]['gudang_retur_id'] = null;
+                $this->itemInputs[$itemId]['rak_retur_id'] = null;
             }
         }
 
@@ -985,6 +995,7 @@ class ReturPenjualanIndex extends Component
         $totalReturQty = 0;
         $hasSnError = false;
         $hasTukarError = false;
+        $hasGudangError = false;
         $allTukarPrepared = [];
 
         foreach ($this->itemInputs as $itemId => $input) {
@@ -1020,6 +1031,12 @@ class ReturPenjualanIndex extends Component
                     $this->addError("itemInputs.{$itemId}.tukar_items", "Pilih minimal 1 produk pengganti untuk {$nama}.");
                     $this->addError('tukarItems', "Pilih minimal 1 produk pengganti untuk {$nama}.");
                     $hasTukarError = true;
+                }
+
+                $kondisiItem = $input['kondisi_barang'] ?? 'rusak';
+                if ($kondisiItem === 'rusak' && empty($input['gudang_retur_id'])) {
+                    $this->addError("itemInputs.{$itemId}.gudang_retur_id", "Barang cacat wajib dipindah ke gudang karantina lain (tidak boleh gudang asal).");
+                    $hasGudangError = true;
                 }
 
                 $itemTukarPrepared = [];
@@ -1075,6 +1092,12 @@ class ReturPenjualanIndex extends Component
 
         if ($hasTukarError) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih minimal satu produk pengganti untuk setiap item berstatus Tukar Barang.']);
+
+            return;
+        }
+
+        if ($hasGudangError) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Barang cacat wajib dipindah ke gudang karantina lain (tidak boleh gudang asal). Pilih gudang tujuan.']);
 
             return;
         }

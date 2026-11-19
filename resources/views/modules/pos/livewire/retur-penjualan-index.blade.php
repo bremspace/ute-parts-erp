@@ -592,7 +592,9 @@
                                                             <select wire:model.live="itemInputs.{{ $itemId }}.gudang_retur_id" @change="gudangId = $event.target.value" class="flex-1 px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer {{ empty($itemInputs[$itemId]['gudang_retur_id']) ? 'border-up-red/50' : '' }}">
                                                                 <option value="" class="bg-ink-900 text-white">-- Pilih Gudang --</option>
                                                                 @foreach($gudangs as $g)
-                                                                    <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
+                                                                    @if(($itemInputs[$itemId]['kondisi_barang'] ?? 'rusak') !== 'rusak' || (int)$g->id !== (int)$asalGudangId)
+                                                                        <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
+                                                                    @endif
                                                                 @endforeach
                                                             </select>
                                                             @if(($itemInputs[$itemId]['kondisi_barang'] ?? 'rusak') === 'bagus')
