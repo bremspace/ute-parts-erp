@@ -2,8 +2,10 @@
 
 namespace App\Modules\Pos\Services;
 
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\ReturnPenjualanItem;
 use App\Modules\Pos\Models\Transaksi;
@@ -22,6 +24,7 @@ use App\Modules\Wms\Services\StokDeductionService;
 use App\Modules\Workflow\Services\ApprovalService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ReturnPenjualanService
@@ -155,6 +158,26 @@ class ReturnPenjualanService
             $allTukarItems = [];
             $tipeCount = ['refund' => 0, 'tukar_produk' => 0];
 
+            // [H1] Rasio alokasi diskon header & PPN dari snapshot transaksi.
+            // Diskon header (nominal/persen/partai/poin) mengurangi DPP secara
+            // proporsional ke semua item; PPN retur = DPP retur x (pajak_nominal/DPP).
+            $trxSubtotal = (float) $transaksiLocked->subtotal;
+            $diskonHeader = (float) ($transaksiLocked->diskon_nominal ?? 0)
+                + (float) ($transaksiLocked->diskon_partai ?? 0)
+                + (float) ($transaksiLocked->diskon_poin ?? 0);
+            if ((float) ($transaksiLocked->diskon_persen ?? 0) > 0) {
+                $diskonHeader += round($trxSubtotal * (float) $transaksiLocked->diskon_persen / 100, 2);
+            }
+            $diskonHeader = min($trxSubtotal, $diskonHeader);
+            // Prefer DPP tersimpan (kanonik checkout, termasuk mode PPN inclusive);
+            // fallback rekonstruksi diskon utk transaksi legacy tanpa dpp.
+            $dppTrx = (float) ($transaksiLocked->dpp ?? 0);
+            if ($dppTrx <= 0) {
+                $dppTrx = max(0.0, $trxSubtotal - $diskonHeader);
+            }
+            $rasioNeto = $trxSubtotal > 0 ? $dppTrx / $trxSubtotal : 1.0;
+            $rasioPpn = $dppTrx > 0 ? (float) ($transaksiLocked->pajak_nominal ?? 0) / $dppTrx : 0.0;
+
             foreach ($items as $itemData) {
                 $trxItem = TransaksiItem::with('produk')->where('transaksi_id', $transaksiLocked->id)
                     ->whereKey($itemData['transaksi_item_id'])
@@ -211,9 +234,19 @@ class ReturnPenjualanService
 
                 // [FIX] qtyRetur dalam SATUAN (mis. box), bukan base unit. harga_satuan &
                 // hpp trxItem tersimpan per satuan. Refund/HPP = harga per satuan x qtyRetur.
-                $hargaSatuan = (float) ($trxItem->harga_final ?? $trxItem->harga_satuan ?? 0);
-                $hppSatuan = (float) ($trxItem->hpp ?? $trxItem->produk?->harga_beli ?? 0);
+                // [H1] Harga neto diskon item: harga_final (neto, ditulis checkout)
+                // fallback subtotal_item / jumlah. Diskon header dialokasikan proporsional.
+                $hargaNetoItem = $trxItem->harga_final !== null
+                    ? (float) $trxItem->harga_final
+                    : ((float) $trxItem->jumlah > 0
+                        ? (float) $trxItem->subtotal / (float) $trxItem->jumlah
+                        : (float) ($trxItem->harga_satuan ?? 0));
+                $subtotalDpp = round(round($hargaNetoItem * $qtyRetur, 2) * $rasioNeto, 2);
+                $hargaSatuan = $qtyRetur > 0 ? round($subtotalDpp / $qtyRetur, 2) : 0.0;
+                // Kontrak: refund item = harga_satuan (neto teralokasi) x qtyRetur.
                 $subtotal = round($hargaSatuan * $qtyRetur, 2);
+                $ppnRetur = round($subtotal * $rasioPpn, 2);
+                $hppSatuan = (float) ($trxItem->hpp ?? $trxItem->produk?->harga_beli ?? 0);
                 $subtotalHpp = round($hppSatuan * $qtyRetur, 2);
                 // hpp per base unit untuk disimpan (eksekusiRetur menghitung hpp x qtyBase).
                 $hppPerBase = $hppSatuan / $konversiTrx;
@@ -257,6 +290,7 @@ class ReturnPenjualanService
                     'konversi' => $konversiTrx,
                     'harga_satuan' => $hargaSatuan,
                     'subtotal' => $subtotal,
+                    'ppn_nominal' => $ppnRetur,
                     'hpp' => $hppPerBase,
                     'sn' => $snList,
                     'kondisi_barang' => $kondisi,
@@ -270,7 +304,7 @@ class ReturnPenjualanService
                     'rak_retur_id' => $itemData['rak_retur_id'] ?? null,
                 ];
 
-                $totalRetur += $subtotal;
+                $totalRetur += $subtotal + $ppnRetur;
                 $totalHpp += $subtotalHpp;
             }
 
@@ -360,6 +394,7 @@ class ReturnPenjualanService
                     'jumlah' => $prep['qty'],
                     'harga_satuan' => $prep['harga_satuan'],
                     'subtotal' => $prep['subtotal'],
+                    'ppn_nominal' => $prep['ppn_nominal'],
                     'hpp' => $prep['hpp'],
                     'kondisi_barang' => $prep['kondisi_barang'],
                     'nomor_seri' => $prep['sn'],
@@ -540,6 +575,10 @@ class ReturnPenjualanService
 
     /**
      * Finalisasi eksekusi retur: kembalikan stok fisik & catat jurnal pembukuan.
+     *
+     * Catatan: $totalHpp dipertahankan utk kompatibilitas pemanggil lama
+     * (ApprovalService/buatRetur) tetapi DIABAIKAN — HPP selalu dihitung ulang
+     * dari snapshot item (hpp per base x qtyDasar) dan dipisah bagus/rusak [H4].
      */
     public function eksekusiRetur(ReturnPenjualan $retur, ?float $totalHpp = null, ?int $userId = null): void
     {
@@ -547,7 +586,7 @@ class ReturnPenjualanService
             return;
         }
 
-        DB::transaction(function () use ($retur, $totalHpp, $userId) {
+        DB::transaction(function () use ($retur, $userId) {
             $cabangId = (int) ($retur->cabang_id ?: ($retur->transaksi?->cabang_id ?: (session('cabang_id') ?: Cabang::value('id') ?: 1)));
             $gudangId = $this->resolveGudangId($retur->gudang_id ? (int) $retur->gudang_id : null, $cabangId);
 
@@ -562,7 +601,10 @@ class ReturnPenjualanService
             $totalNilaiRetur = (float) $retur->jumlah;
             $stokDeductionService = app(StokDeductionService::class);
 
-            $hitungHpp = 0;
+            // [H4] Pisahkan HPP barang bagus (kembali ke persediaan) vs rusak
+            // (write-down NRV; tidak masuk stok siap jual maupun GL 130-01).
+            $hppBagus = 0.0;
+            $hppRusak = 0.0;
 
             foreach ($retur->items as $item) {
                 $qty = (int) $item->jumlah;
@@ -577,7 +619,12 @@ class ReturnPenjualanService
                 $produkId = (int) $item->produk_id;
                 $skuVariantId = $item->sku_variant_id ? (int) $item->sku_variant_id : null;
                 $hppSatuan = (float) ($item->hpp ?? $item->produk?->harga_beli ?? 0);
-                $hitungHpp += ($hppSatuan * $qtyBase);
+                $hppItem = $hppSatuan * $qtyBase;
+                if ($item->kondisi_barang === 'bagus') {
+                    $hppBagus += $hppItem;
+                } else {
+                    $hppRusak += $hppItem;
+                }
 
                 // HANYA barang berstatus BAGUS yang dimasukkan kembali ke stok aktif siap jual
                 if ($item->kondisi_barang === 'bagus') {
@@ -627,7 +674,11 @@ class ReturnPenjualanService
                 }
             }
 
-            $hppFinal = $totalHpp ?? $hitungHpp;
+            // [H1] Pisah DPP vs PPN retur. retur->jumlah = DPP + PPN (snapshot
+            // ppn_nominal per item dibuat saat buatRetur); retur legacy tanpa
+            // ppn_nominal → seluruh nilai dianggap DPP (perilaku lama).
+            $ppnRetur = min($totalNilaiRetur, round((float) $retur->items->sum('ppn_nominal'), 2));
+            $dppRetur = round($totalNilaiRetur - $ppnRetur, 2);
 
             // Jika tukar_produk dan belum diproses transaksi penggantinya (misal dari deferred approval)
             if ($retur->tipe_penyelesaian === 'tukar_produk' && ! $retur->tukar_transaksi_id && ! empty($retur->tukar_items_payload)) {
@@ -637,45 +688,125 @@ class ReturnPenjualanService
 
             // Jurnal Pembukuan Retur:
             // Jika refund:
-            // 1. Akun 410-02 (Retur Penjualan) Debit / Akun Kas/Piutang Kredit (Nilai Jual)
-            // 2. Akun 130-01 (Persediaan) Debit / Akun 510-02 (HPP) Kredit (Nilai HPP)
+            // 1. Dr 410-02 (Retur Penjualan) = DPP neto retur; Dr 220-01 = porsi
+            //    PPN keluaran dibalik [H1]; Kredit kas/piutang/deposit = total.
+            // 2. Barang bagus: Dr 130-01 / Cr 510-02 (HPP) + restore stok.
+            //    Barang rusak: Dr 520-08 / Cr 510-02 — write-down NRV=0 [H4],
+            //    tidak menambah GL persediaan (barang di pool karantina).
             if ($retur->tipe_penyelesaian === 'refund') {
-                $akunKreditPengembalian = $retur->metode_pengembalian === 'piutang' ? '120-01' : '110-01';
+                $noJurnal = $this->jurnalService->generateNoJurnal('retur', $cabangId);
+                $lines = [];
+                if ($dppRetur > 0) {
+                    $lines[] = ['akun_kode' => '410-02', 'debit' => $dppRetur, 'kredit' => 0];
+                }
+                if ($ppnRetur > 0) {
+                    $lines[] = ['akun_kode' => '220-01', 'debit' => $ppnRetur, 'kredit' => 0];
+                }
 
                 if ($retur->metode_pengembalian === 'piutang') {
+                    // [H3] Lookup referensi_tipe+referensi_id (di-set checkout),
+                    // fallback transaksi_id utk piutang POS legacy / servis.
                     $piutang = Piutang::where('referensi_tipe', Transaksi::class)
                         ->where('referensi_id', $retur->transaksi_id)
+                        ->orderBy('id')
                         ->first();
+                    if (! $piutang) {
+                        $piutang = Piutang::where('transaksi_id', $retur->transaksi_id)
+                            ->where(fn ($q) => $q->whereNull('referensi_tipe')->orWhere('referensi_tipe', Transaksi::class))
+                            ->orderBy('id')
+                            ->first();
+                    }
                     if ($piutang) {
-                        $piutang->increment('jumlah_dibayar', $totalNilaiRetur);
-                        if ((float) $piutang->jumlah_dibayar >= (float) $piutang->jumlah - 0.01) {
-                            $piutang->update(['status' => 'lunas']);
+                        $dibayarBaru = min(
+                            (float) $piutang->jumlah,
+                            round((float) $piutang->jumlah_dibayar + $totalNilaiRetur, 2)
+                        );
+                        $piutang->update([
+                            'jumlah_dibayar' => $dibayarBaru,
+                            'status' => $dibayarBaru >= (float) $piutang->jumlah - 0.01 ? 'lunas' : $piutang->status,
+                        ]);
+                    }
+                    // [H3] Plafon kasbon pelanggan ikut turun (floor 0).
+                    if ($retur->pelanggan_id) {
+                        $pelangganAr = Pelanggan::find($retur->pelanggan_id);
+                        if ($pelangganAr) {
+                            $pelangganAr->update([
+                                'saldo_piutang' => max(0, round((float) $pelangganAr->saldo_piutang - $totalNilaiRetur, 2)),
+                            ]);
                         }
+                    }
+                    if ($totalNilaiRetur > 0) {
+                        $lines[] = ['akun_kode' => '120-01', 'debit' => 0, 'kredit' => $totalNilaiRetur];
+                    }
+                } elseif ($retur->metode_pengembalian === 'saldo') {
+                    // [H2] Refund ke deposit pelanggan: kredit liabilitas 210-07,
+                    // bukan kas. Subledger pelanggan.saldo_deposit bertambah.
+                    AkunCOA::firstOrCreate(
+                        ['kode' => '210-07'],
+                        ['nama' => 'Deposit Pelanggan', 'tipe' => 'kewajiban', 'kelompok' => 'utang_lain', 'saldo_normal' => 'kredit', 'is_active' => true]
+                    );
+                    if ($retur->pelanggan_id && $totalNilaiRetur > 0) {
+                        Pelanggan::where('id', $retur->pelanggan_id)->increment('saldo_deposit', $totalNilaiRetur);
+                    }
+                    if ($totalNilaiRetur > 0) {
+                        $lines[] = ['akun_kode' => '210-07', 'debit' => 0, 'kredit' => $totalNilaiRetur];
+                    }
+                } elseif ($totalNilaiRetur > 0) {
+                    // [H2] Refund kas: hormati metode bayar asal. Tunai → Kas Laci
+                    // (110-04) + mutasi laci 'keluar' bila ada sesi buka; tanpa
+                    // sesi → Kas Toko (110-01). Bank/QRIS → 110-02. Split →
+                    // alokasi proporsional porsi tunai & non-tunai.
+                    $transaksiAsal = $retur->transaksi;
+                    $metodeAsal = strtolower((string) ($transaksiAsal?->metode_bayar ?? 'tunai'));
+                    $porsiTunai = $totalNilaiRetur;
+                    $porsiBank = 0.0;
+                    if ($metodeAsal === 'split') {
+                        $detail = (array) ($transaksiAsal?->split_detail ?? []);
+                        $totalAsal = (float) ($transaksiAsal?->total_akhir ?? 0);
+                        $nonTunaiAsal = min($totalAsal, (float) ($detail['non_tunai'] ?? 0));
+                        $tunaiAsal = max(0.0, $totalAsal - $nonTunaiAsal);
+                        $rasio = $totalAsal > 0 ? $totalNilaiRetur / $totalAsal : 1.0;
+                        $porsiTunai = round(min($totalNilaiRetur, $tunaiAsal * $rasio), 2);
+                        $porsiBank = round($totalNilaiRetur - $porsiTunai, 2);
+                    } elseif (! in_array($metodeAsal, ['tunai', 'piutang', 'kasbon'], true)) {
+                        $porsiTunai = 0.0;
+                        $porsiBank = $totalNilaiRetur;
+                    }
+
+                    if ($porsiTunai > 0) {
+                        $dariLaci = $this->catatRefundKasLaci($retur, $porsiTunai, $cabangId, $userId, $noJurnal);
+                        $lines[] = ['akun_kode' => $dariLaci ? '110-04' : '110-01', 'debit' => 0, 'kredit' => $porsiTunai];
+                    }
+                    if ($porsiBank > 0) {
+                        $lines[] = ['akun_kode' => '110-02', 'debit' => 0, 'kredit' => $porsiBank];
                     }
                 }
 
-                $lines = [
-                    ['akun_kode' => '410-02', 'debit' => $totalNilaiRetur, 'kredit' => 0],
-                    ['akun_kode' => $akunKreditPengembalian, 'debit' => 0, 'kredit' => $totalNilaiRetur],
-                ];
-
-                if ($hppFinal > 0) {
-                    $lines[] = ['akun_kode' => '130-01', 'debit' => $hppFinal, 'kredit' => 0];
-                    $lines[] = ['akun_kode' => '510-02', 'debit' => 0, 'kredit' => $hppFinal];
+                // [H4] Hanya barang bagus yang kembali ke persediaan (130-01).
+                if ($hppBagus > 0) {
+                    $lines[] = ['akun_kode' => '130-01', 'debit' => $hppBagus, 'kredit' => 0];
+                    $lines[] = ['akun_kode' => '510-02', 'debit' => 0, 'kredit' => $hppBagus];
+                }
+                // Barang rusak: kerugian write-down NRV (asumsi NRV=0; nilai
+                // recovery dari supplier diakui nanti saat klaim retur pembelian).
+                if ($hppRusak > 0) {
+                    $lines[] = ['akun_kode' => '520-08', 'debit' => $hppRusak, 'kredit' => 0];
+                    $lines[] = ['akun_kode' => '510-02', 'debit' => 0, 'kredit' => $hppRusak];
                 }
 
-                $noJurnal = $this->jurnalService->generateNoJurnal('retur', $cabangId);
-                $this->jurnalService->post(
-                    $noJurnal,
-                    now(),
-                    'retur',
-                    $lines,
-                    "Retur Penjualan {$retur->no_return} (Nota: {$retur->transaksi?->no_transaksi})",
-                    $cabangId,
-                    $userId,
-                    ReturnPenjualan::class,
-                    $retur->id
-                );
+                if (! empty($lines)) {
+                    $this->jurnalService->post(
+                        $noJurnal,
+                        now(),
+                        'retur',
+                        $lines,
+                        "Retur Penjualan {$retur->no_return} (Nota: {$retur->transaksi?->no_transaksi})",
+                        $cabangId,
+                        $userId,
+                        ReturnPenjualan::class,
+                        $retur->id
+                    );
+                }
             } elseif ($retur->tipe_penyelesaian === 'tukar_produk') {
                 // Jurnal Pembukuan Retur Tukar Produk (Exchange)
                 // 1. Pembalikan penjualan item retur:
@@ -695,8 +826,11 @@ class ReturnPenjualanService
                 // Karena $totalNilaiRetur + $selisih == $totalNilaiPengganti, sisi nominal pendapatan seimbang.
 
                 $tukarTrx = $retur->tukarTransaksi;
-                $totalNilaiPengganti = $tukarTrx ? (float) $tukarTrx->total_akhir : $totalNilaiRetur;
-                $selisihNominal = max(0, round((float) ($retur->selisih_nominal ?? ($totalNilaiPengganti - $totalNilaiRetur)), 2));
+                // Basis DPP (tanpa PPN) — perlakuan PPN tukar produk menyusul (M2);
+                // menjaga jurnal tukar tetap balance seperti perilaku sebelumnya.
+                $nilaiReturTukar = $dppRetur;
+                $totalNilaiPengganti = $tukarTrx ? (float) $tukarTrx->total_akhir : $nilaiReturTukar;
+                $selisihNominal = max(0, round((float) ($retur->selisih_nominal ?? ($totalNilaiPengganti - $nilaiReturTukar)), 2));
 
                 $hppPengganti = 0;
                 if ($tukarTrx) {
@@ -708,7 +842,7 @@ class ReturnPenjualanService
                 }
 
                 $lines = [
-                    ['akun_kode' => '410-02', 'debit' => $totalNilaiRetur, 'kredit' => 0],
+                    ['akun_kode' => '410-02', 'debit' => $nilaiReturTukar, 'kredit' => 0],
                     ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $totalNilaiPengganti],
                 ];
 
@@ -716,9 +850,15 @@ class ReturnPenjualanService
                     $lines[] = ['akun_kode' => '110-01', 'debit' => $selisihNominal, 'kredit' => 0];
                 }
 
-                if ($hppFinal > 0) {
-                    $lines[] = ['akun_kode' => '130-01', 'debit' => $hppFinal, 'kredit' => 0];
-                    $lines[] = ['akun_kode' => '510-02', 'debit' => 0, 'kredit' => $hppFinal];
+                // [H4] Sama seperti refund: hanya barang bagus kembali ke 130-01;
+                // barang rusak diakui write-down NRV di 520-08.
+                if ($hppBagus > 0) {
+                    $lines[] = ['akun_kode' => '130-01', 'debit' => $hppBagus, 'kredit' => 0];
+                    $lines[] = ['akun_kode' => '510-02', 'debit' => 0, 'kredit' => $hppBagus];
+                }
+                if ($hppRusak > 0) {
+                    $lines[] = ['akun_kode' => '520-08', 'debit' => $hppRusak, 'kredit' => 0];
+                    $lines[] = ['akun_kode' => '510-02', 'debit' => 0, 'kredit' => $hppRusak];
                 }
 
                 if ($hppPengganti > 0) {
@@ -742,6 +882,72 @@ class ReturnPenjualanService
 
             $retur->update(['status' => 'selesai']);
         });
+    }
+
+    /**
+     * [H2] Catat pengeluaran refund retur di kas_mutasi_laci (pola
+     * GrnService::catatPengeluaranKasLaci): murni baris subledger drawer —
+     * jurnal GL (Cr 110-04) sudah diposting oleh eksekusiRetur, jadi TIDAK
+     * ada jurnal kedua di sini. Idempoten per (sesi, no_jurnal, jenis).
+     *
+     * @return bool true bila refund keluar dari laci (sesi buka ditemukan);
+     *              false bila tidak ada sesi → caller kredit Kas Toko 110-01.
+     */
+    protected function catatRefundKasLaci(ReturnPenjualan $retur, float $nominal, int $cabangId, ?int $userId, string $noJurnal): bool
+    {
+        if ($nominal <= 0 || ! Schema::hasTable('kas_mutasi_laci') || ! Schema::hasTable('kas_sesi')) {
+            return false;
+        }
+
+        // Prioritas 1: sesi buka milik kasir yang mengeksekusi retur.
+        $sesi = DB::table('kas_sesi')
+            ->where('cabang_id', $cabangId)
+            ->where('status', 'buka')
+            ->where('user_id', $userId)
+            ->latest('id')
+            ->first();
+
+        // Prioritas 2: sesi buka apa pun di cabang (sesi bersama legacy).
+        if (! $sesi) {
+            $sesi = DB::table('kas_sesi')
+                ->where('cabang_id', $cabangId)
+                ->where('status', 'buka')
+                ->latest('id')
+                ->first();
+        }
+
+        if (! $sesi) {
+            return false;
+        }
+
+        // user_id wajib (FK users); tanpa kasir teridentifikasi → bukan dari laci.
+        $kasirId = $sesi->user_id ?? $userId;
+        if (! $kasirId) {
+            return false;
+        }
+
+        $exists = DB::table('kas_mutasi_laci')
+            ->where('kas_sesi_id', $sesi->id)
+            ->where('no_jurnal', $noJurnal)
+            ->where('jenis', 'keluar')
+            ->exists();
+
+        if (! $exists) {
+            DB::table('kas_mutasi_laci')->insert([
+                'kas_sesi_id' => $sesi->id,
+                'cabang_id' => $cabangId,
+                'user_id' => $kasirId,
+                'jenis' => 'keluar',
+                'nominal' => $nominal,
+                'akun_lawan_kode' => '410-02',
+                'keterangan' => "Refund Retur Penjualan {$retur->no_return} (Nota: {$retur->transaksi?->no_transaksi})",
+                'no_jurnal' => $noJurnal,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return true;
     }
 
     public function tolakRetur(ReturnPenjualan $retur, ?string $alasan = null): void

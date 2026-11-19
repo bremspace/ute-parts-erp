@@ -21,9 +21,12 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string $nama
  * @property string|null $telepon
  * @property string|null $alamat
+ * @property string $saldo_piutang
+ * @property string $max_piutang
+ * @property string $saldo_deposit
  * @property-read null $cabangs Pelanggan tidak memiliki relasi cabang; akses magic Eloquent selalu resolve null (kode POS memakai fallback nullsafe).
  */
-#[Fillable(['nama', 'username', 'telepon', 'email', 'avatar', 'alamat', 'tanggal_lahir', 'tier_membership_id', 'is_reseller', 'kode_agen', 'referral_kode', 'tipe_konsumen', 'mode_reward_mitra', 'total_belanja_12bulan', 'poin_loyalty', 'saldo_piutang', 'max_piutang', 'password', 'status', 'catatan_approval', 'approved_at', 'approved_by'])]
+#[Fillable(['nama', 'username', 'telepon', 'email', 'avatar', 'alamat', 'tanggal_lahir', 'tier_membership_id', 'is_reseller', 'kode_agen', 'referral_kode', 'tipe_konsumen', 'mode_reward_mitra', 'total_belanja_12bulan', 'poin_loyalty', 'saldo_piutang', 'max_piutang', 'saldo_deposit', 'password', 'status', 'catatan_approval', 'approved_at', 'approved_by'])]
 #[Hidden(['password', 'remember_token'])]
 class Pelanggan extends Model implements Authenticatable
 {
@@ -43,6 +46,7 @@ class Pelanggan extends Model implements Authenticatable
         'total_belanja_12bulan' => 'decimal:2',
         'saldo_piutang' => 'decimal:2',
         'max_piutang' => 'decimal:2',
+        'saldo_deposit' => 'decimal:2',
         'poin_loyalty' => 'integer',
         'password' => 'hashed',
     ];
