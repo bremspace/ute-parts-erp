@@ -3,10 +3,12 @@
 namespace App\Modules\Akunting\Models;
 
 use App\Models\User;
+use App\Modules\Akunting\Services\ExportLaporanService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * [B-10a / P0-3] Header 1 entri jurnal double-entry.
@@ -64,6 +66,19 @@ class JurnalHeader extends Model
      */
     protected static function booted(): void
     {
+        // [A-6] Approve/reject maker-checker mengubah laporan (filter
+        // status_approval) → invalidasi cache laporan cabang + konsolidasi.
+        static::updated(function (self $header): void {
+            if ($header->wasChanged('status_approval')) {
+                ExportLaporanService::bumpVersiCacheLaporan($header->cabang_id);
+                ExportLaporanService::bumpVersiCacheLaporan(null);
+                DB::afterCommit(function () use ($header): void {
+                    ExportLaporanService::bumpVersiCacheLaporan($header->cabang_id);
+                    ExportLaporanService::bumpVersiCacheLaporan(null);
+                });
+            }
+        });
+
         static::updating(function (self $header) {
             $immutableFields = [
                 'no_jurnal', 'cabang_id', 'cabang_key', 'tanggal', 'sumber',

@@ -398,12 +398,18 @@ class AkuntingDashboard extends Component
         $cacheKey = $cabangId !== null
             ? 'laporan-labarugi-'.$cabangId.'-'.$dari.'-'.$sampai
             : 'laporan-labarugi-konsolidasi-'.$dari.'-'.$sampai;
+        // [A-6] key berversi — posting/approval menaikkan versi cabang.
+        $cacheKey = ExportLaporanService::keyCacheLaporan($cacheKey, $cabangId);
 
         return Cache::remember(
             $cacheKey,
             self::LAPORAN_PERIODE_CACHE_TTL,
             function () use ($dari, $sampai, $cabangId): array {
-                $perAkun = $this->agregatJurnalPeriode($dari, $sampai, $cabangId);
+                // Agregat kini ikut membawa akun yang hanya bergerak sebelum
+                // periode (demi saldo awal kas arus kas) — laporan periode
+                // hanya menampilkan akun dengan mutasi periode != 0.
+                $perAkun = $this->agregatJurnalPeriode($dari, $sampai, $cabangId)
+                    ->filter(fn (array $a): bool => $a['total_debit'] != 0.0 || $a['total_kredit'] != 0.0);
 
                 $pendapatan = $perAkun->where('tipe', 'pendapatan')->map(fn (array $a): array => [
                     'nama' => $a['nama'],
@@ -439,44 +445,13 @@ class AkuntingDashboard extends Component
      * `groupBy()` di PHP) menampilkan akun sesuai urutan jurnal pertama, jadi
      * urutan itu dipertahankan agar tampilan tidak berubah.
      *
-     * @return Collection<int,array{akun_coa_id:int,kode:string,nama:string,tipe:string,kelompok:string,saldo_normal:string,total_debit:float,total_kredit:float}>
+     * @return Collection<int,array{akun_coa_id:int,kode:string,nama:string,tipe:string,kelompok:string,saldo_normal:string,total_debit:float,total_kredit:float,kumulatif_debit:float,kumulatif_kredit:float}>
      */
     private function agregatJurnalPeriode(string $dari, string $sampai, ?int $cabangId): Collection
     {
-        $query = JurnalAkuntansi::query()
-            ->join('akun_coa', 'akun_coa.id', '=', 'jurnal_akuntansi.akun_coa_id');
-
-        // [B-10a / P0-2] scope cabang aktif (jika null = konsolidasi seluruh cabang)
-        if ($cabangId !== null) {
-            $query->where('jurnal_akuntansi.cabang_id', $cabangId);
-        }
-
-        return $query->whereDate('jurnal_akuntansi.tanggal', '>=', $dari)
-            ->whereDate('jurnal_akuntansi.tanggal', '<=', $sampai)
-            ->select('jurnal_akuntansi.akun_coa_id')
-            ->selectRaw('akun_coa.kode, akun_coa.nama, akun_coa.tipe, akun_coa.kelompok, akun_coa.saldo_normal')
-            ->selectRaw('SUM(jurnal_akuntansi.debit) as total_debit, SUM(jurnal_akuntansi.kredit) as total_kredit')
-            ->selectRaw('MIN(jurnal_akuntansi.id) as urut_pertama')
-            ->groupBy(
-                'jurnal_akuntansi.akun_coa_id',
-                'akun_coa.kode',
-                'akun_coa.nama',
-                'akun_coa.tipe',
-                'akun_coa.kelompok',
-                'akun_coa.saldo_normal',
-            )
-            ->orderBy('urut_pertama')
-            ->get()
-            ->map(fn (JurnalAkuntansi $a): array => [
-                'akun_coa_id' => (int) $a->akun_coa_id,
-                'kode' => (string) $a->kode,
-                'nama' => (string) $a->nama,
-                'tipe' => (string) $a->tipe,
-                'kelompok' => (string) $a->kelompok,
-                'saldo_normal' => (string) $a->saldo_normal,
-                'total_debit' => (float) $a->total_debit,
-                'total_kredit' => (float) $a->total_kredit,
-            ]);
+        // [A-1/A-2] Sumber tunggal dgn export/API: hanya jurnal disetujui,
+        // tanpa ayat penutup (lihat ExportLaporanService::agregatJurnalPeriode).
+        return app(ExportLaporanService::class)->agregatJurnalPeriode($cabangId, $dari, $sampai);
     }
 
     /**
@@ -501,6 +476,8 @@ class AkuntingDashboard extends Component
         $cacheKey = $cabangId !== null
             ? 'laporan-neraca-'.$cabangId.'-'.$sampai
             : 'laporan-neraca-konsolidasi-'.$sampai;
+        // [A-6] key berversi — posting/approval menaikkan versi cabang.
+        $cacheKey = ExportLaporanService::keyCacheLaporan($cacheKey, $cabangId);
 
         return Cache::remember(
             $cacheKey,
@@ -775,18 +752,13 @@ class AkuntingDashboard extends Component
 
     public function bersihkanCacheLaporan(): void
     {
+        // [A-6] Invalidasi SEMUA laporan (laba rugi, neraca, arus kas, trial
+        // balance, pajak — semua periode, cabang + konsolidasi) sekaligus via
+        // versioned cache key. Sebelumnya hanya 6 key neraca/laba rugi periode
+        // aktif yang dibersihkan → arus kas/neraca saldo/pajak basi s/d 15 menit.
         $cabangId = $this->cabangAktif();
-        $keys = [
-            'laporan-neraca-'.$cabangId.'-'.$this->periodeSampai,
-            'laporan-neraca-'.$cabangId.'-'.now()->toDateString(),
-            'laporan-neraca-konsolidasi-'.$this->periodeSampai,
-            'laporan-neraca-konsolidasi-'.now()->toDateString(),
-            'laporan-labarugi-'.$cabangId.'-'.$this->periodeDari.'-'.$this->periodeSampai,
-            'laporan-labarugi-konsolidasi-'.$this->periodeDari.'-'.$this->periodeSampai,
-        ];
-        foreach ($keys as $k) {
-            Cache::forget($k);
-        }
+        ExportLaporanService::bumpVersiCacheLaporan($cabangId);
+        ExportLaporanService::bumpVersiCacheLaporan(null);
     }
 
     public function segarkanLaporan(): void
@@ -915,8 +887,10 @@ class AkuntingDashboard extends Component
         $cabangId = $this->cabangScopeId();
 
         // 1. Hitung saldo awal kumulatif sebelum tanggal $dari
-        $queryAwal = JurnalAkuntansi::where('akun_coa_id', $akun->id)
-            ->whereDate('tanggal', '<', $dari);
+        // [A-1/F-02] hanya jurnal disetujui (atau baris legacy tanpa header).
+        $queryAwal = ExportLaporanService::hanyaDisetujui(
+            JurnalAkuntansi::where('akun_coa_id', $akun->id)->whereDate('tanggal', '<', $dari)
+        );
         if ($cabangId !== null) {
             $queryAwal->where('cabang_id', $cabangId);
         }
@@ -926,10 +900,12 @@ class AkuntingDashboard extends Component
         $saldoAwal = $akun->saldo_normal === 'debit' ? ($debAwal - $kreAwal) : ($kreAwal - $debAwal);
 
         // 2. Ambil entri mutasi periode
-        $queryPeriode = JurnalAkuntansi::with(['cabang', 'user'])
-            ->where('akun_coa_id', $akun->id)
-            ->whereDate('tanggal', '>=', $dari)
-            ->whereDate('tanggal', '<=', $sampai);
+        $queryPeriode = ExportLaporanService::hanyaDisetujui(
+            JurnalAkuntansi::with(['cabang', 'user'])
+                ->where('akun_coa_id', $akun->id)
+                ->whereDate('tanggal', '>=', $dari)
+                ->whereDate('tanggal', '<=', $sampai)
+        );
         if ($cabangId !== null) {
             $queryPeriode->where('cabang_id', $cabangId);
         }
@@ -1334,14 +1310,12 @@ class AkuntingDashboard extends Component
     }
 
     /**
-     * [B-15b] Arus kas (metode tidak langsung) = agregasi SQL per akun COA
-     * + cache 15 menit. Semua angka, tanda, dan pembulatan TIDAK berubah —
-     * hanya sumber datanya: bukan semua baris jurnal periode, tapi hasil
-     * `GROUP BY akun` (lihat `agregatJurnalPeriode()`).
+     * [B-15b] Arus kas (metode tidak langsung) + cache 15 menit.
      *
-     * Peringatan: delta piutang/persediaan/utang di sini adalah PERGERAKAN
-     * periode (debit - kredit), bukan saldo akhir — itu kontrak lama (sama
-     * dengan API [API: ACC-04b]) dan sengaja dipertahankan.
+     * [A-4/A-5] Perhitungan didelegasikan ke ExportLaporanService::arusKasTidakLangsung
+     * — sumber tunggal yang SAMA dengan API ACC-04b dan export Excel/CSV:
+     * add-back depresiasi, delta piutang/utang berbasis kelompok akun,
+     * dan rekonsiliasi ke saldo kas/bank riil.
      */
     public function getArusKasProperty(): array
     {
@@ -1351,55 +1325,13 @@ class AkuntingDashboard extends Component
         $cacheKey = $cabangId !== null
             ? 'laporan-aruskas-'.$cabangId.'-'.$dari.'-'.$sampai
             : 'laporan-aruskas-konsolidasi-'.$dari.'-'.$sampai;
+        // [A-6] key berversi — posting/approval menaikkan versi cabang.
+        $cacheKey = ExportLaporanService::keyCacheLaporan($cacheKey, $cabangId);
 
         return Cache::remember(
             $cacheKey,
             self::LAPORAN_PERIODE_CACHE_TTL,
-            function () use ($dari, $sampai, $cabangId): array {
-                $akun = $this->agregatJurnalPeriode($dari, $sampai, $cabangId);
-
-                $labaBersih = round(
-                    $akun->where('tipe', 'pendapatan')->sum(fn (array $a) => $a['total_kredit'] - $a['total_debit'])
-                    - $akun->where('tipe', 'beban')->sum(fn (array $a) => $a['total_debit'] - $a['total_kredit']),
-                    2
-                );
-
-                $piutangDelta = round($akun->where('kode', '120-01')->sum('total_debit') - $akun->where('kode', '120-01')->sum('total_kredit'), 2);
-                $persediaanDelta = round($akun->where('kode', '130-01')->sum('total_debit') - $akun->where('kode', '130-01')->sum('total_kredit'), 2);
-                $utangDelta = round(
-                    $akun->where('kode', '210-01')->sum('total_kredit') - $akun->where('kode', '210-01')->sum('total_debit')
-                    + $akun->where('kode', '210-03')->sum('total_kredit') - $akun->where('kode', '210-03')->sum('total_debit'),
-                    2
-                );
-
-                $arusKasOperasi = round($labaBersih - $piutangDelta - $persediaanDelta + $utangDelta, 2);
-
-                $arusInvestasi = round(
-                    -$akun->where('kelompok', 'aset_tetap')->sum(fn (array $a) => $a['total_debit'] - $a['total_kredit'])
-                    - $akun->where('kelompok', 'peralatan')->sum(fn (array $a) => $a['total_debit'] - $a['total_kredit'])
-                    - $akun->where('kelompok', 'perlengkapan')->sum(fn (array $a) => $a['total_debit'] - $a['total_kredit']),
-                    2
-                );
-
-                $arusPendanaan = round(
-                    $akun->where('kelompok', 'modal')->sum(fn (array $a) => $a['total_kredit'] - $a['total_debit'])
-                    + $akun->where('kelompok', 'laba_ditahan')->sum(fn (array $a) => $a['total_kredit'] - $a['total_debit']),
-                    2
-                );
-
-                return [
-                    'laba_bersih' => $labaBersih,
-                    'penyesuaian' => [
-                        'kenaikan_piutang' => -$piutangDelta,
-                        'kenaikan_persediaan' => -$persediaanDelta,
-                        'kenaikan_utang' => $utangDelta,
-                    ],
-                    'arus_kas_operasi' => $arusKasOperasi,
-                    'arus_kas_investasi' => $arusInvestasi,
-                    'arus_kas_pendanaan' => $arusPendanaan,
-                    'kenaikan_kas_neto' => round($arusKasOperasi + $arusInvestasi + $arusPendanaan, 2),
-                ];
-            }
+            fn (): array => app(ExportLaporanService::class)->arusKasTidakLangsung($cabangId, $dari, $sampai)
         );
     }
 
