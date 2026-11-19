@@ -36,6 +36,69 @@ class CartService
     public function all(): array
     {
         $cart = Session::get('shop.cart', []);
+        // Backfill satuan/qty_satuan/harga_satuan untuk item keranjang lama (termasuk harga per box yang benar)
+        $needSave = false;
+        foreach ($cart as $k => $it) {
+            $produk = ! empty($it['product_id']) ? Produk::find($it['product_id']) : null;
+            $baseSatuan = $produk?->satuan ?: 'pcs';
+
+            if (! isset($it['satuan'])) {
+                $cart[$k]['satuan'] = $baseSatuan;
+                $needSave = true;
+            }
+            $satuan = $cart[$k]['satuan'];
+
+            // faktor & harga per satuan dari master (bukan asumsi 1)
+            $faktor = 1.0;
+            $hargaSatuanMaster = null;
+            if ($produk && strcasecmp($satuan, $baseSatuan) !== 0) {
+                foreach ($produk->getDaftarSatuan() as $s) {
+                    if (strcasecmp($s['satuan_kode'], $satuan) === 0) {
+                        $faktor = (float) ($s['faktor_konversi'] ?? 1.0);
+                        if (! empty($s['harga_jual'])) {
+                            $hargaSatuanMaster = (float) $s['harga_jual'];
+                        }
+                        break;
+                    }
+                }
+            }
+            if (! isset($it['faktor_konversi']) || (float) $it['faktor_konversi'] === 1.0 && $faktor !== 1.0) {
+                $cart[$k]['faktor_konversi'] = $faktor;
+                $needSave = true;
+            }
+            $fk = (float) ($cart[$k]['faktor_konversi'] ?? 1.0);
+            if ($fk <= 0) { $fk = 1.0; }
+
+            // harga per base unit yang efektif
+            if (! isset($it['harga']) || (float) $it['harga'] <= 0) {
+                $cart[$k]['harga'] = (float) ($produk?->harga_jual_retail ?? 0);
+                $needSave = true;
+            }
+            $hargaBase = (float) $cart[$k]['harga'];
+
+            if (! isset($it['qty_satuan'])) {
+                $cart[$k]['qty_satuan'] = (int) round(($it['qty'] ?? 1) / $fk);
+                if ($cart[$k]['qty_satuan'] < 1) { $cart[$k]['qty_satuan'] = 1; }
+                $needSave = true;
+            }
+            if (! isset($it['harga_satuan'])) {
+                if ($hargaSatuanMaster !== null) {
+                    $cart[$k]['harga_satuan'] = $hargaSatuanMaster;
+                } else {
+                    $cart[$k]['harga_satuan'] = round($hargaBase * $fk, 2);
+                }
+                $needSave = true;
+            } elseif ($hargaSatuanMaster !== null && (float) $cart[$k]['harga_satuan'] !== $hargaSatuanMaster) {
+                // koreksi harga per satuan jika master berbeda (mis. harga lama salah)
+                $cart[$k]['harga_satuan'] = $hargaSatuanMaster;
+                $cart[$k]['harga'] = round($hargaSatuanMaster / $fk, 2);
+                $needSave = true;
+            }
+        }
+        if ($needSave) {
+            Session::put('shop.cart', $cart);
+        }
+
         $customer = auth('customer')->user();
         if ($customer && ! empty($cart)) {
             $changed = false;
