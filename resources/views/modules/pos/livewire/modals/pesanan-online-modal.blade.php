@@ -1,7 +1,8 @@
 <!-- ===== [POS-ONLINE-PICKUP] MODAL: PEMBAYARAN PESANAN ONLINE (AMBIL DI TOKO) DI KASIR ===== -->
 @if($showPesananOnlineModal)
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 backdrop-blur-md p-4 sm:p-6 overflow-y-auto">
-        <div class="w-full max-w-2xl bg-white dark:bg-[#0B1120] border border-ink-200/80 dark:border-white/10 p-5 sm:p-6 rounded-3xl relative max-h-[90vh] flex flex-col shadow-2xl my-auto">
+    <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-950/80 backdrop-blur-md p-0 sm:p-6 overflow-y-auto">
+        <div class="w-full max-w-2xl bg-white dark:bg-[#0B1120] border-t sm:border border-ink-200/80 dark:border-white/10 p-5 sm:p-6 rounded-t-3xl sm:rounded-3xl relative max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6">
+            <div class="sm:hidden w-10 h-1 rounded-full bg-ink-300 dark:bg-white/20 mx-auto -mt-1 mb-3.5 shrink-0"></div>
             <!-- Header -->
             <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-ink-200/70 dark:border-white/10">
                 <div class="flex items-center gap-2.5">
@@ -32,7 +33,7 @@
                                 wire:model.live.debounce.300ms="pencarianPesananOnline"
                                 wire:keydown.enter="pilihPesananOnlinePertama"
                                 placeholder="Cari no. order / nama / no. HP pelanggan..."
-                                class="w-full px-4 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white border-ink-200/80 dark:border-white/10"
+                                class="w-full px-4 py-2.5 rounded-xl glass-input text-base sm:text-xs font-semibold text-ink-900 dark:text-white border-ink-200/80 dark:border-white/10 min-h-[44px] sm:min-h-[38px]"
                                 autofocus
                             />
                             @if($pencarianPesananOnline)
@@ -300,7 +301,7 @@
                 <button
                     type="button"
                     wire:click="tutupPesananOnlineModal"
-                    class="flex-1 py-2.5 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs cursor-pointer min-h-[42px] transition-colors"
+                    class="flex-1 py-2.5 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs cursor-pointer min-h-[44px] sm:min-h-[42px] transition-colors"
                 >
                     Tutup
                 </button>

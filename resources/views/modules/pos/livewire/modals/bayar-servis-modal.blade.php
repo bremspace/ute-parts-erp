@@ -80,7 +80,7 @@
                                 type="text"
                                 wire:model.live.debounce.300ms="searchServis"
                                 placeholder="Cari no tiket / nama / no hp / tipe hp..."
-                                class="w-full px-4 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white border-ink-200/80 dark:border-white/10"
+                                class="w-full px-4 py-2.5 rounded-xl glass-input text-base sm:text-xs font-semibold text-ink-900 dark:text-white border-ink-200/80 dark:border-white/10 min-h-[44px] sm:min-h-[38px]"
                                 autofocus
                             />
                             @if($searchServis)
@@ -222,7 +222,6 @@
                                     type="text"
                                     wire:model.live="servisJumlahBayar"
                                     class="w-full px-4 py-3 rounded-2xl glass-input text-lg font-black text-ink-900 dark:text-white tabular-nums border-ink-200/80 dark:border-white/10 min-h-[48px]"
-                                    placeholder="0"
                                 />
                                 @if($servisKembalian > 0)
                                     <div class="p-3 rounded-xl bg-ink-50 dark:bg-white/[0.03] border border-ink-200/80 dark:border-white/5 flex items-center justify-between text-xs">
@@ -240,7 +239,7 @@
                                         inputmode="numeric"
                                         x-format-number
                                         wire:model.live.debounce.300ms="servisSplitTunai"
-                                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-bold text-ink-900 dark:text-white tabular-nums border-ink-200/80 dark:border-white/10 min-h-[42px]"
+                                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-bold text-ink-900 dark:text-white tabular-nums border-ink-200/80 dark:border-white/10 min-h-[44px] sm:min-h-[42px]"
                                     />
                                 </div>
                                 <div>
@@ -250,7 +249,7 @@
                                         inputmode="numeric"
                                         x-format-number
                                         wire:model.live.debounce.300ms="servisSplitNonTunai"
-                                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-bold text-ink-900 dark:text-white tabular-nums border-ink-200/80 dark:border-white/10 min-h-[42px]"
+                                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs font-bold text-ink-900 dark:text-white tabular-nums border-ink-200/80 dark:border-white/10 min-h-[44px] sm:min-h-[42px]"
                                     />
                                 </div>
                             </div>
@@ -346,7 +345,7 @@
                                 type="text"
                                 wire:model="servisCatatan"
                                 placeholder="Contoh: No ref transfer / garansi khusus..."
-                                class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-ink-900 dark:text-white border-ink-200/80 dark:border-white/10 min-h-[42px]"
+                                class="w-full px-3.5 py-2.5 rounded-xl glass-input text-base sm:text-xs text-ink-900 dark:text-white border-ink-200/80 dark:border-white/10 min-h-[44px] sm:min-h-[42px]"
                             />
                         </div>
                     </div>

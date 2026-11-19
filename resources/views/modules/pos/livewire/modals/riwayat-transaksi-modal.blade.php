@@ -1,7 +1,8 @@
 <!-- MODAL: RIWAYAT TRANSAKSI HARI INI -->
 @if($showRiwayatTransaksiModal)
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
-        <div class="w-full max-w-4xl bg-white dark:bg-[#0B1120] border border-ink-200/80 dark:border-white/10 p-4 sm:p-6 rounded-3xl relative my-auto max-h-[90vh] sm:max-h-[85vh] flex flex-col shadow-2xl">
+    <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-950/80 backdrop-blur-md p-0 sm:p-6 overflow-y-auto">
+        <div class="w-full max-w-4xl bg-white dark:bg-[#0B1120] border-t sm:border border-ink-200/80 dark:border-white/10 p-4 sm:p-6 rounded-t-3xl sm:rounded-3xl relative max-h-[92dvh] sm:max-h-[85vh] flex flex-col shadow-2xl pb-[max(env(safe-area-inset-bottom),1.25rem)] sm:pb-6">
+            <div class="sm:hidden w-10 h-1 rounded-full bg-ink-300 dark:bg-white/20 mx-auto -mt-1 mb-3.5 shrink-0"></div>
             <!-- Header -->
             <div class="flex items-center justify-between pb-3 mb-2 sm:mb-3 border-b border-ink-200/70 dark:border-white/10 gap-2 shrink-0">
                 <div class="flex items-center gap-2.5 min-w-0">
