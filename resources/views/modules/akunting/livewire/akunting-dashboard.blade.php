@@ -740,7 +740,7 @@
                                     </td>
                                     <td class="py-3.5 px-4 text-ink-600 dark:text-ink-400 max-w-xs truncate">{{ $m->catatan ?: '-' }}</td>
                                     <td class="py-3.5 px-4 text-center">
-                                        @if($m->status === 'selisih' && ! $m->jurnal_id)
+                                        @if($m->status === 'selisih' && ! $m->jurnal_id && auth()->user()?->can('akunting.approve'))
                                             <button type="button" wire:click="postingPenyesuaianKas({{ $m->id }})"
                                                 class="px-2.5 py-1 rounded-lg bg-up-amber hover:bg-up-amber/90 text-ink-950 font-bold text-[10px] transition cursor-pointer shadow-sm">
                                                 Posting Penyesuaian
@@ -891,7 +891,7 @@
                                     <p><strong class="text-up-mint">Rekomendasi Tindakan:</strong> {{ $item['rekomendasi'] }}</p>
                                 </div>
 
-                                @if(!empty($item['solusi_otomatis_tersedia']) && !empty($item['auto_fix_key']))
+                                @if(!empty($item['solusi_otomatis_tersedia']) && !empty($item['auto_fix_key']) && auth()->user()?->can('akunting.approve'))
                                     <div class="pt-2 border-t border-black/5 dark:border-white/5 flex justify-end">
                                         <button type="button" wire:click="eksekusiSolusiDiagnosa('{{ $item['auto_fix_key'] }}', @js($item['payload'] ?? []))"
                                             class="px-3 py-1.5 rounded-lg bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-sm">

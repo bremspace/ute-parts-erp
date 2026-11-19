@@ -1723,10 +1723,12 @@ class AkuntingDashboard extends Component
 
     public function postingPenyesuaianKas(int $matchingId): void
     {
+        // [D-3] Guard server-side + scope cabang fail-closed (konsolidasi berizin = null).
+        $this->izin('akunting.approve');
         $diagnosaService = app(DiagnosaNeracaService::class);
         $res = $diagnosaService->perbaikiOtomatis('posting_selisih_kas_matching', [
             'kas_matching_id' => $matchingId,
-        ], auth()->id());
+        ], auth()->id(), $this->cabangScopeId());
 
         if ($res['success']) {
             $this->bersihkanCacheLaporan();
@@ -1760,7 +1762,10 @@ class AkuntingDashboard extends Component
 
     public function eksekusiSolusiDiagnosa(string $aksiKey, array $payload): void
     {
-        $res = app(DiagnosaNeracaService::class)->perbaikiOtomatis($aksiKey, $payload, auth()->id());
+        // [B-1 / D-1 / D-3] Payload client tidak dipercaya: izin server-side +
+        // scope cabang fail-closed; nominal dihitung ulang dari DB oleh service.
+        $this->izin('akunting.approve');
+        $res = app(DiagnosaNeracaService::class)->perbaikiOtomatis($aksiKey, $payload, auth()->id(), $this->cabangScopeId());
         if ($res['success']) {
             $this->bersihkanCacheLaporan();
             $this->dispatch('alert', ['type' => 'success', 'message' => $res['message']]);
