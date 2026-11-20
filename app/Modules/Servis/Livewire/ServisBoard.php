@@ -1362,6 +1362,7 @@ class ServisBoard extends Component
                 $row['harga'] = $this->parseNominal($value);
             } else {
                 if (! empty($row['produk_id'])) {
+                    /** @var Produk|null $produk */
                     $produk = Produk::find($row['produk_id']);
                     $pelanggan = ! empty($this->terimaForm['pelanggan_id']) ? Pelanggan::find($this->terimaForm['pelanggan_id']) : null;
                     $resolved = $produk ? app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan) : null;
@@ -1427,6 +1428,7 @@ class ServisBoard extends Component
                 $row['harga'] = $this->parseNominal($value);
             } else {
                 if (! empty($row['produk_id'])) {
+                    /** @var Produk|null $produk */
                     $produk = Produk::find($row['produk_id']);
                     $tiket = $this->estimasiTiketId ? $this->tiketScopedOrNull($this->estimasiTiketId) : null;
                     $pelanggan = $tiket?->pelanggan;
@@ -2232,6 +2234,7 @@ class ServisBoard extends Component
                 $row['harga'] = $this->parseNominal($value);
             } else {
                 if (! empty($row['produk_id'])) {
+                    /** @var Produk|null $produk */
                     $produk = Produk::find($row['produk_id']);
                     $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
                     $pelanggan = $tiket?->pelanggan;

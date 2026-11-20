@@ -758,6 +758,8 @@ class PelangganService
                         'harga' => $final,
                         'harga_dasar' => $hargaDasar,
                         'diskon_nominal' => max(0, $hargaDasar - $final),
+                        'potensi_komisi' => 0.0,
+                        'mode_reward' => 'diskon_langsung',
                         'alasan' => 'Harga Khusus Reseller',
                         'tier' => 'Reseller',
                     ];
@@ -776,6 +778,8 @@ class PelangganService
                     'harga' => $final,
                     'harga_dasar' => $hargaDasar,
                     'diskon_nominal' => max(0, $hargaDasar - $final),
+                    'potensi_komisi' => 0.0,
+                    'mode_reward' => 'diskon_langsung',
                     'alasan' => 'Harga Khusus Tier '.($pelanggan->tierMembership?->nama ?? ''),
                     'tier' => $pelanggan->tierMembership?->nama,
                 ];
@@ -794,6 +798,8 @@ class PelangganService
                 'harga' => $finalHarga,
                 'harga_dasar' => $hargaDasar,
                 'diskon_nominal' => $diskonNominal,
+                'potensi_komisi' => 0.0,
+                'mode_reward' => 'diskon_langsung',
                 'alasan' => "Diskon {$tier->diskon_persen}% Tier {$tier->nama}",
                 'tier' => $tier->nama,
             ];

@@ -100,10 +100,10 @@ class PartaiPricingService
             $reqQty = (int) ($tier['min_qty'] ?? 0);
             $diskon = (float) ($tier['diskon_persen'] ?? 0);
             if ($reqQty > 0 && $diskon > 0 && $totalQty >= $reqQty) {
-                if ($diskon > $persenTerpilih) {
-                    $persenTerpilih = $diskon;
-                    $alasan = "Harga Partai (Qty >= {$reqQty} pcs)";
-                }
+                // $persenTerpilih masih 0.0 di sini (loop pertama, assign diikuti break),
+                // sehingga $diskon > $persenTerpilih selalu true bila $diskon > 0.
+                $persenTerpilih = $diskon;
+                $alasan = "Harga Partai (Qty >= {$reqQty} pcs)";
                 break; // Berhenti di tier Qty tertinggi yang terpenuhi
             }
         }
@@ -116,7 +116,8 @@ class PartaiPricingService
                 if ($diskon > $persenTerpilih) {
                     $persenTerpilih = $diskon;
                     $alasan = 'Harga Partai (Belanja >= Rp '.number_format($reqNominal, 0, ',', '.').')';
-                } elseif ($persenTerpilih > 0) {
+                } else {
+                    // Cabang ini hanya tercapai bila $persenTerpilih >= $diskon > 0.
                     $alasan .= ' + Belanja Rp '.number_format($reqNominal, 0, ',', '.');
                 }
                 break; // Berhenti di tier Nominal tertinggi yang terpenuhi

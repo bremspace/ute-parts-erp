@@ -6,6 +6,7 @@ use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\PeriodeAkuntansi;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -105,35 +106,51 @@ class TutupBukuService
                 ->whereDate('tanggal', '<=', $akhirBulan)
         )->with('akun')->get();
 
-        $pendapatanRows = $jurnals->where('akun.tipe', 'pendapatan')
+        /** @var Collection<(int|string), array{akun_id: int, akun_kode: string, akun_nama: string, saldo: float}> $pendapatanMapped */
+        $pendapatanMapped = $jurnals->where('akun.tipe', 'pendapatan')
             ->groupBy('akun_coa_id')
-            ->map(function ($rows) {
-                $akun = $rows->first()->akun;
-                $saldo = round($rows->sum('kredit') - $rows->sum('debit'), 2);
+            ->map(
+                /**
+                 * @param  Collection<int, JurnalAkuntansi>  $rows
+                 * @return array{akun_id: int, akun_kode: string, akun_nama: string, saldo: float}
+                 */
+                function ($rows): array {
+                    $akun = $rows->first()->akun;
+                    $saldo = round($rows->sum('kredit') - $rows->sum('debit'), 2);
 
-                return [
-                    'akun_id' => $akun->id,
-                    'akun_kode' => $akun->kode,
-                    'akun_nama' => $akun->nama,
-                    'saldo' => $saldo,
-                ];
-            })
+                    return [
+                        'akun_id' => $akun->id,
+                        'akun_kode' => $akun->kode,
+                        'akun_nama' => $akun->nama,
+                        'saldo' => $saldo,
+                    ];
+                }
+            );
+        $pendapatanRows = $pendapatanMapped
             ->filter(fn ($r) => abs($r['saldo']) > 0.009)
             ->values();
 
-        $bebanRows = $jurnals->where('akun.tipe', 'beban')
+        /** @var Collection<(int|string), array{akun_id: int, akun_kode: string, akun_nama: string, saldo: float}> $bebanMapped */
+        $bebanMapped = $jurnals->where('akun.tipe', 'beban')
             ->groupBy('akun_coa_id')
-            ->map(function ($rows) {
-                $akun = $rows->first()->akun;
-                $saldo = round($rows->sum('debit') - $rows->sum('kredit'), 2);
+            ->map(
+                /**
+                 * @param  Collection<int, JurnalAkuntansi>  $rows
+                 * @return array{akun_id: int, akun_kode: string, akun_nama: string, saldo: float}
+                 */
+                function ($rows): array {
+                    $akun = $rows->first()->akun;
+                    $saldo = round($rows->sum('debit') - $rows->sum('kredit'), 2);
 
-                return [
-                    'akun_id' => $akun->id,
-                    'akun_kode' => $akun->kode,
-                    'akun_nama' => $akun->nama,
-                    'saldo' => $saldo,
-                ];
-            })
+                    return [
+                        'akun_id' => $akun->id,
+                        'akun_kode' => $akun->kode,
+                        'akun_nama' => $akun->nama,
+                        'saldo' => $saldo,
+                    ];
+                }
+            );
+        $bebanRows = $bebanMapped
             ->filter(fn ($r) => abs($r['saldo']) > 0.009)
             ->values();
 

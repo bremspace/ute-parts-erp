@@ -38,6 +38,9 @@ class PurchaseOrder extends Model
         'status' => 'string',
     ];
 
+    /**
+     * @return BelongsTo<Supplier, $this>
+     */
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);

@@ -406,7 +406,7 @@ class SidMigrateFase2B extends Command
                 }
                 if (! $pelangganId) {
                     $this->counts['b04_retjual_pelanggan_unmapped']++;
-                    $this->unmappedPelanggan[] = sprintf('return penjualan %s → pelanggan `%s`/`%s`', $kode, $kodePlg ?: '-', $namaPlg ?? '-');
+                    $this->unmappedPelanggan[] = sprintf('return penjualan %s → pelanggan `%s`/`%s`', $kode, $kodePlg ?: '-', $namaPlg);
                 }
 
                 $data = [

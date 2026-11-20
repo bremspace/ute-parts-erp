@@ -180,6 +180,7 @@ class WmsController extends Controller
     // [API: WMS-03] Kirim transfer (kurangi stok asal)
     public function kirimTransfer(Request $request, $id)
     {
+        /** @var StokTransfer $transfer */
         $transfer = StokTransfer::with('items')->findOrFail($id);
 
         if ($transfer->status !== 'draft') {
@@ -245,6 +246,7 @@ class WmsController extends Controller
     // [API: WMS-04] Terima transfer (tambah stok tujuan)
     public function terimaTransfer(Request $request, $id)
     {
+        /** @var StokTransfer $transfer */
         $transfer = StokTransfer::with('items')->findOrFail($id);
 
         if ($transfer->status !== 'dikirim') {
@@ -403,6 +405,7 @@ class WmsController extends Controller
     // [API: WMS-07] Approval supervisor opname (sesuaikan stok otomatis)
     public function approveOpname(Request $request, $id)
     {
+        /** @var StokOpname $opname */
         $opname = StokOpname::with('items')->findOrFail($id);
 
         if ($opname->status !== 'menunggu_approval') {

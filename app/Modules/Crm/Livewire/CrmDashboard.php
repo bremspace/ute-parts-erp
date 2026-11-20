@@ -172,12 +172,12 @@ class CrmDashboard extends Component
         $this->hargaPartaiNominalDiskon = $nominalDiskon > 0 ? $nominalDiskon : 2.0;
 
         $this->hargaPartaiTiersQty = $config->hargaPartaiTiersQty();
-        if (empty($this->hargaPartaiTiersQty) && $this->hargaPartaiMinQty > 0 && $this->hargaPartaiQtyDiskon > 0) {
+        if (empty($this->hargaPartaiTiersQty) && $this->hargaPartaiMinQty > 0) {
             $this->hargaPartaiTiersQty = [['min_qty' => $this->hargaPartaiMinQty, 'diskon_persen' => $this->hargaPartaiQtyDiskon]];
         }
 
         $this->hargaPartaiTiersNominal = $config->hargaPartaiTiersNominal();
-        if (empty($this->hargaPartaiTiersNominal) && $this->hargaPartaiMinNominal > 0 && $this->hargaPartaiNominalDiskon > 0) {
+        if (empty($this->hargaPartaiTiersNominal)) {
             $this->hargaPartaiTiersNominal = [['min_nominal' => $this->hargaPartaiMinNominal, 'diskon_persen' => $this->hargaPartaiNominalDiskon]];
         }
     }

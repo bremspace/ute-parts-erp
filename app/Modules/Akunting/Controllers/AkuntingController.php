@@ -21,6 +21,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
@@ -374,19 +375,35 @@ class AkuntingController extends Controller
 
             $jurnals = $query->with('akun')->get();
 
-            $pendapatan = $jurnals->where('akun.tipe', 'pendapatan')->groupBy('akun_coa_id')->map(fn ($rows) => [
-                'nama' => $rows->first()->akun?->nama,
-                'akun' => $rows->first()->akun?->nama,
-                'kode' => $rows->first()->akun?->kode,
-                'total' => round($rows->sum('kredit') - $rows->sum('debit'), 2),
-            ])->values();
+            /** @var Collection<(int|string), array<string, mixed>> $pendapatanMapped */
+            $pendapatanMapped = $jurnals->where('akun.tipe', 'pendapatan')->groupBy('akun_coa_id')->map(
+                /**
+                 * @param  Collection<int, JurnalAkuntansi>  $rows
+                 * @return array<string, mixed>
+                 */
+                fn ($rows): array => [
+                    'nama' => $rows->first()->akun?->nama,
+                    'akun' => $rows->first()->akun?->nama,
+                    'kode' => $rows->first()->akun?->kode,
+                    'total' => round($rows->sum('kredit') - $rows->sum('debit'), 2),
+                ]
+            );
+            $pendapatan = $pendapatanMapped->values();
 
-            $beban = $jurnals->where('akun.tipe', 'beban')->groupBy('akun_coa_id')->map(fn ($rows) => [
-                'nama' => $rows->first()->akun?->nama,
-                'akun' => $rows->first()->akun?->nama,
-                'kode' => $rows->first()->akun?->kode,
-                'total' => round($rows->sum('debit') - $rows->sum('kredit'), 2),
-            ])->values();
+            /** @var Collection<(int|string), array<string, mixed>> $bebanMapped */
+            $bebanMapped = $jurnals->where('akun.tipe', 'beban')->groupBy('akun_coa_id')->map(
+                /**
+                 * @param  Collection<int, JurnalAkuntansi>  $rows
+                 * @return array<string, mixed>
+                 */
+                fn ($rows): array => [
+                    'nama' => $rows->first()->akun?->nama,
+                    'akun' => $rows->first()->akun?->nama,
+                    'kode' => $rows->first()->akun?->kode,
+                    'total' => round($rows->sum('debit') - $rows->sum('kredit'), 2),
+                ]
+            );
+            $beban = $bebanMapped->values();
 
             $totalPendapatan = $pendapatan->sum('total');
             $totalBeban = $beban->sum('total');

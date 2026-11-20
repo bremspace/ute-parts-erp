@@ -51,6 +51,9 @@ class Pelanggan extends Model implements Authenticatable
         'password' => 'hashed',
     ];
 
+    /**
+     * @return BelongsTo<TierMembership, $this>
+     */
     public function tierMembership(): BelongsTo
     {
         return $this->belongsTo(TierMembership::class);

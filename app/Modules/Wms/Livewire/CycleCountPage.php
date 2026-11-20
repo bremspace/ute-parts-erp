@@ -382,6 +382,7 @@ class CycleCountPage extends Component
 
         $foundItem = null;
         foreach ($activeTask->sample_items as $item) {
+            /** @var Produk|null $prod */
             $prod = Produk::find($item['produk_id']);
             if ($prod && (strcasecmp((string) $prod->barcode, $clean) === 0 || strcasecmp((string) $prod->sku, $clean) === 0 || strcasecmp((string) $prod->kode, $clean) === 0)) {
                 $foundItem = $item;

@@ -116,6 +116,7 @@ class ReturnPembelianTab extends Component
             return;
         }
 
+        /** @var PurchaseOrder|null $po */
         $po = PurchaseOrder::with(['items.produk'])->find($value);
         if (! $po) {
             return;

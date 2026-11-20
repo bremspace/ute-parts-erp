@@ -97,6 +97,7 @@ class ShippingController extends Controller
             'kode_pos_tujuan' => 'required|string|max:10',
         ]);
 
+        /** @var Transaksi $transaksi */
         $transaksi = Transaksi::with('items.produk')->findOrFail($request->transaksi_id);
 
         if ($transaksi->status !== 'lunas') {

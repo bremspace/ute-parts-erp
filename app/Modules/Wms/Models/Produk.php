@@ -22,6 +22,8 @@ use Spatie\Activitylog\Support\LogOptions;
 
 /**
  * @property string|null $kode_lama
+ * @property-read string|null $kode Alias kode legacy; tidak ada di skema migrasi (Eloquent mengembalikan null bila absen).
+ * @property-read float|null $harga_jual Harga jual legacy; tidak ada di skema migrasi (Eloquent mengembalikan null bila absen).
  */
 #[Fillable([
     'nama', 'slug', 'barcode', 'barcode_alt', 'deskripsi', 'kategori', 'kategori_id', 'brand_kompatibel',

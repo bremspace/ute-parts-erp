@@ -24,6 +24,7 @@ use Closure;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -255,18 +256,21 @@ class DashboardIndex extends Component
 
             $rawItems = $query->get();
 
+            /** @var Collection<int, array<string, mixed>> $items */
+            $items = $rawItems->map(fn ($r): array => [
+                'id' => $r->id,
+                'produk_nama' => $r->produk?->nama ?? '-',
+                'harga_lama' => (float) $r->harga_lama,
+                'harga_baru' => (float) $r->harga_baru,
+                'selisih' => (float) $r->selisih,
+                'persen' => (float) $r->persentase_perubahan,
+                'waktu' => $r->created_at?->diffForHumans() ?? '-',
+                'is_naik' => (float) $r->selisih > 0,
+            ]);
+
             return [
                 'total' => RiwayatPerubahanHarga::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->count(),
-                'items' => $rawItems->map(fn ($r) => [
-                    'id' => $r->id,
-                    'produk_nama' => $r->produk?->nama ?? '-',
-                    'harga_lama' => (float) $r->harga_lama,
-                    'harga_baru' => (float) $r->harga_baru,
-                    'selisih' => (float) $r->selisih,
-                    'persen' => (float) $r->persentase_perubahan,
-                    'waktu' => $r->created_at?->diffForHumans() ?? '-',
-                    'is_naik' => (float) $r->selisih > 0,
-                ])->all(),
+                'items' => $items->all(),
             ];
         });
 
@@ -295,16 +299,19 @@ class DashboardIndex extends Component
                 ->limit(8)
                 ->get();
 
+            /** @var Collection<int, array<string, mixed>> $items */
+            $items = $rawItems->map(fn ($p): array => [
+                'id' => $p->id,
+                'pelanggan_nama' => $p->pelanggan?->nama ?? '-',
+                'no_piutang' => $p->no_piutang,
+                'sisa' => (float) $p->sisa,
+                'jatuh_tempo' => $p->jatuh_tempo?->format('d/m/Y'),
+                'jatuh_tempo_lewat' => (bool) $p->jatuh_tempo_lewat,
+            ]);
+
             return [
                 'total' => $dasar()->count(),
-                'items' => $rawItems->map(fn ($p) => [
-                    'id' => $p->id,
-                    'pelanggan_nama' => $p->pelanggan?->nama ?? '-',
-                    'no_piutang' => $p->no_piutang,
-                    'sisa' => (float) $p->sisa,
-                    'jatuh_tempo' => $p->jatuh_tempo?->format('d/m/Y'),
-                    'jatuh_tempo_lewat' => (bool) $p->jatuh_tempo_lewat,
-                ])->all(),
+                'items' => $items->all(),
             ];
         });
 
@@ -364,12 +371,13 @@ class DashboardIndex extends Component
             $feed = collect();
 
             // 1. Penjualan
+            /** @var Collection<int, array<string, mixed>> $trx */
             $trx = Transaksi::with(['pelanggan', 'cabang'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->latest()
                 ->limit(6)
                 ->get()
-                ->map(fn ($t) => [
+                ->map(fn ($t): array => [
                     'tipe' => 'Penjualan',
                     'badge' => 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
                     'no_transaksi' => $t->no_transaksi,
@@ -385,11 +393,12 @@ class DashboardIndex extends Component
             $feed = $feed->concat($trx);
 
             // 2. Purchase Order
+            /** @var Collection<int, array<string, mixed>> $pos */
             $pos = PurchaseOrder::with(['supplier'])
                 ->latest()
                 ->limit(4)
                 ->get()
-                ->map(fn ($p) => [
+                ->map(fn ($p): array => [
                     'tipe' => 'Purchase Order',
                     'badge' => 'bg-blue-500/10 text-blue-400 border-blue-500/20',
                     'no_transaksi' => $p->no_po,
@@ -405,12 +414,13 @@ class DashboardIndex extends Component
             $feed = $feed->concat($pos);
 
             // 3. Penerimaan GRN
+            /** @var Collection<int, array<string, mixed>> $grns */
             $grns = Grn::with(['cabang'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->latest()
                 ->limit(4)
                 ->get()
-                ->map(fn ($g) => [
+                ->map(fn ($g): array => [
                     'tipe' => 'Penerimaan GRN',
                     'badge' => 'bg-purple-500/10 text-purple-400 border-purple-500/20',
                     'no_transaksi' => $g->no_grn,
@@ -426,12 +436,13 @@ class DashboardIndex extends Component
             $feed = $feed->concat($grns);
 
             // 4. Tiket Servis
+            /** @var Collection<int, array<string, mixed>> $tikets */
             $tikets = TiketServis::with(['pelanggan', 'cabang'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->latest()
                 ->limit(4)
                 ->get()
-                ->map(fn ($s) => [
+                ->map(fn ($s): array => [
                     'tipe' => 'Tiket Servis',
                     'badge' => 'bg-amber-500/10 text-amber-400 border-amber-500/20',
                     'no_transaksi' => $s->no_tiket,
@@ -447,12 +458,13 @@ class DashboardIndex extends Component
             $feed = $feed->concat($tikets);
 
             // 5. Retur Penjualan
+            /** @var Collection<int, array<string, mixed>> $returs */
             $returs = ReturnPenjualan::with(['cabang'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->latest()
                 ->limit(4)
                 ->get()
-                ->map(fn ($r) => [
+                ->map(fn ($r): array => [
                     'tipe' => 'Retur Konsumen',
                     'badge' => 'bg-rose-500/10 text-rose-400 border-rose-500/20',
                     'no_transaksi' => $r->no_return,
@@ -1169,15 +1181,18 @@ class DashboardIndex extends Component
 
             $rawItems = $query->orderByDesc('created_at')->limit(6)->get();
 
+            /** @var Collection<int, array<string, mixed>> $items */
+            $items = $rawItems->map(fn ($po): array => [
+                'no_po' => $po->no_po,
+                'supplier_nama' => $po->supplier?->nama ?? '-',
+                'total' => (float) $po->total,
+                'status' => $po->status,
+            ]);
+
             return [
                 'total' => (clone $query)->count(),
                 'total_nilai' => round((float) (clone $query)->sum('total'), 2),
-                'items' => $rawItems->map(fn ($po) => [
-                    'no_po' => $po->no_po,
-                    'supplier_nama' => $po->supplier?->nama ?? '-',
-                    'total' => (float) $po->total,
-                    'status' => $po->status,
-                ])->all(),
+                'items' => $items->all(),
             ];
         });
 

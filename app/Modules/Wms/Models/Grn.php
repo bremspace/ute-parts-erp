@@ -47,6 +47,9 @@ class Grn extends Model
         'status' => 'string',
     ];
 
+    /**
+     * @return BelongsTo<PurchaseOrder, $this>
+     */
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class, 'po_id');
