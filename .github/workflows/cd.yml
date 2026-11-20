@@ -74,7 +74,7 @@ jobs:
           target: '/tmp'
 
       - name: Execute Deployment & Proactive Verification over SSH
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         env:
           DEPLOY_PATH_INPUT: ${{ secrets.DEPLOY_PATH || secrets.VPS_PATH || '' }}
           APP_URL_INPUT: ${{ secrets.APP_URL || '' }}
