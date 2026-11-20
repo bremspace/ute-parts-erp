@@ -396,10 +396,12 @@ class ReturPenjualanIndex extends Component
                 'model_kompatibel' => $item->produk?->model_kompatibel,
                 // Kolom `has_sn` tidak ada di tabel produk (legacy, flag SN asli = `sn`); baca magic selalu null, jadi nilai runtime konstan false.
                 'has_sn' => false,
-                'qty_beli' => (float) $item->jumlah,
+                'qty_beli' => (float) $item->jumlah * (float) ($item->konversi ?? 1),
+                'satuan_beli' => $item->satuan ?? 'pcs',
+                'konversi' => (float) ($item->konversi ?? 1),
                 'sudah_diretur' => $sudahDiretur,
-                'sisa_bisa_diretur' => $sisaBisaDiretur,
-                'harga_final' => (float) ($item->harga_final ?? $item->harga_satuan ?? 0),
+                'sisa_bisa_diretur' => max(0, (float) $item->jumlah * (float) ($item->konversi ?? 1) - $sudahDiretur),
+                'harga_final' => (float) ($item->harga_final ?? $item->harga_satuan ?? 0) / max(1, (float) ($item->konversi ?? 1)),
             ];
 
             $this->itemInputs[$item->id] = [

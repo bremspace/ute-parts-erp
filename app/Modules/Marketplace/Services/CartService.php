@@ -238,6 +238,7 @@ class CartService
             'variant_name' => $variant?->nama_varian,
             'satuan' => $cleanSatuan ?: $baseSatuan,
             'harga' => $hargaSatuanPilih,
+            'harga_tier' => (float) $pricing['harga'],
             'harga_satuan' => round($hargaSatuanPilih * $faktorKonversi, 2),
             'faktor_konversi' => $faktorKonversi,
             'qty' => $newQty,
