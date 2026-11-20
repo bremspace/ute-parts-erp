@@ -15,6 +15,10 @@ use Spatie\Activitylog\Support\LogOptions;
  * [F2-2] Goods Received Note. Data per-item disimpan di JSON item_qty_received
  * (produk_id, sku_variant_id, qty_po, qty_received, harga_beli, status).
  * [F1-4] Model kritis — wajib activity log.
+ *
+ * @property float $dpp
+ * @property float $ppn_nominal
+ * @property float $ppn_percent
  */
 #[Fillable([
     'no_grn', 'po_id', 'cabang_id', 'gudang_id', 'user_id', 'status',
