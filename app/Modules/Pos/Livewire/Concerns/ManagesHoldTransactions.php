@@ -80,7 +80,7 @@ trait ManagesHoldTransactions
     {
         $cabangId = (int) (currentCabangId() ?: auth()->user()?->cabangs()->first()?->id ?: Cabang::value('id'));
 
-        return Transaksi::with('kasir')
+        return Transaksi::with(['kasir', 'pelanggan'])
             ->where('cabang_id', $cabangId)
             ->where('status', 'ditahan')
             ->latest()
