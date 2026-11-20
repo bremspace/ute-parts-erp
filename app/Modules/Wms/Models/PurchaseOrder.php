@@ -14,6 +14,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable([
     'no_po', 'supplier_id', 'gudang_tujuan_id', 'status', 'metode_bayar', 'akun_kas_bank',
     'jatuh_tempo', 'total', 'total_dibayar', 'catatan',
+    'dpp', 'ppn_nominal', 'ppn_percent',
 ])]
 class PurchaseOrder extends Model
 {
@@ -31,6 +32,9 @@ class PurchaseOrder extends Model
         'jatuh_tempo' => 'date',
         'total' => 'decimal:2',
         'total_dibayar' => 'decimal:2',
+        'dpp' => 'decimal:2',
+        'ppn_nominal' => 'decimal:2',
+        'ppn_percent' => 'decimal:2',
         'status' => 'string',
     ];
 

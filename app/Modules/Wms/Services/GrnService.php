@@ -7,6 +7,7 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Rbac\Services\TransactionActivityLogService;
 use App\Modules\Wms\Models\Grn;
@@ -286,6 +287,10 @@ class GrnService
 
             $totalHpp = round($totalHpp, 2);
 
+            // [H8/F-32] Snapshot PPN masukan saat GRN dibuat (tidak retroaktif):
+            // DPP neto utk kapitalisasi persediaan + PPN masukan akun 110-03.
+            $pajak = app(PajakService::class)->hitungPembelian($cabangId, $totalHpp);
+
             $grn = Grn::create([
                 'no_grn' => $this->generateNoGrn($cabangId),
                 'po_id' => $po->id,
@@ -294,6 +299,9 @@ class GrnService
                 'user_id' => $pemohon,
                 'status' => 'draft',
                 'total_hpp' => $totalHpp,
+                'dpp' => $pajak['dpp'],
+                'ppn_nominal' => $pajak['ppn_nominal'],
+                'ppn_percent' => $pajak['ppn_percent'],
                 'akun_kas_bank' => $akunKasBank ?: $po->akun_kas_bank,
                 'dibayar_oleh' => $namaPembayarOtomatis,
                 'item_qty_received' => $itemData,
@@ -306,7 +314,7 @@ class GrnService
                     $grn->id,
                     $cabangId,
                     [
-                        'amount' => $totalHpp,
+                        'amount' => $pajak['total_tagihan'],
                         'no_grn' => $grn->no_grn,
                         'po_id' => $po->id,
                         'no_po' => $po->no_po,
@@ -402,6 +410,18 @@ class GrnService
         }
 
         $totalHpp = (float) $grn->total_hpp;
+
+        // [H8/F-32] Pisah PPN masukan dari kapitalisasi persediaan:
+        // Dr 130-01 DPP neto + Dr 110-03 PPN / Cr kas|utang total tagihan.
+        // GRN legacy (dibuat sebelum kolom pajak ada): fallback bruto = DPP.
+        $dpp = (float) $grn->dpp;
+        $ppnMasukan = (float) $grn->ppn_nominal;
+        if ($dpp <= 0 && $totalHpp > 0) {
+            $dpp = $totalHpp;
+            $ppnMasukan = 0.0;
+        }
+        $totalTagihan = round($dpp + $ppnMasukan, 2);
+
         $po = $grn->purchaseOrder()->first();
         $noPo = $po?->no_po ?? '-';
 
@@ -445,10 +465,10 @@ class GrnService
         $dibayarOleh = $grn->dibayar_oleh ?: (User::find($actionedBy)?->name ?? 'Kasir / Staf');
         $akunKredit = $isKredit ? '210-01' : $akunKas;
 
-        // Validasi saldo kas untuk PO Tunai
-        if (! $isKredit && $totalHpp > 0) {
+        // Validasi saldo kas untuk PO Tunai (sebesar total tagihan termasuk PPN)
+        if (! $isKredit && $totalTagihan > 0) {
             $saldoKas = static::hitungSaldoKasCabang($akunKas, (int) $grn->cabang_id);
-            if ($saldoKas < $totalHpp) {
+            if ($saldoKas < $totalTagihan) {
                 $hasMutasi = DB::table('jurnal_akuntansi')
                     ->where('cabang_id', $grn->cabang_id)
                     ->whereExists(function ($q) use ($akunKas) {
@@ -460,7 +480,7 @@ class GrnService
                     ->exists();
 
                 if ($hasMutasi) {
-                    throw new \Exception("Saldo kas {$akunKas} tidak mencukupi untuk pembayaran PO tunai (Saldo: Rp ".number_format($saldoKas, 0, ',', '.').', Dibutuhkan: Rp '.number_format($totalHpp, 0, ',', '.').')');
+                    throw new \Exception("Saldo kas {$akunKas} tidak mencukupi untuk pembayaran PO tunai (Saldo: Rp ".number_format($saldoKas, 0, ',', '.').', Dibutuhkan: Rp '.number_format($totalTagihan, 0, ',', '.').')');
                 }
             }
         }
@@ -468,7 +488,7 @@ class GrnService
         // [KAS-LACI] Jika pembayaran PO tunai diarahkan ke Kas Laci (110-04),
         // otomatis catat pengeluaran kas laci kasir agar saldo fisik & sistem klop dan mudah diaudit.
         if (! $isKredit && $akunKas === '110-04' && Schema::hasTable('kas_mutasi_laci')) {
-            $this->catatPengeluaranKasLaci($grn, $po, $totalHpp, $actionedBy);
+            $this->catatPengeluaranKasLaci($grn, $po, $totalTagihan, $actionedBy);
         }
 
         if ($totalHpp > 0) {
@@ -476,14 +496,21 @@ class GrnService
                 ? "GRN {$grn->no_grn} — {$keterangan} (PO {$noPo})"
                 : "GRN {$grn->no_grn} — Pembayaran Tunai oleh {$dibayarOleh} [{$akunKas}] (PO {$noPo})";
 
+            // [H8/F-32] Persediaan neto (DPP) + PPN masukan 110-03 terpisah;
+            // lawan kas/utang sebesar total tagihan (DPP + PPN).
             $this->jurnalService->post(
                 $grn->no_grn,
                 now(),
                 'grn',
-                [
-                    ['akun_kode' => '130-01', 'debit' => $totalHpp, 'kredit' => 0],
-                    ['akun_kode' => $akunKredit, 'debit' => 0, 'kredit' => $totalHpp],
-                ],
+                array_merge(
+                    [
+                        ['akun_kode' => '130-01', 'debit' => $dpp, 'kredit' => 0],
+                    ],
+                    app(PajakService::class)->jurnalLinesMasukan($ppnMasukan),
+                    [
+                        ['akun_kode' => $akunKredit, 'debit' => 0, 'kredit' => $totalTagihan],
+                    ]
+                ),
                 $keteranganJurnal,
                 (int) $grn->cabang_id,
                 $actionedBy,
@@ -493,13 +520,20 @@ class GrnService
 
             // Subledger Utang (AP) dicatat HANYA bila metode bayar PO adalah kredit
             if ($isKredit) {
-                $this->catatUtang($grn, $po, $totalHpp);
+                $this->catatUtang($grn, $po, $totalTagihan);
             }
         }
+
+        // [H8] Rasio kapitalisasi neto: inclusive → DPP/bruto (< 1);
+        // exclusive / tanpa PPN → 1 (harga masuk sudah neto).
+        $rasioNeto = ($totalHpp > 0 && $ppnMasukan > 0) ? ($dpp / $totalHpp) : 1.0;
+        $itemsSimpan = [];
 
         foreach ($grn->item_qty_received ?? [] as $item) {
             $qty = (int) ($item['qty_received'] ?? 0);
             if ($qty <= 0) {
+                $itemsSimpan[] = $item;
+
                 continue;
             }
 
@@ -510,7 +544,13 @@ class GrnService
 
             $produkId = (int) $item['produk_id'];
             $hargaBeliMasuk = (float) ($item['harga_beli'] ?? 0);
-            $hargaBeliPerBase = round($hargaBeliMasuk / $konversi, 2);
+            // [H8/F-32] Biaya perolehan neto PPN yang dapat dikreditkan (IAS 2 ¶11).
+            // harga_net disimpan per item agar retur pembelian mengkredit persediaan
+            // at biaya yang sama (tanpa residu GL).
+            $hargaNeto = round($hargaBeliMasuk * $rasioNeto, 2);
+            $item['harga_net'] = $hargaNeto;
+            $itemsSimpan[] = $item;
+            $hargaBeliPerBase = round($hargaNeto / $konversi, 2);
 
             // Deteksi & catat perubahan harga dari PO / harga master
             $produk = Produk::find($produkId);
@@ -558,7 +598,7 @@ class GrnService
             }
         }
 
-        $grn->update(['status' => 'terima']);
+        $grn->update(['status' => 'terima', 'item_qty_received' => $itemsSimpan]);
 
         // [F1-4] Catat log aktivitas penerimaan GRN berbasis Transaction-Centric + Dual-Indexing di metadata
         app(TransactionActivityLogService::class)->catatGrn($grn);
@@ -569,10 +609,12 @@ class GrnService
         if ($po) {
             $poUpdates = [
                 'status' => 'diterima',
-                'total' => $totalHpp,
+                // [H8/F-32] Total PO = total tagihan supplier (DPP + PPN masukan),
+                // bukan hanya nilai persediaan — sisa utang mengikuti tagihan riil.
+                'total' => $totalTagihan,
             ];
             if (! $isKredit) {
-                $poUpdates['total_dibayar'] = $totalHpp;
+                $poUpdates['total_dibayar'] = $totalTagihan;
                 $poUpdates['akun_kas_bank'] = $akunKas;
             }
             $po->update($poUpdates);

@@ -46,6 +46,7 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '120-02', 'nama' => 'Piutang / Kliring Duitku Gateway', 'tipe' => 'aset',  'kelompok' => 'piutang',     'saldo_normal' => 'debit'],
             ['kode' => '120-03', 'nama' => 'Piutang / Saldo Channel Shopee', 'tipe' => 'aset',   'kelompok' => 'piutang',     'saldo_normal' => 'debit'],
             ['kode' => '120-04', 'nama' => 'Piutang / Saldo Channel Tokopedia & Lainnya', 'tipe' => 'aset', 'kelompok' => 'piutang', 'saldo_normal' => 'debit'],
+            ['kode' => '120-05', 'nama' => 'Deposit Supplier', 'tipe' => 'aset', 'kelompok' => 'deposit', 'saldo_normal' => 'debit'], // [H13] deposit supplier on-books
             ['kode' => '130-01', 'nama' => 'Persediaan Barang Dagang',     'tipe' => 'aset',      'kelompok' => 'persediaan',  'saldo_normal' => 'debit'],
             ['kode' => '140-01', 'nama' => 'Perlengkapan Toko',            'tipe' => 'aset',      'kelompok' => 'perlengkapan', 'saldo_normal' => 'debit'],
             ['kode' => '150-01', 'nama' => 'Peralatan Servis',             'tipe' => 'aset',      'kelompok' => 'peralatan',   'saldo_normal' => 'debit'],

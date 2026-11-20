@@ -136,9 +136,9 @@ class ReturPembelianMitigasiFluktuasiHargaTest extends TestCase
             ->where('referensi_id', $retur->id)
             ->get();
 
-        $this->assertCount(3, $jurnals);
+        $this->assertCount(5, $jurnals); // [H13] + jurnal deposit Dr 120-05 / Cr 210-01 (on-books)
 
-        $debitUtang = $jurnals->first(fn ($j) => $j->akun?->kode === '210-01');
+        $debitUtang = $jurnals->first(fn ($j) => $j->akun?->kode === '210-01' && (float) $j->debit > 0);
         $this->assertNotNull($debitUtang);
         $this->assertEquals(180000, (float) $debitUtang->debit);
         $this->assertEquals(0, (float) $debitUtang->kredit);
@@ -152,6 +152,15 @@ class ReturPembelianMitigasiFluktuasiHargaTest extends TestCase
         $this->assertNotNull($kreditPersediaan);
         $this->assertEquals(0, (float) $kreditPersediaan->debit);
         $this->assertEquals(200000, (float) $kreditPersediaan->kredit);
+
+        // [H13] Deposit supplier on-books: Dr 120-05 180.000 / Cr 210-01 180.000
+        // sehingga AP neto nol (tidak ada saldo debit tanpa liabilitas lawan).
+        $debitDeposit = $jurnals->first(fn ($j) => $j->akun?->kode === '120-05');
+        $this->assertNotNull($debitDeposit, 'Deposit supplier wajib diakui sebagai aset di GL');
+        $this->assertEquals(180000, (float) $debitDeposit->debit);
+        $kreditUtangDeposit = $jurnals->first(fn ($j) => $j->akun?->kode === '210-01' && (float) $j->kredit > 0);
+        $this->assertNotNull($kreditUtangDeposit);
+        $this->assertEquals(180000, (float) $kreditUtangDeposit->kredit);
     }
 
     public function test_penjurnalan_selisih_klaim_untung_dibukukan_ke_pendapatan_lain_430_01(): void
