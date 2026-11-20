@@ -85,8 +85,10 @@ class JurnalService
 
         $this->cekPeriodeTerbuka($tanggal, $cabangId, $sumber);
 
-        if (empty($lines)) {
-            throw new \Exception('Jurnal membutuhkan minimal 1 baris entri');
+        // [F-12] Double-entry wajib minimal 2 baris meaningful: jurnal 1 baris
+        // D=K>0 (net nol) menampilkan mutasi gross palsu di buku besar.
+        if (count($lines) < 2) {
+            throw new \Exception('Jurnal membutuhkan minimal 2 baris entri (double-entry).');
         }
 
         $totalDebit = 0.0;
@@ -111,22 +113,56 @@ class JurnalService
 
             $debit = round((float) ($line['debit'] ?? 0), 2);
             $kredit = round((float) ($line['kredit'] ?? 0), 2);
+
+            // [F-11] Nominal negatif = mutasi terselubung ke sisi lawan;
+            // post() adalah trust boundary SEMUA modul internal.
+            if ($debit < 0 || $kredit < 0) {
+                throw new \Exception(ValidasiBarisJurnal::pesanNominalNegatif($akun));
+            }
+
+            // [F-12] Baris 0-0 tidak meaningful — dibuang saat normalisasi
+            // (alur otomatis sah, mis. payroll, mengirim baris potongan/komisi
+            // bernilai nol). Buku besar hanya menyimpan baris bermakna; jumlah
+            // baris meaningful dicek setelah loop (minimal 2).
+            if ($debit == 0.0 && $kredit == 0.0) {
+                continue;
+            }
+
             $totalDebit += $debit;
             $totalKredit += $kredit;
 
-            $normalized[] = [
+            $barisDasar = [
                 'no_jurnal' => $noJurnal,
                 'tanggal' => $tanggal ?? now(),
                 'cabang_id' => $cabangId,
+                // [F-18] Kunci isolasi header↔lines per cabang (cabang_id ?? 0,
+                // selaras dengan jurnal_header.cabang_key).
+                'cabang_key' => (int) ($cabangId ?? 0),
                 'akun_coa_id' => $akun->id,
                 'sumber' => $sumber,
                 'deskripsi' => $deskripsi ?? "Jurnal {$sumber} {$noJurnal}",
-                'debit' => $debit,
-                'kredit' => $kredit,
                 'referensi_tipe' => $referensiTipe,
                 'referensi_id' => $referensiId,
                 'user_id' => $userId,
             ];
+
+            // [F-12] Baris dua-sisi (D>0 & K>0) dipecah menjadi dua baris
+            // satu-sisi saat normalisasi — total tetap, buku besar hanya
+            // berisi baris satu-sisi (konvensi double-entry). Alur otomatis
+            // yang mengirim baris dua-sisi tetap sah (behavior-preserving).
+            if ($debit > 0 && $kredit > 0) {
+                $normalized[] = [...$barisDasar, 'debit' => $debit, 'kredit' => 0.0];
+                $normalized[] = [...$barisDasar, 'debit' => 0.0, 'kredit' => $kredit];
+            } else {
+                $normalized[] = [...$barisDasar, 'debit' => $debit, 'kredit' => $kredit];
+            }
+        }
+
+        // [F-12] Setelah normalisasi (baris 0-0 dibuang, dua-sisi dipecah)
+        // wajib tersisa minimal 2 baris meaningful — jurnal net-nol terselubung
+        // (mis. 2 baris input tetapi salah satunya 0-0) tetap ditolak.
+        if (count($normalized) < 2) {
+            throw new \Exception('Jurnal membutuhkan minimal 2 baris entri (double-entry).');
         }
 
         // Double-entry balance check
@@ -277,7 +313,12 @@ class JurnalService
         ?string $lampiranPath = null,
         ?string $lampiranNama = null
     ): void {
-        $sudahAda = JurnalAkuntansi::where('no_jurnal', $noJurnal)->exists();
+        // [F-16] Scope guard per cabang — selaras dengan unique index
+        // (cabang_key, no_jurnal): nomor sama di cabang berbeda adalah sah,
+        // bukan duplikat bisnis (sebelumnya false-positive lintas cabang).
+        $sudahAda = JurnalAkuntansi::where('no_jurnal', $noJurnal)
+            ->where('cabang_id', $cabangId)
+            ->exists();
 
         if (! $this->headerTableReady()) {
             // Migrasi belum dijalankan: guard legacy (non-atomic, tapi tidak mematikan).
@@ -325,15 +366,24 @@ class JurnalService
     }
 
     /**
-     * Deteksi pelanggaran unique index lintas driver (MySQL 1062 / SQLite 19).
+     * [F-17] Deteksi pelanggaran unique index lintas driver. SQLSTATE 23000
+     * mencakup SEMUA integrity constraint violation (unique, FK, NOT NULL) —
+     * hanya unique yang boleh diterjemahkan ke pesan idempotency; FK/NOT NULL
+     * harus melempar exception asli agar penyebab tidak tersembunyi.
+     * MySQL: error 1062 (duplicate entry). SQLite: "UNIQUE constraint failed".
+     * PostgreSQL: "duplicate key value violates unique constraint".
      */
     private function isUniqueViolation(QueryException $e): bool
     {
-        if ((string) $e->getCode() !== '23000') {
-            return str_contains(strtolower($e->getMessage()), 'unique');
+        if ((int) ($e->errorInfo[1] ?? 0) === 1062) {
+            return true;
         }
 
-        return true;
+        $pesan = strtolower($e->getMessage());
+
+        return str_contains($pesan, 'unique constraint failed')
+            || str_contains($pesan, 'duplicate entry')
+            || str_contains($pesan, 'duplicate key');
     }
 
     /**
@@ -373,14 +423,18 @@ class JurnalService
     /**
      * [ISO/Audit] Guard periode buku: tolak posting bila periode sudah ditutup.
      *
+     * [F-13] Tanpa bypass: sumber 'tutup_buku' TIDAK membebaskan cek periode —
+     * jalur sah TutupBukuService memposting penutup SEBELUM periode di-set
+     * closed, dan reopen men-set open SEBELUM reversal, sehingga keduanya tetap
+     * lolos. Jurnal tanpa cabang (null/<=0) dikenai cek periode GLOBAL: bila
+     * ada periode closed untuk bulan tsb di cabang mana pun, posting ditolak
+     * (fail-closed — kontrol tutup buku berlaku universal). Parameter $sumber
+     * dipertahankan untuk kompatibilitas pemanggil, tidak lagi membebaskan cek.
+     *
      * @throws \Exception jika periode akuntansi tanggal tsb berstatus 'closed'
      */
     public function cekPeriodeTerbuka($tanggal, ?int $cabangId, string $sumber = ''): void
     {
-        if ($sumber === 'tutup_buku' || $cabangId === null || $cabangId <= 0) {
-            return;
-        }
-
         if (! Schema::hasTable('periode_akuntansi')) {
             return;
         }
@@ -392,11 +446,13 @@ class JurnalService
         $tahun = (int) $parsed->format('Y');
         $bulan = (int) $parsed->format('n');
 
-        $tertutup = PeriodeAkuntansi::where('cabang_id', $cabangId)
-            ->where('tahun', $tahun)
+        $query = PeriodeAkuntansi::where('tahun', $tahun)
             ->where('bulan', $bulan)
-            ->where('status', 'closed')
-            ->exists();
+            ->where('status', 'closed');
+        if ($cabangId !== null && $cabangId > 0) {
+            $query->where('cabang_id', $cabangId);
+        }
+        $tertutup = $query->exists();
 
         if ($tertutup) {
             $namaBulan = [

@@ -13,7 +13,7 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
-    'no_jurnal', 'tanggal', 'cabang_id', 'akun_coa_id', 'sumber',
+    'no_jurnal', 'tanggal', 'cabang_id', 'cabang_key', 'akun_coa_id', 'sumber',
     'deskripsi', 'debit', 'kredit', 'referensi_tipe', 'referensi_id', 'user_id',
 ])]
 class JurnalAkuntansi extends Model
@@ -30,6 +30,7 @@ class JurnalAkuntansi extends Model
 
     protected $casts = [
         'tanggal' => 'datetime',
+        'cabang_key' => 'integer',
         'debit' => 'decimal:2',
         'kredit' => 'decimal:2',
     ];
@@ -51,7 +52,11 @@ class JurnalAkuntansi extends Model
 
     public function header(): BelongsTo
     {
-        return $this->belongsTo(JurnalHeader::class, 'no_jurnal', 'no_jurnal');
+        // [F-18] no_jurnal saja tidak unik lintas cabang (unique index header
+        // per-cabang); kunci komposit jurnal_rel_key = cabang_key:no_jurnal
+        // (generated column) memastikan baris hanya menarik header cabangnya
+        // sendiri — benar untuk lazy & eager load.
+        return $this->belongsTo(JurnalHeader::class, 'jurnal_rel_key', 'jurnal_rel_key');
     }
 
     /**

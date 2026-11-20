@@ -28,6 +28,7 @@ use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -686,27 +687,36 @@ class AkuntingDashboard extends Component
                 })
                 ->exists();
 
-            $statusApproval = $hasApprovalRule ? 'pending' : 'disetujui';
+            $statusApproval = ($hasApprovalRule || $this->penyesuaianKontra($validation['lines'])) ? 'pending' : 'disetujui';
 
-            $noJurnal = $jurnalService->generateNoJurnal('manual', $cabangId);
-            $jurnalService->post(
-                noJurnal: $noJurnal,
-                tanggal: $this->manualTanggal,
-                sumber: 'manual',
-                lines: $validation['lines'],
-                deskripsi: $this->manualDeskripsi,
-                cabangId: $cabangId,
-                userId: $userId,
-                statusApproval: $statusApproval,
-                lampiranPath: $lampiranPath,
-                lampiranNama: $lampiranNama
-            );
+            // [F-15] generate + post dalam SATU transaksi: lock counter
+            // generateNoJurnal (lockForUpdate) bertahan sampai header+lines
+            // commit — dua posting manual concurrent tidak lagi berebut nomor
+            // sama lalu gagal dengan pesan idempotency yang menyesatkan
+            // (pola sama dengan POS/Servis/TutupBuku).
+            $noJurnal = DB::transaction(function () use ($jurnalService, $cabangId, $userId, $validation, $statusApproval, $lampiranPath, $lampiranNama): string {
+                $no = $jurnalService->generateNoJurnal('manual', $cabangId);
+                $jurnalService->post(
+                    noJurnal: $no,
+                    tanggal: $this->manualTanggal,
+                    sumber: 'manual',
+                    lines: $validation['lines'],
+                    deskripsi: $this->manualDeskripsi,
+                    cabangId: $cabangId,
+                    userId: $userId,
+                    statusApproval: $statusApproval,
+                    lampiranPath: $lampiranPath,
+                    lampiranNama: $lampiranNama
+                );
+
+                return $no;
+            });
 
             $header = JurnalHeader::where('no_jurnal', $noJurnal)
                 ->where('cabang_key', $cabangId)
                 ->first();
 
-            if ($hasApprovalRule && $header) {
+            if (($hasApprovalRule || $this->penyesuaianKontra($validation['lines'])) && $header) {
                 $approvalService->ajukan(
                     entityType: 'jurnal_manual',
                     entityId: $header->id,
@@ -737,7 +747,7 @@ class AkuntingDashboard extends Component
             }
             $this->activeTab = 'jurnal';
 
-            $pesan = $hasApprovalRule
+            $pesan = ($hasApprovalRule || $this->penyesuaianKontra($validation['lines']))
                 ? "Jurnal manual {$noJurnal} berhasil diajukan dan menunggu persetujuan (Maker-Checker)"
                 : "Jurnal manual {$noJurnal} diposting dan tercatat di sistem";
 
@@ -1037,7 +1047,7 @@ class AkuntingDashboard extends Component
 
         $validator->after(function (LaravelValidator $validator) use ($serviceLines, $totalDebit, $totalKredit): void {
             // Sumber tunggal: ValidasiBarisJurnal (sama dgn API ACC-04 + JurnalService).
-            foreach (ValidasiBarisJurnal::cekBarisPerBaris($serviceLines, $this->manualIsPenyesuaian) as $index => $perBaris) {
+            foreach (ValidasiBarisJurnal::cekBarisPerBaris($serviceLines, $this->penyesuaianEfektif()) as $index => $perBaris) {
                 foreach ($perBaris as $item) {
                     $validator->errors()->add("baris.{$index}.{$item['field']}", $item['pesan']);
                 }
@@ -1080,6 +1090,29 @@ class AkuntingDashboard extends Component
             $this->newManualLine('kredit'),
         ];
         $this->showJurnalConfirmation = false;
+    }
+
+    /**
+     * [F-20] Flag penyesuaian UI hanya dihormati untuk role finance/super-admin/
+     * owner; role lain tetap tunduk pada aturan sisi saldo normal.
+     */
+    private function penyesuaianEfektif(): bool
+    {
+        return $this->manualIsPenyesuaian
+            && (bool) auth()->user()?->hasRole(['finance', 'super-admin', 'owner']);
+    }
+
+    /**
+     * [F-20] Penyesuaian yang benar-benar memakai kontra-sisi wajib maker-checker
+     * (status pending, disetujui approver lain via setujuiJurnal) meskipun tanpa
+     * ApprovalRule aktif. Flag yang tidak dipakai untuk kontra-sisi tidak
+     * mengubah alur posting biasa.
+     *
+     * @param  array<int,mixed>  $lines
+     */
+    private function penyesuaianKontra(array $lines): bool
+    {
+        return $this->penyesuaianEfektif() && ValidasiBarisJurnal::adaKontraSisi($lines);
     }
 
     private function newManualLine(string $sisi): array
