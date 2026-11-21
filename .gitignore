@@ -50,3 +50,8 @@ Bremspace-ERP-Installer.zip
 /dist/**/*.tar.gz
 /dist/*.exe
 /dist/**/*.exe
+
+# Hasil sampingan installer Docker lokal (jangan ikut ter-commit)
+/installer_install_error.log
+/Installer docker/install_error.log
+/Installer docker/PROJECT FOLDER/

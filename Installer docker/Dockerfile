@@ -32,8 +32,16 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-di
 RUN chown -R www-data:www-data storage bootstrap/cache public/build \
  && chmod -R 775 storage bootstrap/cache
 
+# Docroot Apache -> /public. WAJIB double-quote: pada single-quote shell tidak
+# meng-expand ${APACHE_DOCUMENT_ROOT}, sed menerimanya literal, dan DocumentRoot
+# jadi "/var/www/${APACHE_DOCUMENT_ROOT}" (semua request 404).
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-RUN sed -ri 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+RUN sed -ri -e "s!/var/www/html!${APACHE_DOCUMENT_ROOT}!g" /etc/apache2/sites-available/*.conf \
+ && sed -ri -e "s!<Directory /var/www/>!<Directory ${APACHE_DOCUMENT_ROOT}>!" /etc/apache2/apache2.conf \
+ && sed -ri -e "/<Directory \/var\/www\/html\/public>/,/<\/Directory>/ s!AllowOverride None!AllowOverride All!" /etc/apache2/apache2.conf \
+ && grep -q "DocumentRoot ${APACHE_DOCUMENT_ROOT}" /etc/apache2/sites-available/000-default.conf \
+ && grep -q "<Directory ${APACHE_DOCUMENT_ROOT}>" /etc/apache2/apache2.conf \
+ && grep -q "AllowOverride All" /etc/apache2/apache2.conf
 
 # PHP runtime limits for large DB restore/upload
 RUN cat > /usr/local/etc/php/conf.d/99-ute-parts.ini <<'PHPINI'
