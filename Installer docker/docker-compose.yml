@@ -3,9 +3,6 @@ name: ute-parts-erp
 services:
   app:
     image: ute-parts-erp:latest
-    build:
-      context: ..
-      dockerfile: "Installer docker/Dockerfile"
     container_name: UTE_PARTS_ERP
     restart: unless-stopped
     ports:
