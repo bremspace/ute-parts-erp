@@ -1,8 +1,10 @@
 name: Sync Unas from Brem
 
-# Otomatis menyerap update dari `brem` ke branch kolaborator `Unas`,
-# supaya perbaikan/koreksi di brem langsung ikut tanpa bergantung aturan AGENTS.md.
-# Trigger: tiap push ke brem, plus schedule tiap 6 jam sebagai pengaman.
+# Menyerap update dari `brem`/`main` ke branch kolaborator `Unas` secara otomatis,
+# supaya perbaikan/koreksi di brem/main selalu ikut tanpa bergantung aturan AGENTS.md.
+# Trigger: tiap push ke brem atau main, plus schedule tiap 6 jam sebagai pengaman.
+# Setelah sinkron, workflow ini juga melaporkan file yang masih MENYIMPANG dari brem
+# (mis. commit Unas yang membatalkan revisi) lewat issue pelacak, agar Unas menelaah.
 
 on:
   push:
@@ -13,6 +15,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: sync-unas-${{ github.ref }}
@@ -35,8 +38,7 @@ jobs:
           GIT_COMMITTER_EMAIL: bot@bremspace.id
         run: |
           set -e
-          git fetch origin brem
-          # Sudah terbarui? lewati.
+          git fetch origin brem main
           if git merge-base --is-ancestor origin/brem HEAD; then
             echo "SYNC_SKIP: Unas sudah memuat brem terbaru"
             exit 0
@@ -48,4 +50,32 @@ jobs:
             echo "SYNC_CONFLICT: merge brem -> Unas bentrok, perlu resolusi manual oleh Unas"
             git merge --abort
             exit 1
+          fi
+
+      - name: Deteksi simpangan & laporkan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          git fetch origin brem Unas
+          DIVERGENT=$(git diff --name-only origin/brem origin/Unas | sort -u || true)
+          SUMMARY="$GITHUB_STEP_SUMMARY"
+          if [ -z "$DIVERGENT" ]; then
+            echo "✅ Unas sejajar dengan brem (tidak ada simpangan)." >> "$SUMMARY"
+            exit 0
+          fi
+          {
+            echo "⚠️ **Unas menyimpang dari brem** pada file berikut — perlu review/revisi oleh Unas:"
+            echo ""
+            echo "$DIVERGENT" | sed 's/^/• /'
+          } >> "$SUMMARY"
+          gh label create sync-unas-divergence --force >/dev/null 2>&1 || true
+          BODY=$(printf 'Sinkronisasi brem -> Unas mendapati file yang masih menyimpang dari brem:\n\n```\n%s\n```\n\nUnas perlu menelaah dan menyerapkan revisi dari brem (mis. membatalkan commit yang menyimpang).' "$DIVERGENT")
+          EXIST=$(gh issue list --state open --label sync-unas-divergence --limit 1 --json number -q '.[0].number // empty')
+          if [ -n "$EXIST" ]; then
+            gh issue comment "$EXIST" --body "$BODY"
+            echo "Memperbarui issue #$EXIST"
+          else
+            gh issue create --title "[sync] Unas menyimpang dari brem — perlu revisi" --body "$BODY" --label sync-unas-divergence
+            echo "Membuka issue pelacak baru"
           fi
