@@ -6,7 +6,7 @@ name: Sync Unas from Brem
 
 on:
   push:
-    branches: [brem]
+    branches: [brem, main]
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
