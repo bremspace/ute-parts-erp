@@ -1,5 +1,8 @@
+name: ute-parts-erp
+
 services:
   app:
+    image: ute-parts-erp:latest
     build:
       context: ..
       dockerfile: "Installer docker/Dockerfile"
