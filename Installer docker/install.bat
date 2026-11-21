@@ -10,32 +10,38 @@ echo ============================================================
 echo   UTE PARTS ERP - Docker Installer (Windows)
 echo ============================================================
 echo.
-echo Pilih sumber instalasi:
-echo   [1] Gunakan folder lokal (default) - offline, pakai folder yang sudah disalin
-echo   [2] Git pull/clone dari URL - online, ambil/update source dari GitHub
+echo Pilih mode instalasi:
+echo   [1] Fresh install - hapus data lama, install ulang dari awal
+echo   [2] Update dari Git - pull terbaru + rebuild, data tetap
+echo   [3] Gunakan folder lokal - offline, tanpa git
 echo.
-set /p "CHOICE=Pilihan (1/2, default 1): "
-if "%CHOICE%"=="" set "CHOICE=1"
+set /p "MODE=Pilihan (1/2/3, default 1): "
+if "%MODE%"=="" set "MODE=1"
 
-if "%CHOICE%"=="2" (
+if "%MODE%"=="1" (
+    echo [INFO] Fresh install: menghapus container dan volume lama...
+    docker compose down -v
+    if errorlevel 1 ( echo [ERROR] Gagal down. & pause & exit /b 1 )
+)
+
+if "%MODE%"=="2" (
     where git >nul 2>nul
-    if errorlevel 1 (
-        echo [ERROR] Git tidak ditemukan. Install Git for Windows terlebih dahulu.
-        pause
-        exit /b 1
-    )
+    if errorlevel 1 ( echo [ERROR] Git tidak ditemukan. & pause & exit /b 1 )
     if exist "%PROJECT_DIR%\.git" (
-        echo [INFO] Folder lokal terdeteksi sebagai repo Git. Menarik update terbaru...
+        echo [INFO] Menarik update terbaru dari Git...
         git -C "%PROJECT_DIR%" fetch origin
         if errorlevel 1 ( echo [ERROR] git fetch gagal. & pause & exit /b 1 )
         git -C "%PROJECT_DIR%" pull origin %GIT_BRANCH%
         if errorlevel 1 ( echo [ERROR] git pull gagal. & pause & exit /b 1 )
     ) else (
-        echo [INFO] Folder lokal bukan repo Git. Melakukan clone dari %GIT_URL% ...
+        echo [INFO] Clone dari %GIT_URL% ...
         git clone --branch %GIT_BRANCH% %GIT_URL% "%PROJECT_DIR%"
         if errorlevel 1 ( echo [ERROR] git clone gagal. & pause & exit /b 1 )
     )
-    echo [INFO] Source siap.
+)
+
+if "%MODE%"=="3" (
+    echo [INFO] Menggunakan folder lokal (offline). Data tetap.
 )
 
 where docker >nul 2>nul
