@@ -1,0 +1,40 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: "Installer docker/Dockerfile"
+    container_name: UTE_PARTS_ERP
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    env_file:
+      - .env.docker
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ute_storage:/var/www/html/storage
+      - ute_bootstrap:/var/www/html/bootstrap/cache
+
+  mysql:
+    image: mysql:8.0
+    container_name: ute-parts-erp-db
+    command: --max-allowed-packet=268435456 --innodb-buffer-pool-size=256M --net-read-timeout=3600 --net-write-timeout=3600
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ute_parts_erp
+      MYSQL_USER: ute
+      MYSQL_PASSWORD: ute_secret
+      MYSQL_ROOT_PASSWORD: root_secret
+    volumes:
+      - ute_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_secret"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ute_storage:
+  ute_bootstrap:
+  ute_mysql:
