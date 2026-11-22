@@ -82,7 +82,7 @@
              x-transition:leave="transition-opacity ease-linear duration-150"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
-             class="fixed inset-0 bg-ink-950/70 backdrop-blur-sm z-40 md:hidden sidebar-backdrop"
+             class="fixed inset-0 bg-ink-950/70 backdrop-blur-sm z-[60] md:hidden sidebar-backdrop"
              @click="sidebarOpen = false"
              aria-hidden="true"
              :class="{ 'open': sidebarOpen }"></div>
@@ -91,7 +91,7 @@
         <aside
             id="sidebar"
             class="bg-[var(--up-bg-surface)] border-r border-[var(--up-border-subtle)] flex flex-col flex-shrink-0
-                   fixed inset-y-0 left-0 z-50 shadow-xl md:shadow-none
+                   fixed inset-y-0 left-0 z-[70] shadow-xl md:shadow-none
                    transition-[width,transform] duration-200 ease-out
                    md:static md:top-0 md:h-screen md:max-h-screen md:inset-auto md:z-30 md:translate-x-0"
             :class="[isMobile ? (sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64') : (sidebarCollapsed ? 'sidebar-collapsed w-[4.75rem]' : 'w-64')]">
