@@ -47,7 +47,7 @@
     "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-DN5cBysh.css",
+    "file": "assets/app-yCBgkFRo.css",
     "name": "app",
     "names": [
       "app.css"
@@ -56,7 +56,7 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-C1HxENWm.js",
+    "file": "assets/app-1QTKCS95.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -67,7 +67,7 @@
       "node_modules/workbox-window/build/workbox-window.prod.es5.mjs"
     ],
     "css": [
-      "assets/app-DN5cBysh.css"
+      "assets/app-yCBgkFRo.css"
     ]
   },
   "resources/js/backoffice.js": {

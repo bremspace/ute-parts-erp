@@ -372,7 +372,7 @@
     </div>
 
     <!-- TOP CONTROL BAR: Scan/Search, Gudang, Pelanggan, Aksi Cepat & Big Total -->
-    <div class="relative z-30 glass-panel p-2 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2 sm:gap-2.5">
+    <div class="relative z-50 glass-panel p-2 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2 sm:gap-2.5">
         <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap lg:flex-nowrap justify-between">
             <!-- Search & Barcode Input with Full-Width Dropdown (Desktop) / Fullscreen Search Sheet (Mobile) -->
             <div class="flex-1 min-w-[200px] sm:min-w-[260px]" @click.outside="searchOpen = false">
@@ -1054,7 +1054,7 @@
                             <summary class="pos-top-pill list-none cursor-pointer inline-flex items-center justify-center rounded-md bg-up-primary/10 border border-up-primary/30 text-up-primary">
                                 Lainnya
                             </summary>
-                            <div class="absolute left-0 top-full mt-2 w-56 max-w-[calc(100vw-1rem)] p-2 rounded-xl bg-white dark:bg-[#0B1120] border border-ink-200/80 dark:border-white/10 shadow-2xl z-[60] flex flex-col gap-1.5">
+                            <div class="absolute left-0 top-full mt-2 w-56 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-13rem)] overflow-y-auto overscroll-contain p-2 rounded-xl bg-white dark:bg-[#0B1120] border border-ink-200/80 dark:border-white/10 shadow-2xl z-[60] flex flex-col gap-1.5">
                                 @if(isset($gudangs) && $gudangs->count() > 1)
                                     <select wire:model.live="selectedGudangId" class="w-full px-2 py-1 rounded-lg glass-input text-xs font-semibold min-h-[32px]">
                                         @foreach($gudangs as $g)
