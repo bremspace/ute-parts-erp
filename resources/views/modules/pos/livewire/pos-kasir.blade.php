@@ -72,7 +72,7 @@
 <div style="display: contents;">
 
 <div
-    class="flex flex-col gap-2 min-w-0 flex-1 min-h-0 md:overflow-y-auto pb-2 md:pb-0"
+    class="flex flex-col gap-2 min-w-0 flex-1 min-h-0 overflow-hidden pb-0 md:overflow-y-auto md:pb-0"
     x-data="{
         flexSet: {},
         searchOpen: false,
@@ -103,6 +103,112 @@
         window.ACTIVE_CABANG_ID = {{ $activeCabangId }};
         window.ACTIVE_CABANG_NAME = @json($activeCabangName);
     </script>
+
+    <style nonce="{{ request()->attributes->get('csp_nonce') }}">
+        @media (max-width: 639px) {
+            .pos-qty-mini {
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 6px !important;
+                background: transparent !important;
+                border: 0 !important;
+                padding: 0 !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+            }
+            .pos-qty-mini button {
+                width: auto !important;
+                height: auto !important;
+                min-width: 28px !important;
+                min-height: 26px !important;
+                padding: 6px 8px !important;
+                margin: 0 !important;
+                background: transparent !important;
+                border: 0 !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                font-size: 10px !important;
+                line-height: 1 !important;
+                font-weight: 700 !important;
+            }
+            .pos-qty-mini input {
+                width: 3.4ch !important;
+                min-width: 3.4ch !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: transparent !important;
+                border: 0 !important;
+                box-shadow: none !important;
+                font-size: 10px !important;
+                line-height: 1 !important;
+                font-weight: 700 !important;
+                text-align: center !important;
+                appearance: textfield !important;
+            }
+            .pos-qty-mini input::-webkit-inner-spin-button,
+            .pos-qty-mini input::-webkit-outer-spin-button {
+                -webkit-appearance: none !important;
+                margin: 0 !important;
+            }
+
+            .pos-top-pill {
+                box-sizing: border-box !important;
+                display: inline-flex !important;
+                flex: 0 0 auto !important;
+                align-items: center !important;
+                justify-content: center !important;
+                height: 26px !important;
+                min-height: 26px !important;
+                max-height: 26px !important;
+                padding: 0 8px !important;
+                border-radius: 6px !important;
+                font-size: 11px !important;
+                line-height: 1 !important;
+                font-weight: 700 !important;
+                white-space: nowrap !important;
+            }
+            .pos-top-pill--customer {
+                flex: 1 1 auto !important;
+                justify-content: flex-end !important;
+                max-width: 46vw !important;
+                min-width: 0 !important;
+            }
+            .pos-top-pill--customer span {
+                display: block !important;
+                min-width: 0 !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+
+            .pos-qty-mini button.qty-flash-minus,
+            .pos-qty-mini button.qty-flash-plus {
+                animation: qtyTapFlash 260ms ease-out !important;
+                border-radius: 6px !important;
+            }
+            .pos-qty-mini button.qty-flash-minus {
+                background: rgba(251, 113, 133, 0.18) !important;
+                color: #fb7185 !important;
+            }
+            .pos-qty-mini button.qty-flash-plus {
+                background: rgba(52, 211, 153, 0.18) !important;
+                color: #34d399 !important;
+            }
+            .pos-qty-mini input.qty-flash-value {
+                animation: qtyValueFlash 260ms ease-out !important;
+            }
+            @keyframes qtyTapFlash {
+                0% { transform: scale(1); }
+                45% { transform: scale(1.35); }
+                100% { transform: scale(1); }
+            }
+            @keyframes qtyValueFlash {
+                0% { transform: scale(1); opacity: 1; }
+                45% { transform: scale(1.25); opacity: 0.6; }
+                100% { transform: scale(1); opacity: 1; }
+            }
+        }
+    </style>
 
     <!-- Offline Banner & Drawer Trigger (PRD-OFFLINE-01) -->
     <div
@@ -266,8 +372,8 @@
     </div>
 
     <!-- TOP CONTROL BAR: Scan/Search, Gudang, Pelanggan, Aksi Cepat & Big Total -->
-    <div class="relative glass-panel p-3 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2.5">
-        <div class="flex items-center gap-2.5 flex-wrap lg:flex-nowrap justify-between">
+    <div class="relative z-30 glass-panel p-2 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2 sm:gap-2.5">
+        <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap lg:flex-nowrap justify-between">
             <!-- Search & Barcode Input with Full-Width Dropdown (Desktop) / Fullscreen Search Sheet (Mobile) -->
             <div class="flex-1 min-w-[200px] sm:min-w-[260px]" @click.outside="searchOpen = false">
                 <x-prism.barcode-scan-input
@@ -449,7 +555,7 @@
                                     aria-disabled="true"
                                     title="{{ $alasanTidakBisaDipilih }}"
                                 @endif
-                                class="p-1.5 sm:p-2 rounded-lg border border-transparent transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] flex flex-col gap-1 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
+                                class="p-1 sm:p-2 rounded-lg border border-transparent transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] flex flex-col gap-1 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
                             >
                                 <div class="flex items-start justify-between gap-2">
                                     <div class="min-w-0 flex items-start gap-2 flex-1">
@@ -778,10 +884,10 @@
         <!-- BARIS 2: SHORTCUT AKSI KASIR (GUDANG, PELANGGAN, RETUR, RIWAYAT, ONLINE, SERVIS) & DATA KONSUMEN -->
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-ink-200/50 dark:border-white/5">
             <!-- Left: Shortcut Actions (Horizontally Scrollable Action Pill Strip on Mobile) -->
-            <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 -mx-3 px-3 sm:mx-0 sm:px-0 flex-nowrap sm:flex-wrap w-full sm:w-auto shrink-0">
+            <div class="flex items-center gap-1.5 sm:gap-2 overflow-visible no-scrollbar py-1 -mx-2 px-2 sm:mx-0 sm:px-0 flex-nowrap sm:flex-wrap w-auto shrink-0 order-last sm:order-none">
                 <!-- Mobile Gudang Selector (sm:hidden) -->
                 @if(isset($gudangs) && $gudangs->count() > 1)
-                    <div class="sm:hidden relative shrink-0">
+                    <div class="hidden relative shrink-0">
                         <select
                             wire:model.live="selectedGudangId"
                             class="text-xs font-bold py-1.5 pl-2 pr-6 rounded-xl bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 text-ink-800 dark:text-ink-200 cursor-pointer appearance-none min-h-[38px]"
@@ -803,7 +909,7 @@
                 <button
                     type="button"
                     @click="mobileCrmOpen = true"
-                    class="sm:hidden px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[32px] shrink-0 whitespace-nowrap {{ $customer ? 'bg-up-primary/10 border-up-primary/30 text-up-primary font-bold' : 'bg-ink-100 dark:bg-white/5 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-200' }}"
+                    class="hidden px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[32px] shrink-0 whitespace-nowrap {{ $customer ? 'bg-up-primary/10 border-up-primary/30 text-up-primary font-bold' : 'bg-ink-100 dark:bg-white/5 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-200' }}"
                     title="Pilih / Cari Pelanggan CRM"
                 >
                     <svg class="w-3.5 h-3.5 {{ $customer ? 'text-up-primary' : 'text-ink-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -817,7 +923,7 @@
                 <button
                     type="button"
                     @click="mobileFilterOpen = true"
-                    class="sm:hidden px-3 py-1.5 rounded-xl border border-up-primary/30 bg-up-primary/10 hover:bg-up-primary/20 text-xs font-bold text-up-primary transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
+                    class="hidden px-3 py-1.5 rounded-xl border border-up-primary/30 bg-up-primary/10 hover:bg-up-primary/20 text-xs font-bold text-up-primary transition-all duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] flex items-center gap-1.5 cursor-pointer min-h-[38px] active:scale-[0.97] shrink-0 whitespace-nowrap shadow-xs"
                     title="Buka Filter Produk"
                 >
                     <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -834,7 +940,7 @@
                     <button
                         type="button"
                         wire:click="bukaMutasiKasModal('keluar')"
-                        class="sm:hidden px-2.5 py-1.5 rounded-xl bg-up-mint/15 text-up-mint border border-up-mint/30 font-bold text-xs flex items-center gap-1.5 shrink-0 whitespace-nowrap min-h-[38px] active:scale-95 cursor-pointer"
+                        class="hidden px-2.5 py-1.5 rounded-xl bg-up-mint/15 text-up-mint border border-up-mint/30 font-bold text-xs flex items-center gap-1.5 shrink-0 whitespace-nowrap min-h-[38px] active:scale-95 cursor-pointer"
                         title="Kasir Aktif - Klik untuk Mutasi / Tutup Kas"
                     >
                         <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
@@ -844,7 +950,7 @@
                     <button
                         type="button"
                         wire:click="bukaKasModal"
-                        class="sm:hidden px-2.5 py-1.5 rounded-xl bg-up-red/15 text-up-red border border-up-red/30 font-bold text-xs flex items-center gap-1.5 shrink-0 whitespace-nowrap min-h-[38px] active:scale-95 cursor-pointer"
+                        class="hidden px-2.5 py-1.5 rounded-xl bg-up-red/15 text-up-red border border-up-red/30 font-bold text-xs flex items-center gap-1.5 shrink-0 whitespace-nowrap min-h-[38px] active:scale-95 cursor-pointer"
                         title="Buka Kasir"
                     >
                         <span class="w-2 h-2 rounded-full bg-up-red"></span>
@@ -852,6 +958,7 @@
                     </button>
                 @endif
 
+                <div class="hidden sm:flex sm:items-center sm:gap-1.5">
                 @canany(['pos.view', 'pos.view-own', 'pos.create'])
                 <a
                     href="/app/pos/retur"
@@ -932,14 +1039,52 @@
                         <span class="min-w-[18px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-mono font-semibold flex items-center justify-center tabular-nums">{{ $ditahanList->count() }}</span>
                     @endif
                 </button>
+                </div>
             </div>
 
             <!-- Right: Data Konsumen Terpilih (atau Pelanggan Umum) + Helper Key -->
-            <div class="flex items-center gap-2 sm:gap-3 flex-wrap ml-auto">
+            <div class="flex items-center gap-2 sm:gap-3 flex-wrap ml-0 w-auto max-w-full sm:w-auto sm:ml-auto">
                 <!-- Status & Info Konsumen Terpilih -->
                 <div class="flex items-center gap-1.5 text-xs">
+                    <div class="sm:hidden flex w-auto max-w-full items-center gap-1 flex-nowrap overflow-visible">
+                        <button type="button" wire:click="openDiskonModal" class="pos-top-pill inline-flex items-center justify-center rounded-md bg-up-primary/10 border border-up-primary/30 text-up-primary">
+                            Diskon
+                        </button>
+                        <details class="relative shrink-0">
+                            <summary class="pos-top-pill list-none cursor-pointer inline-flex items-center justify-center rounded-md bg-up-primary/10 border border-up-primary/30 text-up-primary">
+                                Lainnya
+                            </summary>
+                            <div class="absolute left-0 top-full mt-2 w-56 max-w-[calc(100vw-1rem)] p-2 rounded-xl bg-white dark:bg-[#0B1120] border border-ink-200/80 dark:border-white/10 shadow-2xl z-[60] flex flex-col gap-1.5">
+                                @if(isset($gudangs) && $gudangs->count() > 1)
+                                    <select wire:model.live="selectedGudangId" class="w-full px-2 py-1 rounded-lg glass-input text-xs font-semibold min-h-[32px]">
+                                        @foreach($gudangs as $g)
+                                            <option value="{{ $g->id }}" @selected($g->id == $selectedGudangId)>🏬 {{ $g->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                @endif
+                                <button type="button" @click="mobileFilterOpen = true" class="w-full text-left px-2 py-1 rounded-lg border border-up-primary/30 bg-up-primary/10 text-xs font-bold text-up-primary min-h-[32px]">Filter</button>
+                                @if($kasAktif)
+                                    <button type="button" wire:click="bukaMutasiKasModal('keluar')" class="w-full text-left px-2 py-1 rounded-lg bg-up-mint/15 text-up-mint border border-up-mint/30 font-bold text-xs min-h-[32px]">Kas Aktif</button>
+                                @else
+                                    <button type="button" wire:click="bukaKasModal" class="w-full text-left px-2 py-1 rounded-lg bg-up-red/15 text-up-red border border-up-red/30 font-bold text-xs min-h-[32px]">Buka Kas</button>
+                                @endif
+                                <div class="border-t border-ink-200/60 dark:border-white/10 my-1"></div>
+                                @canany(['pos.view', 'pos.view-own', 'pos.create'])
+                                    <a href="/app/pos/retur" class="w-full text-left px-2 py-1 rounded-lg hover:bg-rose-500/10 text-xs font-semibold text-rose-500 min-h-[32px] flex items-center">Retur</a>
+                                @endcanany
+                                <button type="button" wire:click="bukaRiwayatTransaksi" class="w-full text-left px-2 py-1 rounded-lg hover:bg-ink-100 dark:hover:bg-white/5 text-xs font-semibold text-ink-700 dark:text-ink-200 min-h-[32px]">Riwayat</button>
+                                <button type="button" wire:click="bukaPesananOnlineModal" class="w-full text-left px-2 py-1 rounded-lg hover:bg-ink-100 dark:hover:bg-white/5 text-xs font-semibold text-amber-500 min-h-[32px] flex items-center gap-1">Online @if($jumlahPesananOnline > 0)<span class="px-1 rounded-full bg-amber-500 text-white text-[10px]">{{ $jumlahPesananOnline }}</span>@endif</button>
+                                <button type="button" wire:click="bukaBayarServisModal" class="w-full text-left px-2 py-1 rounded-lg hover:bg-ink-100 dark:hover:bg-white/5 text-xs font-semibold text-blue-500 min-h-[32px]">Bayar Servis</button>
+                                <button type="button" wire:click="bukaMutasiKasModal('keluar')" class="w-full text-left px-2 py-1 rounded-lg hover:bg-ink-100 dark:hover:bg-white/5 text-xs font-semibold text-emerald-500 min-h-[32px]">Mutasi Kas</button>
+                                <button type="button" wire:click="bukaDitahanPanel" class="w-full text-left px-2 py-1 rounded-lg hover:bg-ink-100 dark:hover:bg-white/5 text-xs font-semibold text-amber-500 min-h-[32px] flex items-center gap-1">Ditahan @if($ditahanList->count() > 0)<span class="px-1 rounded-full bg-amber-500 text-white text-[10px]">{{ $ditahanList->count() }}</span>@endif</button>
+                            </div>
+                        </details>
+                        <button type="button" @click="mobileCrmOpen = true" class="pos-top-pill pos-top-pill--customer inline-flex min-w-0 items-center justify-end rounded-md bg-up-primary/10 border border-up-primary/30 text-up-primary">
+                            <span class="min-w-0 truncate">{{ $customer ? $customer->nama : 'Pelanggan Umum' }}</span>
+                        </button>
+                    </div>
                     @if($customer)
-                        <div class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-up-primary/10 border border-up-primary/30 text-ink-900 dark:text-white font-semibold flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <div class="hidden sm:flex px-2.5 sm:px-3 py-1.5 rounded-xl bg-up-primary/10 border border-up-primary/30 text-ink-900 dark:text-white font-semibold flex items-center gap-1.5 sm:gap-2 flex-wrap">
                             <button
                                 type="button"
                                 @click="mobileCrmOpen = true"
@@ -1014,7 +1159,7 @@
                             </button>
                         </div>
                     @else
-                        <div class="px-2.5 py-1.5 rounded-xl bg-black/5 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 text-ink-600 dark:text-ink-300 text-xs font-medium flex items-center gap-1.5">
+                        <div class="hidden sm:flex px-2.5 py-1.5 rounded-xl bg-black/5 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 text-ink-600 dark:text-ink-300 text-xs font-medium flex items-center gap-1.5">
                             <button
                                 type="button"
                                 @click="mobileCrmOpen = true"
@@ -1030,7 +1175,7 @@
                                 class="ml-1 px-1.5 py-0.5 rounded bg-up-amber/15 text-up-amber hover:bg-up-amber/25 text-[10px] font-bold border border-up-amber/30 cursor-pointer"
                                 title="Beri Diskon Langsung pada transaksi"
                             >
-                                🏷️ Diskon
+                                Diskon
                             </button>
                         </div>
                     @endif
@@ -1198,6 +1343,7 @@
             </div>
 
             <!-- Mobile Active Filter Summary Chips (sm:hidden) -->
+            @if($filterKategoriId || $filterBrandId || $filterBrandKompatibel || $filterModelKompatibel || $filterStokStatus !== 'semua')
             <div class="sm:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 text-[11px]">
                 <span class="text-[10px] uppercase font-bold text-ink-400 shrink-0">Filter:</span>
                 @if($filterKategoriId)
@@ -1232,11 +1378,12 @@
                 @endif
                 <button type="button" wire:click="resetFilterValues" class="text-[10px] font-bold text-up-red hover:underline shrink-0">Reset</button>
             </div>
+            @endif
         @endif
     </div>
 
     <!-- MAIN STAGE: TABEL TRANSAKSI KASIR (LELUASA, MODERN & BERSIH) -->
-    <div class="flex-1 min-h-[200px] md:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2.5 sm:p-3 flex flex-col shadow-sm">
+    <div class="flex-1 min-h-0 bg-white dark:bg-[#0F172A]/70 sm:backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-2 sm:p-3 flex flex-col shadow-sm">
         <!-- Mobile Cart Header: Counter & View Toggle (sm:hidden) -->
         <div class="sm:hidden flex items-center justify-between pb-2 mb-1.5 border-b border-ink-200/70 dark:border-white/10 flex-shrink-0">
             <div class="flex items-center gap-2">
@@ -1252,7 +1399,7 @@
                     type="button"
                     @click="setCartViewMode('card')"
                     :class="cartViewMode === 'card' ? 'bg-white dark:bg-ink-800 text-up-primary shadow-sm font-bold' : 'text-ink-500 hover:text-ink-900 dark:hover:text-white'"
-                    class="px-2.5 py-1 rounded-lg text-xs transition flex items-center gap-1 cursor-pointer min-h-[30px]"
+                    class="pos-view-btn inline-flex h-6 items-center justify-center gap-1 rounded-md px-1.5 text-[10px] font-semibold leading-none transition cursor-pointer"
                     title="Tampilan Kartu"
                 >
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1264,7 +1411,7 @@
                     type="button"
                     @click="setCartViewMode('list')"
                     :class="cartViewMode === 'list' ? 'bg-white dark:bg-ink-800 text-up-primary shadow-sm font-bold' : 'text-ink-500 hover:text-ink-900 dark:hover:text-white'"
-                    class="px-2.5 py-1 rounded-lg text-xs transition flex items-center gap-1 cursor-pointer min-h-[30px]"
+                    class="pos-view-btn inline-flex h-6 items-center justify-center gap-1 rounded-md px-1.5 text-[10px] font-semibold leading-none transition cursor-pointer"
                     title="Tampilan Daftar Padat"
                 >
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1276,7 +1423,7 @@
         </div>
 
         <!-- 1. Mobile Cart: Card View Mode -->
-        <div x-show="cartViewMode === 'card'" class="sm:hidden flex-1 min-h-[160px] overflow-y-auto space-y-2.5 pr-0.5">
+        <div x-show="cartViewMode === 'card'" class="sm:hidden flex-1 min-h-[160px] overflow-y-auto space-y-1 sm:space-y-2.5 pr-0.5 pb-48 sm:pb-0">
             @forelse($cart as $key => $item)
                 <div
                     wire:key="cart-mobile-card-{{ $key }}"
@@ -1300,12 +1447,12 @@
                             this.flexOpen = false;
                         }
                     }"
-                    class="p-2.5 sm:p-3 rounded-xl bg-ink-50/70 dark:bg-white/[0.02] border border-ink-200/70 dark:border-white/5 flex flex-col gap-2 shadow-xs"
+                    class="p-1 sm:p-3 rounded-xl bg-ink-50/70 dark:bg-white/[0.02] border border-ink-200/70 dark:border-white/5 flex flex-col gap-1 sm:gap-2 shadow-xs"
                 >
                     <!-- Header Kartu: SKU, Nama, Varian & Tombol Hapus -->
-                    <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-start justify-between gap-1 sm:gap-2">
                         <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-1.5 flex-wrap mb-1">
+                            <div class="flex items-center gap-0.5 sm:gap-1.5 flex-wrap mb-0 sm:mb-1">
                                 <span class="font-mono text-[9px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
                                     {{ !empty($item['sku']) ? $item['sku'] : (!empty($item['kode']) ? $item['kode'] : '-') }}
                                 </span>
@@ -1345,7 +1492,7 @@
                     </div>
 
                     <!-- Row Bawah: Harga + Satuan (Kiri) & Stepper Qty + Subtotal (Kanan) -->
-                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-ink-200/60 dark:border-white/5">
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-center justify-between gap-1 pt-1 border-t border-ink-200/60 dark:border-white/5 sm:flex sm:items-center sm:justify-between sm:gap-2 sm:pt-1.5">
                         <!-- Harga per satuan + Satuan Selector -->
                         <div class="relative min-w-0">
                             @if(isset($item['flex']) && $item['flex'])
@@ -1454,12 +1601,14 @@
                         </div>
 
                         <!-- Stepper & Subtotal -->
-                        <div class="flex items-center gap-2 shrink-0">
-                            <div class="inline-flex items-center bg-ink-100 dark:bg-white/5 rounded-xl p-1 border border-ink-200/80 dark:border-white/10">
+                        <div class="contents sm:flex sm:items-center sm:gap-2 sm:shrink-0">
+                            <div x-data="{ qtyFlash: '', flash(d) { this.qtyFlash = d; if (navigator.vibrate) navigator.vibrate(8); clearTimeout(this._qtyFlashTimer); this._qtyFlashTimer = setTimeout(() => this.qtyFlash = '', 260); } }" class="pos-qty-mini inline-flex items-center gap-0.5 sm:gap-0 sm:bg-ink-100 sm:dark:bg-white/5 sm:rounded-xl sm:p-1 sm:border sm:border-ink-200/80 sm:dark:border-white/10">
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', -1)"
-                                    class="w-8 h-8 rounded-lg hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
+                                    @click="flash('minus')"
+                                    :class="qtyFlash === 'minus' ? 'qty-flash-minus' : ''"
+                                    class="pos-qty-mini-btn w-auto h-auto p-0 bg-transparent sm:w-7 sm:h-7 sm:rounded sm:hover:bg-white sm:dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs leading-none font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Kurangi"
                                 >-</button>
                                 <input
@@ -1468,18 +1617,21 @@
                                     max="{{ $item['stok_max'] ?? 9999 }}"
                                     value="{{ $item['qty'] }}"
                                     wire:change="setQty('{{ $key }}', $event.target.value)"
-                                    class="w-9 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white bg-transparent border-0 p-0 focus:ring-1 focus:ring-up-primary rounded font-mono"
+                                    :class="qtyFlash ? 'qty-flash-value' : ''"
+                                    class="pos-qty-mini-input w-3 sm:w-7 text-center text-xs leading-none font-bold tabular-nums text-ink-900 dark:text-white bg-transparent border-0 p-0 focus:ring-1 focus:ring-up-primary rounded font-mono"
                                     aria-label="Jumlah item"
                                 >
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', 1)"
-                                    class="w-8 h-8 rounded-lg hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
+                                    @click="flash('plus')"
+                                    :class="qtyFlash === 'plus' ? 'qty-flash-plus' : ''"
+                                    class="pos-qty-mini-btn w-auto h-auto p-0 bg-transparent sm:w-7 sm:h-7 sm:rounded sm:hover:bg-white sm:dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs leading-none font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Tambah"
                                 >+</button>
                             </div>
 
-                            <span class="text-xs sm:text-sm font-black text-up-mint tabular-nums font-mono min-w-[70px] text-right">
+                            <span class="justify-self-end sm:justify-self-auto text-xs sm:text-sm font-black text-up-mint tabular-nums font-mono min-w-[70px] text-right">
                                 Rp {{ number_format($item['subtotal'] ?? 0, 0, ',', '.') }}
                             </span>
                         </div>
@@ -1499,7 +1651,7 @@
         </div>
 
         <!-- 2. Mobile Cart: List View Mode (Kompak & Padat untuk Banyak Item) -->
-        <div x-show="cartViewMode === 'list'" class="sm:hidden flex-1 min-h-[160px] overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 pr-0.5">
+        <div x-show="cartViewMode === 'list'" class="sm:hidden flex-1 min-h-[160px] overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 pr-0.5 pb-48 sm:pb-0">
             @forelse($cart as $key => $item)
                 <div
                     wire:key="cart-mobile-list-{{ $key }}"
@@ -1523,11 +1675,11 @@
                             this.flexOpen = false;
                         }
                     }"
-                    class="py-2.5 px-1.5 flex flex-col gap-1.5 transition-colors hover:bg-ink-50/50 dark:hover:bg-white/[0.02]"
+                    class="py-1 sm:py-2.5 px-1 sm:px-1.5 flex flex-col gap-0.5 sm:gap-1.5 transition-colors hover:bg-ink-50/50 dark:hover:bg-white/[0.02]"
                 >
                     <!-- Top Row: SKU, Nama (truncate), Satuan & Tombol Hapus -->
-                    <div class="flex items-center justify-between gap-2">
-                        <div class="min-w-0 flex items-center gap-1.5 flex-1">
+                    <div class="flex items-center justify-between gap-1 sm:gap-2">
+                        <div class="min-w-0 flex items-center gap-0.5 sm:gap-1.5 flex-1">
                             <span class="font-mono text-[9px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded flex-shrink-0">
                                 {{ !empty($item['sku']) ? $item['sku'] : (!empty($item['kode']) ? $item['kode'] : '-') }}
                             </span>
@@ -1572,7 +1724,7 @@
                     </div>
 
                     <!-- Bottom Row: Harga Satuan, Stepper (+ -), Subtotal -->
-                    <div class="flex items-center justify-between gap-2">
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-center justify-between gap-1 pt-0.5 sm:flex sm:items-center sm:justify-between sm:gap-2 sm:pt-0">
                         <!-- Harga Satuan / Flex -->
                         <div class="relative min-w-0">
                             @if(isset($item['flex']) && $item['flex'])
@@ -1612,12 +1764,14 @@
                         </div>
 
                         <!-- Stepper & Subtotal -->
-                        <div class="flex items-center gap-2 flex-shrink-0">
-                            <div class="inline-flex items-center bg-ink-100 dark:bg-white/5 rounded-lg p-0.5 border border-ink-200/80 dark:border-white/10">
+                        <div class="contents sm:flex sm:items-center sm:gap-2 sm:flex-shrink-0">
+                            <div x-data="{ qtyFlash: '', flash(d) { this.qtyFlash = d; if (navigator.vibrate) navigator.vibrate(8); clearTimeout(this._qtyFlashTimer); this._qtyFlashTimer = setTimeout(() => this.qtyFlash = '', 260); } }" class="pos-qty-mini inline-flex items-center gap-0.5 sm:gap-0 sm:bg-ink-100 sm:dark:bg-white/5 sm:rounded-lg sm:p-0.5 sm:border sm:border-ink-200/80 sm:dark:border-white/10">
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', -1)"
-                                    class="w-9 h-9 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
+                                    @click="flash('minus')"
+                                    :class="qtyFlash === 'minus' ? 'qty-flash-minus' : ''"
+                                    class="pos-qty-mini-btn w-auto h-auto p-0 bg-transparent sm:w-9 sm:h-9 sm:rounded sm:hover:bg-white sm:dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs sm:text-sm leading-none font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Kurangi"
                                 >-</button>
                                 <input
@@ -1626,18 +1780,21 @@
                                     max="{{ $item['stok_max'] ?? 9999 }}"
                                     value="{{ $item['qty'] }}"
                                     wire:change="setQty('{{ $key }}', $event.target.value)"
-                                    class="w-10 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white bg-transparent border-0 p-0 focus:ring-1 focus:ring-up-primary rounded"
+                                    :class="qtyFlash ? 'qty-flash-value' : ''"
+                                    class="pos-qty-mini-input w-3 sm:w-10 text-center text-xs sm:text-sm leading-none font-bold tabular-nums text-ink-900 dark:text-white bg-transparent border-0 p-0 focus:ring-1 focus:ring-up-primary rounded"
                                     aria-label="Jumlah item"
                                 >
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', 1)"
-                                    class="w-9 h-9 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-90"
+                                    @click="flash('plus')"
+                                    :class="qtyFlash === 'plus' ? 'qty-flash-plus' : ''"
+                                    class="pos-qty-mini-btn w-auto h-auto p-0 bg-transparent sm:w-9 sm:h-9 sm:rounded sm:hover:bg-white sm:dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs sm:text-sm leading-none font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Tambah"
                                 >+</button>
                             </div>
 
-                            <span class="text-xs font-black text-up-mint tabular-nums min-w-[75px] text-right">
+                            <span class="justify-self-end sm:justify-self-auto text-xs font-black text-up-mint tabular-nums min-w-[75px] text-right">
                                 Rp {{ number_format($item['subtotal'] ?? ($item['harga'] * $item['qty']), 0, ',', '.') }}
                             </span>
                         </div>
@@ -1978,7 +2135,7 @@
         @endif
 
         <!-- BOTTOM CONTROL CENTER: Status Sesi Kas, Ditahan & Action Bayar (Sticky di Mobile agar Tombol Bayar Selalu Siap Tampil Tanpa Tertutup Apapun) -->
-        <div class="border-t border-ink-200/80 dark:border-white/10 pt-2 sm:pt-2.5 mt-1.5 flex-shrink-0 flex items-center justify-between gap-2 flex-wrap sticky bottom-0 z-30 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-md -mx-3 -mb-3 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:mx-0 sm:mb-0 sm:px-0 sm:pb-0 sm:static shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] sm:shadow-none">
+        <div class="fixed inset-x-0 bottom-0 z-40 border-t border-ink-200/80 dark:border-white/10 pt-2 sm:pt-2.5 mt-1.5 flex items-center justify-between gap-2 flex-wrap bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-md px-3 pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] sm:static sm:inset-auto sm:mx-0 sm:mb-0 sm:px-0 sm:pb-0 sm:shadow-none shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)]">
             <!-- Left Info & Sesi Kas (Desktop only inline, Mobile via top action pill) -->
             <div class="hidden sm:flex items-center gap-2.5 flex-wrap">
                 <!-- Sesi Kas Indicator -->

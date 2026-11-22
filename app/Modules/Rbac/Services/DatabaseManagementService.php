@@ -1053,11 +1053,30 @@ class DatabaseManagementService
     protected function executeRestoreSqlite(array $conn, string $sqlPath): void
     {
         $dbPath = $conn['database'] ?? database_path('database.sqlite');
-        if ($dbPath !== ':memory:') {
-            File::copy($sqlPath, $dbPath);
-        } else {
-            DB::unprepared(File::get($sqlPath));
+
+        // Lepaskan koneksi aktif agar file SQLite bisa ditimpa tanpa lock.
+        try {
+            DB::disconnect();
+        } catch (Throwable $e) {
+            // Abaikan; lanjutkan upaya restore.
         }
+
+        if ($dbPath === ':memory:') {
+            DB::unprepared(File::get($sqlPath));
+            return;
+        }
+
+        $header = @file_get_contents($sqlPath, false, null, 0, 16);
+        $isSqliteBinary = is_string($header) && str_starts_with($header, "SQLite format 3\x00");
+
+        if ($isSqliteBinary) {
+            // Backup bawaan Ute Parts untuk SQLite adalah salinan biner database.
+            File::copy($sqlPath, $dbPath);
+            return;
+        }
+
+        // Berkas .sql teks: eksekusi sebagai SQL, bukan menimpa file DB.
+        DB::unprepared(File::get($sqlPath));
     }
 
     protected function gzipFile(string $source, string $dest): void

@@ -77,7 +77,7 @@
         data-barcode-input="true"
         placeholder="{{ $placeholder }}"
         {{ $model ? "wire:model.live.debounce.350ms={$model}" : '' }}
-        {{ $attributes->merge(['class' => 'w-full pl-11 pr-16 sm:pr-20 py-2.5 rounded-xl glass-input text-base sm:text-sm font-medium placeholder-ink-400 focus:ring-2 focus:ring-up-primary/30 transition-[border-color,box-shadow,background-color] duration-140']) }}
+        {{ $attributes->merge(['class' => 'w-full pl-10 pr-14 sm:pr-20 py-2 sm:py-2.5 rounded-xl glass-input text-base sm:text-sm font-medium placeholder-ink-400 focus:ring-2 focus:ring-up-primary/30 transition-[border-color,box-shadow,background-color] duration-140']) }}
         x-ref="barcodeInput"
         @keydown.window.f2.prevent="$refs.barcodeInput.focus(); $refs.barcodeInput.select()"
     />
