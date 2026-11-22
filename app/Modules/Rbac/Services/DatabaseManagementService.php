@@ -1050,6 +1050,14 @@ class DatabaseManagementService
         }
     }
 
+    /**
+     * Restore khusus untuk backup berformat SQLite.
+     *
+     * Catatan: dump MySQL (CREATE TABLE dengan backtick, ENGINE=..., dll.)
+     * TIDAK bisa dipulihkan lewat metode ini. Pastikan DB_CONNECTION=mysql
+     * agar restore memakai executeRestoreMysql(), atau konversi dump ke SQL
+     * SQLite terlebih dahulu.
+     */
     protected function executeRestoreSqlite(array $conn, string $sqlPath): void
     {
         $dbPath = $conn['database'] ?? database_path('database.sqlite');
