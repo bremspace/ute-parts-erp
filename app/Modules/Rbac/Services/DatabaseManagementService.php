@@ -1069,21 +1069,40 @@ class DatabaseManagementService
             // Abaikan; lanjutkan upaya restore.
         }
 
-        if ($dbPath === ':memory:') {
-            DB::unprepared(File::get($sqlPath));
-            return;
-        }
-
         $header = @file_get_contents($sqlPath, false, null, 0, 16);
         $isSqliteBinary = is_string($header) && str_starts_with($header, "SQLite format 3\x00");
+
+        if ($dbPath === ':memory:') {
+            if ($isSqliteBinary) {
+                throw new RuntimeException('Backup biner SQLite tidak dapat dipulihkan ke database :memory:. Pulihkan ke file database nyata.');
+            }
+
+            DB::unprepared(File::get($sqlPath));
+
+            return;
+        }
 
         if ($isSqliteBinary) {
             // Backup bawaan Ute Parts untuk SQLite adalah salinan biner database.
             File::copy($sqlPath, $dbPath);
+
             return;
         }
 
         // Berkas .sql teks: eksekusi sebagai SQL, bukan menimpa file DB.
+        // Tabel dibersihkan dulu (setara wipe di executeRestoreMysql) supaya
+        // CREATE TABLE di dump tidak gagal karena tabel sudah ada.
+        try {
+            DB::unprepared('PRAGMA foreign_keys = OFF;');
+            $tables = DB::select("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
+            foreach ($tables as $table) {
+                DB::statement('DROP TABLE IF EXISTS "'.$table->name.'"');
+            }
+            DB::unprepared('PRAGMA foreign_keys = ON;');
+        } catch (Throwable $e) {
+            Log::warning('Pra-restore wipe SQLite dilewati: '.$e->getMessage());
+        }
+
         DB::unprepared(File::get($sqlPath));
     }
 
