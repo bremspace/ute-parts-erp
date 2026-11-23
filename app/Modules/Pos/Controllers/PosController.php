@@ -5,6 +5,7 @@ namespace App\Modules\Pos\Controllers;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Pos\Exceptions\StokTidakCukupException;
 use App\Modules\Pos\Jobs\PrintThermalJob;
 use App\Modules\Pos\Models\Transaksi;
@@ -646,6 +647,26 @@ class PosController extends Controller
      * Deteksi printer terinstall di sistem (Windows: Get-Printer, Linux: lpstat).
      * Digunakan oleh halaman Pengaturan Printer untuk auto-detect.
      */
+    public function setDefaultPrinter(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'device_id' => 'nullable|string|max:255',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+        $struk = $config->getStrukConfig();
+        $struk['thermal_printer_name'] = $validated['name'];
+        if (! empty($validated['device_id'])) {
+            $struk['thermal_bluetooth_mac'] = $validated['device_id'];
+        }
+        $config->set('struk_config', $struk, 'Pengaturan default struk transaksi kasir POS');
+
+        return $this->success([
+            'name' => $struk['thermal_printer_name'],
+        ], 'Printer default berhasil disimpan.');
+    }
+
     public function listPrinters(Request $request): JsonResponse
     {
         $printers = [];
