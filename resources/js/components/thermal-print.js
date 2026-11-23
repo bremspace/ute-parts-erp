@@ -1223,6 +1223,20 @@ function thermalPrinter(config = {}) {
           return;
         }
 
+        // Mode BLE: pakai printer default jika ada, jika tidak minta pilih.
+        const hasBle = this.printer.device || localStorage.getItem('thermal_printer_device') || this.data.thermal_bluetooth_mac;
+        if (!hasBle) {
+          try {
+            await this.printer.connect(true);
+            this.pairedPrinterName = this.printer.device?.name || 'Bluetooth Printer';
+            localStorage.setItem('ute_ble_printer_name', this.pairedPrinterName);
+          } catch (e) {
+            this.showToast('Pilih printer Bluetooth terlebih dahulu');
+            this.isPrinting = false;
+            return;
+          }
+        }
+
         const paperWidth = Number(paperSize) === 80 ? 80 : 58;
         // Selera kertas & mode font selalu eksplisit agar output == preview == backend job.
         const payload = { ...this.data, paper_width: paperWidth, font_size: this.data.font_size || 'small' };
@@ -1240,40 +1254,24 @@ function thermalPrinter(config = {}) {
             // Fall through to Bluetooth or browser print
           }
         }
-        // 1b. Web Serial / USB direct print
-        if (this.serialPort) {
-          try {
-            await this.printViaSerial(bytes);
-            this.showToast('Struk dikirim via Serial/USB');
-            return;
-          } catch (serialErr) {
-            console.warn('Serial print gagal, fallback ke Bluetooth/Browser:', serialErr);
-          }
-        }
-        // 1c. Web USB direct print
-        if (this.usbDevice && this.usbEndpointOut) {
-          try {
-            await this.printViaUsb(bytes);
-            this.showToast('Struk dikirim via USB');
-            return;
-          } catch (usbErr) {
-            console.warn('USB print gagal, fallback ke Bluetooth/Browser:', usbErr);
-          }
-        }
-        // 2. Web Bluetooth direct print
+        // 2. Web Bluetooth direct print (default printer / yang sudah dipilih)
         if (this.printer.device || localStorage.getItem('thermal_printer_device')) {
           await this.printer.print(bytes);
           this.showToast('Struk berhasil dicetak via Bluetooth');
         }
-        // 3. Browser fallback dialog
+        // 3. Tanpa browser fallback: BLE saja sesuai permintaan
         else {
-          this.printViaBrowser(paperSize);
+          this.showToast('Printer Bluetooth belum tersambung');
         }
       } catch (e) {
         console.error('Print failed:', e);
-        // Fallback to browser print
-        if (confirm('Gagal cetak (' + e.message + '). Buka cetak browser?')) {
-          this.printViaBrowser(paperSize);
+        this.showToast('Gagal cetak, pilih ulang printer Bluetooth');
+        try {
+          await this.printer.connect(true);
+          this.pairedPrinterName = this.printer.device?.name || 'Bluetooth Printer';
+          localStorage.setItem('ute_ble_printer_name', this.pairedPrinterName);
+        } catch (bleErr) {
+          this.showToast('Printer Bluetooth belum dipilih');
         }
       } finally {
         this.isPrinting = false;

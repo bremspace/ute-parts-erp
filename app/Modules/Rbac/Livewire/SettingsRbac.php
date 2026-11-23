@@ -178,7 +178,7 @@ class SettingsRbac extends Component
         'thermal_printer_name' => '',
         'thermal_bluetooth_mac' => '',
         'thermal_auto_print' => false,
-        'thermal_print_mode' => 'browser',
+        'thermal_print_mode' => 'direct',
     ];
 
     public array $wmsDocForm = [
@@ -264,7 +264,7 @@ class SettingsRbac extends Component
         'thermal_printer_name' => '',     // CUPS printer name
         'thermal_bluetooth_mac' => '',    // Bluetooth MAC for Web Bluetooth
         'thermal_auto_print' => false,    // Auto-print per transaction
-        'thermal_print_mode' => 'browser', // direct | browser
+        'thermal_print_mode' => 'direct', // direct | browser
     ];
 
     public array $integrasiForm = [
@@ -798,7 +798,7 @@ class SettingsRbac extends Component
             'thermal_printer_name' => (string) ($strukCfg['thermal_printer_name'] ?? ''),
             'thermal_bluetooth_mac' => (string) ($strukCfg['thermal_bluetooth_mac'] ?? ''),
             'thermal_auto_print' => (bool) ($strukCfg['thermal_auto_print'] ?? false),
-            'thermal_print_mode' => (string) ($strukCfg['thermal_print_mode'] ?? 'browser'),
+            'thermal_print_mode' => (string) ($strukCfg['thermal_print_mode'] ?? 'direct'),
         ];
     }
 
