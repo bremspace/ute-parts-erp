@@ -1054,6 +1054,10 @@ function thermalPrinter(config = {}) {
     printer: printer,
     serialPort: null,
     pairedSerialName: localStorage.getItem('ute_serial_printer_name') || null,
+    usbDevice: null,
+    pairedUsbName: localStorage.getItem('ute_usb_printer_name') || null,
+    usbInterfaceNumber: null,
+    usbEndpointOut: null,
 
     init() {
       const templateDefault = this.data.default_width?.includes('80') ? '80' : '58';
@@ -1077,6 +1081,18 @@ function thermalPrinter(config = {}) {
         }
       };
 
+      // Auto-detect previously granted USB devices (tanpa dialog)
+      if (navigator.usb && typeof navigator.usb.getDevices === 'function') {
+        navigator.usb.getDevices().then((devices) => {
+          if (devices && devices.length > 0) {
+            this.usbDevice = devices[0];
+            if (!this.pairedUsbName) {
+              this.pairedUsbName = devices[0].productName || 'USB Printer';
+            }
+          }
+        }).catch(() => {});
+      }
+
       // Auto-detect previously granted serial ports (tanpa dialog)
       if (navigator.serial && typeof navigator.serial.getPorts === 'function') {
         navigator.serial.getPorts().then((ports) => {
@@ -1097,6 +1113,58 @@ function thermalPrinter(config = {}) {
           }, 350);
         }
       });
+    },
+
+    async connectUsb() {
+      if (!navigator.usb) {
+        this.showToast('Web USB tidak didukung browser ini (gunakan Chrome/Edge & HTTPS/localhost)');
+        return;
+      }
+      try {
+        const device = await navigator.usb.requestDevice({ filters: [] });
+        await device.open();
+        if (device.configuration === null) {
+          await device.selectConfiguration(1);
+        }
+        const iface = device.configuration.interfaces.find((i) => {
+          const alt = i.alternates[0];
+          return alt && alt.endpoints.some((e) => e.direction === 'out' && (e.type === 'bulk' || e.type === 'interrupt'));
+        });
+        if (!iface) throw new Error('Interface OUT tidak ditemukan');
+        const alt = iface.alternates[0];
+        this.usbInterfaceNumber = iface.interfaceNumber;
+        this.usbEndpointOut = alt.endpoints.find((e) => e.direction === 'out' && (e.type === 'bulk' || e.type === 'interrupt'));
+        await device.claimInterface(iface.interfaceNumber);
+        this.usbDevice = device;
+        this.pairedUsbName = device.productName || 'USB Printer';
+        localStorage.setItem('ute_usb_printer_name', this.pairedUsbName);
+        this.showToast('Printer USB terhubung');
+      } catch (e) {
+        console.warn('USB connect failed:', e);
+        this.showToast('Gagal sambung USB: ' + (e && e.message ? e.message : e));
+      }
+    },
+
+    disconnectUsb() {
+      try {
+        if (this.usbDevice) {
+          if (this.usbInterfaceNumber !== null) {
+            this.usbDevice.releaseInterface(this.usbInterfaceNumber).catch(() => {});
+          }
+          this.usbDevice.close().catch(() => {});
+        }
+      } catch (e) {}
+      this.usbDevice = null;
+      this.usbInterfaceNumber = null;
+      this.usbEndpointOut = null;
+      this.pairedUsbName = null;
+      localStorage.removeItem('ute_usb_printer_name');
+      this.showToast('Printer USB diputuskan');
+    },
+
+    async printViaUsb(bytes) {
+      if (!this.usbDevice || !this.usbEndpointOut) throw new Error('Printer USB tidak tersambung');
+      await this.usbDevice.transferOut(this.usbEndpointOut.endpointNumber, bytes);
     },
 
     async connectSerial() {
@@ -1174,6 +1242,16 @@ function thermalPrinter(config = {}) {
             return;
           } catch (serialErr) {
             console.warn('Serial print gagal, fallback ke Bluetooth/Browser:', serialErr);
+          }
+        }
+        // 1c. Web USB direct print
+        if (this.usbDevice && this.usbEndpointOut) {
+          try {
+            await this.printViaUsb(bytes);
+            this.showToast('Struk dikirim via USB');
+            return;
+          } catch (usbErr) {
+            console.warn('USB print gagal, fallback ke Bluetooth/Browser:', usbErr);
           }
         }
         // 2. Web Bluetooth direct print

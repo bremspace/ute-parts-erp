@@ -186,6 +186,17 @@
 
                     <button
                         type="button"
+                        @click="connectUsb()"
+                        :disabled="isPrinting"
+                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-amber font-semibold text-xs border border-up-amber/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
+                        title="Deteksi / pasangkan printer USB langsung"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v18m9-9H3"/></svg>
+                        <span x-text="pairedUsbName ? 'USB OK' : 'Pilih USB'"></span>
+                    </button>
+
+                    <button
+                        type="button"
                         @click="paperSize === '58' ? printStruk58(true) : printFaktur80(true)"
                         :disabled="isPrinting"
                         class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-xs border border-up-mint/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
