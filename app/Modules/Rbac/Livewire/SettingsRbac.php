@@ -156,6 +156,9 @@ class SettingsRbac extends Component
     // Deteksi printer terinstall (untuk dropdown CUPS)
     public array $detectedPrinters = [];
 
+    // Printer yang terdeteksi dari browser (Web Serial / USB / Bluetooth)
+    public array $clientPrinters = [];
+
     public bool $printerDetecting = false;
 
     public array $printerForm = [
@@ -800,6 +803,20 @@ class SettingsRbac extends Component
     }
 
     /**
+     * Terima daftar printer yang terdeteksi dari sisi browser (Web Serial/USB/Bluetooth).
+     */
+    public function setClientPrinters(array $printers): void
+    {
+        $clean = array_values(array_unique(array_filter(array_map(
+            static fn ($p) => is_string($p) ? trim($p) : '',
+            $printers
+        ))));
+        $this->clientPrinters = $clean;
+        $this->detectedPrinters = array_values(array_unique(array_merge($this->detectedPrinters, $clean)));
+        sort($this->detectedPrinters);
+    }
+
+    /**
      * Deteksi printer terinstall di sistem (Windows: Get-Printer, Linux: lpstat).
      * Hasil disimpan di $detectedPrinters untuk dropdown.
      */
@@ -850,7 +867,7 @@ class SettingsRbac extends Component
             }
         }
 
-        $this->detectedPrinters = array_values(array_unique(array_filter($printers)));
+        $this->detectedPrinters = array_values(array_unique(array_filter(array_merge($printers, $this->clientPrinters))));
         sort($this->detectedPrinters);
         $this->printerDetecting = false;
 

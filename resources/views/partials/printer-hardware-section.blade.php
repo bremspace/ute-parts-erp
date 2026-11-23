@@ -13,7 +13,7 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-            <label class="block text-xs font-semibold text-ink-300 mb-1">Nama Printer CUPS / Windows</label>
+            <label class="block text-xs font-semibold text-ink-300 mb-1">Nama Printer / Default Printer</label>
             <div class="flex gap-2">
                 <select wire:model.live="{{ $f }}.thermal_printer_name"
                     class="flex-1 px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900/60 border border-white/10">
@@ -26,6 +26,35 @@
                     class="px-3 py-2 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white text-xs font-bold cursor-pointer transition active:scale-95 disabled:opacity-50 whitespace-nowrap">
                     <span wire:loading.remove wire:target="deteksiPrinter">Deteksi</span>
                     <span wire:loading wire:target="deteksiPrinter">...</span>
+                </button>
+                <button
+                    type="button"
+                    x-data="{
+                        async detectClient(){
+                            const found = [];
+                            try {
+                                if (navigator.serial && navigator.serial.getPorts) {
+                                    (await navigator.serial.getPorts()).forEach((p, i) => {
+                                        const info = p.getInfo ? p.getInfo() : {};
+                                        found.push(info.usbProductId ? 'Serial USB ' + info.usbProductId : 'Serial Printer #' + (i + 1));
+                                    });
+                                }
+                                if (navigator.usb && navigator.usb.getDevices) {
+                                    (await navigator.usb.getDevices()).forEach(d => found.push(d.productName || 'USB Printer'));
+                                }
+                                if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+                                    (await navigator.bluetooth.getDevices()).forEach(d => found.push(d.name || 'Bluetooth Printer'));
+                                }
+                            } catch (e) {}
+                            $wire.setClientPrinters(found);
+                        }
+                    }"
+                    x-init="detectClient()"
+                    @click="detectClient()"
+                    class="px-3 py-2 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint border border-up-mint/30 text-xs font-bold cursor-pointer transition active:scale-95 whitespace-nowrap"
+                    title="Deteksi printer yang sudah diizinkan di browser ini"
+                >
+                    Deteksi Browser
                 </button>
             </div>
             <p class="text-[10px] text-ink-400 mt-1">Klik "Deteksi" untuk scan printer terinstall. Atau ketik manual di bawah.</p>
