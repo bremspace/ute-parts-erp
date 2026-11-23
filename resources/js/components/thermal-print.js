@@ -1153,8 +1153,8 @@ function thermalPrinter(config = {}) {
       }
 
       const paperWidth = Number(paperSize) === 80 ? 80 : 58;
-      const esc = new window.EscPos(paperWidth);
-      const html = esc.buildPreviewHtml({ ...this.data, paper_width: paperWidth, font_size: this.data.font_size || 'small' }, paperWidth);
+      const writer = new window.EscPos(paperWidth);
+      const html = writer.buildPreviewHtml({ ...this.data, paper_width: paperWidth, font_size: this.data.font_size || 'small' }, paperWidth);
 
       const storeName = this.data.nama_toko || 'Bremspace';
 
@@ -1163,7 +1163,7 @@ function thermalPrinter(config = {}) {
         <html>
         <head>
           <meta charset="utf-8">
-          <title>Struk ${esc(storeName)}</title>
+          <title>Struk ${storeName}</title>
           <style>
             @media print {
               @page { margin: 0; size: ${paperWidth}mm auto; }
