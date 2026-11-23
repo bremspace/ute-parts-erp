@@ -604,7 +604,7 @@
         <!-- Main Content Area -->
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-[var(--up-bg-root)]">
             <!-- Top App Bar -->
-            <header class="h-14 sm:h-16 border-b border-[var(--up-border-subtle)] bg-[var(--up-bg-surface)] px-2.5 sm:px-4 lg:px-6 flex items-center justify-between z-20">
+            <header class="h-14 sm:h-16 border-b border-[var(--up-border-subtle)] bg-[var(--up-bg-surface)] px-2.5 sm:px-4 lg:px-6 flex items-center justify-between z-[70]">
                 <div class="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1 sm:flex-initial mr-1 sm:mr-0">
                     <!-- Menu Button: <768 toggle drawer · >=768 toggle collapse icon-rail (persist) -->
                     <button @click="toggleSidebar()"
