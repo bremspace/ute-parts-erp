@@ -22,6 +22,9 @@ COPY . .
 COPY --from=assets /app/public/build ./public/build
 COPY Installer*docker/.env.docker .env
 
+# Pastikan .env bisa ditulis oleh proses app (www-data) dari UI Pengaturan
+RUN chown www-data:www-data .env && chmod 664 .env
+
 RUN grep -q '^APP_KEY=' .env || (printf '\nAPP_KEY=\n' >> .env)
 
 RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \

@@ -40,4 +40,8 @@ php artisan config:cache || true
 php artisan route:cache || true
 php artisan view:cache || true
 
+# Jalankan worker antrean & scheduler di background (container single-process)
+su -s /bin/sh www-data -c "cd /var/www/html && php artisan queue:work --sleep=3 --tries=3" > /var/www/html/storage/logs/queue-worker.log 2>&1 &
+su -s /bin/sh www-data -c "cd /var/www/html && php artisan schedule:work" > /var/www/html/storage/logs/scheduler.log 2>&1 &
+
 exec "$@"
