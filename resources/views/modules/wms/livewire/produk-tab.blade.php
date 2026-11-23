@@ -3374,7 +3374,7 @@
     <!-- MODAL: EDIT PRODUK -->
     @if($showEditProdukModal)
         <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4">
-            <div class="w-full max-w-5xl glass-panel p-4 sm:p-6 rounded-t-3xl sm:rounded-3xl relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto" x-data="{ tab: 'utama' }">
+            <div class="w-full max-w-2xl glass-panel p-4 sm:p-6 rounded-t-3xl sm:rounded-3xl relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto" x-data="{ tab: 'utama' }">
                 <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
                     <div>
                         <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
