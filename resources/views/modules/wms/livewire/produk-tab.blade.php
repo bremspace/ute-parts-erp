@@ -3902,22 +3902,23 @@
                                 <!-- [MARGIN GUARD INDICATOR] -->
                                 @if((!function_exists('isSuperAdminOrOwner') || isSuperAdminOrOwner() || canSeeField('harga_beli') || canSeeField('margin')) && !empty($marginGuardEdit) && ($marginGuardEdit['harga_beli'] ?? 0) > 0)
                                     <div class="mt-2 p-2.5 rounded-xl text-xs border {{ $marginGuardEdit['status'] === 'bahaya' ? 'bg-up-red/10 border-up-red/30 text-up-red' : ($marginGuardEdit['status'] === 'peringatan' ? 'bg-up-amber/10 border-up-amber/30 text-up-amber' : 'bg-up-mint/10 border-up-mint/30 text-up-mint') }}">
-                                        <div class="flex items-start justify-between gap-2">
-                                            <div class="space-y-0.5">
+                                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                                            <div class="space-y-0.5 min-w-0">
                                                 <div class="flex items-center gap-1.5 font-bold">
                                                     <span>{{ $marginGuardEdit['status'] === 'bahaya' ? '🚨' : ($marginGuardEdit['status'] === 'peringatan' ? '⚠️' : '🛡️') }}</span>
                                                     <span>{{ $marginGuardEdit['status_label'] }} (Margin: {{ $marginGuardEdit['margin_persen'] }}%)</span>
                                                 </div>
-                                                <p class="text-[10px] opacity-90">{{ $marginGuardEdit['pesan'] }}</p>
+                                                <p class="text-[10px] opacity-90 break-words">{{ $marginGuardEdit['pesan'] }}</p>
                                             </div>
                                             @if($marginGuardEdit['status'] !== 'aman')
                                                 <button
                                                     type="button"
                                                     wire:click="terapkanRekomendasiMargin('edit')"
-                                                    class="px-2 py-1 rounded-lg bg-up-primary text-white font-bold text-[10px] whitespace-nowrap shadow-sm hover:opacity-90 active:scale-95 cursor-pointer flex-shrink-0"
+                                                    class="w-full sm:w-auto px-3 py-2 rounded-lg bg-up-primary text-white font-bold text-[10px] shadow-sm hover:opacity-90 active:scale-95 cursor-pointer flex-shrink-0 text-center"
                                                     title="Terapkan harga aman Rp {{ number_format($marginGuardEdit['rekomendasi_harga'], 0, ',', '.') }}"
                                                 >
-                                                    Gunakan Rekomendasi (Rp {{ number_format($marginGuardEdit['rekomendasi_harga'], 0, ',', '.') }})
+                                                    Gunakan Rekomendasi<br class="hidden sm:block" />
+                                                    (Rp {{ number_format($marginGuardEdit['rekomendasi_harga'], 0, ',', '.') }})
                                                 </button>
                                             @endif
                                         </div>
