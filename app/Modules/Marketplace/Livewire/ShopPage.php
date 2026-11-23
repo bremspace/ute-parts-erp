@@ -19,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -438,6 +439,43 @@ class ShopPage extends Component
         }
 
         return $query->paginate(24);
+    }
+
+    /**
+     * Auto suggestion pencarian katalog (mobile/tablet).
+     * Ringan: maksimal 6 produk, hanya saat query >= 2 karakter.
+     */
+    #[Computed]
+    public function searchSuggestions(): Collection
+    {
+        $q = trim($this->search);
+        if (mb_strlen($q) < 2) {
+            return collect();
+        }
+
+        return Produk::query()
+            ->where('produk.is_active', true)
+            ->withSum('stokItems', 'jumlah')
+            ->with(['hargaTier', 'satuanKonversi'])
+            ->filterKatalog([
+                'search' => $q,
+                'auto_relevance' => true,
+            ])
+            ->limit(6)
+            ->get()
+            ->map(function (Produk $p) {
+                $price = app(PricingService::class)->resolve($p, auth('customer')->user());
+
+                return [
+                    'id' => $p->id,
+                    'nama' => $p->nama,
+                    'sku' => $p->sku,
+                    'slug' => $p->slug,
+                    'gambar' => $p->thumbnail_url ?: $p->gambar,
+                    'harga' => (float) ($price['harga'] ?? $p->harga_jual_retail ?? 0),
+                    'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
+                ];
+            });
     }
 
     public function getProductDetailProperty(): ?Produk
@@ -869,6 +907,7 @@ class ShopPage extends Component
             'filterBrand' => $this->filterBrand,
             'filterKondisi' => $this->filterKondisi,
             'search' => $this->search,
+            'searchSuggestions' => $this->searchSuggestions,
         ])->layout('layouts.marketplace', [
             'title' => $metaTitle,
         ]);
