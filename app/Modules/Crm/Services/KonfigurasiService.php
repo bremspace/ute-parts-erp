@@ -521,7 +521,7 @@ class KonfigurasiService
             'thermal_printer_name' => '',    // CUPS printer name (e.g., 'POS-58', 'TM-T20')
             'thermal_bluetooth_mac' => '',   // Bluetooth MAC for Web Bluetooth (e.g., 'AA:BB:CC:DD:EE:FF')
             'thermal_auto_print' => false,   // Auto-print per transaction (alias of auto_print)
-            'thermal_print_mode' => 'browser', // direct | browser
+            'thermal_print_mode' => 'direct', // direct | browser
         ];
 
         $cfg = $this->get('struk_config');
