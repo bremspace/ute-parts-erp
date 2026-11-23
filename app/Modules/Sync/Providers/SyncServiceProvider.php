@@ -65,12 +65,31 @@ class SyncServiceProvider extends ServiceProvider
                 }
 
                 $value = $saved[$key];
+
                 if ($key === 'enabled') {
                     $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
                 } elseif ($key === 'pull_interval_seconds') {
                     $value = max(5, (int) $value);
-                } elseif (is_scalar($value)) {
+                } elseif ($key === 'node_role') {
+                    // Hanya dua peran yang dikenal; nilai lain (mis. hasil sunting
+                    // manual tabel konfigurasi) jangan dipakai.
+                    if (! in_array((string) $value, ['primary_store', 'cloud_storefront'], true)) {
+                        continue;
+                    }
                     $value = (string) $value;
+                } elseif (is_scalar($value)) {
+                    $value = trim((string) $value);
+
+                    // String kosong berarti "tidak disetel di UI". Jangan timpa
+                    // nilai .env yang masih berlaku — kalau ditimpa dengan '',
+                    // VerifySyncSignature menolak semua request dengan 401 dan
+                    // push sync gagal diam-diam tanpa pesan yang jelas.
+                    if (($key === 'api_secret' || $key === 'remote_url') && $value === '') {
+                        continue;
+                    }
+                } else {
+                    // Array/objek tidak punya padanan di config('sync.*').
+                    continue;
                 }
 
                 config()->set($target, $value);

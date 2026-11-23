@@ -1233,7 +1233,21 @@ class SettingsRbac extends Component
             'integrasiForm.duitku_merchant_key' => 'nullable|string|max:255',
             'integrasiForm.duitku_expiry_period' => 'required|integer|min:15|max:10080',
             'integrasiForm.biteship_api_key' => 'nullable|string|max:255',
+
+            // Asymmetric Hybrid Sync — nilai ini jadi sumber runtime (lihat
+            // SyncServiceProvider::applyDatabaseConfig), jadi divalidasi di sini.
+            'integrasiForm.sync_enabled' => 'required|boolean',
+            'integrasiForm.sync_node_role' => 'required|in:primary_store,cloud_storefront',
+            'integrasiForm.sync_node_id' => 'required|string|max:64',
+            'integrasiForm.sync_remote_url' => 'nullable|url|max:2048',
+            'integrasiForm.sync_api_secret' => 'nullable|string|max:512',
+            'integrasiForm.sync_pull_interval_seconds' => 'required|integer|min:5|max:3600',
         ]);
+
+        // String kosong pada URL/secret dibiarkan sebagai null agar aturan
+        // `nullable` di atas lolos; penyimpanan tetap menulis ''.
+        $this->integrasiForm['sync_remote_url'] = trim((string) ($this->integrasiForm['sync_remote_url'] ?? '')) ?: null;
+        $this->integrasiForm['sync_api_secret'] = trim((string) ($this->integrasiForm['sync_api_secret'] ?? '')) ?: null;
 
         $config = app(KonfigurasiService::class);
 
