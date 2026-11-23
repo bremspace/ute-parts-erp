@@ -4360,15 +4360,61 @@
 
                     <!-- Asymmetric Hybrid Sync Card -->
                     <x-prism.glass-card title="Asymmetric Hybrid Sync (Lokal <-> Cloud VPS)" subtitle="Sinkronisasi offline-first otomatis antara Server Toko Fisik dan Toko Online VPS">
-                        <div class="mb-3 p-3 rounded-xl bg-white/[0.03] border border-white/5 flex flex-wrap items-center gap-2 text-[11px]">
-                            <span class="px-2 py-0.5 rounded-full font-bold {{ config('sync.enabled') ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : 'bg-white/5 text-ink-400 border border-white/10' }}">
-                                {{ config('sync.enabled') ? 'Sync AKTIF' : 'Sync NONAKTIF' }}
-                            </span>
-                            <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary border border-up-primary/30 font-mono font-bold">
-                                {{ config('sync.node_role') }}
-                            </span>
-                            <span class="text-ink-400 font-mono">NODE: {{ config('sync.node_id') }}</span>
-                            <span class="text-ink-400">Remote: {{ config('sync.remote_url') ?: '-' }}</span>
+                        <div class="mb-3 p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-2 text-[11px]">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-0.5 rounded-full font-bold {{ config('sync.enabled') ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : 'bg-white/5 text-ink-400 border border-white/10' }}">
+                                    {{ config('sync.enabled') ? 'Sync AKTIF' : 'Sync NONAKTIF' }}
+                                </span>
+                                <span class="px-2 py-0.5 rounded-full font-bold {{ ($syncStatus['connected'] ?? false) ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : 'bg-up-red/10 text-up-red border border-up-red/30' }}">
+                                    {{ ($syncStatus['connected'] ?? false) ? '● TERSAMBUNG' : '○ TERPUTUS' }}
+                                </span>
+                                <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary border border-up-primary/30 font-mono font-bold">
+                                    {{ config('sync.node_role') }}
+                                </span>
+                                <span class="text-ink-400 font-mono">NODE: {{ config('sync.node_id') }}</span>
+                                <span class="text-ink-400">Remote: {{ config('sync.remote_url') ?: '-' }}</span>
+                                <button
+                                    type="button"
+                                    wire:click="refreshSyncStatus"
+                                    wire:loading.attr="disabled"
+                                    class="ml-auto px-2 py-0.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-semibold cursor-pointer disabled:opacity-50"
+                                >
+                                    <span wire:loading.remove wire:target="refreshSyncStatus">⟳ Cek Ulang</span>
+                                    <span wire:loading wire:target="refreshSyncStatus">Mengecek...</span>
+                                </button>
+                            </div>
+
+                            <div class="text-ink-300">
+                                Status: <span class="font-semibold text-white">{{ $syncStatus['message'] ?? '-' }}</span>
+                                <span class="text-ink-500">· dicek {{ $syncStatus['checked_at'] ?? '-' }}</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <div class="px-2 py-1.5 rounded-lg bg-white/[0.03] border border-white/5">
+                                    <div class="text-[10px] text-ink-500">Outbox pending</div>
+                                    <div class="font-mono font-bold text-white">{{ $syncStatus['local_pending'] ?? 0 }}</div>
+                                </div>
+                                <div class="px-2 py-1.5 rounded-lg bg-white/[0.03] border border-white/5">
+                                    <div class="text-[10px] text-ink-500">Outbox gagal</div>
+                                    <div class="font-mono font-bold {{ ($syncStatus['local_failed'] ?? 0) > 0 ? 'text-up-red' : 'text-white' }}">{{ $syncStatus['local_failed'] ?? 0 }}</div>
+                                </div>
+                                <div class="px-2 py-1.5 rounded-lg bg-white/[0.03] border border-white/5">
+                                    <div class="text-[10px] text-ink-500">Event tersinkron</div>
+                                    <div class="font-mono font-bold text-up-mint">{{ $syncStatus['local_synced'] ?? 0 }}</div>
+                                </div>
+                                <div class="px-2 py-1.5 rounded-lg bg-white/[0.03] border border-white/5">
+                                    <div class="text-[10px] text-ink-500">Sinkron terakhir</div>
+                                    <div class="font-mono font-bold text-white">{{ $syncStatus['last_synced_at'] ?? '-' }}</div>
+                                </div>
+                            </div>
+
+                            @if(!empty($syncStatus['remote']))
+                                <div class="pt-2 border-t border-white/5 text-ink-400">
+                                    Remote: role <span class="font-mono text-white">{{ $syncStatus['remote']['node_role'] ?? '-' }}</span>,
+                                    pending <span class="font-mono text-white">{{ $syncStatus['remote']['pending_count'] ?? 0 }}</span>,
+                                    server time <span class="font-mono text-white">{{ $syncStatus['remote']['server_time'] ?? '-' }}</span>
+                                </div>
+                            @endif
                         </div>
                         <div class="space-y-4">
                             <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">

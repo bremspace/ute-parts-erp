@@ -22,6 +22,7 @@ use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\StokDeductionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class HybridSyncProcessorService
@@ -622,8 +623,48 @@ class HybridSyncProcessorService
      */
     protected function handleTransaksiPos(array $payload): void
     {
+        $noTransaksi = $payload['nomor_transaksi'] ?? $payload['no_transaksi'] ?? null;
+        if (! $noTransaksi) {
+            return;
+        }
+
+        $sourceNode = $payload['source_node'] ?? 'STORE-01';
+
+        if (! Schema::hasTable('hybrid_sync_pos_transaksi')) {
+            Log::warning('[HybridSync] Tabel hybrid_sync_pos_transaksi belum ada di cloud; event transaksi.pos diterima tapi tidak disimpan.');
+
+            return;
+        }
+
+        DB::table('hybrid_sync_pos_transaksi')->updateOrInsert(
+            [
+                'no_transaksi' => $noTransaksi,
+                'source_node' => $sourceNode,
+            ],
+            [
+                'sumber' => $payload['sumber'] ?? null,
+                'status' => $payload['status'] ?? null,
+                'cabang_id' => $payload['cabang_id'] ?? null,
+                'kasir_id' => $payload['kasir_id'] ?? null,
+                'kasir_nama' => $payload['kasir_nama'] ?? null,
+                'pelanggan_id' => $payload['pelanggan_id'] ?? null,
+                'pelanggan_nama' => $payload['pelanggan_nama'] ?? null,
+                'subtotal' => $payload['subtotal'] ?? 0,
+                'diskon_total' => $payload['diskon_total'] ?? 0,
+                'pajak_nominal' => $payload['pajak_nominal'] ?? 0,
+                'total' => $payload['total_akhir'] ?? $payload['total'] ?? 0,
+                'metode_bayar' => $payload['metode_bayar'] ?? null,
+                'jumlah_item' => $payload['jumlah_item'] ?? 0,
+                'transaksi_created_at' => ! empty($payload['transaksi_created_at']) ? $payload['transaksi_created_at'] : null,
+                'paid_at' => ! empty($payload['paid_at']) ? $payload['paid_at'] : null,
+                'payload' => json_encode($payload),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
         Log::info('[HybridSync] Transaksi POS tersinkron ke cloud:', [
-            'nomor_transaksi' => $payload['nomor_transaksi'] ?? $payload['no_transaksi'] ?? null,
+            'nomor_transaksi' => $noTransaksi,
             'total' => $payload['total_akhir'] ?? $payload['total'] ?? 0,
             'cabang_id' => $payload['cabang_id'] ?? null,
         ]);
