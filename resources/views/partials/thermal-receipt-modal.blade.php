@@ -164,6 +164,16 @@
                 <div class="flex gap-2">
                     <button
                         type="button"
+                        @click="printViaBrowser(paperSize)"
+                        :disabled="isPrinting"
+                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs border border-white/10 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
+                        title="Buka dialog cetak browser (printer Windows yang sudah terinstall)"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/></svg>
+                        <span>Browser Print</span>
+                    </button>
+                    <button
+                        type="button"
                         @click="directPrint(paperSize)"
                         :disabled="isPrinting"
                         class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs shadow-md shadow-up-mint/20 cursor-pointer min-h-[42px] flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-50"
