@@ -175,6 +175,7 @@ class SettingsRbac extends Component
         'thermal_printer_name' => '',
         'thermal_bluetooth_mac' => '',
         'thermal_auto_print' => false,
+        'thermal_print_mode' => 'browser',
     ];
 
     public array $wmsDocForm = [
@@ -260,6 +261,7 @@ class SettingsRbac extends Component
         'thermal_printer_name' => '',     // CUPS printer name
         'thermal_bluetooth_mac' => '',    // Bluetooth MAC for Web Bluetooth
         'thermal_auto_print' => false,    // Auto-print per transaction
+        'thermal_print_mode' => 'browser', // direct | browser
     ];
 
     public array $integrasiForm = [
@@ -793,6 +795,7 @@ class SettingsRbac extends Component
             'thermal_printer_name' => (string) ($strukCfg['thermal_printer_name'] ?? ''),
             'thermal_bluetooth_mac' => (string) ($strukCfg['thermal_bluetooth_mac'] ?? ''),
             'thermal_auto_print' => (bool) ($strukCfg['thermal_auto_print'] ?? false),
+            'thermal_print_mode' => (string) ($strukCfg['thermal_print_mode'] ?? 'browser'),
         ];
     }
 
@@ -911,6 +914,7 @@ class SettingsRbac extends Component
             'printerForm.label_margin_left' => 'required|numeric|min:0|max:20',
             'printerForm.label_margin_right' => 'required|numeric|min:0|max:20',
             'printerForm.struk_default_width' => 'required|in:80mm,58mm,a4',
+            'printerForm.thermal_print_mode' => 'required|in:direct,browser',
         ]);
 
         $config = app(KonfigurasiService::class);
@@ -934,6 +938,7 @@ class SettingsRbac extends Component
             'thermal_printer_name' => $this->printerForm['thermal_printer_name'],
             'thermal_bluetooth_mac' => $this->printerForm['thermal_bluetooth_mac'],
             'thermal_auto_print' => $this->printerForm['thermal_auto_print'],
+            'thermal_print_mode' => $this->printerForm['thermal_print_mode'],
         ]);
 
         $config->set('label_qr_config', $labelData, 'Ukuran dan margin cetak label QR produk');
@@ -945,6 +950,7 @@ class SettingsRbac extends Component
         $this->strukForm['thermal_printer_name'] = $this->printerForm['thermal_printer_name'];
         $this->strukForm['thermal_bluetooth_mac'] = $this->printerForm['thermal_bluetooth_mac'];
         $this->strukForm['thermal_auto_print'] = $this->printerForm['thermal_auto_print'];
+        $this->strukForm['thermal_print_mode'] = $this->printerForm['thermal_print_mode'];
 
         app(AuditService::class)->catat(
             'Konfigurasi',

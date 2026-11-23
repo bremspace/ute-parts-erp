@@ -1217,6 +1217,12 @@ function thermalPrinter(config = {}) {
       this.isPrinting = true;
 
       try {
+        if (this.data.thermal_print_mode === 'browser') {
+          this.printViaBrowser(paperSize);
+          this.isPrinting = false;
+          return;
+        }
+
         const paperWidth = Number(paperSize) === 80 ? 80 : 58;
         // Selera kertas & mode font selalu eksplisit agar output == preview == backend job.
         const payload = { ...this.data, paper_width: paperWidth, font_size: this.data.font_size || 'small' };
