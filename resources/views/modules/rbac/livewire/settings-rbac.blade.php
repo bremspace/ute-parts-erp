@@ -4409,6 +4409,32 @@
                                     <p class="text-[10px] text-ink-400 mt-1">Wajib sama persis antara server lokal dan cloud VPS.</p>
                                 </div>
                             </div>
+
+                            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-xs font-bold text-white">Status Sinkronisasi</p>
+                                    <button type="button" wire:click="testSyncConnection" wire:loading.attr="disabled" class="px-3 py-1.5 rounded-lg bg-up-primary/20 text-up-primary text-[11px] font-bold hover:bg-up-primary/30 transition disabled:opacity-50">
+                                        <span wire:loading.remove wire:target="testSyncConnection">Cek Status Sync</span>
+                                        <span wire:loading wire:target="testSyncConnection">Mengecek...</span>
+                                    </button>
+                                </div>
+                                @if($syncStatusMessage)
+                                    <p class="text-[11px] {{ $syncTestStatus === 'success' ? 'text-up-mint' : 'text-red-400' }}">{{ $syncStatusMessage }}</p>
+                                @endif
+                                @if(!empty($syncStatusData))
+                                    <div class="grid grid-cols-2 gap-2 text-[10px] text-ink-400">
+                                        <div>Lokal: {{ $syncStatusData['local_enabled'] ? 'AKTIF' : 'NONAKTIF' }} ({{ $syncStatusData['local_role'] }})</div>
+                                        <div>Node: {{ $syncStatusData['local_node'] }}</div>
+                                        <div>Outbox pending: {{ $syncStatusData['outbox_pending'] }}</div>
+                                        <div>Outbox failed: {{ $syncStatusData['outbox_failed'] }}</div>
+                                        <div>Outbox synced: {{ $syncStatusData['outbox_synced'] }}</div>
+                                        <div>Cloud: {{ $syncStatusData['cloud_connected'] ? 'TERHUBUNG' : 'TIDAK TERHUBUNG' }}</div>
+                                        <div>Cloud node: {{ $syncStatusData['cloud_node'] }} ({{ $syncStatusData['cloud_role'] }})</div>
+                                        <div>Cloud pending: {{ $syncStatusData['cloud_pending'] ?? '-' }}</div>
+                                    </div>
+                                    <p class="text-[10px] text-ink-400">Cloud message: {{ $syncStatusData['cloud_message'] }}</p>
+                                @endif
+                            </div>
                         </div>
                     </x-prism.glass-card>
                 </div>
