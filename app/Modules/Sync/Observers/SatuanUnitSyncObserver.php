@@ -10,7 +10,7 @@ class SatuanUnitSyncObserver
 {
     public function saved(SatuanUnit $satuan): void
     {
-        if (! config('sync.enabled') || config('sync.node_role') !== 'primary_store') {
+        if (! config('sync.enabled')) {
             return;
         }
 
