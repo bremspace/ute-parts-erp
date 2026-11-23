@@ -161,12 +161,12 @@
                 </div>
 
                 <!-- Tombol Cetak Utama & Bluetooth BLE -->
-                <div class="flex gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <button
                         type="button"
                         @click="directPrint(paperSize)"
                         :disabled="isPrinting"
-                        class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs shadow-md shadow-up-mint/20 cursor-pointer min-h-[42px] flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-50"
+                        class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs shadow-md shadow-up-mint/20 cursor-pointer min-h-[42px] flex items-center justify-center gap-2 whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
                         :title="'Cetak struk langsung ke printer aktif'"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
@@ -177,7 +177,7 @@
                         type="button"
                         @click="connectSerial()"
                         :disabled="isPrinting"
-                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-primary font-semibold text-xs border border-up-primary/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
+                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-primary font-semibold text-xs border border-up-primary/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
                         title="Deteksi / pasangkan printer Serial atau USB (CDC)"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M6.757 17.243l-2.121 2.121m0-14.728l2.121 2.121m10.486 10.486l2.121 2.121"/></svg>
@@ -188,7 +188,7 @@
                         type="button"
                         @click="connectUsb()"
                         :disabled="isPrinting"
-                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-amber font-semibold text-xs border border-up-amber/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
+                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-amber font-semibold text-xs border border-up-amber/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
                         title="Deteksi / pasangkan printer USB langsung"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v18m9-9H3"/></svg>
@@ -199,7 +199,7 @@
                         type="button"
                         @click="paperSize === '58' ? printStruk58(true) : printFaktur80(true)"
                         :disabled="isPrinting"
-                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-xs border border-up-mint/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
+                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-xs border border-up-mint/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
                         :title="'Pilih / pasangkan printer Bluetooth baru (' + paperSize + 'mm)'"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
