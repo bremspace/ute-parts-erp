@@ -10,6 +10,7 @@ use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
@@ -118,6 +119,7 @@ class HybridSyncProcessorService
     {
         match ($eventType) {
             'produk.upsert' => $this->handleProdukUpsert($payload),
+            'sku_variant.upsert' => $this->handleSkuVariantUpsert($payload),
             'pelanggan.upsert' => $this->handlePelangganUpsert($payload),
             'kategori_produk.upsert' => $this->handleKategoriProdukUpsert($payload),
             'brand.upsert' => $this->handleBrandUpsert($payload),
@@ -149,6 +151,7 @@ class HybridSyncProcessorService
     {
         match ($eventType) {
             'produk.upsert' => $this->handleProdukUpsert($payload),
+            'sku_variant.upsert' => $this->handleSkuVariantUpsert($payload),
             'pelanggan.upsert' => $this->handlePelangganUpsert($payload),
             'kategori_produk.upsert' => $this->handleKategoriProdukUpsert($payload),
             'brand.upsert' => $this->handleBrandUpsert($payload),
@@ -161,6 +164,37 @@ class HybridSyncProcessorService
             'order.online_paid' => $this->handleOrderOnlinePaid($payload),
             default => Log::info("[HybridSync] Generic event: {$eventType}"),
         };
+    }
+
+    /**
+     * Tentukan apakah data masuk lebih baru dari data lokal (last-write-wins).
+     */
+    protected function isIncomingNewer(?string $incoming, $existing): bool
+    {
+        if (empty($incoming)) {
+            return true;
+        }
+
+        $existingTs = null;
+        if (is_object($existing) && method_exists($existing, 'getAttribute')) {
+            $val = $existing->updated_at ?? null;
+            $existingTs = $val instanceof \DateTimeInterface ? $val->format('c') : (string) $val;
+        } elseif (is_string($existing)) {
+            $existingTs = $existing;
+        }
+
+        if (empty($existingTs)) {
+            return true;
+        }
+
+        $in = strtotime($incoming);
+        $ex = strtotime($existingTs);
+
+        if ($in === false || $ex === false) {
+            return true;
+        }
+
+        return $in > $ex;
     }
 
     /**
@@ -195,7 +229,11 @@ class HybridSyncProcessorService
         if (isset($payload['id']) && $payload['id']) {
             $existing = Produk::find($payload['id']);
             if ($existing) {
-                $existing->update($attributes);
+                if (! $this->isIncomingNewer($payload['updated_at'] ?? null, $existing)) {
+                    return;
+                }
+                $existing->fill($attributes);
+                $existing->saveQuietly();
             } else {
                 DB::table('produk')->insert(array_merge($attributes, [
                     'id' => $payload['id'],
@@ -252,6 +290,9 @@ class HybridSyncProcessorService
 
         $pelanggan = Pelanggan::find($id);
         if ($pelanggan) {
+            if (! $this->isIncomingNewer($payload['updated_at'] ?? null, $pelanggan)) {
+                return;
+            }
             $pelanggan->fill($attributes);
             $pelanggan->saveQuietly();
         } else {
@@ -290,6 +331,9 @@ class HybridSyncProcessorService
 
         $model = KategoriProduk::find($id);
         if ($model) {
+            if (! $this->isIncomingNewer($payload['updated_at'] ?? null, $model)) {
+                return;
+            }
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
@@ -325,6 +369,9 @@ class HybridSyncProcessorService
 
         $model = Brand::find($id);
         if ($model) {
+            if (! $this->isIncomingNewer($payload['updated_at'] ?? null, $model)) {
+                return;
+            }
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
@@ -366,6 +413,9 @@ class HybridSyncProcessorService
 
         $model = KualitasProduk::find($id);
         if ($model) {
+            if (! $this->isIncomingNewer($payload['updated_at'] ?? null, $model)) {
+                return;
+            }
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
@@ -401,6 +451,9 @@ class HybridSyncProcessorService
 
         $model = SatuanUnit::find($id);
         if ($model) {
+            if (! $this->isIncomingNewer($payload['updated_at'] ?? null, $model)) {
+                return;
+            }
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
@@ -438,6 +491,9 @@ class HybridSyncProcessorService
 
         $model = TipeHp::find($id);
         if ($model) {
+            if (! $this->isIncomingNewer($payload['updated_at'] ?? null, $model)) {
+                return;
+            }
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
@@ -449,6 +505,64 @@ class HybridSyncProcessorService
 
         if (class_exists(TipeHp::class) && method_exists(TipeHp::class, 'clearResolutionCache')) {
             TipeHp::clearResolutionCache();
+        }
+    }
+
+    /**
+     * Handle sku_variant.upsert: sinkron SKU varian produk.
+     */
+    protected function handleSkuVariantUpsert(array $payload): void
+    {
+        if (! class_exists(SkuVariant::class)) {
+            Log::warning('[HybridSync] Model SkuVariant tidak tersedia.');
+
+            return;
+        }
+
+        $id = (int) ($payload['id'] ?? 0);
+        $produkId = (int) ($payload['produk_id'] ?? 0);
+        if ($id <= 0 || $produkId <= 0) {
+            return;
+        }
+
+        // Pastikan produk induk ada di cloud; jika belum, buat placeholder minimal.
+        if (! Produk::where('id', $produkId)->exists()) {
+            Produk::insert([
+                'id' => $produkId,
+                'nama' => 'Produk '.$produkId,
+                'slug' => 'produk-'.$produkId.'-'.uniqid(),
+                'harga_jual_retail' => 0,
+                'harga_beli' => 0,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $attributes = [
+            'produk_id' => $produkId,
+            'sku' => $payload['sku'] ?? null,
+            'barcode' => $payload['barcode'] ?? null,
+            'nama_varian' => $payload['nama_varian'] ?? null,
+            'satuan_kode' => $payload['satuan_kode'] ?? null,
+            'atribut' => $payload['atribut'] ?? null,
+            'harga_beli' => $payload['harga_beli'] ?? 0,
+            'harga_jual_retail' => $payload['harga_jual_retail'] ?? 0,
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+        ];
+
+        $model = SkuVariant::find($id);
+        if ($model) {
+            if (! $this->isIncomingNewer($payload['updated_at'] ?? null, $model)) {
+                return;
+            }
+            $model->fill($attributes);
+            $model->saveQuietly();
+        } else {
+            $model = new SkuVariant();
+            $model->id = $id;
+            $model->forceFill($attributes);
+            $model->saveQuietly();
         }
     }
 

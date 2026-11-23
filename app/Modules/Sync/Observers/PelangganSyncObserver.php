@@ -10,7 +10,7 @@ class PelangganSyncObserver
 {
     public function saved(Pelanggan $pelanggan): void
     {
-        if (! config('sync.enabled') || config('sync.node_role') !== 'primary_store') {
+        if (! config('sync.enabled')) {
             return;
         }
 
