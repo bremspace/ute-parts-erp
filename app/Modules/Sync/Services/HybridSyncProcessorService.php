@@ -6,19 +6,19 @@ use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Wms\Models\Brand;
-use App\Modules\Wms\Models\KategoriProduk;
-use App\Modules\Wms\Models\KualitasProduk;
-use App\Modules\Wms\Models\SatuanUnit;
-use App\Modules\Wms\Models\SkuVariant;
-use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Sync\Models\HybridSyncInbox;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\StokDeductionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -337,7 +337,7 @@ class HybridSyncProcessorService
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
-            $model = new KategoriProduk();
+            $model = new KategoriProduk;
             $model->id = $id;
             $model->forceFill($attributes);
             $model->saveQuietly();
@@ -375,7 +375,7 @@ class HybridSyncProcessorService
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
-            $model = new Brand();
+            $model = new Brand;
             $model->id = $id;
             $model->forceFill($attributes);
             $model->saveQuietly();
@@ -419,7 +419,7 @@ class HybridSyncProcessorService
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
-            $model = new KualitasProduk();
+            $model = new KualitasProduk;
             $model->id = $id;
             $model->forceFill($attributes);
             $model->saveQuietly();
@@ -457,7 +457,7 @@ class HybridSyncProcessorService
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
-            $model = new SatuanUnit();
+            $model = new SatuanUnit;
             $model->id = $id;
             $model->forceFill($attributes);
             $model->saveQuietly();
@@ -497,7 +497,7 @@ class HybridSyncProcessorService
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
-            $model = new TipeHp();
+            $model = new TipeHp;
             $model->id = $id;
             $model->forceFill($attributes);
             $model->saveQuietly();
@@ -559,7 +559,7 @@ class HybridSyncProcessorService
             $model->fill($attributes);
             $model->saveQuietly();
         } else {
-            $model = new SkuVariant();
+            $model = new SkuVariant;
             $model->id = $id;
             $model->forceFill($attributes);
             $model->saveQuietly();

@@ -1387,6 +1387,7 @@ class SettingsRbac extends Component
             $this->syncStatusMessage = 'Remote URL atau Shared Secret belum diisi.';
             $this->syncStatusData = $data;
             $this->dispatch('alert', ['type' => 'error', 'message' => $this->syncStatusMessage]);
+
             return;
         }
 
