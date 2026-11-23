@@ -2,10 +2,12 @@
 
 namespace App\Modules\Sync\Providers;
 
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Sync\Services\HybridSyncOutboxService;
 use App\Modules\Sync\Services\HybridSyncProcessorService;
 use App\Modules\Sync\SyncObserverBootstrap;
 use Illuminate\Support\ServiceProvider;
+use Throwable;
 
 class SyncServiceProvider extends ServiceProvider
 {
@@ -30,6 +32,52 @@ class SyncServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->applyDatabaseConfig();
+
         SyncObserverBootstrap::register();
+    }
+
+    /**
+     * Pengaturan Hybrid Sync dari interface (tabel konfigurasi) harus menjadi
+     * sumber runtime. Tanpa ini, UI hanya menyimpan `hybrid_sync_config` tetapi
+     * observer/processor tetap membaca `config('sync.*')` dari .env.
+     */
+    protected function applyDatabaseConfig(): void
+    {
+        try {
+            $saved = app(KonfigurasiService::class)->get('hybrid_sync_config');
+            if (! is_array($saved) || $saved === []) {
+                return;
+            }
+
+            $map = [
+                'enabled' => 'sync.enabled',
+                'node_role' => 'sync.node_role',
+                'node_id' => 'sync.node_id',
+                'remote_url' => 'sync.remote_url',
+                'api_secret' => 'sync.api_secret',
+                'pull_interval_seconds' => 'sync.pull_interval_seconds',
+            ];
+
+            foreach ($map as $key => $target) {
+                if (! array_key_exists($key, $saved)) {
+                    continue;
+                }
+
+                $value = $saved[$key];
+                if ($key === 'enabled') {
+                    $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+                } elseif ($key === 'pull_interval_seconds') {
+                    $value = max(5, (int) $value);
+                } elseif (is_scalar($value)) {
+                    $value = (string) $value;
+                }
+
+                config()->set($target, $value);
+            }
+        } catch (Throwable $e) {
+            // Saat install/migrasi awal tabel konfigurasi mungkin belum ada.
+            // Fallback ke konfigurasi .env.
+        }
     }
 }

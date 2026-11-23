@@ -4360,6 +4360,16 @@
 
                     <!-- Asymmetric Hybrid Sync Card -->
                     <x-prism.glass-card title="Asymmetric Hybrid Sync (Lokal <-> Cloud VPS)" subtitle="Sinkronisasi offline-first otomatis antara Server Toko Fisik dan Toko Online VPS">
+                        <div class="mb-3 p-3 rounded-xl bg-white/[0.03] border border-white/5 flex flex-wrap items-center gap-2 text-[11px]">
+                            <span class="px-2 py-0.5 rounded-full font-bold {{ config('sync.enabled') ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : 'bg-white/5 text-ink-400 border border-white/10' }}">
+                                {{ config('sync.enabled') ? 'Sync AKTIF' : 'Sync NONAKTIF' }}
+                            </span>
+                            <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary border border-up-primary/30 font-mono font-bold">
+                                {{ config('sync.node_role') }}
+                            </span>
+                            <span class="text-ink-400 font-mono">NODE: {{ config('sync.node_id') }}</span>
+                            <span class="text-ink-400">Remote: {{ config('sync.remote_url') ?: '-' }}</span>
+                        </div>
                         <div class="space-y-4">
                             <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
                                 <div>
