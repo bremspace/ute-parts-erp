@@ -31,6 +31,7 @@ use App\Modules\Wms\Services\ImportAtributService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -297,6 +298,12 @@ class SettingsRbac extends Component
     ];
 
     public ?string $waTestStatus = null;
+
+    public ?string $syncTestStatus = null;
+
+    public string $syncStatusMessage = '';
+
+    public array $syncStatusData = [];
 
     public function mount(?string $tab = null): void
     {
@@ -1346,6 +1353,81 @@ class SettingsRbac extends Component
     }
 
     /** [T-22] Simpan strategi loyalitas → tabel konfigurasi + diskon tier + skema komisi default. Non-retroaktif: hanya berlaku utk transaksi baru. */
+    public function testSyncConnection(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengecek sinkronisasi.')) {
+            return;
+        }
+
+        $remoteUrl = trim((string) ($this->integrasiForm['sync_remote_url'] ?? ''));
+        $secret = trim((string) ($this->integrasiForm['sync_api_secret'] ?? ''));
+        $nodeId = trim((string) ($this->integrasiForm['sync_node_id'] ?? 'STORE-01'));
+
+        $pending = (int) DB::table('hybrid_sync_outbox')->where('status', 'pending')->count();
+        $failed = (int) DB::table('hybrid_sync_outbox')->where('status', 'failed')->count();
+        $synced = (int) DB::table('hybrid_sync_outbox')->where('status', 'synced')->count();
+
+        $data = [
+            'local_enabled' => (bool) ($this->integrasiForm['sync_enabled'] ?? false),
+            'local_role' => (string) ($this->integrasiForm['sync_node_role'] ?? '-'),
+            'local_node' => $nodeId,
+            'remote_url' => $remoteUrl ?: '-',
+            'outbox_pending' => $pending,
+            'outbox_failed' => $failed,
+            'outbox_synced' => $synced,
+            'cloud_connected' => false,
+            'cloud_node' => '-',
+            'cloud_role' => '-',
+            'cloud_pending' => null,
+            'cloud_message' => '-',
+        ];
+
+        if ($remoteUrl === '' || $secret === '') {
+            $this->syncTestStatus = 'error';
+            $this->syncStatusMessage = 'Remote URL atau Shared Secret belum diisi.';
+            $this->syncStatusData = $data;
+            $this->dispatch('alert', ['type' => 'error', 'message' => $this->syncStatusMessage]);
+            return;
+        }
+
+        try {
+            $timestamp = (string) time();
+            $hmac = hash_hmac('sha256', $timestamp.'.', $secret);
+            $response = Http::timeout(10)->withHeaders([
+                'X-Sync-Node' => $nodeId,
+                'X-Sync-Signature' => $hmac,
+                'X-Sync-Timestamp' => $timestamp,
+                'Accept' => 'application/json',
+            ])->get(rtrim($remoteUrl, '/').'/api/internal/sync/health');
+
+            if ($response->successful()) {
+                $json = $response->json();
+                $data['cloud_connected'] = true;
+                $data['cloud_node'] = (string) ($json['data']['node_id'] ?? '-');
+                $data['cloud_role'] = (string) ($json['data']['node_role'] ?? '-');
+                $data['cloud_pending'] = (int) ($json['data']['pending_count'] ?? 0);
+                $data['cloud_message'] = (string) ($json['message'] ?? 'OK');
+
+                $this->syncTestStatus = 'success';
+                $this->syncStatusMessage = 'Koneksi ke cloud BERHASIL. Node cloud: '.$data['cloud_node'].' ('.$data['cloud_role'].').';
+            } else {
+                $data['cloud_message'] = 'HTTP '.$response->status().': '.$response->body();
+                $this->syncTestStatus = 'error';
+                $this->syncStatusMessage = 'Cloud menolak koneksi: HTTP '.$response->status().'.';
+            }
+        } catch (\Throwable $e) {
+            $data['cloud_message'] = $e->getMessage();
+            $this->syncTestStatus = 'error';
+            $this->syncStatusMessage = 'Gagal terhubung ke cloud: '.$e->getMessage();
+        }
+
+        $this->syncStatusData = $data;
+        $this->dispatch('alert', [
+            'type' => $this->syncTestStatus === 'success' ? 'success' : 'error',
+            'message' => $this->syncStatusMessage,
+        ]);
+    }
+
     public function simpanLoyalitas()
     {
         if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi loyalitas.')) {
