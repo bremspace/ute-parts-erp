@@ -1052,6 +1052,8 @@ function thermalPrinter(config = {}) {
     autoDirectPrint: localStorage.getItem('ute_pos_auto_direct_print') === 'true' || autoPrintEnabled,
     pairedPrinterName: initialPairedName,
     printer: printer,
+    serialPort: null,
+    pairedSerialName: localStorage.getItem('ute_serial_printer_name') || null,
 
     init() {
       const templateDefault = this.data.default_width?.includes('80') ? '80' : '58';
@@ -1075,6 +1077,18 @@ function thermalPrinter(config = {}) {
         }
       };
 
+      // Auto-detect previously granted serial ports (tanpa dialog)
+      if (navigator.serial && typeof navigator.serial.getPorts === 'function') {
+        navigator.serial.getPorts().then((ports) => {
+          if (ports && ports.length > 0) {
+            this.serialPort = ports[0];
+            if (!this.pairedSerialName) {
+              this.pairedSerialName = 'Serial Printer';
+            }
+          }
+        }).catch(() => {});
+      }
+
       // Auto-trigger background print on checkout if configured
       this.$nextTick(() => {
         if (this.autoDirectPrint) {
@@ -1083,6 +1097,51 @@ function thermalPrinter(config = {}) {
           }, 350);
         }
       });
+    },
+
+    async connectSerial() {
+      if (!navigator.serial) {
+        this.showToast('Web Serial tidak didukung browser ini (gunakan Chrome/Edge & HTTPS/localhost)');
+        return;
+      }
+      try {
+        const port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 9600 });
+        this.serialPort = port;
+        const info = port.getInfo ? port.getInfo() : {};
+        this.pairedSerialName = info.usbVendorId ? `Serial (VID ${info.usbVendorId})` : 'Serial Printer';
+        localStorage.setItem('ute_serial_printer_name', this.pairedSerialName);
+        this.showToast('Printer serial/USB terhubung');
+      } catch (e) {
+        console.warn('Serial connect failed:', e);
+        this.showToast('Gagal sambung serial: ' + (e && e.message ? e.message : e));
+      }
+    },
+
+    disconnectSerial() {
+      try {
+        if (this.serialPort && this.serialPort.writable) {
+          const writer = this.serialPort.writable.getWriter();
+          writer.releaseLock();
+        }
+        if (this.serialPort && typeof this.serialPort.close === 'function') {
+          this.serialPort.close();
+        }
+      } catch (e) {}
+      this.serialPort = null;
+      this.pairedSerialName = null;
+      localStorage.removeItem('ute_serial_printer_name');
+      this.showToast('Printer serial diputuskan');
+    },
+
+    async printViaSerial(bytes) {
+      if (!this.serialPort) throw new Error('Printer serial tidak tersambung');
+      if (!this.serialPort.writable) {
+        await this.serialPort.open({ baudRate: 9600 });
+      }
+      const writer = this.serialPort.writable.getWriter();
+      await writer.write(bytes);
+      writer.releaseLock();
     },
 
     async directPrint(paperSize) {
@@ -1105,6 +1164,16 @@ function thermalPrinter(config = {}) {
           } catch (cupsErr) {
             console.warn('CUPS print gagal, fallback ke Bluetooth/Browser:', cupsErr);
             // Fall through to Bluetooth or browser print
+          }
+        }
+        // 1b. Web Serial / USB direct print
+        if (this.serialPort) {
+          try {
+            await this.printViaSerial(bytes);
+            this.showToast('Struk dikirim via Serial/USB');
+            return;
+          } catch (serialErr) {
+            console.warn('Serial print gagal, fallback ke Bluetooth/Browser:', serialErr);
           }
         }
         // 2. Web Bluetooth direct print
