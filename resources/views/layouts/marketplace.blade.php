@@ -422,6 +422,36 @@
         {{ $slot }}
     </main>
 
+    <!-- Mobile/tablet: sticky mini cart when items exist -->
+    @php
+        $cartItems = app(\App\Modules\Marketplace\Services\CartService::class)->all();
+        $cartCount = array_sum(array_column($cartItems, 'qty'));
+        $cartTotal = app(\App\Modules\Marketplace\Services\CartService::class)->hitungSubtotal();
+    @endphp
+    @if($cartCount > 0)
+    <div class="lg:hidden fixed inset-x-3 bottom-[76px] z-40 pointer-events-none"
+         style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);">
+        <a href="{{ route('cart') }}"
+           x-data="{ count: {{ $cartCount }} }"
+           @cart-updated.window="count = $event.detail.count"
+           x-show="count > 0"
+           x-cloak
+           class="pointer-events-auto w-full max-w-md mx-auto flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-ink-900 dark:bg-white text-white dark:text-ink-950 shadow-2xl active:scale-[0.98] transition-transform cursor-pointer">
+            <span class="flex items-center gap-2 text-xs font-semibold">
+                <span class="relative">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    <span class="absolute -top-2 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-up-accent text-white text-[9px] font-bold flex items-center justify-center" x-text="count">{{ $cartCount }}</span>
+                </span>
+                <span><span x-text="count">{{ $cartCount }}</span> item di keranjang</span>
+            </span>
+            <span class="flex items-center gap-2">
+                <span class="text-xs font-bold tabular-nums">Rp {{ number_format($cartTotal, 0, ',', '.') }}</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+            </span>
+        </a>
+    </div>
+    @endif
+
     <!-- [T-49] Floating Pill Mobile Dock (md:hidden) -->
     <div class="md:hidden fixed bottom-3 inset-x-0 w-full flex justify-center px-4 z-50 pointer-events-none"
          style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.25rem);">

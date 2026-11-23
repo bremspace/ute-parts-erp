@@ -105,6 +105,7 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12"
      x-data="{
         viewMode: localStorage.getItem('ute-shop-view-mode') || 'grid',
+        mobileFilterOpen: false,
         previewImg: null,
         openPreview(url) { this.previewImg = url; },
         closePreview() { this.previewImg = null; },
@@ -113,6 +114,48 @@
             try { localStorage.setItem('ute-shop-view-mode', mode); } catch (e) {}
         }
      }">
+    <!-- MOBILE/TABLET: search-first bar + quick HP chips -->
+    <div class="lg:hidden sticky top-16 z-30 -mx-4 px-4 sm:-mx-6 sm:px-6 py-2 bg-white/95 dark:bg-[#090D16]/95 backdrop-blur-xl border-b border-ink-100 dark:border-white/10">
+        <div class="flex items-center gap-2">
+            <div class="relative flex-1 min-w-0">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input type="text"
+                       wire:model.live.debounce.250ms="search"
+                       placeholder="Cari LCD, baterai, model HP, SKU..."
+                       class="w-full pl-9 pr-9 py-2.5 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-ink-900 dark:text-white placeholder-ink-400 text-[15px] font-medium focus:outline-none focus:border-up-primary focus:ring-4 focus:ring-up-primary/10">
+                @if(!empty($search))
+                    <button type="button" wire:click="$set('search', '')" class="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-ink-400 hover:text-up-red cursor-pointer" aria-label="Hapus pencarian">✕</button>
+                @endif
+            </div>
+            <button type="button"
+                    @click="mobileFilterOpen = !mobileFilterOpen"
+                    class="relative shrink-0 h-[42px] px-3 rounded-xl bg-ink-900 dark:bg-white text-white dark:text-ink-950 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                <span>Filter</span>
+                @if(!empty($hasActiveFilters ?? false))
+                    <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-up-accent ring-2 ring-white dark:ring-[#090D16]"></span>
+                @endif
+            </button>
+        </div>
+
+        @if(!empty($hpMerkList))
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-2 -mx-4 px-4 sm:-mx-6 sm:px-6">
+            <button type="button" wire:click="$set('filterHpMerk', '')"
+                    class="shrink-0 px-2.5 py-1 rounded-full border text-[11px] font-bold cursor-pointer {{ empty($filterHpMerk) ? 'bg-up-primary text-white border-up-primary' : 'bg-white dark:bg-ink-900 text-ink-600 dark:text-ink-300 border-ink-200 dark:border-white/10' }}">
+                Semua HP
+            </button>
+            @foreach(array_slice($hpMerkList, 0, 10) as $m)
+                <button type="button" wire:click="$set('filterHpMerk', @js($m))"
+                        class="shrink-0 px-2.5 py-1 rounded-full border text-[11px] font-bold cursor-pointer {{ $filterHpMerk === $m ? 'bg-up-primary text-white border-up-primary' : 'bg-white dark:bg-ink-900 text-ink-600 dark:text-ink-300 border-ink-200 dark:border-white/10' }}">
+                    {{ $m }}
+                </button>
+            @endforeach
+        </div>
+        @endif
+    </div>
+
     @php
         $heroDisplayMode = $webConfig['hero_display_mode'] ?? 'hero_standard';
         $heroBanners = $webBanners->where('posisi', 'hero_slider');
@@ -571,8 +614,8 @@
 
     <!-- Spotlight Search & Pill Filter System -->
     <section class="space-y-3 sm:space-y-4">
-        <!-- Raycast/Spotlight Style Search Bar -->
-        <div class="relative group">
+        <!-- Raycast/Spotlight Style Search Bar (desktop/tablet besar) -->
+        <div class="relative group hidden lg:block">
             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-ink-400 group-focus-within:text-up-primary transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -710,8 +753,26 @@
             }
         @endphp
         @if($filtersEnabled)
+        <!-- Backdrop filter (mobile/tablet) -->
+        <div x-show="mobileFilterOpen"
+             x-cloak
+             @click="mobileFilterOpen = false"
+             class="fixed inset-0 z-[65] bg-black/60 backdrop-blur-sm lg:hidden"></div>
+
         <!-- Filter Selectors Matrix -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5"
+             x-cloak
+             :class="mobileFilterOpen ? 'fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-y-auto overscroll-contain p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] rounded-t-3xl bg-white dark:bg-[#0B1120] border-t border-ink-200 dark:border-white/10 shadow-2xl' : 'hidden lg:grid'">
+            <div class="lg:hidden flex items-center justify-between pb-2 mb-1 border-b border-ink-100 dark:border-white/10 col-span-full">
+                <div>
+                    <h3 class="text-sm font-bold text-ink-900 dark:text-white">Filter &amp; Urutkan</h3>
+                    <p class="text-[10px] text-ink-400">Perhalus pencarian Anda</p>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" wire:click="resetAllFilters" class="px-2 py-1 rounded-lg text-[11px] font-bold text-up-red hover:bg-up-red/10 cursor-pointer">Reset</button>
+                    <button type="button" @click="mobileFilterOpen = false" class="px-3 py-1 rounded-lg bg-ink-900 dark:bg-white text-white dark:text-ink-950 text-[11px] font-bold cursor-pointer">Selesai</button>
+                </div>
+            </div>
             @if($allowedFilters['kategori'] ?? true)
             <!-- Kategori -->
             <div class="relative min-w-0 w-full">
@@ -986,7 +1047,7 @@
                                                 wire:click="addToCart({{ $p->id }})"
                                                 wire:loading.attr="disabled"
                                                 wire:target="addToCart({{ $p->id }})"
-                                                class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-up-primary hover:bg-up-primary/90 text-white transition-colors cursor-pointer"
+                                                class="flex-shrink-0 inline-flex items-center justify-center w-11 h-11 sm:w-10 sm:h-10 lg:w-8 lg:h-8 rounded-xl lg:rounded-lg bg-up-primary hover:bg-up-primary/90 text-white transition-colors cursor-pointer active:scale-95"
                                                 title="Tambah ke Keranjang">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                                         </button>
@@ -1103,7 +1164,7 @@
                                         wire:click="addToCart({{ $p->id }})"
                                         wire:loading.attr="disabled"
                                         wire:target="addToCart({{ $p->id }})"
-                                        class="py-1.5 px-3.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-[transform,background-color] duration-140 active:scale-95 cursor-pointer"
+                                        class="min-h-[44px] lg:min-h-0 py-1.5 px-3.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-[transform,background-color] duration-140 active:scale-95 cursor-pointer"
                                         title="Tambah ke Keranjang">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -1167,7 +1228,7 @@
                                 <button type="button"
                                         wire:click="addToCart({{ $p->id }})"
                                         wire:loading.attr="disabled"
-                                        class="p-1.5 rounded-lg bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white transition-colors cursor-pointer"
+                                        class="p-2.5 lg:p-1.5 rounded-xl lg:rounded-lg bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white transition-colors cursor-pointer active:scale-95"
                                         title="+ Keranjang">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
