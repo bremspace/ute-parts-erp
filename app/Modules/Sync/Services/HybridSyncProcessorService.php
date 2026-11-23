@@ -184,6 +184,10 @@ class HybridSyncProcessorService
             'is_active' => $payload['is_active'] ?? $payload['aktif'] ?? true,
         ];
 
+        if (array_key_exists('cabang_id', $payload)) {
+            $attributes['cabang_id'] = $payload['cabang_id'];
+        }
+
         if (isset($payload['barcode'])) {
             $attributes['barcode'] = $payload['barcode'];
         }
