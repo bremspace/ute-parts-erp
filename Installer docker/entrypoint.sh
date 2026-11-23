@@ -2,14 +2,35 @@
 set -e
 cd /var/www/html
 
-if [ ! -f .env ]; then
-    cp .env.docker .env
+# .env dipersist di volume storage (storage/.env) lalu di-symlink, supaya
+# tulisan UI Pengaturan (APP_URL, APP_KEY, token deploy) tidak hilang saat
+# image dibangun ulang. Named volume tidak bisa di-mount langsung ke sebuah
+# berkas, itu sebabnya dipakai symlink.
+if [ -f storage/.env ]; then
+    rm -f .env
+    ln -s storage/.env .env
+else
+    [ -f .env ] || cp .env.docker .env
+    cp .env storage/.env
+    rm -f .env
+    ln -s storage/.env .env
 fi
+
+# .env harus bisa ditulis proses www-data (UI Pengaturan menulis APP_KEY saat
+# penyelarasan snapshot). Kepemilikan/mode berkas di volume bisa berubah,
+# jadi dipastikan lagi tiap start.
+chown www-data:www-data storage/.env 2>/dev/null || true
+chmod 664 storage/.env 2>/dev/null || true
 
 grep -q '^APP_KEY=' .env || echo 'APP_KEY=' >> .env
 if ! grep -q '^APP_KEY=.\+' .env; then
     APP_KEY_VALUE="base64:$(php -r 'echo base64_encode(random_bytes(32));')"
-    sed -i "s|^APP_KEY=.*|APP_KEY=${APP_KEY_VALUE}|" .env
+    # Jangan pakai `sed -i`: ia mengganti symlink .env dengan berkas baru,
+    # sehingga storage/.env (sumber persistensinya) tertinggal dan APP_KEY
+    # berubah tiap restart. Tulis lewat shell redirection agar symlink utuh.
+    sed "s|^APP_KEY=.*|APP_KEY=${APP_KEY_VALUE}|" .env > .env.tmp
+    cat .env.tmp > .env
+    rm -f .env.tmp
 fi
 
 mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache

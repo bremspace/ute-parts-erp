@@ -6,6 +6,11 @@ use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Wms\Models\Brand;
+use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
+use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Models\TiketServis;
@@ -114,6 +119,11 @@ class HybridSyncProcessorService
         match ($eventType) {
             'produk.upsert' => $this->handleProdukUpsert($payload),
             'pelanggan.upsert' => $this->handlePelangganUpsert($payload),
+            'kategori_produk.upsert' => $this->handleKategoriProdukUpsert($payload),
+            'brand.upsert' => $this->handleBrandUpsert($payload),
+            'kualitas_produk.upsert' => $this->handleKualitasProdukUpsert($payload),
+            'satuan_unit.upsert' => $this->handleSatuanUnitUpsert($payload),
+            'tipe_hp.upsert' => $this->handleTipeHpUpsert($payload),
             'stok.mutasi' => $this->handleStokMutasi($payload),
             'transaksi.pos' => $this->handleTransaksiPos($payload),
             'servis.update' => $this->handleServisUpdate($payload),
@@ -140,6 +150,11 @@ class HybridSyncProcessorService
         match ($eventType) {
             'produk.upsert' => $this->handleProdukUpsert($payload),
             'pelanggan.upsert' => $this->handlePelangganUpsert($payload),
+            'kategori_produk.upsert' => $this->handleKategoriProdukUpsert($payload),
+            'brand.upsert' => $this->handleBrandUpsert($payload),
+            'kualitas_produk.upsert' => $this->handleKualitasProdukUpsert($payload),
+            'satuan_unit.upsert' => $this->handleSatuanUnitUpsert($payload),
+            'tipe_hp.upsert' => $this->handleTipeHpUpsert($payload),
             'stok.mutasi' => $this->handleStokMutasi($payload),
             'transaksi.pos' => $this->handleTransaksiPos($payload),
             'servis.update' => $this->handleServisUpdate($payload),
@@ -203,7 +218,7 @@ class HybridSyncProcessorService
 
         $id = (int) ($payload['id'] ?? 0);
         if ($id <= 0) {
-            Log::warning('[HybridSync] Pelanggan tanpa id valid �?" sinkronisasi dilewati.');
+            Log::warning('[HybridSync] Pelanggan tanpa id valid - sinkronisasi dilewati.');
 
             return;
         }
@@ -236,10 +251,200 @@ class HybridSyncProcessorService
             $pelanggan->fill($attributes);
             $pelanggan->saveQuietly();
         } else {
-            $pelanggan = new Pelanggan();
+            $pelanggan = new Pelanggan;
             $pelanggan->id = $id;
             $pelanggan->forceFill($attributes);
             $pelanggan->saveQuietly();
+        }
+    }
+
+    /**
+     * Handle kategori_produk.upsert: sinkron master kategori produk.
+     */
+    protected function handleKategoriProdukUpsert(array $payload): void
+    {
+        if (! class_exists(KategoriProduk::class)) {
+            Log::warning('[HybridSync] Model KategoriProduk tidak tersedia.');
+
+            return;
+        }
+
+        $id = (int) ($payload['id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+
+        $attributes = [
+            'parent_id' => $payload['parent_id'] ?? null,
+            'nama' => $payload['nama'] ?? 'Kategori Sync',
+            'slug' => $payload['slug'] ?? null,
+            'icon' => $payload['icon'] ?? null,
+            'urutan' => $payload['urutan'] ?? 0,
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'is_default' => (bool) ($payload['is_default'] ?? false),
+        ];
+
+        $model = KategoriProduk::find($id);
+        if ($model) {
+            $model->fill($attributes);
+            $model->saveQuietly();
+        } else {
+            $model = new KategoriProduk();
+            $model->id = $id;
+            $model->forceFill($attributes);
+            $model->saveQuietly();
+        }
+    }
+
+    /**
+     * Handle brand.upsert: sinkron master brand.
+     */
+    protected function handleBrandUpsert(array $payload): void
+    {
+        if (! class_exists(Brand::class)) {
+            Log::warning('[HybridSync] Model Brand tidak tersedia.');
+
+            return;
+        }
+
+        $id = (int) ($payload['id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+
+        $attributes = [
+            'nama' => $payload['nama'] ?? 'Brand Sync',
+            'keterangan' => $payload['keterangan'] ?? null,
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'is_default' => (bool) ($payload['is_default'] ?? false),
+        ];
+
+        $model = Brand::find($id);
+        if ($model) {
+            $model->fill($attributes);
+            $model->saveQuietly();
+        } else {
+            $model = new Brand();
+            $model->id = $id;
+            $model->forceFill($attributes);
+            $model->saveQuietly();
+        }
+    }
+
+    /**
+     * Handle kualitas_produk.upsert: sinkron master kualitas produk.
+     */
+    protected function handleKualitasProdukUpsert(array $payload): void
+    {
+        if (! class_exists(KualitasProduk::class)) {
+            Log::warning('[HybridSync] Model KualitasProduk tidak tersedia.');
+
+            return;
+        }
+
+        $id = (int) ($payload['id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+
+        $brandId = $payload['brand_id'] ?? null;
+        if ($brandId !== null && ! Brand::where('id', $brandId)->exists()) {
+            $brandId = null;
+        }
+
+        $attributes = [
+            'nama' => $payload['nama'] ?? 'Kualitas Sync',
+            'keterangan' => $payload['keterangan'] ?? null,
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'brand_id' => $brandId,
+            'is_default' => (bool) ($payload['is_default'] ?? false),
+        ];
+
+        $model = KualitasProduk::find($id);
+        if ($model) {
+            $model->fill($attributes);
+            $model->saveQuietly();
+        } else {
+            $model = new KualitasProduk();
+            $model->id = $id;
+            $model->forceFill($attributes);
+            $model->saveQuietly();
+        }
+    }
+
+    /**
+     * Handle satuan_unit.upsert: sinkron master satuan.
+     */
+    protected function handleSatuanUnitUpsert(array $payload): void
+    {
+        if (! class_exists(SatuanUnit::class)) {
+            Log::warning('[HybridSync] Model SatuanUnit tidak tersedia.');
+
+            return;
+        }
+
+        $id = (int) ($payload['id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+
+        $attributes = [
+            'kode' => $payload['kode'] ?? ('SAT-'.$id),
+            'nama' => $payload['nama'] ?? 'Satuan Sync',
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'is_default' => (bool) ($payload['is_default'] ?? false),
+        ];
+
+        $model = SatuanUnit::find($id);
+        if ($model) {
+            $model->fill($attributes);
+            $model->saveQuietly();
+        } else {
+            $model = new SatuanUnit();
+            $model->id = $id;
+            $model->forceFill($attributes);
+            $model->saveQuietly();
+        }
+    }
+
+    /**
+     * Handle tipe_hp.upsert: sinkron master tipe HP.
+     */
+    protected function handleTipeHpUpsert(array $payload): void
+    {
+        if (! class_exists(TipeHp::class)) {
+            Log::warning('[HybridSync] Model TipeHp tidak tersedia.');
+
+            return;
+        }
+
+        $id = (int) ($payload['id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+
+        $attributes = [
+            'merk' => $payload['merk'] ?? null,
+            'model' => $payload['model'] ?? null,
+            'kode_produk' => $payload['kode_produk'] ?? null,
+            'nama' => $payload['nama'] ?? null,
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'is_default' => (bool) ($payload['is_default'] ?? false),
+        ];
+
+        $model = TipeHp::find($id);
+        if ($model) {
+            $model->fill($attributes);
+            $model->saveQuietly();
+        } else {
+            $model = new TipeHp();
+            $model->id = $id;
+            $model->forceFill($attributes);
+            $model->saveQuietly();
+        }
+
+        if (class_exists(TipeHp::class) && method_exists(TipeHp::class, 'clearResolutionCache')) {
+            TipeHp::clearResolutionCache();
         }
     }
 
