@@ -4,7 +4,9 @@ namespace App\Modules\Sync;
 
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Sync\Observers\OrderOnlinePaidSyncObserver;
+use App\Modules\Sync\Observers\PelangganSyncObserver;
 use App\Modules\Sync\Observers\ProdukSyncObserver;
 use App\Modules\Sync\Observers\StokLogSyncObserver;
 use App\Modules\Sync\Observers\TiketServisSyncObserver;
@@ -27,6 +29,10 @@ class SyncObserverBootstrap
         if ($nodeRole === 'primary_store') {
             if (class_exists(Produk::class)) {
                 Produk::observe(ProdukSyncObserver::class);
+            }
+
+            if (class_exists(Pelanggan::class)) {
+                Pelanggan::observe(PelangganSyncObserver::class);
             }
 
             if (class_exists(StokLog::class)) {
