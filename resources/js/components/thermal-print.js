@@ -880,8 +880,8 @@ class ThermalPrinter {
     throw new Error('Tidak ditemukan karakteristik write pada printer thermal ini');
   }
 
-  /** Connect to printer — prompts device picker if not connected */
-  async connect(pairNew = false) {
+  /** Connect to printer. defaultName -> silent match; pairNew -> always show picker. */
+  async connect(pairNew = false, defaultName = null, silent = false) {
     if (this.isConnecting) return;
     if (!pairNew && this.device?.gatt?.connected && this.characteristic) {
       return this.setStatus('connected');
@@ -896,19 +896,39 @@ class ThermalPrinter {
 
     try {
       if (pairNew || !this.device) {
+        // Cari printer default yang sudah diizinkan (tanpa dialog)
+        if (!pairNew && defaultName && typeof navigator.bluetooth.getDevices === 'function') {
+          const devices = await navigator.bluetooth.getDevices();
+          const matched = devices.find(d => d.name === defaultName || d.id === defaultName);
+          if (matched) {
+            this.device = matched;
+            this.device.addEventListener('gattserverdisconnected', () => this.scheduleReconnect());
+            await this.connectGatt();
+            return;
+          }
+        }
+
+        if (silent) {
+          throw new Error('Printer default belum tersedia');
+        }
+
+        const filters = defaultName
+          ? [{ name: defaultName }, { namePrefix: defaultName }]
+          : [
+              { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
+              { namePrefix: 'POS' },
+              { namePrefix: 'Thermal' },
+              { namePrefix: 'Printer' },
+              { namePrefix: 'MPT' },
+              { namePrefix: 'RP' },
+              { namePrefix: 'PTP' },
+              { namePrefix: 'InnerPrinter' },
+              { namePrefix: 'BlueTooth' },
+              { namePrefix: 'MTP' },
+            ];
+
         this.device = await navigator.bluetooth.requestDevice({
-          filters: [
-            { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
-            { namePrefix: 'POS' },
-            { namePrefix: 'Thermal' },
-            { namePrefix: 'Printer' },
-            { namePrefix: 'MPT' },
-            { namePrefix: 'RP' },
-            { namePrefix: 'PTP' },
-            { namePrefix: 'InnerPrinter' },
-            { namePrefix: 'BlueTooth' },
-            { namePrefix: 'MTP' },
-          ],
+          filters,
           optionalServices: this.serviceUuids,
         });
 
@@ -1105,6 +1125,14 @@ function thermalPrinter(config = {}) {
         }).catch(() => {});
       }
 
+      // Hubungkan diam-diam ke printer default dari pengaturan
+      const defaultName = this.data.thermal_printer_name || savedBluetoothMac;
+      if (defaultName && navigator.bluetooth) {
+        this.printer.connect(false, defaultName, true).then(() => {
+          this.pairedPrinterName = this.printer.device?.name || defaultName;
+        }).catch(() => {});
+      }
+
       // Auto-trigger background print on checkout if configured
       this.$nextTick(() => {
         if (this.autoDirectPrint) {
@@ -1212,66 +1240,80 @@ function thermalPrinter(config = {}) {
       writer.releaseLock();
     },
 
+    async saveDefaultPrinter(name, deviceId = '') {
+      try {
+        await fetch('/api/printer/default', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+          },
+          body: JSON.stringify({ name, device_id: deviceId }),
+        });
+        this.data.thermal_printer_name = name;
+      } catch (e) {}
+    },
+
+    async choosePrinter() {
+      try {
+        await this.printer.connect(true);
+        this.pairedPrinterName = this.printer.device?.name || 'Bluetooth Printer';
+        localStorage.setItem('ute_ble_printer_name', this.pairedPrinterName);
+        await this.saveDefaultPrinter(this.pairedPrinterName, this.printer.device?.id || '');
+        this.showToast('Printer default: ' + this.pairedPrinterName);
+      } catch (e) {
+        this.showToast('Pemilihan printer dibatalkan');
+      }
+    },
+
     async directPrint(paperSize) {
       if (this.isPrinting) return;
       this.isPrinting = true;
+      let bytes = null;
 
       try {
-        if (this.data.thermal_print_mode === 'browser') {
-          this.printViaBrowser(paperSize);
-          this.isPrinting = false;
-          return;
-        }
+        const defaultName = this.data.thermal_printer_name || this.pairedPrinterName || '';
 
-        // Mode BLE: pakai printer default jika ada, jika tidak minta pilih.
-        const hasBle = this.printer.device || localStorage.getItem('thermal_printer_device') || this.data.thermal_bluetooth_mac;
-        if (!hasBle) {
-          try {
+        // 1. Hubungkan: default dulu, jika gagal baru minta pilih
+        if (!this.printer.device || !this.printer.characteristic) {
+          if (defaultName) {
+            try {
+              await this.printer.connect(false, defaultName, true);
+            } catch (e) {
+              await this.printer.connect(true);
+            }
+          } else {
             await this.printer.connect(true);
-            this.pairedPrinterName = this.printer.device?.name || 'Bluetooth Printer';
-            localStorage.setItem('ute_ble_printer_name', this.pairedPrinterName);
-          } catch (e) {
-            this.showToast('Pilih printer Bluetooth terlebih dahulu');
-            this.isPrinting = false;
-            return;
           }
+          this.pairedPrinterName = this.printer.device?.name || defaultName || 'Bluetooth Printer';
+          localStorage.setItem('ute_ble_printer_name', this.pairedPrinterName);
         }
 
+        // 2. Cetak
         const paperWidth = Number(paperSize) === 80 ? 80 : 58;
-        // Selera kertas & mode font selalu eksplisit agar output == preview == backend job.
         const payload = { ...this.data, paper_width: paperWidth, font_size: this.data.font_size || 'small' };
         const esc = new window.EscPos(paperWidth);
-        const bytes = esc.buildReceipt(payload, paperWidth);
+        bytes = esc.buildReceipt(payload, paperWidth);
+        await this.printer.print(bytes);
 
-        // 1. CUPS raw printing if configured (hanya tersedia di Linux/macOS)
-        if (savedCupsPrinter) {
-          try {
-            await this.printViaCups(savedCupsPrinter, bytes);
-            this.showToast(`Struk dikirim ke printer CUPS: ${savedCupsPrinter}`);
-            return;
-          } catch (cupsErr) {
-            console.warn('CUPS print gagal, fallback ke Bluetooth/Browser:', cupsErr);
-            // Fall through to Bluetooth or browser print
-          }
+        // 3. Simpan sebagai default jika berbeda
+        if (this.data.thermal_printer_name !== this.pairedPrinterName) {
+          await this.saveDefaultPrinter(this.pairedPrinterName, this.printer.device?.id || '');
         }
-        // 2. Web Bluetooth direct print (default printer / yang sudah dipilih)
-        if (this.printer.device || localStorage.getItem('thermal_printer_device')) {
-          await this.printer.print(bytes);
-          this.showToast('Struk berhasil dicetak via Bluetooth');
-        }
-        // 3. Tanpa browser fallback: BLE saja sesuai permintaan
-        else {
-          this.showToast('Printer Bluetooth belum tersambung');
-        }
+        this.showToast('Struk berhasil dicetak');
       } catch (e) {
         console.error('Print failed:', e);
-        this.showToast('Gagal cetak, pilih ulang printer Bluetooth');
+        this.showToast('Gagal cetak. Pilih printer lagi');
         try {
           await this.printer.connect(true);
           this.pairedPrinterName = this.printer.device?.name || 'Bluetooth Printer';
           localStorage.setItem('ute_ble_printer_name', this.pairedPrinterName);
-        } catch (bleErr) {
-          this.showToast('Printer Bluetooth belum dipilih');
+          if (bytes) await this.printer.print(bytes);
+          await this.saveDefaultPrinter(this.pairedPrinterName, this.printer.device?.id || '');
+          this.showToast('Struk berhasil dicetak');
+        } catch (e2) {
+          this.showToast('Pemilihan printer dibatalkan');
         }
       } finally {
         this.isPrinting = false;

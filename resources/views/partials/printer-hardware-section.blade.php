@@ -86,13 +86,6 @@
     </div>
 
     @if($f === 'strukForm')
-        <div>
-            <label class="block text-xs font-semibold text-ink-300 mb-1">Mode Cetak Struk</label>
-            <select wire:model.live="{{ $f }}.thermal_print_mode" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900/60 border border-white/10">
-                <option value="browser" class="bg-ink-900">Browser Print (dialog printer Windows) — paling stabil</option>
-                <option value="direct" class="bg-ink-900">Direct Print (BLE / Serial / USB / CUPS)</option>
-            </select>
-            <p class="text-[10px] text-ink-400 mt-1">Pilih Browser Print agar sistem memakai dialog printer Windows yang sudah terinstall.</p>
-        </div>
+        <p class="text-[10px] text-ink-400 px-1">Printer yang dipilih di atas langsung dipakai saat transaksi. Ganti printer bisa juga dilakukan di modal struk.</p>
     @endif
 </div>

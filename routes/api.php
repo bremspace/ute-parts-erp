@@ -88,7 +88,8 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::get('/kas/riwayat', [PosController::class, 'riwayatKas'])->middleware('permission:pos.view'); // POS-09
             Route::post('/transaksi/{id}/print', [PosController::class, 'printStruk'])->middleware('permission:pos.view'); // [T-35] POS-10
             Route::post('/print-raw', [PosController::class, 'printRaw'])->middleware('permission:pos.view'); // [T-36] Print raw ESC/POS via CUPS
-            Route::get('/printers', [PosController::class, 'listPrinters'])->middleware('permission:pos.view'); // Deteksi printer terinstall
+            Route::get('/printers', [PosController::class, 'listPrinters'])->middleware('permission:pos.view');
+            Route::post('/printer/default', [PosController::class, 'setDefaultPrinter'])->middleware('permission:pos.view');
 
             // Retur Penjualan
             Route::get('/retur', [ReturnPenjualanController::class, 'index'])->middleware('permission:pos.view');

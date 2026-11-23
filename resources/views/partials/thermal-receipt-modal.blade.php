@@ -105,37 +105,14 @@
 
             <!-- Tombol Aksi Cetak & Tutup (Sederhana, Bersih & Presisi) -->
             <div class="mt-3 pt-3 border-t border-white/10 space-y-2 flex-shrink-0 no-print">
-                <!-- Status Bluetooth Printer jika terhubung -->
-                <template x-if="pairedPrinterName">
-                    <div class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-up-mint/10 border border-up-mint/20 text-[11px] text-up-mint">
-                        <span class="flex items-center gap-1.5 truncate">
-                            <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
-                            <span class="truncate">Printer Aktif: <strong x-text="pairedPrinterName"></strong></span>
-                        </span>
-                        <button
-                            type="button"
-                            @click="disconnectPrinter()"
-                            class="text-ink-400 hover:text-white underline text-[10px] ml-2 shrink-0 cursor-pointer"
-                        >
-                            Ganti
-                        </button>
-                    </div>
-                </template>
-
-                <!-- Toggle Opsi Cetak Langsung (Direct Print) -->
-                <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs">
-                    <div class="flex flex-col">
-                        <span class="text-white font-medium text-[11px] flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5 text-up-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                            Cetak Langsung Struk
-                        </span>
-                        <span class="text-[10px] text-ink-400">Otomatis kirim ke printer tersambung</span>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" :checked="autoDirectPrint" @change="toggleAutoDirectPrint()" class="sr-only peer">
-                        <div class="w-9 h-5 bg-ink-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-ink-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-up-mint"></div>
-                    </label>
+                <!-- Status printer default (ringkas) -->
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/10 text-[11px]">
+                    <span class="w-2 h-2 rounded-full shrink-0" :class="pairedPrinterName ? 'bg-up-mint animate-pulse' : 'bg-ink-500'"></span>
+                    <span class="truncate text-ink-300">
+                        Printer: <strong class="text-white" x-text="pairedPrinterName || data.thermal_printer_name || 'Belum dipilih'"></strong>
+                    </span>
                 </div>
+
 
                 <!-- Pilihan Ukuran Struk (Segmented Control Ringkas) -->
                 <div class="flex items-center justify-between p-1 bg-white/5 rounded-xl border border-white/10 text-xs">
@@ -160,50 +137,25 @@
                     </div>
                 </div>
 
-                <!-- Tombol Cetak Utama & Bluetooth BLE -->
-                <div class="flex flex-wrap items-center gap-2">
+                <!-- Tombol aksi: 1 cetak, 1 pilih printer -->
+                <div class="flex items-center gap-2">
                     <button
                         type="button"
                         @click="directPrint(paperSize)"
                         :disabled="isPrinting"
-                        class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs shadow-md shadow-up-mint/20 cursor-pointer min-h-[42px] flex items-center justify-center gap-2 whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
-                        :title="'Cetak struk langsung ke printer aktif'"
+                        class="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs shadow-md shadow-up-mint/20 cursor-pointer min-h-[42px] flex items-center justify-center gap-2 whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                        <span x-text="isPrinting ? 'Mencetak...' : 'Cetak Struk (' + paperSize + 'mm)'"></span>
+                        <span x-text="isPrinting ? 'Mencetak...' : 'Cetak Struk'"></span>
                     </button>
-
                     <button
                         type="button"
-                        @click="connectSerial()"
+                        @click="choosePrinter()"
                         :disabled="isPrinting"
-                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-primary font-semibold text-xs border border-up-primary/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
-                        title="Deteksi / pasangkan printer Serial atau USB (CDC)"
+                        class="py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-200 font-semibold text-xs border border-white/10 cursor-pointer min-h-[42px] whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
+                        title="Pilih printer Bluetooth dan jadikan default"
                     >
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M6.757 17.243l-2.121 2.121m0-14.728l2.121 2.121m10.486 10.486l2.121 2.121"/></svg>
-                        <span x-text="pairedSerialName ? 'Serial OK' : 'Pilih Serial/USB'"></span>
-                    </button>
-
-                    <button
-                        type="button"
-                        @click="connectUsb()"
-                        :disabled="isPrinting"
-                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-amber font-semibold text-xs border border-up-amber/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
-                        title="Deteksi / pasangkan printer USB langsung"
-                    >
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v18m9-9H3"/></svg>
-                        <span x-text="pairedUsbName ? 'USB OK' : 'Pilih USB'"></span>
-                    </button>
-
-                    <button
-                        type="button"
-                        @click="paperSize === '58' ? printStruk58(true) : printFaktur80(true)"
-                        :disabled="isPrinting"
-                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-xs border border-up-mint/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50"
-                        :title="'Pilih / pasangkan printer Bluetooth baru (' + paperSize + 'mm)'"
-                    >
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        <span x-text="isPrinting ? '...' : (pairedPrinterName ? 'Pair Baru' : 'Pilih BLE')"></span>
+                        <span x-text="(pairedPrinterName || data.thermal_printer_name) ? 'Ganti Printer' : 'Pilih Printer'"></span>
                     </button>
                 </div>
 
