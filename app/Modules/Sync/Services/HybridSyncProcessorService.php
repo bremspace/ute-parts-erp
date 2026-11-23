@@ -203,7 +203,7 @@ class HybridSyncProcessorService
 
         $id = (int) ($payload['id'] ?? 0);
         if ($id <= 0) {
-            Log::warning('[HybridSync] Pelanggan tanpa id valid �?" sinkronisasi dilewati.');
+            Log::warning('[HybridSync] Pelanggan tanpa id valid - sinkronisasi dilewati.');
 
             return;
         }
@@ -236,7 +236,7 @@ class HybridSyncProcessorService
             $pelanggan->fill($attributes);
             $pelanggan->saveQuietly();
         } else {
-            $pelanggan = new Pelanggan();
+            $pelanggan = new Pelanggan;
             $pelanggan->id = $id;
             $pelanggan->forceFill($attributes);
             $pelanggan->saveQuietly();

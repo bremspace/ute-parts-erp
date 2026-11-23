@@ -2,9 +2,9 @@
 
 namespace App\Modules\Sync;
 
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
-use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Sync\Observers\OrderOnlinePaidSyncObserver;
 use App\Modules\Sync\Observers\PelangganSyncObserver;
 use App\Modules\Sync\Observers\ProdukSyncObserver;
