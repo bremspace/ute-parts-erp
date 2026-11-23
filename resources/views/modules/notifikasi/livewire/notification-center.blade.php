@@ -3,7 +3,7 @@
     <div
         x-show="open"
         x-cloak
-        class="fixed inset-0 bg-ink-950/60 backdrop-blur-xs z-40 sm:hidden"
+        class="fixed inset-0 bg-ink-950/60 backdrop-blur-xs z-[90] sm:hidden"
         @click="open = false"
         aria-hidden="true"
     ></div>
@@ -42,7 +42,7 @@
         x-transition:leave="transition ease-out duration-100"
         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
         x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-        class="fixed inset-x-2 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2.5 sm:w-96 md:w-[440px] origin-top sm:origin-top-right max-h-[85vh] rounded-3xl bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-2xl border border-ink-200/90 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.35)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-50 flex flex-col overflow-hidden"
+        class="fixed inset-x-2 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2.5 sm:w-96 md:w-[440px] origin-top sm:origin-top-right max-h-[85vh] rounded-3xl bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-2xl border border-ink-200/90 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.35)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-[100] flex flex-col overflow-hidden"
     >
         <!-- Header -->
         <div class="p-3.5 sm:p-4 border-b border-ink-200/70 dark:border-white/10 bg-ink-50/70 dark:bg-white/[0.02]">
