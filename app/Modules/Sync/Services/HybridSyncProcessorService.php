@@ -4,6 +4,7 @@ namespace App\Modules\Sync\Services;
 
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
@@ -112,6 +113,7 @@ class HybridSyncProcessorService
     {
         match ($eventType) {
             'produk.upsert' => $this->handleProdukUpsert($payload),
+            'pelanggan.upsert' => $this->handlePelangganUpsert($payload),
             'stok.mutasi' => $this->handleStokMutasi($payload),
             'transaksi.pos' => $this->handleTransaksiPos($payload),
             'servis.update' => $this->handleServisUpdate($payload),
@@ -137,6 +139,7 @@ class HybridSyncProcessorService
     {
         match ($eventType) {
             'produk.upsert' => $this->handleProdukUpsert($payload),
+            'pelanggan.upsert' => $this->handlePelangganUpsert($payload),
             'stok.mutasi' => $this->handleStokMutasi($payload),
             'transaksi.pos' => $this->handleTransaksiPos($payload),
             'servis.update' => $this->handleServisUpdate($payload),
@@ -184,6 +187,59 @@ class HybridSyncProcessorService
             }
         } else {
             Produk::updateOrCreate(['slug' => $slug], $attributes);
+        }
+    }
+
+    /**
+     * Handle pelanggan.upsert: sinkron master pelanggan dari toko lokal ke cloud.
+     */
+    protected function handlePelangganUpsert(array $payload): void
+    {
+        if (! class_exists(Pelanggan::class)) {
+            Log::warning('[HybridSync] Model Pelanggan tidak tersedia.');
+
+            return;
+        }
+
+        $id = (int) ($payload['id'] ?? 0);
+        if ($id <= 0) {
+            Log::warning('[HybridSync] Pelanggan tanpa id valid �?" sinkronisasi dilewati.');
+
+            return;
+        }
+
+        $attributes = [
+            'nama' => $payload['nama'] ?? 'Pelanggan Sync',
+            'username' => $payload['username'] ?? null,
+            'telepon' => $payload['telepon'] ?? null,
+            'email' => $payload['email'] ?? null,
+            'alamat' => $payload['alamat'] ?? null,
+            'tanggal_lahir' => $payload['tanggal_lahir'] ?? null,
+            'tier_membership_id' => $payload['tier_membership_id'] ?? null,
+            'is_reseller' => (bool) ($payload['is_reseller'] ?? false),
+            'kode_agen' => $payload['kode_agen'] ?? null,
+            'referral_kode' => $payload['referral_kode'] ?? null,
+            'tipe_konsumen' => $payload['tipe_konsumen'] ?? 'retail',
+            'mode_reward_mitra' => $payload['mode_reward_mitra'] ?? null,
+            'poin_loyalty' => $payload['poin_loyalty'] ?? 0,
+            'saldo_piutang' => $payload['saldo_piutang'] ?? 0,
+            'max_piutang' => $payload['max_piutang'] ?? 0,
+            'saldo_deposit' => $payload['saldo_deposit'] ?? 0,
+            'status' => $payload['status'] ?? 'aktif',
+            'catatan_approval' => $payload['catatan_approval'] ?? null,
+            'approved_at' => $payload['approved_at'] ?? null,
+            'approved_by' => $payload['approved_by'] ?? null,
+        ];
+
+        $pelanggan = Pelanggan::find($id);
+        if ($pelanggan) {
+            $pelanggan->fill($attributes);
+            $pelanggan->saveQuietly();
+        } else {
+            $pelanggan = new Pelanggan();
+            $pelanggan->id = $id;
+            $pelanggan->forceFill($attributes);
+            $pelanggan->saveQuietly();
         }
     }
 
