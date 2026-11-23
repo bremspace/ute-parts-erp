@@ -175,6 +175,17 @@
 
                     <button
                         type="button"
+                        @click="connectSerial()"
+                        :disabled="isPrinting"
+                        class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-primary font-semibold text-xs border border-up-primary/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
+                        title="Deteksi / pasangkan printer Serial atau USB (CDC)"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M6.757 17.243l-2.121 2.121m0-14.728l2.121 2.121m10.486 10.486l2.121 2.121"/></svg>
+                        <span x-text="pairedSerialName ? 'Serial OK' : 'Pilih Serial/USB'"></span>
+                    </button>
+
+                    <button
+                        type="button"
                         @click="paperSize === '58' ? printStruk58(true) : printFaktur80(true)"
                         :disabled="isPrinting"
                         class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-xs border border-up-mint/30 cursor-pointer min-h-[42px] flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
