@@ -976,9 +976,20 @@
                                      loading="lazy"
                                      class="w-full h-full object-contain transition-transform duration-200 ease-out group-hover/img:scale-105"
                                      onerror="this.style.display='none'; const ph=this.closest('a')?.querySelector('[data-img-placeholder]'); if(ph) ph.classList.remove('hidden');">
-                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}', '{{ addslashes($p->nama) }}')" class="absolute top-2 right-2 z-20 inline-flex items-center gap-1 rounded-full bg-black/55 text-white px-2 py-1 backdrop-blur-sm transition-all duration-150 cursor-zoom-in lg:opacity-0 lg:group-hover/img:opacity-100" title="Lihat gambar {{ $p->nama }}">
+                                 {{-- Mobile: badge zoom kecil, selalu terlihat --}}
+                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}', '{{ addslashes($p->nama) }}')" class="lg:hidden absolute top-2 right-2 z-20 inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/55 text-white backdrop-blur-sm cursor-zoom-in" title="Lihat gambar {{ $p->nama }}">
                                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m-3-3h6"/></svg>
-                                     <span class="hidden lg:inline text-[9px] font-bold">Lihat gambar</span>
+                                 </button>
+
+                                 {{-- Desktop: overlay penuh saat hover gambar --}}
+                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}', '{{ addslashes($p->nama) }}')" class="hidden lg:flex absolute inset-0 z-20 flex-col items-center justify-end pb-4 bg-gradient-to-t from-ink-950/80 via-ink-950/10 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-150 cursor-zoom-in" title="Lihat gambar {{ $p->nama }}">
+                                     <span class="max-w-[90%] rounded-2xl bg-black/60 backdrop-blur-md px-4 py-2.5 text-center shadow-xl">
+                                         <span class="flex items-center justify-center gap-2 text-[11px] font-bold text-white">
+                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m-3-3h6"/></svg>
+                                             Lihat gambar
+                                         </span>
+                                         <span class="mt-0.5 block text-[10px] font-medium leading-snug text-white/80 line-clamp-2 break-words">{{ $p->nama }}</span>
+                                     </span>
                                  </button>
                             @endif
                             <div data-img-placeholder class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-4 text-center {{ $thumbImg ? 'hidden' : '' }}">
@@ -989,7 +1000,7 @@
                             </div>
 
                             <!-- Badges top row -->
-                            <div class="absolute top-2 inset-x-2 flex items-center justify-between pointer-events-none overflow-hidden gap-1">
+                            <div class="absolute top-2 inset-x-2 z-30 flex items-center justify-between pointer-events-none overflow-hidden gap-1">
                                 @if((int) ($p->total_terjual ?? 0) > 0)
                                     <span class="text-[9px] font-bold bg-ink-900/80 dark:bg-white/90 backdrop-blur-md text-amber-300 dark:text-ink-950 px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
                                         ★ <span class="hidden xs:inline">Terlaris</span>
