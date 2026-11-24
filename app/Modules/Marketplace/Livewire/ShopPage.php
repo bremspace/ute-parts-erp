@@ -429,7 +429,7 @@ class ShopPage extends Component
         } elseif ($this->sort === 'terbaru') {
             $query->latest('produk.id');
         } elseif ($this->sort === 'terlaris') {
-            $query->orderByDesc('total_terjual')->orderByDesc('stok_katalog');
+            $query->urutTerlaris();
         } elseif (! empty($this->search)) {
             $query->urutkanRelevansi($this->search);
         } elseif (! $this->sort && $this->filterHpModel) {

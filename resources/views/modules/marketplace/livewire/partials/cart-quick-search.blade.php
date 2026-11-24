@@ -82,7 +82,7 @@
                     <div class="p-1.5 space-y-0.5">
                         @foreach($cartSearchSuggestions as $suggestion)
                             <div class="flex items-center gap-2 p-1.5 rounded-xl hover:bg-ink-50 dark:hover:bg-white/5 transition-colors">
-                                @include('modules.marketplace.livewire.partials.cart-product-thumb', [
+                                @include('modules.marketplace.livewire.partials.product-image-preview', [
                                     'url' => $suggestion['gambar'] ?? null,
                                     'nama' => $suggestion['nama'],
                                     'class' => 'w-9 h-9',
