@@ -434,7 +434,8 @@
                                     <button
                                         type="button"
                                         wire:click.prevent="hapus('{{ $itemKey }}')"
-                                        class="hidden lg:flex w-9 h-9 rounded-xl bg-ink-100/60 dark:bg-white/5 text-ink-400 hover:text-up-red hover:bg-up-red/10 items-center justify-center text-xs transition-colors cursor-pointer flex-shrink-0"
+                                        aria-label="Hapus {{ $item['name'] }} dari keranjang"
+                                        class="flex w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-ink-100/60 dark:bg-white/5 text-ink-400 hover:text-up-red hover:bg-up-red/10 items-center justify-center text-xs transition-colors cursor-pointer flex-shrink-0"
                                         title="Hapus dari keranjang">
                                         ✕
                                     </button>
@@ -442,48 +443,44 @@
 
                                 <div class="mt-2 lg:mt-0 flex items-center justify-between sm:justify-end gap-3 sm:gap-5 w-full sm:w-auto min-w-0">
                                     <!-- Stepper button & manual input -->
-                                    <div class="flex items-center bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 rounded-xl sm:rounded-2xl p-0.5 sm:p-1 flex-shrink-0" wire:loading.class="opacity-50">
-                                        @if((int) $item['qty'] <= 1)
-                                            <button
-                                                type="button"
-                                                wire:click.prevent="hapus('{{ $itemKey }}')"
-                                                wire:confirm="Hapus produk dari keranjang?"
-                                                class="lg:hidden w-8 h-8 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-white dark:bg-ink-900 hover:bg-up-red/10 hover:text-up-red font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs"
-                                                title="Hapus dari keranjang">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                wire:click="updateQty('{{ $itemKey }}', 1)"
-                                                wire:loading.attr="disabled"
-                                                class="hidden lg:flex w-7 h-7 rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
-                                                −
-                                            </button>
-                                        @else
-                                            <button
-                                                type="button"
-                                                wire:click="updateQty('{{ $itemKey }}', {{ (int) $item['qty'] - 1 }})"
-                                                wire:loading.attr="disabled"
-                                                class="w-8 h-8 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
-                                                −
-                                            </button>
-                                        @endif
+                                    <div class="flex items-center gap-0.5 rounded-full bg-ink-100/80 dark:bg-white/[0.06] p-0.5 ring-1 ring-ink-200/70 dark:ring-white/10 shadow-inner flex-shrink-0">
+                                        <button
+                                            type="button"
+                                            wire:click="updateQty('{{ $itemKey }}', {{ max(1, (int) $item['qty'] - 1) }})"
+                                            wire:target="updateQty('{{ $itemKey }}', {{ max(1, (int) $item['qty'] - 1) }})"
+                                            wire:loading.attr="disabled"
+                                            wire:loading.class="bg-up-primary/15 text-up-primary ring-1 ring-up-primary/30"
+                                            @if((int) $item['qty'] <= 1) disabled @endif
+                                            aria-label="Kurangi jumlah"
+                                            class="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-white dark:bg-ink-900 ring-1 ring-black/5 dark:ring-white/5 shadow-sm hover:bg-ink-50 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-all duration-150 flex items-center justify-center cursor-pointer active:scale-90 text-sm disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-ink-900">
+                                            <span wire:loading.remove wire:target="updateQty('{{ $itemKey }}', {{ max(1, (int) $item['qty'] - 1) }})">−</span>
+                                            <svg wire:loading wire:target="updateQty('{{ $itemKey }}', {{ max(1, (int) $item['qty'] - 1) }})" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                                                <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path>
+                                            </svg>
+                                        </button>
                                         <input
                                             type="number"
                                             min="1"
                                             max="{{ (int) ($item['stok_max'] ?? 9999) }}"
                                             value="{{ $item['qty'] }}"
                                             wire:change="updateQty('{{ $itemKey }}', $event.target.value)"
-                                            wire:loading.attr="disabled"
-                                            class="w-8 sm:w-10 text-center font-bold text-xs text-ink-900 dark:text-white bg-transparent outline-none border-0 focus:ring-0 p-0 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            class="w-8 sm:w-9 text-center font-black text-xs text-ink-900 dark:text-white bg-transparent outline-none border-0 focus:ring-0 p-0 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             aria-label="Jumlah pesanan"
                                         />
                                         <button
                                             type="button"
                                             wire:click="updateQty('{{ $itemKey }}', {{ (int) $item['qty'] + 1 }})"
+                                            wire:target="updateQty('{{ $itemKey }}', {{ (int) $item['qty'] + 1 }})"
                                             wire:loading.attr="disabled"
-                                            class="w-8 h-8 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
-                                            +
+                                            wire:loading.class="bg-up-primary/15 text-up-primary ring-1 ring-up-primary/30"
+                                            aria-label="Tambah jumlah"
+                                            class="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-white dark:bg-ink-900 ring-1 ring-black/5 dark:ring-white/5 shadow-sm hover:bg-up-primary/10 hover:text-up-primary dark:hover:bg-up-primary/20 font-bold text-ink-700 dark:text-ink-300 transition-all duration-150 flex items-center justify-center cursor-pointer active:scale-90 text-sm">
+                                            <span wire:loading.remove wire:target="updateQty('{{ $itemKey }}', {{ (int) $item['qty'] + 1 }})">+</span>
+                                            <svg wire:loading wire:target="updateQty('{{ $itemKey }}', {{ (int) $item['qty'] + 1 }})" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                                                <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path>
+                                            </svg>
                                         </button>
                                     </div>
 
