@@ -1248,33 +1248,33 @@
                         $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
                         $thumbImg = $p->thumbnail_url ?: $p->gambar;
                     @endphp
-                    <div class="px-2 py-2 sm:px-3.5 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3 hover:bg-ink-50 dark:hover:bg-white/[0.03] transition-colors group">
-                        <div class="min-w-0 flex items-center gap-2 sm:gap-3">
-                            <span class="w-2 h-2 rounded-full flex-shrink-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                            <div class="min-w-0">
-                                <a href="{{ route('shop.detail', $p->slug) }}" class="text-[11px] sm:text-xs lg:text-sm font-semibold leading-tight break-words text-ink-900 dark:text-white group-hover:text-up-primary transition-colors">
+                    <div class="px-2 py-1.5 sm:px-3 sm:py-2 lg:px-3.5 lg:py-2.5 flex flex-col lg:flex-row lg:items-center justify-between gap-1 sm:gap-2 lg:gap-3 hover:bg-ink-50 dark:hover:bg-white/[0.03] transition-colors group">
+                        <div class="min-w-0 flex items-start gap-2 lg:gap-3">
+                            <span class="w-2 h-2 rounded-full flex-shrink-0 mt-1 lg:mt-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
+                            <div class="min-w-0 flex-1">
+                                <a href="{{ route('shop.detail', $p->slug) }}" class="text-[11px] sm:text-xs lg:text-sm font-semibold leading-snug break-words text-ink-900 dark:text-white group-hover:text-up-primary transition-colors">
                                     {{ $p->nama }}
                                 </a>
                                 @if($p->sku)
-                                    <span class="text-[10px] font-mono text-ink-400 ml-1.5 hidden sm:inline">{{ $p->sku }}</span>
+                                    <span class="block lg:hidden text-[9px] font-mono text-ink-400 mt-0.5 truncate">{{ $p->sku }}</span>
+                                    <span class="hidden lg:inline text-[10px] font-mono text-ink-400 ml-1.5">{{ $p->sku }}</span>
                                 @endif
                             </div>
                         </div>
-                        <div class="flex items-center gap-3 sm:gap-4 flex-shrink-0 text-right">
-                            <span class="text-xs text-ink-500 tabular-nums hidden xs:inline">{{ $stockInfo['label'] }}</span>
+                        <div class="w-full lg:w-auto flex items-center justify-between lg:justify-end gap-2 sm:gap-3 lg:gap-4 flex-shrink-0 text-right pl-4 lg:pl-0">
                             <span class="text-[11px] sm:text-sm font-bold text-ink-900 dark:text-white tabular-nums">
-                                Rp {{ number_format($price['harga'], 0, ',', '.') }}@if(collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')) <span class="text-[9px] text-ink-400 font-normal">/ box Rp {{ number_format((collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')->harga_jual) ?: 0, 0, ',', '.') }}</span>@endif
+                                Rp {{ number_format($price['harga'], 0, ',', '.') }}@if(collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')) <span class="hidden lg:inline text-[9px] text-ink-400 font-normal">/ box Rp {{ number_format((collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')->harga_jual) ?: 0, 0, ',', '.') }}</span>@endif
                             </span>
                             @if($stok > 0)
                              @if($thumbImg)
-                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="text-[10px] font-semibold text-up-primary hover:underline cursor-pointer" title="Lihat gambar produk">Lihat gambar</button>
+                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="hidden lg:inline-flex text-[10px] font-semibold text-up-primary hover:underline cursor-pointer" title="Lihat gambar produk">Lihat gambar</button>
                              @endif
                                 <button type="button"
                                         wire:click="addToCart({{ $p->id }})"
                                         wire:loading.attr="disabled"
-                                        class="p-2.5 lg:p-1.5 rounded-xl lg:rounded-lg bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white transition-colors cursor-pointer active:scale-95"
+                                        class="w-10 h-10 sm:w-9 sm:h-9 lg:w-auto lg:h-auto flex items-center justify-center p-0 lg:p-1.5 rounded-xl lg:rounded-lg bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white transition-colors cursor-pointer active:scale-95"
                                         title="+ Keranjang">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                    <svg class="w-4 h-4 lg:w-3.5 lg:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
                             @endif
                         </div>
