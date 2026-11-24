@@ -104,7 +104,9 @@
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-5 lg:py-10 space-y-4 sm:space-y-6 lg:space-y-12"
      x-data="{
-        viewMode: localStorage.getItem('ute-shop-view-mode') || 'grid',
+        viewMode: ['grid', 'list', 'compact'].includes(localStorage.getItem('ute-shop-view-mode'))
+            ? localStorage.getItem('ute-shop-view-mode')
+            : 'grid',
         mobileFilterOpen: false,
         suggestionsOpen: false,
         previewImg: null,
