@@ -74,6 +74,11 @@ class ShopPage extends Component
     /** Halaman tambahan yang sudah dimuat saat infinite scroll aktif. */
     public int $loadedPages = 1;
 
+    /** Jumlah suggestion keyword yang sudah dimuat (auto-load saat scroll). */
+    public int $suggestionLimit = 6;
+
+    private ?array $suggestionsDataMemo = null;
+
     #[Url(as: 'hargaMax', except: null)]
     public ?int $hargaMax = null;
 
@@ -222,11 +227,17 @@ class ShopPage extends Component
             $this->loadedPages = 1;
             $this->resetPage();
         }
+        if ($propertyName === 'search') {
+            $this->suggestionLimit = 6;
+            $this->suggestionsDataMemo = null;
+        }
     }
 
     public function updatingSearch()
     {
         $this->resetPage();
+        $this->suggestionLimit = 6;
+        $this->suggestionsDataMemo = null;
     }
 
     public function updatedFilterKategori()
@@ -422,6 +433,16 @@ class ShopPage extends Component
         return (bool) app(WebKonsumenService::class)->get('catalog_infinite_scroll', false);
     }
 
+    public function loadMoreSuggestions(): void
+    {
+        if (mb_strlen(trim($this->search)) < 2 || ! $this->suggestionsData()['has_more']) {
+            return;
+        }
+
+        $this->suggestionLimit = min(120, $this->suggestionLimit + 6);
+        $this->suggestionsDataMemo = null;
+    }
+
     public function loadMoreProducts(): void
     {
         if (! $this->infiniteScrollEnabled) {
@@ -514,15 +535,18 @@ class ShopPage extends Component
      * Auto suggestion pencarian katalog (mobile/tablet).
      * Ringan: maksimal 6 produk, hanya saat query >= 2 karakter.
      */
-    #[Computed]
-    public function searchSuggestions(): Collection
+    private function suggestionsData(): array
     {
-        $q = trim($this->search);
-        if (mb_strlen($q) < 2) {
-            return collect();
+        if ($this->suggestionsDataMemo !== null) {
+            return $this->suggestionsDataMemo;
         }
 
-        return Produk::query()
+        $q = trim($this->search);
+        if (mb_strlen($q) < 2) {
+            return $this->suggestionsDataMemo = ['rows' => collect(), 'has_more' => false];
+        }
+
+        $rows = Produk::query()
             ->where('produk.is_active', true)
             ->withSum('stokItems', 'jumlah')
             ->with(['hargaTier', 'satuanKonversi', 'kualitas', 'tipeHps'])
@@ -530,33 +554,49 @@ class ShopPage extends Component
                 'search' => $q,
                 'auto_relevance' => true,
             ])
-            ->limit(6)
-            ->get()
-            ->map(function (Produk $p) {
-                $price = app(PricingService::class)->resolve($p, auth('customer')->user());
-                $kompatibel = $p->daftarKompatibel;
-                $fit = $kompatibel->join(', ');
-                $fitNeedExpand = mb_strlen($fit) > 70;
-                $fitShort = $fitNeedExpand
-                    ? $kompatibel->take(2)->join(', ').($kompatibel->count() > 2 ? ' +'.($kompatibel->count() - 2) : '')
-                    : $fit;
+            ->limit($this->suggestionLimit + 1)
+            ->get();
 
-                return [
-                    'id' => $p->id,
-                    'nama' => $p->nama,
-                    'sku' => $p->sku,
-                    'slug' => $p->slug,
-                    'gambar' => $p->thumbnail_url ?: $p->gambar ?: $this->fotoDefault,
-                    'harga' => (float) ($price['harga'] ?? $p->harga_jual_retail ?? 0),
-                    'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
-                    'kategori' => (string) ($p->kategori ?: $p->kategoriRelasi?->nama ?: ''),
-                    'kompatibel' => $fit,
-                    'kompatibel_short' => $fitShort,
-                    'kompatibel_need_expand' => $fitNeedExpand,
-                    'kompatibel_count' => $kompatibel->count(),
-                    'kualitas' => (string) ($p->kualitas?->nama ?: $p->kondisi ?: ''),
-                ];
-            });
+        $hasMore = $rows->count() > $this->suggestionLimit;
+        $rows = $rows->take($this->suggestionLimit)->map(function (Produk $p) {
+            $price = app(PricingService::class)->resolve($p, auth('customer')->user());
+            $kompatibel = $p->daftarKompatibel;
+            $fit = $kompatibel->join(', ');
+            $fitNeedExpand = mb_strlen($fit) > 70;
+            $fitShort = $fitNeedExpand
+                ? $kompatibel->take(2)->join(', ').($kompatibel->count() > 2 ? ' +'.($kompatibel->count() - 2) : '')
+                : $fit;
+
+            return [
+                'id' => $p->id,
+                'nama' => $p->nama,
+                'sku' => $p->sku,
+                'slug' => $p->slug,
+                'gambar' => $p->thumbnail_url ?: $p->gambar ?: $this->fotoDefault,
+                'harga' => (float) ($price['harga'] ?? $p->harga_jual_retail ?? 0),
+                'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
+                'kategori' => (string) ($p->kategori ?: $p->kategoriRelasi?->nama ?: ''),
+                'kompatibel' => $fit,
+                'kompatibel_short' => $fitShort,
+                'kompatibel_need_expand' => $fitNeedExpand,
+                'kompatibel_count' => $kompatibel->count(),
+                'kualitas' => (string) ($p->kualitas?->nama ?: $p->kondisi ?: ''),
+            ];
+        });
+
+        return $this->suggestionsDataMemo = ['rows' => $rows, 'has_more' => $hasMore];
+    }
+
+    #[Computed]
+    public function searchSuggestions(): Collection
+    {
+        return $this->suggestionsData()['rows'];
+    }
+
+    #[Computed]
+    public function searchSuggestionsHasMore(): bool
+    {
+        return (bool) $this->suggestionsData()['has_more'];
     }
 
     public function getProductDetailProperty(): ?Produk
@@ -989,6 +1029,8 @@ class ShopPage extends Component
             'filterKondisi' => $this->filterKondisi,
             'search' => $this->search,
             'searchSuggestions' => $this->searchSuggestions,
+            'suggestionHasMore' => $this->searchSuggestionsHasMore,
+            'suggestionLimit' => $this->suggestionLimit,
             'fotoDefault' => $this->fotoDefault,
             'lazyLoad' => $this->lazyLoadEnabled,
             'infiniteScroll' => $this->infiniteScrollEnabled,

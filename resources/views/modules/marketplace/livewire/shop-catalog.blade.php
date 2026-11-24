@@ -111,9 +111,32 @@
         suggestionsOpen: false,
         previewImg: null,
         previewNama: '',
+        suggestionLoading: false,
+        suggestionObserver: null,
         fitExpanded: {},
         toggleFit(key) { this.fitExpanded[key] = !this.fitExpanded[key]; },
         isFitExpanded(key) { return Boolean(this.fitExpanded[key]); },
+        initSuggestionScroll() {
+            this.$nextTick(() => {
+                if (this.suggestionObserver) this.suggestionObserver.disconnect();
+                const panel = this.$refs.suggestionPanel;
+                const sentinel = this.$refs.suggestionSentinel;
+                if (!panel || !sentinel) return;
+                this.suggestionObserver = new IntersectionObserver((entries) => {
+                    if (entries[0].isIntersecting && document.contains(sentinel)) this.loadMoreSuggestions();
+                }, { root: panel, rootMargin: '120px 0px' });
+                this.suggestionObserver.observe(sentinel);
+            });
+        },
+        async loadMoreSuggestions() {
+            if (this.suggestionLoading) return;
+            this.suggestionLoading = true;
+            try {
+                if (typeof this.$wire.loadMoreSuggestions === 'function') await this.$wire.loadMoreSuggestions();
+            } finally {
+                setTimeout(() => { this.suggestionLoading = false; }, 500);
+            }
+        },
         openPreview(url, nama = '') { this.previewImg = url; this.previewNama = nama; },
         closePreview() { this.previewImg = null; this.previewNama = ''; },
         setPreview(data) {
