@@ -132,46 +132,7 @@
                     <button type="button" wire:click="$set('search', '')" class="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-ink-400 hover:text-up-red cursor-pointer" aria-label="Hapus pencarian">✕</button>
                 @endif
 
-                @if($searchSuggestions->isNotEmpty())
-                <div x-show="suggestionsOpen"
-                     x-cloak
-                     x-transition:enter="transition ease-out duration-120"
-                     x-transition:enter-start="opacity-0 -translate-y-1"
-                     x-transition:enter-end="opacity-100 translate-y-0"
-                     class="absolute left-0 right-0 top-full mt-2 z-[80] rounded-2xl bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10 shadow-2xl overflow-hidden">
-                    <div class="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-ink-400 border-b border-ink-100 dark:border-white/5">
-                        Saran produk
-                    </div>
-                    <div class="max-h-[60vh] overflow-y-auto divide-y divide-ink-100 dark:divide-white/5">
-                        @foreach($searchSuggestions as $s)
-                            <a href="{{ route('shop.detail', $s['slug']) }}"
-                               @click="suggestionsOpen = false"
-                               class="flex items-center gap-2.5 px-3 py-2 hover:bg-ink-50 dark:hover:bg-white/5 transition-colors cursor-pointer">
-                                <span class="w-9 h-9 shrink-0 rounded-lg bg-ink-50 dark:bg-ink-950 overflow-hidden flex items-center justify-center">
-                                    @if($s['gambar'])
-                                        <img src="{{ $s['gambar'] }}" alt="" class="w-full h-full object-contain" loading="lazy">
-                                    @else
-                                        <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                                    @endif
-                                </span>
-                                <span class="min-w-0 flex-1">
-                                    <span class="block text-[11px] font-bold text-ink-900 dark:text-white leading-tight break-words">{{ $s['nama'] }}</span>
-                                    <span class="block text-[10px] text-ink-400 font-mono truncate">{{ $s['sku'] ?: '-' }}</span>
-                                </span>
-                                <span class="shrink-0 text-right">
-                                    <span class="block text-[11px] font-bold text-up-primary tabular-nums">Rp {{ number_format($s['harga'], 0, ',', '.') }}</span>
-                                    <span class="block text-[9px] {{ $s['stok'] > 0 ? 'text-up-mint' : 'text-up-red' }}">{{ $s['stok'] > 0 ? 'Ready' : 'Habis' }}</span>
-                                </span>
-                            </a>
-                        @endforeach
-                    </div>
-                    <button type="button"
-                            @click="suggestionsOpen = false; document.getElementById('katalog-produk')?.scrollIntoView({ behavior: 'smooth' })"
-                            class="w-full px-3 py-2.5 text-[11px] font-bold text-up-primary bg-up-primary/5 hover:bg-up-primary/10 cursor-pointer">
-                        Lihat semua hasil untuk “{{ $search }}”
-                    </button>
-                </div>
-                @endif
+                @include('modules.marketplace.livewire.partials.catalog-search-suggestions')
             </div>
             <button type="button"
                     @click="mobileFilterOpen = !mobileFilterOpen"
@@ -659,7 +620,9 @@
     <!-- Spotlight Search & Pill Filter System -->
     <section class="space-y-3 sm:space-y-4">
         <!-- Raycast/Spotlight Style Search Bar (desktop/tablet besar) -->
-        <div class="relative group hidden lg:block">
+        <div class="relative group hidden lg:block"
+             @click.outside="suggestionsOpen = false"
+             @keydown.escape.window="suggestionsOpen = false">
             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-ink-400 group-focus-within:text-up-primary transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -668,6 +631,8 @@
             <input
                 type="text"
                 wire:model.live.debounce.250ms="search"
+                @focus="suggestionsOpen = true"
+                @input="suggestionsOpen = true"
                 placeholder="Ketik tipe LCD, baterai iPhone, model Samsung, nomor part..."
                 class="w-full pl-12 pr-12 py-3.5 sm:py-4 rounded-2xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-ink-900 dark:text-white placeholder-ink-400 text-base sm:text-sm font-medium shadow-[0_4px_16px_rgba(0,0,0,0.02)] focus:outline-none focus:border-up-primary focus:ring-4 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140"
             />
@@ -682,6 +647,8 @@
                     </svg>
                 </button>
             @endif
+
+            @include('modules.marketplace.livewire.partials.catalog-search-suggestions')
         </div>
 
         @php
