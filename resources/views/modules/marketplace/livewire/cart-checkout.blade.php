@@ -1,7 +1,15 @@
 <div class="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-5 lg:py-10"
-     x-data="{ cartPreview: null }"
-     @open-preview.window="cartPreview = Array.isArray($event.detail) ? $event.detail[0] : $event.detail"
-     @keydown.escape.window="cartPreview = null">
+     x-data="{
+         cartPreview: null,
+         cartPreviewNama: '',
+         setCartPreview(data) {
+             const d = Array.isArray(data) ? data[0] : data;
+             this.cartPreview = (d && typeof d === 'object') ? (d.url || null) : (d || null);
+             this.cartPreviewNama = (d && typeof d === 'object') ? (d.nama || '') : '';
+         }
+     }"
+     @open-preview.window="setCartPreview($event.detail)"
+     @keydown.escape.window="cartPreview = null; cartPreviewNama = ''">
     @if($orderSuccess)
         <!-- ===== ORDER SUCCESS (Clean Editorial Receipt) ===== -->
         <div class="max-w-lg mx-auto text-center py-12 space-y-6">
@@ -168,6 +176,11 @@
                                 @foreach($cart as $itemKey => $item)
                                     @php $tampil = $hargaTampilan[$itemKey] ?? []; @endphp
                                     <div class="flex items-center justify-between gap-3 py-2 border-b border-ink-100/60 dark:border-white/[0.06] last:border-0">
+                                        @include('modules.marketplace.livewire.partials.cart-product-thumb', [
+                                            'url' => $item['gambar_preview'] ?? $item['gambar'] ?? null,
+                                            'nama' => $item['name'],
+                                            'class' => 'w-10 h-10 sm:w-12 sm:h-12',
+                                        ])
                                         <div class="min-w-0 space-y-0.5">
                                             <p class="text-xs font-bold text-ink-900 dark:text-white truncate">{{ $item['name'] }}</p>
                                             @if(!empty($item['catatan']))
@@ -388,11 +401,11 @@
                             @php $tampil = $hargaTampilan[$itemKey] ?? []; @endphp
                             <div class="py-2 sm:py-2.5 border-b border-ink-100/70 dark:border-white/[0.06] last:border-0 min-w-0 w-full lg:flex lg:items-center lg:justify-between lg:gap-4">
                                 <div class="flex items-start gap-2 sm:gap-3 lg:flex-1 lg:items-center">
-                                    @if(!empty($item['gambar']))
-                                        <button type="button" @click.prevent="$dispatch('open-preview', '{{ $item['gambar'] }}')" class="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg bg-ink-50 dark:bg-ink-950 border border-ink-100 dark:border-white/10 overflow-hidden cursor-pointer" title="Lihat gambar produk">
-                                            <img src="{{ $item['gambar'] }}" alt="{{ $item['name'] }}" class="w-full h-full object-contain" loading="lazy">
-                                        </button>
-                                    @endif
+                                    @include('modules.marketplace.livewire.partials.cart-product-thumb', [
+                                        'url' => $item['gambar_preview'] ?? $item['gambar'] ?? null,
+                                        'nama' => $item['name'],
+                                        'class' => 'w-12 h-12 sm:w-14 sm:h-14',
+                                    ])
                                     <div class="min-w-0 flex-1 space-y-1">
                                         <h4 class="text-[11px] sm:text-xs lg:text-sm font-bold leading-snug break-words text-ink-900 dark:text-white">{{ $item['name'] }}</h4>
                                         <div class="flex items-center gap-1.5 flex-wrap text-[10px] sm:text-[11px]">
@@ -677,11 +690,20 @@
          x-cloak
          x-transition.opacity
          class="fixed inset-0 z-[9998] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
-         @click="cartPreview = null">
-        <div class="max-w-lg w-full max-h-[85vh] rounded-3xl bg-white dark:bg-ink-900 border border-white/10 p-3 shadow-2xl" @click.stop>
+         @click="cartPreview = null; cartPreviewNama = ''">
+        <div class="relative max-w-lg w-full max-h-[85vh] rounded-3xl bg-white dark:bg-ink-900 border border-white/10 p-3 shadow-2xl" @click.stop>
+            <button type="button"
+                    @click="cartPreview = null; cartPreviewNama = ''"
+                    aria-label="Tutup preview"
+                    class="absolute -top-3 -right-3 z-10 w-9 h-9 rounded-full bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-ink-200 dark:border-white/10 shadow-xl flex items-center justify-center text-sm font-bold hover:text-up-red cursor-pointer">
+                ✕
+            </button>
             <template x-if="cartPreview">
-                <img :src="cartPreview" alt="Preview produk" class="w-full h-full max-h-[78vh] object-contain rounded-2xl">
+                <img :src="cartPreview" :alt="cartPreviewNama || 'Preview produk'" class="w-full h-full max-h-[74vh] object-contain rounded-2xl">
             </template>
+            <p x-show="cartPreviewNama"
+               x-text="cartPreviewNama"
+               class="text-center text-[11px] font-bold text-ink-600 dark:text-ink-300 pt-2 break-words"></p>
         </div>
     </div>
 </div>
