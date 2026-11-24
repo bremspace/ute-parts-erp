@@ -291,6 +291,181 @@ class SmartSearchService
     }
 
     /**
+     * Pencarian khusus autosuggest.
+     *
+     - Token harus cocok di nama/model/brand utama ATAU lewat relasi kompatibilitas
+       yang benar-benar spesifik (model + merek), bukan perluasan merek saja.
+     - Mencegah A22 muncul saat mencari Samsung A15, tetapi tetap memunculkan
+       produk A16 bila memang kompatibel dengan Oppo A15.
+     */
+    public function applySuggestionSearch(Builder $query, string $q): Builder
+    {
+        $term = preg_replace('/\s+/', ' ', trim($q)) ?: '';
+        if ($term === '') {
+            return $query;
+        }
+
+        $tokenGroups = $this->tokenize($term);
+        if (empty($tokenGroups)) {
+            return $query;
+        }
+
+        $classified = $this->classifySuggestionTokens($tokenGroups);
+        $modelGroups = $classified['model'];
+        $brandGroups = $classified['brand'];
+        $descriptorGroups = $classified['descriptor'];
+        $tipeHpIds = $modelGroups ? $this->suggestionTipeHpIds($modelGroups, $brandGroups) : [];
+
+        return $query->where(function ($sub) use ($term, $tokenGroups, $tipeHpIds, $descriptorGroups) {
+            // Alternatif 1: kecocokan eksplisit barcode / SKU.
+            $sub->where(function ($exact) use ($term) {
+                $exact->where('produk.barcode', $term)
+                    ->orWhere('produk.barcode_alt', 'like', '%"'.$term.'"%')
+                    ->orWhereExists(function ($ex) use ($term) {
+                        $ex->select(DB::raw(1))
+                            ->from('produk_barcodes')
+                            ->whereColumn('produk_barcodes.produk_id', 'produk.id')
+                            ->where('produk_barcodes.barcode', $term);
+                    })
+                    ->orWhereIn('produk.id', SkuVariant::query()
+                        ->where('is_active', true)
+                        ->where(function ($sq) use ($term) {
+                            $sq->where('barcode', $term)
+                                ->orWhere('sku', $term)
+                                ->orWhere('sku', 'like', '%'.$term.'%');
+                        })
+                        ->select('produk_id'));
+            });
+
+            // Alternatif 2: AND antar token, OR antar sinonim, hanya field utama.
+            $sub->orWhere(function ($strict) use ($tokenGroups) {
+                foreach ($tokenGroups as $group) {
+                    $strict->where(function ($oneTokenQ) use ($group) {
+                        foreach ($group as $syn) {
+                            $oneTokenQ->orWhere(function ($clause) use ($syn) {
+                                $clause->where('produk.nama', 'like', '%'.$syn.'%')
+                                    ->orWhere('produk.model_kompatibel', 'like', '%'.$syn.'%')
+                                    ->orWhere('produk.brand_kompatibel', 'like', '%'.$syn.'%');
+                            });
+                        }
+                    });
+                }
+            });
+
+            // Alternatif 3: kompatibilitas tipe HP yang spesifik + deskriptor produk.
+            if (! empty($tipeHpIds)) {
+                $sub->orWhere(function ($compat) use ($tipeHpIds, $descriptorGroups) {
+                    $compat->whereIn('produk.id', function ($sq) use ($tipeHpIds) {
+                        $sq->select('kompatibilitas_produk_tipe_hp.produk_id')
+                            ->from('kompatibilitas_produk_tipe_hp')
+                            ->whereIn('kompatibilitas_produk_tipe_hp.tipe_hp_id', $tipeHpIds);
+                    });
+
+                    foreach ($descriptorGroups as $group) {
+                        $compat->where(function ($oneTokenQ) use ($group) {
+                            foreach ($group as $syn) {
+                                $oneTokenQ->orWhere(function ($clause) use ($syn) {
+                                    $clause->where('produk.nama', 'like', '%'.$syn.'%')
+                                        ->orWhere('produk.kategori', 'like', '%'.$syn.'%')
+                                        ->orWhere('produk.model_kompatibel', 'like', '%'.$syn.'%')
+                                        ->orWhere('produk.brand_kompatibel', 'like', '%'.$syn.'%');
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * @param  array<int, array<int, string>>  $tokenGroups
+     * @return array{model: array<int, array<int, string>>, brand: array<int, array<int, string>>, descriptor: array<int, array<int, string>>}
+     */
+    protected function classifySuggestionTokens(array $tokenGroups): array
+    {
+        $brandNames = array_merge(
+            Brand::query()->pluck('nama')->all(),
+            TipeHp::query()->distinct()->pluck('merk')->all()
+        );
+        $brandLookup = array_values(array_unique(array_map(
+            fn ($n) => mb_strtolower(trim((string) $n)),
+            $brandNames
+        )));
+
+        $modelGroups = [];
+        $brandGroups = [];
+        $descriptorGroups = [];
+
+        foreach ($tokenGroups as $group) {
+            $hasDigit = false;
+            $isBrand = false;
+            foreach ($group as $token) {
+                if (preg_match('/\d/', $token)) {
+                    $hasDigit = true;
+                }
+                foreach ($brandLookup as $brand) {
+                    if ($brand !== '' && str_contains($brand, mb_strtolower($token))) {
+                        $isBrand = true;
+                    }
+                }
+            }
+
+            if ($hasDigit) {
+                $modelGroups[] = $group;
+            } elseif ($isBrand) {
+                $brandGroups[] = $group;
+            } else {
+                $descriptorGroups[] = $group;
+            }
+        }
+
+        return ['model' => $modelGroups, 'brand' => $brandGroups, 'descriptor' => $descriptorGroups];
+    }
+
+    /**
+     * @param  array<int, array<int, string>>  $modelGroups
+     * @param  array<int, array<int, string>>  $brandGroups
+     * @return array<int, int>
+     */
+    protected function suggestionTipeHpIds(array $modelGroups, array $brandGroups): array
+    {
+        $brandTerms = [];
+        foreach ($brandGroups as $group) {
+            foreach ($group as $syn) {
+                $brandTerms[] = $syn;
+            }
+        }
+        $brandTerms = array_values(array_unique(array_filter($brandTerms)));
+
+        $query = TipeHp::query()->where('is_active', true);
+
+        if (! empty($brandTerms)) {
+            $query->where(function ($bq) use ($brandTerms) {
+                foreach ($brandTerms as $brand) {
+                    $bq->orWhere('merk', 'like', '%'.$brand.'%')
+                        ->orWhere('nama', 'like', '%'.$brand.'%');
+                }
+            });
+        }
+
+        $query->where(function ($mq) use ($modelGroups) {
+            foreach ($modelGroups as $group) {
+                foreach ($group as $token) {
+                    if (! preg_match('/\d/', $token)) {
+                        continue;
+                    }
+                    $mq->orWhere('model', 'like', '%'.$token.'%')
+                        ->orWhere('nama', 'like', '%'.$token.'%')
+                        ->orWhere('kode_produk', 'like', '%'.$token.'%');
+                }
+            }
+        });
+
+        return $query->pluck('id')->all();
+    }
+
+    /**
      * Urutkan hasil pencarian berdasarkan skor relevansi kecocokan tertinggi.
      * Mengutamakan nama produk di posisi paling atas (Exact, Prefix, All-words phrase),
      * lalu kecocokan kompatibilitas dan brand.

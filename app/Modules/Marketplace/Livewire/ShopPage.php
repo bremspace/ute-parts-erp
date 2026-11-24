@@ -533,7 +533,8 @@ class ShopPage extends Component
 
     /**
      * Auto suggestion pencarian katalog (mobile/tablet).
-     * Ringan: maksimal 6 produk, hanya saat query >= 2 karakter.
+     * Token cocok di nama/model/brand utama, SKU/barcode eksplisit, atau
+     * kompatibilitas tipe HP spesifik (model + merek), bukan perluasan merek saja.
      */
     private function suggestionsData(): array
     {
@@ -546,16 +547,14 @@ class ShopPage extends Component
             return $this->suggestionsDataMemo = ['rows' => collect(), 'has_more' => false];
         }
 
+        $searchService = app(SmartSearchService::class);
         $rows = Produk::query()
             ->where('produk.is_active', true)
             ->withSum('stokItems', 'jumlah')
-            ->with(['hargaTier', 'satuanKonversi', 'kualitas', 'tipeHps'])
-            ->filterKatalog([
-                'search' => $q,
-                'auto_relevance' => true,
-            ])
-            ->limit($this->suggestionLimit + 1)
-            ->get();
+            ->with(['hargaTier', 'satuanKonversi', 'kualitas', 'tipeHps']);
+        $searchService->applySuggestionSearch($rows, $q);
+        $searchService->applyRelevanceRanking($rows, $q);
+        $rows = $rows->limit($this->suggestionLimit + 1)->get();
 
         $hasMore = $rows->count() > $this->suggestionLimit;
         $rows = $rows->take($this->suggestionLimit)->map(function (Produk $p) {
