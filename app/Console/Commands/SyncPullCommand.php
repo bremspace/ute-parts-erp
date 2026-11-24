@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Modules\Sync\Services\HybridSyncProcessorService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class SyncPullCommand extends Command
@@ -45,10 +46,11 @@ class SyncPullCommand extends Command
         $limit = max(1, (int) $this->option('limit'));
         $cabangId = $this->option('cabang_id');
         $pullAll = (bool) $this->option('all');
-        $apiSecret = config('sync.api_secret');
+        $apiSecret = (string) config('sync.api_secret', '');
 
         $totalProcessed = 0;
         $totalFailed = 0;
+        $maxIterations = 100;
         $iteration = 0;
 
         do {
@@ -58,9 +60,10 @@ class SyncPullCommand extends Command
                 $queryParams['cabang_id'] = $cabangId;
             }
 
-            $endpoint = rtrim($remoteUrl, '/').'/api/internal/sync/pull?'.http_build_query($queryParams);
+            $queryString = http_build_query($queryParams);
+            $endpoint = rtrim($remoteUrl, '/').'/api/internal/sync/pull?'.$queryString;
             $timestamp = time();
-            $signature = hash_hmac('sha256', $timestamp.'.', $apiSecret);
+            $signature = hash_hmac('sha256', $timestamp.'.'.$queryString, $apiSecret);
 
             $this->info("Menghubungi VPS: {$endpoint} ...");
 
@@ -75,10 +78,13 @@ class SyncPullCommand extends Command
                     ->get($endpoint);
 
                 if ($response->failed()) {
+                    Cache::put('hybrid_sync:remote_reachable', false, now()->addMinutes(2));
                     $this->error("Gagal menarik data dari remote node (HTTP {$response->status()}): ".$response->body());
 
                     return Command::FAILURE;
                 }
+
+                Cache::put('hybrid_sync:remote_reachable', true, now()->addMinutes(5));
 
                 $items = $response->json('data', []);
                 $count = count($items);
@@ -94,12 +100,12 @@ class SyncPullCommand extends Command
 
                 foreach ($items as $item) {
                     $result = $processor->process($item);
-                    if ($result['success'] ?? false) {
+                    if ($result['success']) {
                         $batchProcessed++;
                         $processedUuids[] = $item['sync_uuid'];
                     } else {
                         $batchFailed++;
-                        $this->warn("Gagal memproses event {$item['sync_uuid']}: ".($result['message'] ?? 'Unknown error'));
+                        $this->warn("Gagal memproses event {$item['sync_uuid']}: ".$result['message']);
                     }
                 }
 
@@ -119,16 +125,16 @@ class SyncPullCommand extends Command
                     ])->withBody($ackPayload, 'application/json')->post(rtrim($remoteUrl, '/').'/api/internal/sync/ack');
                 }
 
-                // Jika tidak memakai opsi --all atau jumlah yang ditarik kurang dari limit, hentikan loop
                 if (! $pullAll || $count < $limit) {
                     break;
                 }
             } catch (\Throwable $e) {
+                Cache::put('hybrid_sync:remote_reachable', false, now()->addMinutes(2));
                 $this->error('Koneksi ke remote node terputus: '.$e->getMessage());
 
                 return Command::FAILURE;
             }
-        } while ($pullAll);
+        } while ($iteration < $maxIterations);
 
         $this->info("Sinkronisasi pull selesai: {$totalProcessed} diproses, {$totalFailed} gagal.");
 

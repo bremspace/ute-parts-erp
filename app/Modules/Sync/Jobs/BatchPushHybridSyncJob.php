@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class BatchPushHybridSyncJob implements ShouldQueue
@@ -35,12 +36,13 @@ class BatchPushHybridSyncJob implements ShouldQueue
             return;
         }
 
-        if (! config('sync.enabled') || empty(config('sync.remote_url'))) {
+        if (! config('sync.enabled') || config('sync.node_role') !== 'primary_store' || empty(config('sync.remote_url'))) {
             return;
         }
 
         $items = HybridSyncOutbox::whereIn('id', $this->outboxIds)
             ->where('status', '!=', 'synced')
+            ->orderBy('created_at', 'asc')
             ->get();
 
         if ($items->isEmpty()) {
@@ -65,7 +67,7 @@ class BatchPushHybridSyncJob implements ShouldQueue
         $body = ['events' => $events];
         $jsonPayload = json_encode($body);
         $timestamp = time();
-        $signature = hash_hmac('sha256', $timestamp.'.'.$jsonPayload, config('sync.api_secret'));
+        $signature = hash_hmac('sha256', $timestamp.'.'.$jsonPayload, (string) config('sync.api_secret'));
 
         try {
             $response = Http::timeout(25)
@@ -78,9 +80,11 @@ class BatchPushHybridSyncJob implements ShouldQueue
                     'Accept' => 'application/json',
                 ])
                 ->withBody($jsonPayload, 'application/json')
-                ->post(rtrim(config('sync.remote_url'), '/').'/api/internal/sync/push-batch');
+                ->post(rtrim((string) config('sync.remote_url'), '/').'/api/internal/sync/push-batch');
 
             if ($response->successful()) {
+                Cache::put('hybrid_sync:remote_reachable', true, now()->addMinutes(5));
+
                 $results = $response->json('data.results', []);
                 $successUuids = [];
                 $failedMap = [];
@@ -96,38 +100,54 @@ class BatchPushHybridSyncJob implements ShouldQueue
                     }
                 }
 
-                // Update yang berhasil
                 if (! empty($successUuids)) {
                     HybridSyncOutbox::whereIn('sync_uuid', $successUuids)->update([
                         'status' => 'synced',
+                        'last_error' => null,
                         'synced_at' => now(),
                     ]);
                 }
 
-                // Update yang gagal
-                foreach ($failedMap as $uuid => $errMsg) {
-                    HybridSyncOutbox::where('sync_uuid', $uuid)->update([
+                // Pastikan tidak ada item tersangkut di 'processing': item yang gagal ATAU
+                // terlewat dari array results ditandai failed dan attempts dinaikkan.
+                foreach ($items as $item) {
+                    if (in_array($item->sync_uuid, $successUuids, true)) {
+                        continue;
+                    }
+                    $errMsg = $failedMap[$item->sync_uuid] ?? 'Respons batch tidak mengonfirmasi status event.';
+                    $item->update([
                         'status' => 'failed',
+                        'attempts' => (int) $item->attempts + 1,
                         'last_error' => $errMsg,
                     ]);
                 }
             } else {
+                Cache::put('hybrid_sync:remote_reachable', false, now()->addMinutes(2));
                 $attempts = $this->attempts();
-                HybridSyncOutbox::whereIn('id', $items->pluck('id'))->update([
-                    'status' => 'failed',
-                    'attempts' => $attempts,
-                    'last_error' => 'HTTP '.$response->status().': '.$response->body(),
-                ]);
-                $this->release($this->backoff()[$attempts - 1] ?? 900);
+                foreach ($items as $item) {
+                    $item->update([
+                        'status' => 'failed',
+                        'attempts' => max($attempts, (int) $item->attempts + 1),
+                        'last_error' => 'HTTP '.$response->status().': '.$response->body(),
+                    ]);
+                }
+                if ($this->job) {
+                    $this->release($this->backoff()[$attempts - 1] ?? 900);
+                }
             }
         } catch (\Throwable $e) {
+            Cache::put('hybrid_sync:remote_reachable', false, now()->addMinutes(2));
             $attempts = $this->attempts();
-            HybridSyncOutbox::whereIn('id', $items->pluck('id'))->update([
-                'status' => 'failed',
-                'attempts' => $attempts,
-                'last_error' => $e->getMessage(),
-            ]);
-            $this->release($this->backoff()[$attempts - 1] ?? 900);
+            foreach ($items as $item) {
+                $item->update([
+                    'status' => 'failed',
+                    'attempts' => max($attempts, (int) $item->attempts + 1),
+                    'last_error' => $e->getMessage(),
+                ]);
+            }
+            if ($this->job) {
+                $this->release($this->backoff()[$attempts - 1] ?? 900);
+            }
         }
     }
 }

@@ -2,14 +2,22 @@
 
 namespace App\Modules\Sync;
 
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Hr\Models\PayrollPeriode;
+use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Sync\Observers\BrandSyncObserver;
+use App\Modules\Sync\Observers\HargaTierSyncObserver;
+use App\Modules\Sync\Observers\JurnalHeaderSyncObserver;
 use App\Modules\Sync\Observers\KategoriProdukSyncObserver;
 use App\Modules\Sync\Observers\KualitasProdukSyncObserver;
 use App\Modules\Sync\Observers\OrderOnlinePaidSyncObserver;
+use App\Modules\Sync\Observers\PayrollPeriodeSyncObserver;
 use App\Modules\Sync\Observers\PelangganSyncObserver;
+use App\Modules\Sync\Observers\ProdukBarcodeSyncObserver;
+use App\Modules\Sync\Observers\ProdukSatuanKonversiSyncObserver;
 use App\Modules\Sync\Observers\ProdukSyncObserver;
 use App\Modules\Sync\Observers\SatuanUnitSyncObserver;
 use App\Modules\Sync\Observers\SkuVariantSyncObserver;
@@ -22,6 +30,8 @@ use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\ProdukBarcode;
+use App\Modules\Wms\Models\ProdukSatuanKonversi;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokLog;
@@ -31,54 +41,46 @@ class SyncObserverBootstrap
 {
     /**
      * Daftarkan model observer untuk auto-enqueue outbox sync.
+     * Observer dipasang sekali per lifecycle app; pengecekan enabled & node_role
+     * dievaluasi secara dinamis di tiap observer agar perubahan config runtime / test langsung aktif.
      */
     public static function register(): void
     {
-        if (! config('sync.enabled')) {
+        $app = app();
+        if ($app->bound('sync.observers_registered')) {
             return;
         }
+        $app->instance('sync.observers_registered', true);
 
-        $nodeRole = config('sync.node_role');
-
-        // Master data observers: aktif di kedua node (lokal & cloud) agar
-        // perubahan di salah satu sisi bisa disinkronkan ke sisi lain.
-        $masterObservers = [
-            Produk::class => ProdukSyncObserver::class,
-            SkuVariant::class => SkuVariantSyncObserver::class,
-            Pelanggan::class => PelangganSyncObserver::class,
-            KategoriProduk::class => KategoriProdukSyncObserver::class,
-            Brand::class => BrandSyncObserver::class,
-            KualitasProduk::class => KualitasProdukSyncObserver::class,
-            SatuanUnit::class => SatuanUnitSyncObserver::class,
-            TipeHp::class => TipeHpSyncObserver::class,
+        $observers = [
+            Produk::class => [ProdukSyncObserver::class],
+            SkuVariant::class => [SkuVariantSyncObserver::class],
+            Pelanggan::class => [PelangganSyncObserver::class],
+            KategoriProduk::class => [KategoriProdukSyncObserver::class],
+            Brand::class => [BrandSyncObserver::class],
+            KualitasProduk::class => [KualitasProdukSyncObserver::class],
+            SatuanUnit::class => [SatuanUnitSyncObserver::class],
+            TipeHp::class => [TipeHpSyncObserver::class],
+            HargaTier::class => [HargaTierSyncObserver::class],
+            ProdukSatuanKonversi::class => [ProdukSatuanKonversiSyncObserver::class],
+            ProdukBarcode::class => [ProdukBarcodeSyncObserver::class],
+            StokLog::class => [StokLogSyncObserver::class],
+            TiketServis::class => [TiketServisSyncObserver::class],
+            JurnalHeader::class => [JurnalHeaderSyncObserver::class],
+            PayrollPeriode::class => [PayrollPeriodeSyncObserver::class],
+            Transaksi::class => [
+                TransaksiPosSyncObserver::class,
+                OrderOnlinePaidSyncObserver::class,
+                TransaksiCloudPosSyncObserver::class,
+            ],
         ];
 
-        foreach ($masterObservers as $model => $observer) {
-            if (class_exists($model)) {
+        foreach ($observers as $model => $modelObservers) {
+            if (! class_exists($model)) {
+                continue;
+            }
+            foreach ($modelObservers as $observer) {
                 $model::observe($observer);
-            }
-        }
-
-        // Observers khusus node lokal
-        if ($nodeRole === 'primary_store') {
-            if (class_exists(StokLog::class)) {
-                StokLog::observe(StokLogSyncObserver::class);
-            }
-
-            if (class_exists(TiketServis::class)) {
-                TiketServis::observe(TiketServisSyncObserver::class);
-            }
-
-            if (class_exists(Transaksi::class)) {
-                Transaksi::observe(TransaksiPosSyncObserver::class);
-            }
-        }
-
-        // Observers khusus node cloud
-        if ($nodeRole === 'cloud_storefront') {
-            if (class_exists(Transaksi::class)) {
-                Transaksi::observe(OrderOnlinePaidSyncObserver::class);
-                Transaksi::observe(TransaksiCloudPosSyncObserver::class);
             }
         }
     }

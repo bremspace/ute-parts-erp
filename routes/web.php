@@ -707,8 +707,12 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
     Route::get('/dashboard', DashboardIndex::class)->name('dashboard');
 
     // [Hybrid Sync] Status & Manual Trigger Real-Time
-    Route::get('/sync/status', [SyncStatusController::class, 'status'])->name('sync.status');
-    Route::post('/sync/trigger', [SyncStatusController::class, 'trigger'])->name('sync.trigger');
+    Route::get('/sync/status', [SyncStatusController::class, 'status'])
+        ->middleware('permission:pos.view|pos.view-own|servis.view|pengaturan.manage')
+        ->name('sync.status');
+    Route::post('/sync/trigger', [SyncStatusController::class, 'trigger'])
+        ->middleware(['permission:pos.view|pos.view-own|servis.view|pengaturan.manage', 'throttle:10,1'])
+        ->name('sync.trigger');
 
     // POS Kasir Screen — RBAC: permission pos.view (admin-toko/super-admin) ATAU
     // pos.view-own (role kasir) — pola pipe spatie, sama dgn permission:role|role

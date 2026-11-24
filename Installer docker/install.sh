@@ -63,7 +63,8 @@ fi
 # 3. Build & Jalankan Container
 echo ""
 echo "ℹ Membangun image Docker (Dockerfile)..."
-$COMPOSE_CMD build
+echo ">>> Mem-build Docker image ute-parts-erp:latest..."
+docker build -t ute-parts-erp:latest -f "$SCRIPT_DIR/Dockerfile" "$PROJECT_ROOT"
 
 echo "ℹ Menjalankan service app dan database..."
 $COMPOSE_CMD up -d

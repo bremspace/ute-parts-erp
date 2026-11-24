@@ -1050,6 +1050,7 @@
                 <!-- Status & Info Konsumen Terpilih -->
                 <div class="flex items-center gap-1.5 text-xs">
                     <div class="sm:hidden flex w-auto max-w-full items-center gap-1 flex-nowrap overflow-visible">
+                        <x-prism.sync-badge :compact="true" class="shrink-0" />
                         <button type="button" wire:click="openDiskonModal" class="pos-top-pill inline-flex items-center justify-center rounded-md bg-up-primary/10 border border-up-primary/30 text-up-primary">
                             Diskon
                         </button>

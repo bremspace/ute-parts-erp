@@ -2,38 +2,45 @@
 
 namespace App\Modules\Sync\Observers;
 
-use App\Modules\Sync\Services\HybridSyncOutboxService;
+use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
 use App\Modules\Wms\Models\TipeHp;
-use Illuminate\Support\Facades\Log;
 
 class TipeHpSyncObserver
 {
-    public function saved(TipeHp $tipeHp): void
+    use SyncsModelEvents;
+
+    public function created(TipeHp $tipeHp): void
     {
-        if (! config('sync.enabled')) {
-            return;
-        }
+        $this->enqueueSync($tipeHp);
+    }
 
-        try {
-            $payload = [
-                'id' => $tipeHp->id,
-                'merk' => $tipeHp->merk,
-                'model' => $tipeHp->model,
-                'kode_produk' => $tipeHp->kode_produk,
-                'nama' => $tipeHp->nama,
-                'is_active' => (bool) $tipeHp->is_active,
-                'is_default' => (bool) $tipeHp->is_default,
-                'updated_at' => $tipeHp->updated_at?->toIso8601String(),
-            ];
+    public function updated(TipeHp $tipeHp): void
+    {
+        $this->enqueueSync($tipeHp);
+    }
 
-            app(HybridSyncOutboxService::class)->enqueue(
-                'tipe_hp.upsert',
-                $tipeHp,
-                $payload,
-                null
-            );
-        } catch (\Throwable $e) {
-            Log::warning('[HybridSync] Observer TipeHp gagal: '.$e->getMessage());
-        }
+    private function enqueueSync(TipeHp $tipeHp): void
+    {
+        $this->enqueueModelEvent(
+            $tipeHp,
+            'tipe_hp.upsert',
+            function (TipeHp $model): array {
+                $syncUuid = $this->ensureSyncUuid($model);
+
+                return [
+                    'id' => $model->id,
+                    'sync_uuid' => $syncUuid,
+                    'merk' => $model->merk,
+                    'model' => $model->model,
+                    'kode_produk' => $model->kode_produk,
+                    'nama' => $model->nama,
+                    'is_active' => (bool) ($model->is_active ?? true),
+                    'is_default' => (bool) ($model->is_default ?? false),
+                    'created_at' => $model->created_at?->toIso8601String(),
+                    'updated_at' => $model->updated_at?->toIso8601String(),
+                ];
+            },
+            logLabel: 'TipeHpSyncObserver'
+        );
     }
 }

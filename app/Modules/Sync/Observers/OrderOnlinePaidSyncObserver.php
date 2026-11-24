@@ -3,51 +3,70 @@
 namespace App\Modules\Sync\Observers;
 
 use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Pos\Models\TransaksiItem;
-use App\Modules\Sync\Services\HybridSyncOutboxService;
-use Illuminate\Support\Facades\Log;
+use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
 
 class OrderOnlinePaidSyncObserver
 {
-    public function updated(Transaksi $transaksi): void
+    use SyncsModelEvents;
+
+    private const PAID_STATUSES = ['paid', 'lunas', 'selesai'];
+
+    public function created(Transaksi $transaksi): void
     {
-        if (! config('sync.enabled') || config('sync.node_role') !== 'cloud_storefront') {
+        if (config('sync.node_role') !== 'cloud_storefront') {
             return;
         }
 
-        // Cek apakah status berubah menjadi paid / lunas / selesai
+        if (strtolower((string) $transaksi->sumber) !== 'marketplace') {
+            return;
+        }
+
+        $status = strtolower((string) $transaksi->status);
+        if (! in_array($status, self::PAID_STATUSES, true)) {
+            return;
+        }
+
+        $this->enqueueOrderPaid($transaksi);
+    }
+
+    public function updated(Transaksi $transaksi): void
+    {
+        if (config('sync.node_role') !== 'cloud_storefront') {
+            return;
+        }
+
+        if (strtolower((string) $transaksi->sumber) !== 'marketplace') {
+            return;
+        }
+
         if (! $transaksi->wasChanged('status')) {
             return;
         }
 
+        $oldStatus = strtolower((string) $transaksi->getOriginal('status'));
         $newStatus = strtolower((string) $transaksi->status);
-        if (! in_array($newStatus, ['paid', 'lunas', 'selesai'], true)) {
+
+        // Hanya kirim event sekali saat transisi unpaid -> paid/lunas/selesai
+        // agar lunas -> selesai saat pengiriman tidak mengirim order.online_paid ganda.
+        if (in_array($oldStatus, self::PAID_STATUSES, true)) {
             return;
         }
 
-        try {
-            $payload = [
-                'order_id' => $transaksi->id,
-                'nomor_order' => $transaksi->no_transaksi ?? (string) $transaksi->id,
-                'total' => $transaksi->total_akhir ?? 0,
-                'cabang_id' => $transaksi->cabang_id ?? null,
-                'items' => $transaksi->items->map(function (TransaksiItem $item): array {
-                    return [
-                        'produk_id' => $item->produk_id,
-                        'qty' => $item->jumlah,
-                        'harga' => $item->harga_satuan,
-                    ];
-                })->toArray(),
-            ];
-
-            app(HybridSyncOutboxService::class)->enqueue(
-                'order.online_paid',
-                $transaksi,
-                $payload,
-                $transaksi->cabang_id ?? null
-            );
-        } catch (\Throwable $e) {
-            Log::warning('[HybridSync] Observer OrderOnlinePaid gagal: '.$e->getMessage());
+        if (! in_array($newStatus, self::PAID_STATUSES, true)) {
+            return;
         }
+
+        $this->enqueueOrderPaid($transaksi);
+    }
+
+    private function enqueueOrderPaid(Transaksi $transaksi): void
+    {
+        $this->enqueueModelEvent(
+            $transaksi,
+            'order.online_paid',
+            fn (Transaksi $model): array => $this->buildTransaksiPosPayload($model, poinHandledAtSource: true),
+            cabangId: $transaksi->cabang_id,
+            logLabel: 'OrderOnlinePaidSyncObserver'
+        );
     }
 }

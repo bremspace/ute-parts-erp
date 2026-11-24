@@ -12,7 +12,7 @@ class SyncFlushCommand extends Command
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'sync:flush {--batch : Kirim dalam batch massal (BatchPushHybridSyncJob)} {--chunk=50 : Ukuran batch per request}';
+    protected $signature = 'sync:flush {--batch : Kirim dalam batch massal (BatchPushHybridSyncJob)} {--chunk=50 : Ukuran batch per request} {--sync-now : Jalankan langsung tanpa menunggu queue worker}';
 
     /**
      * The console command description.
@@ -30,7 +30,19 @@ class SyncFlushCommand extends Command
             return Command::SUCCESS;
         }
 
+        if (config('sync.node_role') !== 'primary_store' || empty(config('sync.remote_url'))) {
+            $this->info('Node ini tidak memiliki target remote push (hanya node primary_store dengan SYNC_REMOTE_URL yang melakukan push).');
+
+            return Command::SUCCESS;
+        }
+
+        // Pulihkan item 'processing' yang menggantung > 5 menit akibat crash worker
+        HybridSyncOutbox::where('status', 'processing')
+            ->where('updated_at', '<=', now()->subMinutes(5))
+            ->update(['status' => 'pending']);
+
         $items = HybridSyncOutbox::whereIn('status', ['pending', 'failed'])
+            ->where('attempts', '<', 10)
             ->orderBy('created_at', 'asc')
             ->get();
 
@@ -42,15 +54,22 @@ class SyncFlushCommand extends Command
 
         $this->info("Ditemukan {$items->count()} item outbox untuk diproses ulang.");
 
-        if ($this->option('batch')) {
+        $syncNow = (bool) $this->option('sync-now');
+
+        if ($this->option('batch') || $syncNow) {
             $chunkSize = max(1, (int) $this->option('chunk'));
             $chunks = $items->pluck('id')->chunk($chunkSize);
 
             foreach ($chunks as $chunkIds) {
-                BatchPushHybridSyncJob::dispatch($chunkIds->all());
+                if ($syncNow) {
+                    BatchPushHybridSyncJob::dispatchSync($chunkIds->all());
+                } else {
+                    BatchPushHybridSyncJob::dispatch($chunkIds->all());
+                }
             }
 
-            $this->info("Berhasil mendispatch {$chunks->count()} BatchPushHybridSyncJob ({$items->count()} total item) ke antrean queue.");
+            $modeLabel = $syncNow ? 'dieksekusi langsung' : 'didispatch ke antrean queue';
+            $this->info("Berhasil {$chunks->count()} BatchPushHybridSyncJob ({$items->count()} total item) {$modeLabel}.");
 
             return Command::SUCCESS;
         }

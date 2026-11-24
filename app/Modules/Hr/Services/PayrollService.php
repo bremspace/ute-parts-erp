@@ -230,7 +230,7 @@ class PayrollService
             throw new \DomainException("Periode {$periode} belum difinalisasi (jurnal accrual belum ada). Tidak dapat dibayar.");
         }
 
-        return DB::transaction(function () use ($periode, $periodeId, $akunKasKode, $targetCabangId) {
+        return DB::transaction(function () use ($periode, $periodeId, $periodeRecord, $akunKasKode, $targetCabangId) {
             // Jurnal pembayaran: debit Utang Gaji (210-02) / kredit Kas ($akunKasKode)
             $slips = PayrollSlip::where('payroll_periode_id', $periodeId)->get();
             $total = $slips->sum('total_gaji');
@@ -259,7 +259,7 @@ class PayrollService
                 ->where('status', 'approved')
                 ->update(['status' => 'dibayar']);
 
-            PayrollPeriode::where('id', $periodeId)->update(['status' => 'dibayar']);
+            $periodeRecord->update(['status' => PayrollPeriode::STATUS_DIBAYAR]);
 
             // [AUDIT-FIX F-04] Tandai cair HANYA komisi yang tercantum pada slip
             // periode+cabang yang dibayar (via payroll_komisi_detail.komisi_id).

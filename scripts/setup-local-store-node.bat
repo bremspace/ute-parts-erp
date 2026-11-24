@@ -41,9 +41,30 @@ if %errorlevel% neq 0 (
     echo.>> .env
     echo SYNC_ENABLED=true>> .env
     echo SYNC_NODE_ROLE=primary_store>> .env
+    echo SYNC_NODE_ID=STORE-01>> .env
     echo QUEUE_CONNECTION=database>> .env
 ) else (
     echo [OK] Parameter SYNC sudah terdaftar di .env.
+)
+
+findstr /m "SYNC_REMOTE_URL" .env >nul
+if %errorlevel% neq 0 (
+    set /p REMOTE_URL_INPUT="Masukkan URL Cloud VPS (opsional, contoh https://vps.bremspace.id): "
+    if not "%REMOTE_URL_INPUT%"=="" (
+        echo SYNC_REMOTE_URL=%REMOTE_URL_INPUT%>> .env
+    ) else (
+        echo SYNC_REMOTE_URL=>> .env
+    )
+)
+
+findstr /m "SYNC_API_SECRET" .env >nul
+if %errorlevel% neq 0 (
+    set /p API_SECRET_INPUT="Masukkan API Secret Sync (sama dengan Cloud VPS, opsional): "
+    if not "%API_SECRET_INPUT%"=="" (
+        echo SYNC_API_SECRET=%API_SECRET_INPUT%>> .env
+    ) else (
+        echo SYNC_API_SECRET=>> .env
+    )
 )
 
 REM 4. Generate App Key jika belum ada
@@ -70,6 +91,9 @@ echo Membuat shortcut launcher Buka-Kasir.bat...
 echo @echo off
 echo chcp 65001 ^>nul
 echo echo Membuka Kasir Bremspace ERP...
+echo if not exist storage\logs mkdir storage\logs
+echo start /B /MIN cmd /c "php artisan queue:work --queue=default,sync --sleep=3 --tries=3 >> storage\logs\queue-worker.log 2>&1"
+echo start /B /MIN cmd /c "php artisan schedule:work >> storage\logs\scheduler.log 2>&1"
 echo start "" http://localhost:8000/app/pos
 echo php artisan serve --port=8000
 ) > Buka-Kasir.bat

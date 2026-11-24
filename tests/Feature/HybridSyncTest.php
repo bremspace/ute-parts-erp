@@ -83,7 +83,8 @@ class HybridSyncTest extends TestCase
         $secret = $secret ?? config('sync.api_secret');
         $node = $node ?? config('sync.node_id');
         $rawBody = json_encode($data);
-        $signature = hash_hmac('sha256', $rawBody, $secret);
+        $timestamp = (string) time();
+        $signature = hash_hmac('sha256', $timestamp.'.'.$rawBody, $secret);
 
         return $this->call(
             'POST',
@@ -95,6 +96,7 @@ class HybridSyncTest extends TestCase
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_ACCEPT' => 'application/json',
                 'HTTP_X_SYNC_NODE' => $node,
+                'HTTP_X_SYNC_TIMESTAMP' => $timestamp,
                 'HTTP_X_SYNC_SIGNATURE' => $signature,
             ],
             $rawBody
@@ -140,6 +142,7 @@ class HybridSyncTest extends TestCase
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_ACCEPT' => 'application/json',
                 'HTTP_X_SYNC_NODE' => 'STORE-REMOTE',
+                'HTTP_X_SYNC_TIMESTAMP' => (string) time(),
                 'HTTP_X_SYNC_SIGNATURE' => 'signature-palsu-ngawur',
             ],
             json_encode($data)
@@ -342,6 +345,7 @@ class HybridSyncTest extends TestCase
     public function test_outbox_enqueue_creates_database_record_and_dispatches_job(): void
     {
         Queue::fake();
+        config(['sync.remote_url' => 'https://cloud.bremspace.test']);
 
         $produk = new Produk;
         $produk->id = 88;
@@ -366,10 +370,12 @@ class HybridSyncTest extends TestCase
      */
     public function test_health_endpoint_returns_node_info(): void
     {
-        $signature = hash_hmac('sha256', '', config('sync.api_secret'));
+        $timestamp = (string) time();
+        $signature = hash_hmac('sha256', $timestamp.'.', config('sync.api_secret'));
 
         $response = $this->withHeaders([
             'X-Sync-Node' => config('sync.node_id'),
+            'X-Sync-Timestamp' => $timestamp,
             'X-Sync-Signature' => $signature,
         ])->getJson('/api/internal/sync/health');
 
@@ -408,10 +414,12 @@ class HybridSyncTest extends TestCase
             'status' => 'pending',
         ]);
 
-        $signature = hash_hmac('sha256', '', config('sync.api_secret'));
+        $timestamp = (string) time();
+        $signature = hash_hmac('sha256', $timestamp.'.', config('sync.api_secret'));
 
         $resAuthorized = $this->withHeaders([
             'X-Sync-Node' => config('sync.node_id'),
+            'X-Sync-Timestamp' => $timestamp,
             'X-Sync-Signature' => $signature,
         ])->getJson('/api/internal/sync/pull');
 
@@ -426,6 +434,7 @@ class HybridSyncTest extends TestCase
     public function test_sync_flush_command_dispatches_jobs(): void
     {
         Queue::fake();
+        config(['sync.remote_url' => 'https://cloud.bremspace.test']);
 
         $item = HybridSyncOutbox::create([
             'sync_uuid' => (string) Str::uuid(),
@@ -541,10 +550,12 @@ class HybridSyncTest extends TestCase
             'status' => 'pending',
         ]);
 
-        $signature = hash_hmac('sha256', '', config('sync.api_secret'));
+        $timestamp = (string) time();
+        $signature = hash_hmac('sha256', $timestamp.'.', config('sync.api_secret'));
 
         $res = $this->withHeaders([
             'X-Sync-Node' => config('sync.node_id'),
+            'X-Sync-Timestamp' => $timestamp,
             'X-Sync-Signature' => $signature,
         ])->getJson('/api/internal/sync/pull');
 
@@ -783,6 +794,7 @@ class HybridSyncTest extends TestCase
     public function test_sync_flush_command_with_batch_option_dispatches_batch_job(): void
     {
         Queue::fake();
+        config(['sync.remote_url' => 'https://cloud.bremspace.test']);
 
         $item = HybridSyncOutbox::create([
             'sync_uuid' => (string) Str::uuid(),

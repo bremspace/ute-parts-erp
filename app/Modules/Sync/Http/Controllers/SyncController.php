@@ -68,7 +68,7 @@ class SyncController extends Controller
             }
 
             $res = $processor->process($event);
-            if ($res['success'] ?? false) {
+            if ($res['success']) {
                 $processed++;
             } else {
                 $failed++;
@@ -76,8 +76,8 @@ class SyncController extends Controller
 
             $results[] = [
                 'sync_uuid' => $event['sync_uuid'],
-                'success' => $res['success'] ?? false,
-                'message' => $res['message'] ?? '',
+                'success' => $res['success'],
+                'message' => $res['message'],
             ];
         }
 
@@ -125,7 +125,11 @@ class SyncController extends Controller
                 'kualitas_produk.upsert',
                 'satuan_unit.upsert',
                 'tipe_hp.upsert',
+                'harga_tier.upsert',
+                'produk_satuan_konversi.upsert',
+                'produk_barcode.sync',
                 'transaksi.pos_cloud',
+                'transaksi.void',
             ];
             $query->whereIn('event_type', $allowedEvents);
         }

@@ -6,7 +6,9 @@ use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class SyncStatusControllerTest extends TestCase
@@ -35,6 +37,9 @@ class SyncStatusControllerTest extends TestCase
         ]);
         $this->user->cabangs()->attach($this->cabang->id, ['is_default' => true]);
 
+        Permission::firstOrCreate(['name' => 'pos.view', 'guard_name' => 'web']);
+        $this->user->givePermissionTo('pos.view');
+
         session([
             'cabang_id' => $this->cabang->id,
             'cabang_nama' => $this->cabang->nama,
@@ -46,7 +51,7 @@ class SyncStatusControllerTest extends TestCase
         config([
             'sync.enabled' => true,
             'sync.node_role' => 'primary_store',
-            'sync.cloud_url' => 'https://vps.bremspace.id',
+            'sync.remote_url' => 'https://vps.bremspace.id',
         ]);
 
         DB::table('hybrid_sync_outbox')->insert([
@@ -89,11 +94,15 @@ class SyncStatusControllerTest extends TestCase
 
     public function test_sync_trigger_executes_successfully(): void
     {
+        Http::fake([
+            'https://mock.bremspace.id/api/internal/sync/*' => Http::response(['success' => true, 'data' => []], 200),
+        ]);
+
         config([
             'sync.enabled' => true,
             'sync.node_role' => 'primary_store',
-            'sync.cloud_url' => 'https://mock.bremspace.id',
-            'sync.shared_secret' => 'test-secret',
+            'sync.remote_url' => 'https://mock.bremspace.id',
+            'sync.api_secret' => 'test-secret',
         ]);
 
         $response = $this->actingAs($this->user)

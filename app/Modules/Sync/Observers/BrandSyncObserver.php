@@ -2,36 +2,43 @@
 
 namespace App\Modules\Sync\Observers;
 
-use App\Modules\Sync\Services\HybridSyncOutboxService;
+use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
 use App\Modules\Wms\Models\Brand;
-use Illuminate\Support\Facades\Log;
 
 class BrandSyncObserver
 {
-    public function saved(Brand $brand): void
+    use SyncsModelEvents;
+
+    public function created(Brand $brand): void
     {
-        if (! config('sync.enabled')) {
-            return;
-        }
+        $this->enqueueSync($brand);
+    }
 
-        try {
-            $payload = [
-                'id' => $brand->id,
-                'nama' => $brand->nama,
-                'keterangan' => $brand->keterangan,
-                'is_active' => (bool) $brand->is_active,
-                'is_default' => (bool) $brand->is_default,
-                'updated_at' => $brand->updated_at?->toIso8601String(),
-            ];
+    public function updated(Brand $brand): void
+    {
+        $this->enqueueSync($brand);
+    }
 
-            app(HybridSyncOutboxService::class)->enqueue(
-                'brand.upsert',
-                $brand,
-                $payload,
-                null
-            );
-        } catch (\Throwable $e) {
-            Log::warning('[HybridSync] Observer Brand gagal: '.$e->getMessage());
-        }
+    private function enqueueSync(Brand $brand): void
+    {
+        $this->enqueueModelEvent(
+            $brand,
+            'brand.upsert',
+            function (Brand $model): array {
+                $syncUuid = $this->ensureSyncUuid($model);
+
+                return [
+                    'id' => $model->id,
+                    'sync_uuid' => $syncUuid,
+                    'nama' => $model->nama,
+                    'keterangan' => $model->keterangan,
+                    'is_active' => (bool) ($model->is_active ?? true),
+                    'is_default' => (bool) ($model->is_default ?? false),
+                    'created_at' => $model->created_at?->toIso8601String(),
+                    'updated_at' => $model->updated_at?->toIso8601String(),
+                ];
+            },
+            logLabel: 'BrandSyncObserver'
+        );
     }
 }

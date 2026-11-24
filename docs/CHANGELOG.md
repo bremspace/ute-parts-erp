@@ -3,6 +3,25 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-24 — Hybrid Database Sync: Audit Hardening, Akuntansi & Backoffice Parity
+
+- **Keamanan & Retry**:
+  - `HybridSyncProcessorService`: Event `hybrid_sync_inbox` berstatus `failed` tidak lagi dianggap `already_processed` saat retry; inbox diperbarui bersih untuk diproses ulang secara atomik.
+  - `VerifySyncSignature`: Menolak request jika `SYNC_ENABLED=false` (kecuali `/health`), mewajibkan header `X-Sync-Timestamp` (batas drift ±300 detik), dan menandatangani query string pada GET request (`/pull`, `/health`).
+  - Route `/app/sync/status` & `/app/sync/trigger`: Dilindungi RBAC `permission:pos.view|pos.view-own|servis.view|pengaturan.manage` serta `throttle:10,1`.
+- **Akuntansi, Stok & Paritas Transaksi**:
+  - Konfigurasi distandardisasi menggunakan `SYNC_REMOTE_URL` (`sync.remote_url`) dan `SYNC_API_SECRET` (`sync.api_secret`).
+  - `ProdukSyncObserver` & `handleProdukUpsert`: Hapus referensi `produk.cabang_id` yang tidak ada; sinkronkan field lengkap produk termasuk soft-delete/restore.
+  - Proteksi kolisi primary key lintas node melalui kolom unik `sync_uuid` pada 14 tabel master/operasional + natural key lookup (`resolveTargetModel` & `resolveForeignId`).
+  - Penyatuan `upsertSyncedPosTransaction` (dukungan metode bayar tunai, transfer/QRIS, piutang + `Piutang`, split, PPN `220-01`, HPP, `StokDeductionService` pada `pos_cloud`, garansi, pencegahan double-poin & double-jurnal servis) + dukungan `transaksi.void`.
+  - Cakupan Backoffice penuh: `HargaTier`, `ProdukSatuanKonversi`, `ProdukBarcode`, `TiketServis` penuh, `StokLog.sku_variant_id`, `JurnalHeader` standalone (`manual`, `payroll`, `payroll-bayar`, `asset`, `depresiasi`, `disposal`), dan `PayrollPeriode` (`selesai`/`dibayar`).
+- **Worker, Installer & Frontend UI**:
+  - Queue/scheduler hanya dijadwalkan pada `primary_store` dengan `remote_url` terisi; recovery outbox `processing` yang macet > 5 menit & batas retry 10 kali.
+  - `<x-prism.sync-badge>`: Cek konektivitas remote riil + `navigator.onLine`, perbaiki toast ke `window.showToast()`, dan hadir di header POS desktop maupun mobile.
+  - `SettingsRbac`: Gabungkan probe status sinkronisasi (`probeHybridSyncEndpoint`), sinkronkan cache konektivitas UI, dan terapkan config runtime instan saat simpan.
+  - Installer (`Installer docker/install.sh`, `.env.docker`, `scripts/setup-local-store-node.sh/.bat`) distandardisasi ke `SYNC_REMOTE_URL`/`SYNC_API_SECRET`, build image eksplisit di `install.sh`, dan menyalakan `queue:work` + `schedule:work`.
+  - **QA**: Larastan level 6 (`phpstan`) 0 errors, Laravel Pint 100% pass, Vite build + Blade `view:cache` lulus, dan 86 unit/feature tests (486 assertions) hijau.
+
 ## 2026-11-23 — Hybrid Database Sync: Toko Offline-First & Cloud VPS Failover (Fase 1 - 4)
 
 - **ADR 0013 & Implementation Plan**: Arsitektur Hybrid Database Sync lengkap (Toko Lokal Mandiri <-> Cloud VPS Failover) dengan respon kasir < 50ms tanpa ketergantungan koneksi cloud.

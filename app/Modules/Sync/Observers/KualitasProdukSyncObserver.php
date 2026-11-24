@@ -2,37 +2,47 @@
 
 namespace App\Modules\Sync\Observers;
 
-use App\Modules\Sync\Services\HybridSyncOutboxService;
+use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
 use App\Modules\Wms\Models\KualitasProduk;
-use Illuminate\Support\Facades\Log;
 
 class KualitasProdukSyncObserver
 {
-    public function saved(KualitasProduk $kualitas): void
+    use SyncsModelEvents;
+
+    public function created(KualitasProduk $kualitas): void
     {
-        if (! config('sync.enabled')) {
-            return;
-        }
+        $this->enqueueSync($kualitas);
+    }
 
-        try {
-            $payload = [
-                'id' => $kualitas->id,
-                'nama' => $kualitas->nama,
-                'keterangan' => $kualitas->keterangan,
-                'is_active' => (bool) $kualitas->is_active,
-                'brand_id' => $kualitas->brand_id,
-                'is_default' => (bool) $kualitas->is_default,
-                'updated_at' => $kualitas->updated_at?->toIso8601String(),
-            ];
+    public function updated(KualitasProduk $kualitas): void
+    {
+        $this->enqueueSync($kualitas);
+    }
 
-            app(HybridSyncOutboxService::class)->enqueue(
-                'kualitas_produk.upsert',
-                $kualitas,
-                $payload,
-                null
-            );
-        } catch (\Throwable $e) {
-            Log::warning('[HybridSync] Observer KualitasProduk gagal: '.$e->getMessage());
-        }
+    private function enqueueSync(KualitasProduk $kualitas): void
+    {
+        $this->enqueueModelEvent(
+            $kualitas,
+            'kualitas_produk.upsert',
+            function (KualitasProduk $model): array {
+                $syncUuid = $this->ensureSyncUuid($model);
+                $model->loadMissing('brand');
+
+                return [
+                    'id' => $model->id,
+                    'sync_uuid' => $syncUuid,
+                    'nama' => $model->nama,
+                    'keterangan' => $model->keterangan,
+                    'brand_id' => $model->brand_id,
+                    'brand_sync_uuid' => $model->brand?->getAttribute('sync_uuid'),
+                    'brand_nama' => $model->brand?->getAttribute('nama'),
+                    'is_active' => (bool) ($model->is_active ?? true),
+                    'is_default' => (bool) ($model->getAttribute('is_default') ?? false),
+                    'created_at' => $model->created_at?->toIso8601String(),
+                    'updated_at' => $model->updated_at?->toIso8601String(),
+                ];
+            },
+            logLabel: 'KualitasProdukSyncObserver'
+        );
     }
 }

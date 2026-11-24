@@ -64,6 +64,7 @@ update_env() {
 
 update_env "SYNC_ENABLED" "true"
 update_env "SYNC_NODE_ROLE" "primary_store"
+update_env "SYNC_NODE_ID" "STORE-01"
 update_env "CACHE_STORE" "file"
 update_env "QUEUE_CONNECTION" "database"
 
@@ -71,22 +72,22 @@ echo "✔ SYNC_ENABLED=true"
 echo "✔ SYNC_NODE_ROLE=primary_store"
 echo "✔ QUEUE_CONNECTION=database"
 
-# Konfigurasi Cloud URL & Shared Secret jika belum ada
-if ! grep -q "^SYNC_CLOUD_URL=" .env || grep -q "^SYNC_CLOUD_URL=$" .env; then
+# Konfigurasi Remote URL & API Secret jika belum ada
+if ! grep -q "^SYNC_REMOTE_URL=" .env || grep -q "^SYNC_REMOTE_URL=$" .env; then
     echo ""
     read -r -p "Masukkan URL Cloud VPS (contoh: https://vps.bremspace.id): " CLOUD_URL_INPUT
     if [ -n "$CLOUD_URL_INPUT" ]; then
-        update_env "SYNC_CLOUD_URL" "$CLOUD_URL_INPUT"
-        echo "✔ SYNC_CLOUD_URL disetel: $CLOUD_URL_INPUT"
+        update_env "SYNC_REMOTE_URL" "$CLOUD_URL_INPUT"
+        echo "✔ SYNC_REMOTE_URL disetel: $CLOUD_URL_INPUT"
     fi
 fi
 
-if ! grep -q "^SYNC_SHARED_SECRET=" .env || grep -q "^SYNC_SHARED_SECRET=$" .env; then
+if ! grep -q "^SYNC_API_SECRET=" .env || grep -q "^SYNC_API_SECRET=$" .env; then
     echo ""
-    read -r -p "Masukkan Shared Secret Sync dari Cloud VPS: " SHARED_SECRET_INPUT
+    read -r -p "Masukkan API Secret Sync (sama dengan Cloud VPS): " SHARED_SECRET_INPUT
     if [ -n "$SHARED_SECRET_INPUT" ]; then
-        update_env "SYNC_SHARED_SECRET" "$SHARED_SECRET_INPUT"
-        echo "✔ SYNC_SHARED_SECRET berhasil disimpan"
+        update_env "SYNC_API_SECRET" "$SHARED_SECRET_INPUT"
+        echo "✔ SYNC_API_SECRET berhasil disimpan"
     fi
 fi
 
@@ -110,7 +111,12 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
 echo "Memulai background queue worker & scheduler..."
-php artisan queue:work --queue=default,sync --sleep=3 --tries=3 > /dev/null 2>&1 &
+mkdir -p storage/logs
+php artisan queue:work --queue=default,sync --sleep=3 --tries=3 >> storage/logs/queue-worker.log 2>&1 &
+QUEUE_PID=$!
+php artisan schedule:work >> storage/logs/scheduler.log 2>&1 &
+SCHED_PID=$!
+trap 'kill $QUEUE_PID $SCHED_PID 2>/dev/null || true' EXIT
 
 echo "Memulai server lokal Bremspace ERP di port 8000..."
 php artisan serve --host=0.0.0.0 --port=8000

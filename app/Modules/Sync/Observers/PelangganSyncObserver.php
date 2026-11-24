@@ -3,51 +3,60 @@
 namespace App\Modules\Sync\Observers;
 
 use App\Modules\Crm\Models\Pelanggan;
-use App\Modules\Sync\Services\HybridSyncOutboxService;
-use Illuminate\Support\Facades\Log;
+use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
 
 class PelangganSyncObserver
 {
-    public function saved(Pelanggan $pelanggan): void
+    use SyncsModelEvents;
+
+    public function created(Pelanggan $pelanggan): void
     {
-        if (! config('sync.enabled')) {
-            return;
-        }
+        $this->enqueueSync($pelanggan);
+    }
 
-        try {
-            $payload = [
-                'id' => $pelanggan->id,
-                'nama' => $pelanggan->nama,
-                'username' => $pelanggan->username,
-                'telepon' => $pelanggan->telepon,
-                'email' => $pelanggan->email,
-                'alamat' => $pelanggan->alamat,
-                'tanggal_lahir' => $pelanggan->tanggal_lahir?->toDateString(),
-                'tier_membership_id' => $pelanggan->tier_membership_id,
-                'is_reseller' => (bool) $pelanggan->is_reseller,
-                'kode_agen' => $pelanggan->kode_agen,
-                'referral_kode' => $pelanggan->referral_kode,
-                'tipe_konsumen' => $pelanggan->tipe_konsumen,
-                'mode_reward_mitra' => $pelanggan->mode_reward_mitra,
-                'poin_loyalty' => $pelanggan->poin_loyalty,
-                'saldo_piutang' => $pelanggan->saldo_piutang,
-                'max_piutang' => $pelanggan->max_piutang,
-                'saldo_deposit' => $pelanggan->saldo_deposit,
-                'status' => $pelanggan->status,
-                'catatan_approval' => $pelanggan->catatan_approval,
-                'approved_at' => $pelanggan->approved_at,
-                'approved_by' => $pelanggan->approved_by,
-                'updated_at' => $pelanggan->updated_at?->toIso8601String(),
-            ];
+    public function updated(Pelanggan $pelanggan): void
+    {
+        $this->enqueueSync($pelanggan);
+    }
 
-            app(HybridSyncOutboxService::class)->enqueue(
-                'pelanggan.upsert',
-                $pelanggan,
-                $payload,
-                null
-            );
-        } catch (\Throwable $e) {
-            Log::warning('[HybridSync] Observer Pelanggan gagal: '.$e->getMessage());
-        }
+    private function enqueueSync(Pelanggan $pelanggan): void
+    {
+        $this->enqueueModelEvent(
+            $pelanggan,
+            'pelanggan.upsert',
+            function (Pelanggan $model): array {
+                $syncUuid = $this->ensureSyncUuid($model);
+                $model->loadMissing('tierMembership');
+
+                return [
+                    'id' => $model->id,
+                    'sync_uuid' => $syncUuid,
+                    'nama' => $model->nama,
+                    'username' => $model->username,
+                    'telepon' => $model->telepon,
+                    'email' => $model->email,
+                    'avatar' => $model->avatar,
+                    'alamat' => $model->alamat,
+                    'tanggal_lahir' => $this->formatDateString($model->getAttribute('tanggal_lahir')),
+                    'tier_membership_id' => $model->tier_membership_id,
+                    'tier_membership_kode' => $model->tierMembership?->getAttribute('kode'),
+                    'is_reseller' => (bool) ($model->is_reseller ?? false),
+                    'kode_agen' => $model->kode_agen,
+                    'referral_kode' => $model->referral_kode,
+                    'tipe_konsumen' => $model->tipe_konsumen ?? 'retail',
+                    'mode_reward_mitra' => $model->mode_reward_mitra,
+                    'total_belanja_12bulan' => (float) ($model->getAttribute('total_belanja_12bulan') ?? 0),
+                    'poin_loyalty' => (int) ($model->getAttribute('poin_loyalty') ?? 0),
+                    'saldo_piutang' => (float) ($model->getAttribute('saldo_piutang') ?? 0),
+                    'max_piutang' => $this->toNullableFloat($model, 'max_piutang'),
+                    'saldo_deposit' => (float) ($model->getAttribute('saldo_deposit') ?? 0),
+                    'status' => $model->status ?? 'aktif',
+                    'catatan_approval' => $model->catatan_approval,
+                    'approved_at' => $this->formatIso8601($model->getAttribute('approved_at')),
+                    'approved_by' => $model->approved_by,
+                ];
+            },
+            logLabel: 'PelangganSyncObserver'
+        );
     }
 }
