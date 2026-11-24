@@ -82,14 +82,11 @@
                     <div class="p-1.5 space-y-0.5">
                         @foreach($cartSearchSuggestions as $suggestion)
                             <div class="flex items-center gap-2 p-1.5 rounded-xl hover:bg-ink-50 dark:hover:bg-white/5 transition-colors">
-                                @if(!empty($suggestion['gambar']))
-                                    <button type="button"
-                                            @click="$dispatch('open-preview', '{{ $suggestion['gambar'] }}')"
-                                            class="w-8 h-8 shrink-0 rounded-lg bg-ink-50 dark:bg-ink-950 border border-ink-100 dark:border-white/10 overflow-hidden cursor-pointer"
-                                            title="Lihat gambar produk">
-                                        <img src="{{ $suggestion['gambar'] }}" alt="" class="w-full h-full object-contain" loading="lazy">
-                                    </button>
-                                @endif
+                                @include('modules.marketplace.livewire.partials.cart-product-thumb', [
+                                    'url' => $suggestion['gambar'] ?? null,
+                                    'nama' => $suggestion['nama'],
+                                    'class' => 'w-9 h-9',
+                                ])
 
                                 <div class="min-w-0 flex-1">
                                     <p class="text-[11px] font-bold leading-snug break-words text-ink-900 dark:text-white">{{ $suggestion['nama'] }}</p>

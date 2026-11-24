@@ -54,6 +54,11 @@ class CartService
                 $cart[$k]['gambar'] = $produk?->thumbnail_url ?: $produk?->gambar;
                 $needSave = true;
             }
+            $gambarPreview = $this->gambarPreviewProduk($produk);
+            if (($cart[$k]['gambar_preview'] ?? null) !== $gambarPreview) {
+                $cart[$k]['gambar_preview'] = $gambarPreview;
+                $needSave = true;
+            }
 
             // Info harga box dari master dipakai untuk iming-iming "beli box lebih murah"
             $infoBox = $this->infoBoxProduk($produk);
@@ -212,6 +217,7 @@ class CartService
     {
         $produk = Produk::findOrFail($produkId);
         $infoBox = $this->infoBoxProduk($produk);
+        $gambarPreview = $this->gambarPreviewProduk($produk);
         $cleanCatatan = $catatan ? trim($catatan) : null;
         $cleanSatuan = $satuan ? trim($satuan) : null;
         $key = $this->cartKey($produkId, $variantId, $cleanCatatan, $cleanSatuan);
@@ -277,6 +283,7 @@ class CartService
             'name' => $produk->nama,
             'sku' => $produk->sku,
             'gambar' => $produk->thumbnail_url ?: $produk->gambar,
+            'gambar_preview' => $gambarPreview,
             'variant_name' => $variant?->nama_varian,
             'satuan' => $cleanSatuan ?: $baseSatuan,
             'harga' => $hargaEfektif,
@@ -439,6 +446,26 @@ class CartService
     public function kosongkan(): void
     {
         Session::forget('shop.cart');
+    }
+
+    /**
+     * URL gambar full-size (utama) untuk preview.
+     */
+    private function gambarPreviewProduk(?Produk $produk): ?string
+    {
+        if (! $produk) {
+            return null;
+        }
+
+        foreach ($produk->galeri_foto as $foto) {
+            if (! empty($foto['is_primary']) && ! empty($foto['url'])) {
+                return (string) $foto['url'];
+            }
+        }
+
+        return ! empty($produk->gambar)
+            ? Produk::formatFotoUrl($produk->gambar)
+            : null;
     }
 
     /**
