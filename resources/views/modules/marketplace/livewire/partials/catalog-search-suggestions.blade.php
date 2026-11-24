@@ -2,6 +2,7 @@
     <div x-show="suggestionsOpen"
          x-cloak
          x-transition.opacity
+         x-ref="suggestionPanel"
          class="absolute left-0 right-0 top-full mt-2 z-[80] rounded-2xl bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10 shadow-2xl overflow-y-auto overscroll-contain"
          style="max-height: min(70vh, 420px); overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch;">
         <div class="sticky top-0 z-20 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-ink-400 bg-white dark:bg-ink-900 border-b border-ink-100 dark:border-white/5">
@@ -59,6 +60,23 @@
                 </a>
             @endforeach
         </div>
+
+        @if($suggestionHasMore)
+            <div x-ref="suggestionSentinel"
+                 x-init="initSuggestionScroll()"
+                 class="px-3 py-2 text-center border-t border-ink-100 dark:border-white/5">
+                <button type="button"
+                        wire:click="loadMoreSuggestions"
+                        wire:loading.attr="disabled"
+                        wire:target="loadMoreSuggestions"
+                        class="px-3 py-1.5 rounded-lg text-[10px] font-bold text-up-primary bg-up-primary/5 hover:bg-up-primary/10 cursor-pointer disabled:opacity-50">
+                    <span wire:loading.remove wire:target="loadMoreSuggestions">Muat lebih banyak hasil…</span>
+                    <span wire:loading wire:target="loadMoreSuggestions">Memuat…</span>
+                </button>
+                <p class="mt-1 text-[9px] text-ink-400">Gulir ke bawah untuk memuat otomatis</p>
+            </div>
+        @endif
+
         <button type="button"
                 @click="suggestionsOpen = false; document.getElementById('katalog-produk')?.scrollIntoView({ behavior: 'smooth' })"
                 class="sticky bottom-0 z-20 w-full px-3 py-2.5 text-[11px] font-bold text-up-primary bg-white dark:bg-ink-900 border-t border-ink-100 dark:border-white/5 hover:bg-up-primary/5 cursor-pointer">
