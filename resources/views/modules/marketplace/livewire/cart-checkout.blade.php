@@ -355,7 +355,7 @@
                     @endif
 
                     @if(!empty($rekomendasi))
-                        <div class="lg:hidden mt-8 border-t border-ink-100/80 dark:border-white/10 pt-5">
+                        <div class="mt-8 border-t border-ink-100/80 dark:border-white/10 pt-5">
                             <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white mb-3">Pilihan populer untuk Anda</h3>
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                                 @foreach($rekomendasi as $rec)
@@ -382,14 +382,14 @@
                     @endif
                 </div>
             @else
-                <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-3 sm:p-4 lg:p-7 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-2 lg:space-y-4">
+                <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-3 sm:p-4 lg:p-7 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-2">
                     <div class="space-y-4">
                         @foreach($cart as $itemKey => $item)
                             @php $tampil = $hargaTampilan[$itemKey] ?? []; @endphp
-                            <div class="py-2 sm:py-2.5 lg:py-3.5 border-b border-ink-100/70 dark:border-white/[0.06] last:border-0 min-w-0 w-full lg:flex lg:items-center lg:justify-between lg:gap-4">
+                            <div class="py-2 sm:py-2.5 border-b border-ink-100/70 dark:border-white/[0.06] last:border-0 min-w-0 w-full lg:flex lg:items-center lg:justify-between lg:gap-4">
                                 <div class="flex items-start gap-2 sm:gap-3 lg:flex-1 lg:items-center">
                                     @if(!empty($item['gambar']))
-                                        <button type="button" @click.prevent="$dispatch('open-preview', '{{ $item['gambar'] }}')" class="lg:hidden w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg bg-ink-50 dark:bg-ink-950 border border-ink-100 dark:border-white/10 overflow-hidden cursor-pointer" title="Lihat gambar produk">
+                                        <button type="button" @click.prevent="$dispatch('open-preview', '{{ $item['gambar'] }}')" class="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg bg-ink-50 dark:bg-ink-950 border border-ink-100 dark:border-white/10 overflow-hidden cursor-pointer" title="Lihat gambar produk">
                                             <img src="{{ $item['gambar'] }}" alt="{{ $item['name'] }}" class="w-full h-full object-contain" loading="lazy">
                                         </button>
                                     @endif
@@ -397,7 +397,7 @@
                                         <h4 class="text-[11px] sm:text-xs lg:text-sm font-bold leading-snug break-words text-ink-900 dark:text-white">{{ $item['name'] }}</h4>
                                         <div class="flex items-center gap-1.5 flex-wrap text-[10px] sm:text-[11px]">
                                             @if(!empty($item['sku']))
-                                                <span class="lg:hidden font-mono text-ink-400">{{ $item['sku'] }}</span>
+                                                <span class="font-mono text-ink-400">{{ $item['sku'] }}</span>
                                             @endif
                                             <span class="font-bold px-1.5 py-0.5 rounded bg-ink-100 dark:bg-white/5 text-ink-500 dark:text-ink-300">PCS</span>
                                             @if(!empty($item['breakdown']))
@@ -485,7 +485,7 @@
                                     </div>
 
                                     <div class="text-right sm:w-32 min-w-0 space-y-0.5">
-                                        <span class="lg:hidden block text-[9px] sm:text-[10px] text-ink-400 tabular-nums whitespace-nowrap">
+                                        <span class="block text-[9px] sm:text-[10px] text-ink-400 tabular-nums whitespace-nowrap">
                                             @
                                             @if(($tampil['potongan_per_pcs'] ?? 0) > 0)
                                                 <span class="line-through">Rp {{ number_format((float) $tampil['asli_per_pcs'], 0, ',', '.') }}</span>
@@ -520,7 +520,7 @@
 
                     <div class="pt-4 sm:pt-5 lg:pt-6 border-t border-ink-100/80 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                         <div class="w-full sm:w-auto">
-                            <div class="flex items-baseline justify-between sm:block lg:hidden">
+                            <div class="flex items-baseline justify-between sm:block">
                                 <div>
                                     <div class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Total belanja</div>
                                     <div class="text-2xl font-black text-up-primary tabular-nums">
@@ -530,7 +530,7 @@
                                 <span class="text-[10px] text-ink-400">{{ $jumlahItem }} suku cadang</span>
                             </div>
 
-                            <details class="lg:hidden mt-2 rounded-2xl bg-ink-50/70 dark:bg-white/[0.03] border border-ink-200/70 dark:border-white/5 overflow-hidden">
+                            <details class="mt-2 rounded-2xl bg-ink-50/70 dark:bg-white/[0.03] border border-ink-200/70 dark:border-white/5 overflow-hidden">
                                 <summary class="px-3 py-2 text-[11px] font-bold text-ink-600 dark:text-ink-300 cursor-pointer select-none flex items-center justify-between">
                                     <span>Detail harga</span>
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
@@ -577,7 +577,7 @@
                                 </div>
                             </details>
 
-                            <div class="hidden lg:block text-xs text-ink-500 dark:text-ink-400">
+                            <div class="hidden text-xs text-ink-500 dark:text-ink-400">
                                 Total pesanan terhitung untuk <strong class="text-ink-900 dark:text-white">{{ $jumlahItem }} suku cadang</strong>
                                 @if(($potonganKemasan ?? 0) > 0)
                                     <div class="mt-1 text-up-mint font-bold text-[11px]">
@@ -603,7 +603,7 @@
                                 @endif
                             </div>
                         </div>
-                        <div class="hidden lg:flex flex-col items-end gap-1">
+                        <div class="hidden flex-col items-end gap-1">
                             @if(($potonganKemasan ?? 0) > 0 || ($potonganMember ?? 0) > 0)
                                 <div class="flex items-center gap-2 text-xs text-ink-500">
                                     <span>Subtotal Retail:</span>
@@ -649,20 +649,8 @@
                     </div>
                 </div>
 
-                <div class="hidden lg:flex justify-end pt-2">
-                    <button
-                        type="button"
-                        wire:click="lanjutCheckout"
-                        class="w-full sm:w-auto px-6 sm:px-10 py-3.5 sm:py-4 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs sm:text-sm shadow-sm shadow-up-primary/25 transition-[background-color,transform] duration-140 cursor-pointer active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2">
-                        <span>Lanjutkan ke Pengambilan & Pembayaran</span>
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
-                    </button>
-                </div>
-
-                <!-- Mobile/tablet sticky checkout bar -->
-                <div class="lg:hidden fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-40 pointer-events-none">
+                <!-- Sticky checkout bar (mobile/tablet/desktop) -->
+                <div class="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-40 pointer-events-none">
                     <div class="max-w-4xl mx-auto px-4 sm:px-6">
                         <button
                             type="button"
