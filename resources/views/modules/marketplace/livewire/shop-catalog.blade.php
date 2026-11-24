@@ -121,7 +121,7 @@
             this.viewMode = mode;
             try { localStorage.setItem('ute-shop-view-mode', mode); } catch (e) {}
         }
-     }
+     }"
      @open-preview.window="setPreview($event.detail)"
      @keydown.escape.window="closePreview()">
     <!-- MOBILE/TABLET: search-first bar + quick HP chips -->
