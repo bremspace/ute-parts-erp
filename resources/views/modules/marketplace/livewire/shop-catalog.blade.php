@@ -1103,7 +1103,7 @@
                                 <div class="flex items-center justify-between gap-1 mt-1 sm:mt-1.5 text-[9px] sm:text-[10px] min-w-0">
                                     <span class="inline-flex items-center gap-1.5 font-medium truncate {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500 font-semibold' : 'text-up-mint') : 'text-up-red' }}">
                                         <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                                        <span class="truncate">{{ $stockInfo['label'] }}</span>
+                                        <span class="truncate">{{ $stockInfo['is_available'] ? 'Ready' : $stockInfo['label'] }}</span>
                                     </span>
                                     @if(($webConfig['show_sold_counter'] ?? true) && (int) ($p->total_terjual ?? 0) > 0)
                                         <span class="text-ink-400 tabular-nums hidden xs:inline flex-shrink-0">{{ $p->total_terjual }} terjual</span>
@@ -1197,7 +1197,7 @@
                             </div>
                             <div class="inline-flex items-center gap-1.5 text-[11px] font-semibold {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500' : 'text-up-mint') : 'text-up-red' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                                <span>{{ $stockInfo['label'] }}</span>
+                                <span>{{ $stockInfo['is_available'] ? 'Ready' : $stockInfo['label'] }}</span>
                             </div>
                         </div>
 
@@ -1267,11 +1267,12 @@
                         <div class="w-full lg:w-auto flex items-center justify-between lg:justify-end gap-2 sm:gap-3 lg:gap-4 flex-shrink-0 text-right pl-4 lg:pl-0">
                             <div class="flex items-center gap-2 text-left min-w-0">
                                 <span class="text-[9px] sm:text-[10px] font-semibold {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500' : 'text-up-mint') : 'text-up-red' }}">
-                                    {{ $stockInfo['label'] }}
+                                    {{ $stockInfo['is_available'] ? 'Ready' : $stockInfo['label'] }}
                                 </span>
                                 @if($thumbImg)
-                                    <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="inline-flex text-[9px] sm:text-[10px] font-semibold text-up-primary hover:underline cursor-pointer" title="Lihat gambar produk">
-                                        <span class="lg:hidden">Gambar</span><span class="hidden lg:inline">Lihat gambar</span>
+                                    <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="inline-flex items-center text-[9px] sm:text-[10px] font-semibold text-up-primary hover:underline cursor-pointer shrink-0" title="Lihat gambar produk">
+                                        <img src="{{ $thumbImg }}" alt="" loading="lazy" class="w-6 h-6 sm:w-7 sm:h-7 rounded-md border border-ink-200/80 dark:border-white/10 bg-white dark:bg-ink-950 object-contain lg:hidden">
+                                        <span class="hidden lg:inline">Lihat gambar</span>
                                     </button>
                                 @endif
                             </div>

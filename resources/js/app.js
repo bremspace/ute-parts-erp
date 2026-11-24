@@ -66,9 +66,10 @@ function showToast(message, type = 'info', options = {}) {
     }
 
     const title = options.title || (type === 'error' ? 'Peringatan / Error' : (type === 'warning' ? 'Perhatian' : (type === 'success' ? 'Sukses' : 'Notifikasi')));
-    const isUnprocessed = options.unprocessed ?? (type === 'warning' || type === 'error' || type === 'approval' || Boolean(options.actionUrl));
+    const actionCallback = typeof options.actionCallback === 'function' ? options.actionCallback : null;
     const actionUrl = options.actionUrl || null;
-    const actionLabel = options.actionLabel || (actionUrl ? 'Buka / Proses' : null);
+    const actionLabel = options.actionLabel || ((actionUrl || actionCallback) ? 'Buka / Proses' : null);
+    const isUnprocessed = options.unprocessed ?? (type === 'warning' || type === 'error' || type === 'approval' || Boolean(actionUrl));
 
     const colors = {
         success: {
@@ -130,7 +131,12 @@ function showToast(message, type = 'info', options = {}) {
             <span>${actionLabel}</span>
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
         </a>
-    ` : '';
+    ` : (actionCallback ? `
+        <button type="button" data-toast-action class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-up-primary hover:bg-indigo-500 shadow-md shadow-up-primary/30 transition-all duration-150 cursor-pointer">
+            <span>${actionLabel}</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </button>
+    ` : '');
 
     toast.innerHTML = `
         <div class="flex items-start gap-3">
@@ -162,6 +168,14 @@ function showToast(message, type = 'info', options = {}) {
         setTimeout(() => toast.remove(), 250);
     };
     closeBtn.addEventListener('click', dismiss);
+
+    const actionBtn = toast.querySelector('[data-toast-action]');
+    if (actionBtn && actionCallback) {
+        actionBtn.addEventListener('click', () => {
+            actionCallback();
+            dismiss();
+        });
+    }
 
     container.appendChild(toast);
     requestAnimationFrame(() => {
@@ -206,6 +220,21 @@ document.addEventListener('livewire:init', () => {
             sound: data?.sound ?? true,
             unprocessed: data?.unprocessed ?? false,
             actionUrl: data?.actionUrl || null
+        });
+    });
+
+    Livewire.on('cart-removed', (payload) => {
+        const data = Array.isArray(payload) ? (payload[0] || {}) : (payload || {});
+        showToast(data?.message || 'Produk dihapus dari keranjang', 'success', {
+            title: 'Keranjang',
+            unprocessed: false,
+            sound: false,
+            actionLabel: 'Undo',
+            actionCallback: () => {
+                if (window.Livewire) {
+                    window.Livewire.dispatch('undoHapus');
+                }
+            }
         });
     });
 });

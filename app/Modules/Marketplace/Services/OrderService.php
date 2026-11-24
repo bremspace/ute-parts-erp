@@ -59,6 +59,9 @@ class OrderService
                 // mengonversi qty satuan terpilih ke base sebelum checkout.
                 $qtyDasar = (int) $item['jumlah'];
                 $variant = isset($item['sku_variant_id']) ? SkuVariant::find($item['sku_variant_id']) : null;
+                $hargaRetailSatuan = $variant && $variant->harga_jual_retail !== null
+                    ? (float) $variant->harga_jual_retail
+                    : (float) $produk->harga_jual_retail;
 
                 // Checkout harus memakai stok cabang order, bukan agregat semua cabang.
                 // Stok dihitung dengan mengunci baris stok, dikurangi pending transfer lock dan active online reservation.
@@ -118,6 +121,7 @@ class OrderService
                         'harga_satuan' => $harga,
                         'diskon_nominal' => $diskonItem,
                         'potensi_komisi' => $komisiItem,
+                        'harga_retail' => $hargaRetailSatuan,
                         'hpp' => $hppBase,
                         'subtotal' => $lineSubtotal,
                         'catatan' => $catatan,
@@ -156,6 +160,7 @@ class OrderService
                         'harga_satuan' => $hargaPerSatuan,
                         'diskon_nominal' => $boxDiskon,
                         'potensi_komisi' => $boxKomisi,
+                        'harga_retail' => $hargaRetailSatuan,
                         'hpp' => $hppBase * $konversi,
                         'subtotal' => $boxSubtotal,
                         'catatan' => $catatan,
@@ -171,6 +176,7 @@ class OrderService
                             'harga_satuan' => $pcsPrice,
                             'diskon_nominal' => round($diskonItem - $boxDiskon, 2),
                             'potensi_komisi' => round($komisiItem - $boxKomisi, 2),
+                            'harga_retail' => $hargaRetailSatuan,
                             'hpp' => $hppBase,
                             'subtotal' => round($lineSubtotal - $boxSubtotal, 2),
                             'catatan' => $catatan,
@@ -197,6 +203,7 @@ class OrderService
                         'harga_satuan' => $hargaPerSatuan,
                         'diskon_nominal' => $diskonItem,
                         'potensi_komisi' => $komisiItem,
+                        'harga_retail' => $hargaRetailSatuan,
                         'hpp' => $hppBase * $konversi,
                         'subtotal' => $lineSubtotal,
                         'catatan' => $catatan,
@@ -223,6 +230,7 @@ class OrderService
                         'harga_satuan' => $hargaPerSatuan,
                         'diskon_nominal' => $boxDiskon,
                         'potensi_komisi' => $boxKomisi,
+                        'harga_retail' => $hargaRetailSatuan,
                         'hpp' => $hppBase * $konversi,
                         'subtotal' => $boxSubtotal,
                         'catatan' => $catatan,
@@ -238,6 +246,7 @@ class OrderService
                     'harga_satuan' => round($harga, 2),
                     'diskon_nominal' => round($diskonItem - $boxDiskon, 2),
                     'potensi_komisi' => round($komisiItem - $boxKomisi, 2),
+                    'harga_retail' => $hargaRetailSatuan,
                     'hpp' => $hppBase,
                     'subtotal' => round($lineSubtotal - $boxSubtotal, 2),
                     'catatan' => $catatan,
@@ -298,6 +307,7 @@ class OrderService
                     'satuan' => $row['satuan'],
                     'konversi' => $row['konversi'],
                     'harga_satuan' => $row['harga_satuan'],
+                    'harga_retail' => $row['harga_retail'] ?? null,
                     'diskon_nominal' => $row['diskon_nominal'],
                     'subtotal' => $row['subtotal'],
                     'hpp' => $row['hpp'],

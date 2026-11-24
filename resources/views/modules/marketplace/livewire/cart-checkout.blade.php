@@ -1,4 +1,7 @@
-<div class="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+<div class="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-5 lg:py-10"
+     x-data="{ cartPreview: null }"
+     @open-preview.window="cartPreview = Array.isArray($event.detail) ? $event.detail[0] : $event.detail"
+     @keydown.escape.window="cartPreview = null">
     @if($orderSuccess)
         <!-- ===== ORDER SUCCESS (Clean Editorial Receipt) ===== -->
         <div class="max-w-lg mx-auto text-center py-12 space-y-6">
@@ -51,7 +54,7 @@
         </div>
     @elseif($mode === 'checkout')
         <!-- ===== CHECKOUT (Refined Clean 2-Column or Stacked Summary) ===== -->
-        <div class="space-y-6">
+        <div class="space-y-4 sm:space-y-5 lg:space-y-6">
             <div class="flex items-center justify-between pb-2">
                 <div>
                     <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-ink-900 dark:text-white">Penyelesaian Pesanan</h1>
@@ -162,7 +165,8 @@
                         <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-5 sm:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-4">
                             <span class="text-xs font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">Rincian Belanja</span>
                             <div class="space-y-3 max-h-72 overflow-y-auto pr-1">
-                                @foreach($cart as $item)
+                                @foreach($cart as $itemKey => $item)
+                                    @php $tampil = $hargaTampilan[$itemKey] ?? []; @endphp
                                     <div class="flex items-center justify-between gap-3 py-2 border-b border-ink-100/60 dark:border-white/[0.06] last:border-0">
                                         <div class="min-w-0 space-y-0.5">
                                             <p class="text-xs font-bold text-ink-900 dark:text-white truncate">{{ $item['name'] }}</p>
@@ -173,36 +177,33 @@
                                             @endif
                                             <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
                                                 <span class="text-ink-400 font-semibold">
-                                                    @if(($item['satuan'] ?? 'pcs') !== 'pcs')
-                                                        @if(!empty($item['breakdown']))
-                                                            {{ $item['breakdown'] }}
-                                                        @else
-                                                            {{ (int) ($item['qty_satuan'] ?? 1) }} {{ $item['satuan'] }}
-                                                        @endif
-                                                        ({{ $item['qty'] }} pcs) × Rp {{ number_format((float) ($item['harga_satuan'] ?? $item['harga'] ?? 0), 0, ',', '.') }}
-                                                        @php
-                                                            $boxSaving = 0;
-                                                            if (isset($item['harga_satuan']) && isset($item['harga']) && (float)($item['faktor_konversi'] ?? 1) > 0) {
-                                                                $boxSaving = max(0, round(((float) $item['harga'] * (float) ($item['faktor_konversi'] ?? 1)) - (float) $item['harga_satuan'], 2));
-                                                            }
-                                                        @endphp
-                                                        @if($boxSaving > 0)
-                                                            <span class="text-[9px] text-up-mint font-bold">(hemat Rp {{ number_format($boxSaving, 0, ',', '.') }} / {{ $item['satuan'] }})</span>
-                                                        @endif
-                                                    @else
-                                                        {{ $item['qty'] }} × Rp {{ number_format((float) ($item['harga'] ?? 0), 0, ',', '.') }}
+                                                    {{ (int) ($tampil['qty_pcs'] ?? $item['qty']) }} pcs ×
+                                                    <span class="line-through text-ink-400 tabular-nums">Rp {{ number_format((float) ($tampil['asli_per_pcs'] ?? 0), 0, ',', '.') }}</span>
+                                                    @if(($tampil['potongan_per_pcs'] ?? 0) > 0)
+                                                        <span class="text-up-mint font-bold tabular-nums">Rp {{ number_format((float) $tampil['akhir_per_pcs'], 0, ',', '.') }}/PCS</span>
                                                     @endif
                                                 </span>
-                                                @if(!empty($item['diskon_tier']) && (float) $item['diskon_tier'] > 0)
-                                                    <span class="line-through text-ink-400 text-[10px]">Rp {{ number_format($item['harga_retail'], 0, ',', '.') }}</span>
+                                                @if(!empty($item['breakdown']))
+                                                    <span class="px-1.5 py-0.2 rounded bg-up-mint/10 text-up-mint text-[9px] font-bold" title="Box penuh pakai harga box, sisa pcs pakai harga retail">
+                                                        {{ $item['breakdown'] }}
+                                                    </span>
+                                                @endif
+                                                @if(($tampil['potongan_total'] ?? 0) > 0)
                                                     <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-black">
-                                                        -Rp {{ number_format($item['diskon_tier'], 0, ',', '.') }}
+                                                        {{ $tampil['label'] }} -Rp {{ number_format((float) $tampil['potongan_total'], 0, ',', '.') }}
                                                     </span>
                                                 @endif
                                             </div>
                                         </div>
-                                        <div class="text-xs font-bold text-ink-900 dark:text-white tabular-nums flex-shrink-0">
-                                            Rp {{ number_format($item['harga'] * $item['qty'], 0, ',', '.') }}
+                                        <div class="text-right flex-shrink-0">
+                                            @if(($tampil['potongan_total'] ?? 0) > 0)
+                                                <div class="text-[9px] text-ink-400 line-through tabular-nums">
+                                                    Rp {{ number_format((float) $tampil['asli_total'], 0, ',', '.') }}
+                                                </div>
+                                            @endif
+                                            <div class="text-xs font-bold text-ink-900 dark:text-white tabular-nums">
+                                                Rp {{ number_format((float) ($tampil['akhir_total'] ?? ($item['harga'] * $item['qty'])), 0, ',', '.') }}
+                                            </div>
                                         </div>
                                     </div>
                                 @endforeach
@@ -214,10 +215,18 @@
                                         <span>Subtotal Retail</span>
                                         <span class="tabular-nums line-through">Rp {{ number_format($subtotalRetail, 0, ',', '.') }}</span>
                                     </div>
-                                    <div class="flex justify-between items-center text-up-mint font-semibold">
-                                        <span>Diskon / Box ({{ $pelanggan->tierMembership?->nama ?? ($pelanggan->tipe_konsumen === 'reseller' ? 'Reseller' : 'Member') }})</span>
-                                        <span class="tabular-nums">- Rp {{ number_format($diskonTier, 0, ',', '.') }}</span>
-                                    </div>
+                                    @if(($potonganKemasan ?? 0) > 0)
+                                        <div class="flex justify-between items-center text-up-mint font-semibold">
+                                            <span>Potongan Kemasan / Per Box</span>
+                                            <span class="tabular-nums">- Rp {{ number_format($potonganKemasan, 0, ',', '.') }}</span>
+                                        </div>
+                                    @endif
+                                    @if(($potonganMember ?? 0) > 0)
+                                        <div class="flex justify-between items-center text-up-mint font-semibold">
+                                            <span>Potongan Member ({{ $pelanggan->tierMembership?->nama ?? ($pelanggan->tipe_konsumen === 'reseller' ? 'Reseller' : 'Member') }})</span>
+                                            <span class="tabular-nums">- Rp {{ number_format($potonganMember, 0, ',', '.') }}</span>
+                                        </div>
+                                    @endif
                                     <div class="flex justify-between items-center text-ink-700 dark:text-ink-300 font-bold pt-1 border-t border-ink-100/60 dark:border-white/5">
                                         <span>Subtotal Bersih</span>
                                         <span class="tabular-nums text-ink-900 dark:text-white">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
@@ -257,9 +266,14 @@
                                 </div>
                             </div>
 
-                            @if(($diskonTier ?? 0) > 0)
+                            @if(($potonganKemasan ?? 0) > 0)
                                 <div class="p-2.5 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-center text-xs font-bold text-up-mint">
-                                    🎉 Anda menghemat Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan harga khusus member!
+                                    📦 Anda menghemat Rp {{ number_format($potonganKemasan, 0, ',', '.') }} dari potongan kemasan / per box.
+                                </div>
+                            @endif
+                            @if(($potonganMember ?? 0) > 0)
+                                <div class="p-2.5 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-center text-xs font-bold text-up-mint">
+                                    🎉 Anda menghemat Rp {{ number_format($potonganMember, 0, ',', '.') }} dari potongan member.
                                 </div>
                             @endif
 
@@ -319,14 +333,9 @@
         <div class="space-y-6">
             <div class="flex items-center justify-between pb-2">
                 <div>
-                    <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-ink-900 dark:text-white">Keranjang Belanja</h1>
+                    <h1 class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-ink-900 dark:text-white">Keranjang Belanja</h1>
                     <p class="text-xs text-ink-500 dark:text-ink-400">Periksa suku cadang sebelum melanjutkan ke proses pengambilan.</p>
                 </div>
-                @if(count($cart) > 0)
-                    <a href="{{ url('/') }}" class="text-xs font-semibold text-up-primary hover:underline">
-                        + Tambah Produk Lain
-                    </a>
-                @endif
             </div>
 
             @if(count($cart) === 0)
@@ -337,82 +346,168 @@
                         description="Cari layar LCD, baterai pengganti, atau pesan jasa servis teknisi profesional."
                     >
                         <x-slot:action>
-                            <x-ui.button href="{{ url('/') }}" variant="primary">
-                                Jelajahi Katalog Sparepart
-                            </x-ui.button>
+                            <span class="text-[10px] text-ink-400">Gunakan pencarian di bawah untuk menambah produk.</span>
                         </x-slot:action>
                     </x-ui.empty-state>
+
+                    @if($mode === 'cart')
+                        @include('modules.marketplace.livewire.partials.cart-quick-search')
+                    @endif
+
+                    @if(!empty($rekomendasi))
+                        <div class="lg:hidden mt-8 border-t border-ink-100/80 dark:border-white/10 pt-5">
+                            <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white mb-3">Pilihan populer untuk Anda</h3>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                @foreach($rekomendasi as $rec)
+                                    <button type="button"
+                                            wire:click="tambahRekomendasi({{ $rec['id'] }})"
+                                            wire:loading.attr="disabled"
+                                            class="text-left rounded-2xl border border-ink-200/80 dark:border-white/10 bg-white dark:bg-ink-900 p-2 hover:border-up-primary/50 transition-colors cursor-pointer active:scale-[0.98] flex flex-col gap-2 disabled:opacity-50">
+                                        <span class="w-full aspect-square rounded-xl bg-ink-50 dark:bg-ink-950 overflow-hidden flex items-center justify-center">
+                                            @if($rec['gambar'])
+                                                <img src="{{ $rec['gambar'] }}" alt="" class="w-full h-full object-contain" loading="lazy">
+                                            @else
+                                                <svg class="w-6 h-6 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                                            @endif
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block text-[11px] font-bold text-ink-900 dark:text-white leading-snug line-clamp-2 break-words">{{ $rec['nama'] }}</span>
+                                            <span class="block text-[10px] text-ink-400 font-mono truncate">{{ $rec['sku'] ?: '-' }}</span>
+                                            <span class="block text-[11px] font-black text-up-primary tabular-nums mt-0.5">Rp {{ number_format($rec['harga'], 0, ',', '.') }}</span>
+                                        </span>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @else
-                <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-5 sm:p-7 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-4">
+                <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-3 sm:p-4 lg:p-7 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-2 lg:space-y-4">
                     <div class="space-y-4">
                         @foreach($cart as $itemKey => $item)
-                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 py-3.5 border-b border-ink-100/70 dark:border-white/[0.06] last:border-0 min-w-0 w-full">
-                                <div class="flex items-center gap-3 min-w-0 w-full sm:flex-1">
-                                    <button
-                                        type="button"
-                                        wire:click.prevent="hapus('{{ $itemKey }}')"
-                                        class="w-7 h-7 rounded-xl bg-ink-100/60 dark:bg-white/5 text-ink-400 hover:text-up-red hover:bg-up-red/10 flex items-center justify-center text-xs transition-colors cursor-pointer flex-shrink-0"
-                                        title="Hapus dari keranjang">
-                                        ✕
-                                    </button>
-                                    <div class="min-w-0 flex-1 space-y-0.5">
-                                        <h4 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white truncate">{{ $item['name'] }}</h4>
-                                        <div class="flex items-center gap-2 flex-wrap text-[11px]">
-                                            <span class="text-ink-500 dark:text-ink-400">
-                                                {{ $item['variant_name'] ?? 'Standar' }}
-                                                @if(!empty($item['satuan']))
-                                                    <span class="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-ink-300 border border-white/10">Satuan: {{ $item['satuan'] }}</span>
-                                                @endif
-                                                @if($item['alasan_harga'] !== 'Harga Retail Standar')
-                                                    <span class="text-up-mint font-medium">• {{ $item['alasan_harga'] }}</span>
-                                                @endif
-                                            </span>
+                            @php $tampil = $hargaTampilan[$itemKey] ?? []; @endphp
+                            <div class="py-2 sm:py-2.5 lg:py-3.5 border-b border-ink-100/70 dark:border-white/[0.06] last:border-0 min-w-0 w-full lg:flex lg:items-center lg:justify-between lg:gap-4">
+                                <div class="flex items-start gap-2 sm:gap-3 lg:flex-1 lg:items-center">
+                                    @if(!empty($item['gambar']))
+                                        <button type="button" @click.prevent="$dispatch('open-preview', '{{ $item['gambar'] }}')" class="lg:hidden w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg bg-ink-50 dark:bg-ink-950 border border-ink-100 dark:border-white/10 overflow-hidden cursor-pointer" title="Lihat gambar produk">
+                                            <img src="{{ $item['gambar'] }}" alt="{{ $item['name'] }}" class="w-full h-full object-contain" loading="lazy">
+                                        </button>
+                                    @endif
+                                    <div class="min-w-0 flex-1 space-y-1">
+                                        <h4 class="text-[11px] sm:text-xs lg:text-sm font-bold leading-snug break-words text-ink-900 dark:text-white">{{ $item['name'] }}</h4>
+                                        <div class="flex items-center gap-1.5 flex-wrap text-[10px] sm:text-[11px]">
+                                            @if(!empty($item['sku']))
+                                                <span class="lg:hidden font-mono text-ink-400">{{ $item['sku'] }}</span>
+                                            @endif
+                                            <span class="font-bold px-1.5 py-0.5 rounded bg-ink-100 dark:bg-white/5 text-ink-500 dark:text-ink-300">PCS</span>
+                                            @if(!empty($item['breakdown']))
+                                                <span class="px-1.5 py-0.5 rounded bg-up-mint/10 text-up-mint font-bold" title="Box penuh pakai harga box, sisa pcs pakai harga retail">
+                                                    {{ $item['breakdown'] }}
+                                                </span>
+                                            @endif
+                                            @if(($tampil['potongan_box'] ?? 0) > 0 && ! ($tampil['is_kemasan'] ?? false))
+                                                <button
+                                                    type="button"
+                                                    wire:click="updateQty('{{ $itemKey }}', {{ (int) ($tampil['box_faktor'] ?? 10) }})"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="updateQty('{{ $itemKey }}', {{ (int) ($tampil['box_faktor'] ?? 10) }})"
+                                                    class="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 font-bold border border-amber-200/70 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                                                    title="Klik untuk ubah ke 1 box">
+                                                    💡 Beli 1 box ({{ (int) $tampil['box_faktor'] }} pcs) hemat Rp {{ number_format((float) $tampil['potongan_box'], 0, ',', '.') }}
+                                                </button>
+                                            @endif
+                                            @if(($tampil['is_kemasan'] ?? false))
+                                                <span class="text-up-mint font-medium">• Harga Kemasan</span>
+                                            @elseif($item['alasan_harga'] !== 'Harga Retail Standar')
+                                                <span class="text-up-mint font-medium">• {{ $item['alasan_harga'] }}</span>
+                                            @endif
+                                            @if(!empty($item['variant_name']))
+                                                <span class="text-ink-400 hidden lg:inline">• {{ $item['variant_name'] }}</span>
+                                            @endif
                                             @if(!empty($item['catatan']))
-                                                <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-up-primary/10 text-up-primary dark:bg-up-primary/20 dark:text-white border border-up-primary/20">
-                                                    <span>📱 {{ $item['catatan'] }}</span>
+                                                <span class="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-md bg-up-primary/10 text-up-primary dark:bg-up-primary/20 dark:text-white border border-up-primary/20">
+                                                    📱 {{ $item['catatan'] }}
                                                 </span>
                                             @endif
                                         </div>
                                     </div>
+                                    <button
+                                        type="button"
+                                        wire:click.prevent="hapus('{{ $itemKey }}')"
+                                        class="hidden lg:flex w-9 h-9 rounded-xl bg-ink-100/60 dark:bg-white/5 text-ink-400 hover:text-up-red hover:bg-up-red/10 items-center justify-center text-xs transition-colors cursor-pointer flex-shrink-0"
+                                        title="Hapus dari keranjang">
+                                        ✕
+                                    </button>
                                 </div>
 
-                                <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-5 w-full sm:w-auto min-w-0">
+                                <div class="mt-2 lg:mt-0 flex items-center justify-between sm:justify-end gap-3 sm:gap-5 w-full sm:w-auto min-w-0">
                                     <!-- Stepper button & manual input -->
-                                    <div class="flex items-center bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 rounded-2xl p-1 flex-shrink-0">
-                                        <button
-                                            type="button"
-                                            wire:click="updateQty('{{ $itemKey }}', {{ max(1, $item['qty'] - 1) }})"
-                                            class="w-7 h-7 rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
-                                            −
-                                        </button>
+                                    <div class="flex items-center bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 rounded-xl sm:rounded-2xl p-0.5 sm:p-1 flex-shrink-0" wire:loading.class="opacity-50">
+                                        @if((int) $item['qty'] <= 1)
+                                            <button
+                                                type="button"
+                                                wire:click.prevent="hapus('{{ $itemKey }}')"
+                                                wire:confirm="Hapus produk dari keranjang?"
+                                                class="lg:hidden w-8 h-8 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-white dark:bg-ink-900 hover:bg-up-red/10 hover:text-up-red font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs"
+                                                title="Hapus dari keranjang">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                wire:click="updateQty('{{ $itemKey }}', 1)"
+                                                wire:loading.attr="disabled"
+                                                class="hidden lg:flex w-7 h-7 rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
+                                                −
+                                            </button>
+                                        @else
+                                            <button
+                                                type="button"
+                                                wire:click="updateQty('{{ $itemKey }}', {{ (int) $item['qty'] - 1 }})"
+                                                wire:loading.attr="disabled"
+                                                class="w-8 h-8 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
+                                                −
+                                            </button>
+                                        @endif
                                         <input
                                             type="number"
                                             min="1"
+                                            max="{{ (int) ($item['stok_max'] ?? 9999) }}"
                                             value="{{ $item['qty'] }}"
                                             wire:change="updateQty('{{ $itemKey }}', $event.target.value)"
-                                            class="w-10 text-center font-bold text-xs text-ink-900 dark:text-white bg-transparent outline-none border-0 focus:ring-0 p-0 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            wire:loading.attr="disabled"
+                                            class="w-8 sm:w-10 text-center font-bold text-xs text-ink-900 dark:text-white bg-transparent outline-none border-0 focus:ring-0 p-0 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             aria-label="Jumlah pesanan"
                                         />
                                         <button
                                             type="button"
-                                            wire:click="updateQty('{{ $itemKey }}', {{ $item['qty'] + 1 }})"
-                                            class="w-7 h-7 rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
+                                            wire:click="updateQty('{{ $itemKey }}', {{ (int) $item['qty'] + 1 }})"
+                                            wire:loading.attr="disabled"
+                                            class="w-8 h-8 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
                                             +
                                         </button>
                                     </div>
 
                                     <div class="text-right sm:w-32 min-w-0 space-y-0.5">
-                                        <span class="text-xs sm:text-sm font-black text-ink-900 dark:text-white tabular-nums block truncate">
-                                            Rp {{ number_format($item['harga'] * $item['qty'], 0, ',', '.') }}
+                                        <span class="lg:hidden block text-[9px] sm:text-[10px] text-ink-400 tabular-nums whitespace-nowrap">
+                                            @
+                                            @if(($tampil['potongan_per_pcs'] ?? 0) > 0)
+                                                <span class="line-through">Rp {{ number_format((float) $tampil['asli_per_pcs'], 0, ',', '.') }}</span>
+                                                <span class="text-up-mint font-bold">Rp {{ number_format((float) $tampil['akhir_per_pcs'], 0, ',', '.') }}</span>
+                                            @else
+                                                Rp {{ number_format((float) ($tampil['akhir_per_pcs'] ?? $item['harga']), 0, ',', '.') }}
+                                            @endif
+                                            /PCS
                                         </span>
-                                        @if(!empty($item['diskon_tier']) && (float) $item['diskon_tier'] > 0)
-                                            <div class="flex items-center justify-end gap-1 text-[10px]">
+                                        <span class="text-xs sm:text-sm font-black text-ink-900 dark:text-white tabular-nums block whitespace-nowrap">
+                                            Rp {{ number_format((float) ($tampil['akhir_total'] ?? ($item['harga'] * $item['qty'])), 0, ',', '.') }}
+                                        </span>
+                                        @if(($tampil['potongan_total'] ?? 0) > 0)
+                                            <div class="flex items-center justify-end gap-1 text-[10px] flex-wrap">
                                                 <span class="line-through text-ink-400 tabular-nums">
-                                                    Rp {{ number_format($item['harga_retail'] * $item['qty'], 0, ',', '.') }}
+                                                    Rp {{ number_format((float) $tampil['asli_total'], 0, ',', '.') }}
                                                 </span>
                                                 <span class="px-1 py-0.2 rounded bg-up-mint/15 text-up-mint font-black">
-                                                    -Rp {{ number_format($item['diskon_tier'] * $item['qty'], 0, ',', '.') }}
+                                                    {{ $tampil['label'] }} -Rp {{ number_format((float) $tampil['potongan_total'], 0, ',', '.') }}
                                                 </span>
                                             </div>
                                         @endif
@@ -422,36 +517,112 @@
                         @endforeach
                     </div>
 
-                    <div class="pt-6 border-t border-ink-100/80 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div class="text-xs text-ink-500 dark:text-ink-400">
-                            Total pesanan terhitung untuk <strong class="text-ink-900 dark:text-white">{{ $jumlahItem }} suku cadang</strong>
-                            @if(($diskonTier ?? 0) > 0)
-                                <div class="mt-1 text-up-mint font-bold text-[11px]">
-                                    🎉 Anda menghemat total Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan diskon / box
+                    @if($mode === 'cart')
+                        @include('modules.marketplace.livewire.partials.cart-quick-search')
+                    @endif
+
+                    <div class="pt-4 sm:pt-5 lg:pt-6 border-t border-ink-100/80 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+                        <div class="w-full sm:w-auto">
+                            <div class="flex items-baseline justify-between sm:block lg:hidden">
+                                <div>
+                                    <div class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Total belanja</div>
+                                    <div class="text-2xl font-black text-up-primary tabular-nums">
+                                        Rp {{ number_format(max(0, $subtotal - ($diskonPartai ?? 0)), 0, ',', '.') }}
+                                    </div>
                                 </div>
-                            @endif
-                            @if(($potensiKomisi ?? 0) > 0)
-                                <div class="mt-1 text-up-amber font-bold text-[11px] flex items-center gap-1">
-                                    <span>💰</span>
-                                    <span>Akumulasi komisi mitra: +Rp {{ number_format($potensiKomisi, 0, ',', '.') }} (Harga Retail)</span>
+                                <span class="text-[10px] text-ink-400">{{ $jumlahItem }} suku cadang</span>
+                            </div>
+
+                            <details class="lg:hidden mt-2 rounded-2xl bg-ink-50/70 dark:bg-white/[0.03] border border-ink-200/70 dark:border-white/5 overflow-hidden">
+                                <summary class="px-3 py-2 text-[11px] font-bold text-ink-600 dark:text-ink-300 cursor-pointer select-none flex items-center justify-between">
+                                    <span>Detail harga</span>
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                </summary>
+                                <div class="px-3 pb-3 space-y-2 text-[11px] border-t border-ink-200/60 dark:border-white/5 pt-2">
+                                    @if(($potonganKemasan ?? 0) > 0 || ($potonganMember ?? 0) > 0)
+                                        <div class="flex justify-between gap-3 text-ink-500">
+                                            <span>Subtotal Retail</span>
+                                            <span class="line-through tabular-nums">Rp {{ number_format($subtotalRetail, 0, ',', '.') }}</span>
+                                        </div>
+                                    @endif
+                                    @if(($potonganKemasan ?? 0) > 0)
+                                        <div class="flex justify-between gap-3 text-up-mint font-semibold">
+                                            <span>Potongan Kemasan / Per Box</span>
+                                            <span class="tabular-nums">- Rp {{ number_format($potonganKemasan, 0, ',', '.') }}</span>
+                                        </div>
+                                    @endif
+                                    @if(($potonganMember ?? 0) > 0)
+                                        <div class="flex justify-between gap-3 text-up-mint font-semibold">
+                                            <span>Potongan Member</span>
+                                            <span class="tabular-nums">- Rp {{ number_format($potonganMember, 0, ',', '.') }}</span>
+                                        </div>
+                                    @endif
+                                    @if(($diskonPartai ?? 0) > 0)
+                                        <div class="flex justify-between gap-3 text-ink-500">
+                                            <span>Subtotal</span>
+                                            <span class="tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
+                                        </div>
+                                        <div class="flex justify-between gap-3 text-up-accent font-semibold">
+                                            <span>Potongan Partai ({{ $partaiInfo['persen'] ?? 0 }}%)</span>
+                                            <span class="tabular-nums">- Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
+                                        </div>
+                                    @endif
+                                    @if(($potensiKomisi ?? 0) > 0)
+                                        <div class="flex justify-between gap-3 text-up-amber font-semibold">
+                                            <span>Komisi Mitra</span>
+                                            <span class="tabular-nums">+ Rp {{ number_format($potensiKomisi, 0, ',', '.') }}</span>
+                                        </div>
+                                    @endif
+                                    <div class="flex justify-between gap-3 text-ink-900 dark:text-white font-bold pt-2 border-t border-ink-200/60 dark:border-white/5">
+                                        <span>Total</span>
+                                        <span class="tabular-nums">Rp {{ number_format(max(0, $subtotal - ($diskonPartai ?? 0)), 0, ',', '.') }}</span>
+                                    </div>
                                 </div>
-                            @endif
-                            @if(($diskonPartai ?? 0) > 0)
-                                <div class="mt-1 text-up-accent font-bold text-[11px] flex items-center gap-1">
-                                    <span>📦</span>
-                                    <span>Potongan partai: {{ $partaiInfo['alasan'] ?? '' }} (-Rp {{ number_format($diskonPartai, 0, ',', '.') }})</span>
-                                </div>
-                            @endif
+                            </details>
+
+                            <div class="hidden lg:block text-xs text-ink-500 dark:text-ink-400">
+                                Total pesanan terhitung untuk <strong class="text-ink-900 dark:text-white">{{ $jumlahItem }} suku cadang</strong>
+                                @if(($potonganKemasan ?? 0) > 0)
+                                    <div class="mt-1 text-up-mint font-bold text-[11px]">
+                                        📦 Anda menghemat Rp {{ number_format($potonganKemasan, 0, ',', '.') }} dari potongan kemasan / per box
+                                    </div>
+                                @endif
+                                @if(($potonganMember ?? 0) > 0)
+                                    <div class="mt-1 text-up-mint font-bold text-[11px]">
+                                        🎉 Anda menghemat Rp {{ number_format($potonganMember, 0, ',', '.') }} dari potongan member
+                                    </div>
+                                @endif
+                                @if(($potensiKomisi ?? 0) > 0)
+                                    <div class="mt-1 text-up-amber font-bold text-[11px] flex items-center gap-1">
+                                        <span>💰</span>
+                                        <span>Akumulasi komisi mitra: +Rp {{ number_format($potensiKomisi, 0, ',', '.') }} (Harga Retail)</span>
+                                    </div>
+                                @endif
+                                @if(($diskonPartai ?? 0) > 0)
+                                    <div class="mt-1 text-up-accent font-bold text-[11px] flex items-center gap-1">
+                                        <span>📦</span>
+                                        <span>Potongan partai: {{ $partaiInfo['alasan'] ?? '' }} (-Rp {{ number_format($diskonPartai, 0, ',', '.') }})</span>
+                                    </div>
+                                @endif
+                            </div>
                         </div>
-                        <div class="flex flex-col items-end gap-1">
-                            @if(($diskonTier ?? 0) > 0)
+                        <div class="hidden lg:flex flex-col items-end gap-1">
+                            @if(($potonganKemasan ?? 0) > 0 || ($potonganMember ?? 0) > 0)
                                 <div class="flex items-center gap-2 text-xs text-ink-500">
                                     <span>Subtotal Retail:</span>
                                     <span class="line-through tabular-nums">Rp {{ number_format($subtotalRetail, 0, ',', '.') }}</span>
                                 </div>
+                            @endif
+                            @if(($potonganKemasan ?? 0) > 0)
                                 <div class="flex items-center gap-2 text-xs text-up-mint font-semibold">
-                                    <span>Diskon / Box:</span>
-                                    <span class="tabular-nums">- Rp {{ number_format($diskonTier, 0, ',', '.') }}</span>
+                                    <span>Potongan Kemasan / Per Box:</span>
+                                    <span class="tabular-nums">- Rp {{ number_format($potonganKemasan, 0, ',', '.') }}</span>
+                                </div>
+                            @endif
+                            @if(($potonganMember ?? 0) > 0)
+                                <div class="flex items-center gap-2 text-xs text-up-mint font-semibold">
+                                    <span>Potongan Member:</span>
+                                    <span class="tabular-nums">- Rp {{ number_format($potonganMember, 0, ',', '.') }}</span>
                                 </div>
                             @endif
                             @if(($diskonPartai ?? 0) > 0)
@@ -481,18 +652,51 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end pt-2">
+                <div class="hidden lg:flex justify-end pt-2">
                     <button
                         type="button"
                         wire:click="lanjutCheckout"
-                        class="w-full sm:w-auto px-10 py-4 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-sm shadow-up-primary/25 transition-[background-color,transform] duration-140 cursor-pointer active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2">
+                        class="w-full sm:w-auto px-6 sm:px-10 py-3.5 sm:py-4 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs sm:text-sm shadow-sm shadow-up-primary/25 transition-[background-color,transform] duration-140 cursor-pointer active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2">
                         <span>Lanjutkan ke Pengambilan & Pembayaran</span>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
                     </button>
                 </div>
+
+                <!-- Mobile/tablet sticky checkout bar -->
+                <div class="lg:hidden fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-40 pointer-events-none">
+                    <div class="max-w-4xl mx-auto px-4 sm:px-6">
+                        <button
+                            type="button"
+                            wire:click="lanjutCheckout"
+                            wire:loading.attr="disabled"
+                            class="pointer-events-auto w-full rounded-2xl bg-ink-900 dark:bg-white text-white dark:text-ink-950 px-4 py-3.5 flex items-center justify-between gap-3 shadow-2xl active:scale-[0.99] transition-transform cursor-pointer disabled:opacity-60">
+                            <span class="text-left min-w-0">
+                                <span class="block text-[9px] uppercase tracking-wider text-white/60 dark:text-ink-950/60 font-bold">Total belanja</span>
+                                <span class="block text-sm font-black tabular-nums truncate">Rp {{ number_format(max(0, $subtotal - ($diskonPartai ?? 0)), 0, ',', '.') }}</span>
+                            </span>
+                            <span class="shrink-0 inline-flex items-center gap-1.5 text-xs font-bold">
+                                Lanjut Checkout
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                            </span>
+                        </button>
+                    </div>
+                </div>
             @endif
         </div>
     @endif
+
+    <!-- Lightbox preview gambar di keranjang -->
+    <div x-show="cartPreview"
+         x-cloak
+         x-transition.opacity
+         class="fixed inset-0 z-[9998] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+         @click="cartPreview = null">
+        <div class="max-w-lg w-full max-h-[85vh] rounded-3xl bg-white dark:bg-ink-900 border border-white/10 p-3 shadow-2xl" @click.stop>
+            <template x-if="cartPreview">
+                <img :src="cartPreview" alt="Preview produk" class="w-full h-full max-h-[78vh] object-contain rounded-2xl">
+            </template>
+        </div>
+    </div>
 </div>
