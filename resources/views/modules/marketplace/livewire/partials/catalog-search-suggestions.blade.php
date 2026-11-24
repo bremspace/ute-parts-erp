@@ -6,7 +6,9 @@
         <div class="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-ink-400 border-b border-ink-100 dark:border-white/5">
             Saran produk
         </div>
-        <div class="max-h-[60vh] overflow-y-auto divide-y divide-ink-100 dark:divide-white/5">
+        <div class="max-h-[min(60vh,360px)] overflow-y-auto overscroll-contain divide-y divide-ink-100 dark:divide-white/5"
+             style="max-height: min(60vh, 360px); overscroll-behavior: contain; touch-action: pan-y;">
+
             @foreach($searchSuggestions as $s)
                 <a href="{{ route('shop.detail', $s['slug']) }}"
                    @click="suggestionsOpen = false"
