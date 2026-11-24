@@ -130,10 +130,13 @@ class CartCheckout extends Component
         return Produk::query()
             ->where('is_active', true)
             ->withSum('stokItems', 'jumlah')
-            ->having('stok_items_sum_jumlah', '>', 0)
             ->orderBy('produk.nama')
-            ->limit(3)
+            ->limit(20)
             ->get()
+            // Disaring di koleksi, bukan HAVING: SQLite menolak HAVING tanpa
+            // GROUP BY (MySQL menerimanya), jadi halaman gagal 500 saat test.
+            ->filter(fn (Produk $p) => (float) ($p->stok_items_sum_jumlah ?? 0) > 0)
+            ->take(3)
             ->map(fn (Produk $p) => [
                 'id' => $p->id,
                 'nama' => $p->nama,
@@ -177,9 +180,11 @@ class CartCheckout extends Component
                 'search' => $q,
                 'auto_relevance' => true,
             ])
-            ->having('stok_items_sum_jumlah', '>', 0)
-            ->limit(6)
+            // Disaring di koleksi, bukan HAVING (portabilitas SQLite/MySQL).
+            ->limit(30)
             ->get()
+            ->filter(fn (Produk $p) => (float) ($p->stok_items_sum_jumlah ?? 0) > 0)
+            ->take(6)
             ->map(function (Produk $p) {
                 $price = app(PricingService::class)->resolve($p, auth('customer')->user());
 
