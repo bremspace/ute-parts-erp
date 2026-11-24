@@ -16,6 +16,8 @@ use App\Modules\Sync\Observers\SkuVariantSyncObserver;
 use App\Modules\Sync\Observers\StokLogSyncObserver;
 use App\Modules\Sync\Observers\TiketServisSyncObserver;
 use App\Modules\Sync\Observers\TipeHpSyncObserver;
+use App\Modules\Sync\Observers\TransaksiCloudPosSyncObserver;
+use App\Modules\Sync\Observers\TransaksiPosSyncObserver;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
@@ -66,12 +68,17 @@ class SyncObserverBootstrap
             if (class_exists(TiketServis::class)) {
                 TiketServis::observe(TiketServisSyncObserver::class);
             }
+
+            if (class_exists(Transaksi::class)) {
+                Transaksi::observe(TransaksiPosSyncObserver::class);
+            }
         }
 
         // Observers khusus node cloud
         if ($nodeRole === 'cloud_storefront') {
             if (class_exists(Transaksi::class)) {
                 Transaksi::observe(OrderOnlinePaidSyncObserver::class);
+                Transaksi::observe(TransaksiCloudPosSyncObserver::class);
             }
         }
     }

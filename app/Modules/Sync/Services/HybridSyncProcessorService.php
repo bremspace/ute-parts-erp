@@ -5,6 +5,7 @@ namespace App\Modules\Sync\Services;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
@@ -20,6 +21,7 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\StokDeductionService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -68,48 +70,50 @@ class HybridSyncProcessorService
 
         $nodeRole = config('sync.node_role');
 
-        try {
-            DB::beginTransaction();
+        return SyncExecutionGuard::runWithoutSync(function () use ($eventType, $payload, $syncUuid, $inbox, $nodeRole) {
+            try {
+                DB::beginTransaction();
 
-            if ($nodeRole === 'cloud_storefront') {
-                $this->processForCloud($eventType, $payload);
-            } elseif ($nodeRole === 'primary_store') {
-                $this->processForPrimaryStore($eventType, $payload);
-            } else {
-                // Default fallback: allow handling based on event type
-                $this->processGeneric($eventType, $payload);
+                if ($nodeRole === 'cloud_storefront') {
+                    $this->processForCloud($eventType, $payload);
+                } elseif ($nodeRole === 'primary_store') {
+                    $this->processForPrimaryStore($eventType, $payload);
+                } else {
+                    // Default fallback: allow handling based on event type
+                    $this->processGeneric($eventType, $payload);
+                }
+
+                $inbox->update([
+                    'status' => 'processed',
+                    'processed_at' => now(),
+                ]);
+
+                DB::commit();
+
+                return [
+                    'success' => true,
+                    'data' => ['sync_uuid' => $syncUuid],
+                    'message' => "Event {$eventType} berhasil disinkronisasi.",
+                ];
+            } catch (\Throwable $e) {
+                DB::rollBack();
+
+                $inbox->update([
+                    'status' => 'failed',
+                    'error_message' => $e->getMessage(),
+                ]);
+
+                Log::error("[HybridSync] Gagal memproses event {$eventType} ({$syncUuid}): ".$e->getMessage(), [
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
+                return [
+                    'success' => false,
+                    'data' => ['sync_uuid' => $syncUuid],
+                    'message' => 'Gagal memproses sinkronisasi: '.$e->getMessage(),
+                ];
             }
-
-            $inbox->update([
-                'status' => 'processed',
-                'processed_at' => now(),
-            ]);
-
-            DB::commit();
-
-            return [
-                'success' => true,
-                'data' => ['sync_uuid' => $syncUuid],
-                'message' => "Event {$eventType} berhasil disinkronisasi.",
-            ];
-        } catch (\Throwable $e) {
-            DB::rollBack();
-
-            $inbox->update([
-                'status' => 'failed',
-                'error_message' => $e->getMessage(),
-            ]);
-
-            Log::error("[HybridSync] Gagal memproses event {$eventType} ({$syncUuid}): ".$e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return [
-                'success' => false,
-                'data' => ['sync_uuid' => $syncUuid],
-                'message' => 'Gagal memproses sinkronisasi: '.$e->getMessage(),
-            ];
-        }
+        });
     }
 
     /**
@@ -140,6 +144,7 @@ class HybridSyncProcessorService
     {
         match ($eventType) {
             'order.online_paid' => $this->handleOrderOnlinePaid($payload),
+            'transaksi.pos_cloud' => $this->handleTransaksiPosCloud($payload),
             default => $this->processGeneric($eventType, $payload),
         };
     }
@@ -160,6 +165,7 @@ class HybridSyncProcessorService
             'tipe_hp.upsert' => $this->handleTipeHpUpsert($payload),
             'stok.mutasi' => $this->handleStokMutasi($payload),
             'transaksi.pos' => $this->handleTransaksiPos($payload),
+            'transaksi.pos_cloud' => $this->handleTransaksiPosCloud($payload),
             'servis.update' => $this->handleServisUpdate($payload),
             'order.online_paid' => $this->handleOrderOnlinePaid($payload),
             default => Log::info("[HybridSync] Generic event: {$eventType}"),
@@ -579,9 +585,11 @@ class HybridSyncProcessorService
 
         $produkId = $payload['produk_id'] ?? null;
         $cabangId = $payload['cabang_id'] ?? null;
-        $stokAkhir = $payload['stok_akhir'] ?? $payload['jumlah'] ?? null;
+        // Ambil delta mutasi (perubahan) jika tersedia
+        $jumlahMutasi = isset($payload['perubahan']) ? (float) $payload['perubahan'] : (isset($payload['jumlah']) ? (float) $payload['jumlah'] : null);
+        $stokAkhir = isset($payload['stok_akhir']) ? (float) $payload['stok_akhir'] : null;
 
-        if ($produkId && $stokAkhir !== null) {
+        if ($produkId) {
             // Pastikan produk ada di database agar tidak melanggar foreign key constraint
             if (! Produk::where('id', $produkId)->exists()) {
                 DB::table('produk')->insert([
@@ -604,29 +612,372 @@ class HybridSyncProcessorService
             }
 
             if ($gudangId) {
-                StokItem::updateOrCreate(
+                $stokItem = StokItem::firstOrCreate(
                     [
                         'produk_id' => $produkId,
                         'gudang_id' => $gudangId,
                     ],
                     [
-                        'jumlah' => $stokAkhir,
+                        'jumlah' => 0,
                     ]
                 );
+
+                // Delta-based mutation: jika ada nilai delta mutasi selain 0
+                if ($jumlahMutasi !== null && $jumlahMutasi != 0.0) {
+                    $stokItem->increment('jumlah', $jumlahMutasi);
+                } elseif ($stokAkhir !== null) {
+                    // Fallback ke stok_akhir hanya jika delta mutasi tidak tersedia
+                    $stokItem->jumlah = $stokAkhir;
+                    $stokItem->saveQuietly();
+                }
             }
         }
     }
 
     /**
-     * Handle transaksi.pos: rekap ringkasan POS untuk monitoring owner di VPS
+     * Handle transaksi.pos: rekap transaksi POS lengkap, simpan items, dan posting jurnal di VPS
      */
     protected function handleTransaksiPos(array $payload): void
     {
-        Log::info('[HybridSync] Transaksi POS tersinkron ke cloud:', [
-            'nomor_transaksi' => $payload['nomor_transaksi'] ?? $payload['no_transaksi'] ?? null,
-            'total' => $payload['total_akhir'] ?? $payload['total'] ?? 0,
-            'cabang_id' => $payload['cabang_id'] ?? null,
+        if (! class_exists(Transaksi::class)) {
+            Log::warning('[HybridSync] Model Transaksi tidak tersedia.');
+
+            return;
+        }
+
+        $uuid = $payload['offline_uuid'] ?? null;
+        $noTransaksi = $payload['no_transaksi'] ?? $payload['nomor_transaksi'] ?? null;
+
+        if (! $noTransaksi && ! $uuid) {
+            Log::warning('[HybridSync] Transaksi POS diabaikan: nomor transaksi atau UUID tidak ada.');
+
+            return;
+        }
+
+        // 1. Idempotensi check
+        $query = Transaksi::query();
+        if ($uuid) {
+            $query->where('offline_uuid', $uuid);
+        } else {
+            $query->where('no_transaksi', $noTransaksi);
+        }
+        $existing = $query->first();
+
+        if ($existing) {
+            Log::info("[HybridSync] Transaksi POS {$noTransaksi} ({$uuid}) sudah ada di database, lewati.");
+
+            return;
+        }
+
+        $cabangId = (int) ($payload['cabang_id'] ?? (class_exists(Cabang::class) ? Cabang::first()?->id ?? 1 : 1));
+        $totalAkhir = (float) ($payload['total_akhir'] ?? $payload['total'] ?? 0);
+        $clientCreatedAt = isset($payload['created_at'])
+            ? rescue(fn () => Carbon::parse($payload['created_at']), now())
+            : now();
+
+        // 2. Simpan Transaksi di Cloud
+        $transaksi = Transaksi::create([
+            'no_transaksi' => $noTransaksi,
+            'cabang_id' => $cabangId,
+            'kasir_id' => $payload['kasir_id'] ?? 1,
+            'pelanggan_id' => $payload['pelanggan_id'] ?? null,
+            'gudang_id' => $payload['gudang_id'] ?? null,
+            'sumber' => $payload['sumber'] ?? 'pos',
+            'subtotal' => (float) ($payload['subtotal'] ?? $totalAkhir),
+            'diskon_nominal' => (float) ($payload['diskon_nominal'] ?? 0),
+            'pajak_nominal' => (float) ($payload['pajak_nominal'] ?? 0),
+            'ppn_nominal' => (float) ($payload['pajak_nominal'] ?? 0),
+            'total_akhir' => $totalAkhir,
+            'metode_bayar' => $payload['metode_bayar'] ?? 'tunai',
+            'jumlah_bayar' => (float) ($payload['jumlah_bayar'] ?? $totalAkhir),
+            'kembalian' => (float) ($payload['kembalian'] ?? 0),
+            'split_detail' => $payload['split_detail'] ?? null,
+            'status' => $payload['status'] ?? 'selesai',
+            'catatan' => $payload['catatan'] ?? null,
+            'offline_uuid' => $uuid,
+            'is_offline' => true,
+            'client_created_at' => $clientCreatedAt,
+            'synced_at' => now(),
+            'sync_status' => 'synced',
         ]);
+
+        // 3. Simpan TransaksiItem
+        $items = $payload['items'] ?? [];
+        $totalHpp = 0.0;
+
+        foreach ($items as $item) {
+            $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+            $qty = (float) ($item['jumlah'] ?? 1);
+            $hppPerSatuan = (float) ($item['hpp'] ?? 0);
+
+            TransaksiItem::create([
+                'transaksi_id' => $transaksi->id,
+                'produk_id' => $item['produk_id'] ?? 0,
+                'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                'jumlah' => $qty,
+                'satuan' => $item['satuan'] ?? 'pcs',
+                'konversi' => $konversi,
+                'harga_satuan' => (float) ($item['harga_satuan'] ?? 0),
+                'diskon_nominal' => (float) ($item['diskon_nominal'] ?? 0),
+                'subtotal' => (float) ($item['subtotal'] ?? 0),
+                'harga_final' => $qty > 0 ? round((float) ($item['subtotal'] ?? 0) / $qty, 2) : (float) ($item['harga_satuan'] ?? 0),
+                'hpp' => $hppPerSatuan,
+                'catatan' => $item['catatan'] ?? null,
+            ]);
+
+            $totalHpp += ($hppPerSatuan * $qty);
+        }
+
+        // 4. Update Akumulasi Belanja Pelanggan CRM
+        if (! empty($payload['pelanggan_id']) && class_exists(PelangganService::class)) {
+            try {
+                app(PelangganService::class)->tambahBelanjaDanPoin(
+                    (int) $payload['pelanggan_id'],
+                    $totalAkhir,
+                    $transaksi->id
+                );
+            } catch (\Throwable $e) {
+                Log::warning("[HybridSync] Gagal update poin pelanggan {$payload['pelanggan_id']}: {$e->getMessage()}");
+            }
+        }
+
+        // 5. Posting Jurnal Double-Entry di Cloud
+        if (class_exists(JurnalService::class)) {
+            try {
+                $jurnalService = app(JurnalService::class);
+                $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
+
+                $barisJurnal = [
+                    [
+                        'akun_kode' => '110-04', // Kas Toko / Kasir
+                        'nama_akun' => 'Kas',
+                        'debit' => $totalAkhir,
+                        'kredit' => 0.0,
+                        'keterangan' => "Penerimaan Kas POS Sync {$transaksi->no_transaksi}",
+                    ],
+                    [
+                        'akun_kode' => '410-01', // Pendapatan Penjualan
+                        'nama_akun' => 'Pendapatan Penjualan',
+                        'debit' => 0.0,
+                        'kredit' => $totalAkhir,
+                        'keterangan' => "Penjualan POS Sync {$transaksi->no_transaksi}",
+                    ],
+                ];
+
+                if ($totalHpp > 0) {
+                    $barisJurnal[] = [
+                        'akun_kode' => '510-02',
+                        'nama_akun' => 'Harga Pokok Penjualan',
+                        'debit' => $totalHpp,
+                        'kredit' => 0.0,
+                        'keterangan' => "HPP POS Sync {$transaksi->no_transaksi}",
+                    ];
+                    $barisJurnal[] = [
+                        'akun_kode' => '130-01',
+                        'nama_akun' => 'Persediaan Barang Dagang',
+                        'debit' => 0.0,
+                        'kredit' => $totalHpp,
+                        'keterangan' => "Pengurangan Persediaan POS Sync {$transaksi->no_transaksi}",
+                    ];
+                }
+
+                $jurnalService->post(
+                    noJurnal: $noJurnal,
+                    tanggal: $clientCreatedAt->toDateString(),
+                    sumber: 'pos',
+                    lines: $barisJurnal,
+                    deskripsi: "Jurnal POS Sync {$transaksi->no_transaksi}",
+                    cabangId: $cabangId,
+                    userId: $transaksi->kasir_id,
+                    referensiTipe: Transaksi::class,
+                    referensiId: $transaksi->id
+                );
+            } catch (\Throwable $jurnalEx) {
+                Log::warning("[HybridSync] Gagal membuat jurnal POS Sync {$transaksi->no_transaksi}: {$jurnalEx->getMessage()}");
+            }
+        }
+    }
+
+    /**
+     * Handle transaksi.pos_cloud: transaksi kasir darurat di cloud ditarik dan diserap ke toko lokal
+     */
+    protected function handleTransaksiPosCloud(array $payload): void
+    {
+        if (! class_exists(Transaksi::class)) {
+            Log::warning('[HybridSync] Model Transaksi tidak tersedia.');
+
+            return;
+        }
+
+        $uuid = $payload['offline_uuid'] ?? null;
+        $noTransaksi = $payload['no_transaksi'] ?? $payload['nomor_transaksi'] ?? null;
+
+        if (! $noTransaksi && ! $uuid) {
+            Log::warning('[HybridSync] Transaksi Cloud POS diabaikan: nomor transaksi atau UUID tidak ada.');
+
+            return;
+        }
+
+        // 1. Idempotensi check
+        $query = Transaksi::query();
+        if ($uuid) {
+            $query->where('offline_uuid', $uuid);
+        } else {
+            $query->where('no_transaksi', $noTransaksi);
+        }
+        $existing = $query->first();
+
+        if ($existing) {
+            Log::info("[HybridSync] Transaksi Cloud POS {$noTransaksi} ({$uuid}) sudah ada di database lokal, lewati.");
+
+            return;
+        }
+
+        $cabangId = (int) ($payload['cabang_id'] ?? (class_exists(Cabang::class) ? Cabang::first()?->id ?? 1 : 1));
+        $totalAkhir = (float) ($payload['total_akhir'] ?? $payload['total'] ?? 0);
+        $clientCreatedAt = isset($payload['created_at'])
+            ? rescue(fn () => Carbon::parse($payload['created_at']), now())
+            : now();
+
+        // Cari atau gunakan gudang default cabang
+        $gudangId = $payload['gudang_id'] ?? null;
+        if (! $gudangId && class_exists(Gudang::class)) {
+            $gudang = Gudang::getDefault($cabangId);
+            $gudangId = $gudang?->id;
+        }
+
+        // 2. Simpan Transaksi di Toko Lokal
+        $transaksi = Transaksi::create([
+            'no_transaksi' => $noTransaksi,
+            'cabang_id' => $cabangId,
+            'kasir_id' => $payload['kasir_id'] ?? 1,
+            'pelanggan_id' => $payload['pelanggan_id'] ?? null,
+            'gudang_id' => $gudangId,
+            'sumber' => $payload['sumber'] ?? 'pos',
+            'subtotal' => (float) ($payload['subtotal'] ?? $totalAkhir),
+            'diskon_nominal' => (float) ($payload['diskon_nominal'] ?? 0),
+            'pajak_nominal' => (float) ($payload['pajak_nominal'] ?? 0),
+            'ppn_nominal' => (float) ($payload['pajak_nominal'] ?? 0),
+            'total_akhir' => $totalAkhir,
+            'metode_bayar' => $payload['metode_bayar'] ?? 'tunai',
+            'jumlah_bayar' => (float) ($payload['jumlah_bayar'] ?? $totalAkhir),
+            'kembalian' => (float) ($payload['kembalian'] ?? 0),
+            'split_detail' => $payload['split_detail'] ?? null,
+            'status' => $payload['status'] ?? 'selesai',
+            'catatan' => $payload['catatan'] ?? '[FAILOVER CLOUD POS]',
+            'offline_uuid' => $uuid,
+            'is_offline' => false,
+            'client_created_at' => $clientCreatedAt,
+            'synced_at' => now(),
+            'sync_status' => 'synced',
+        ]);
+
+        // 3. Simpan TransaksiItem & Potong Stok Fisik Lokal
+        $items = $payload['items'] ?? [];
+        $totalHpp = 0.0;
+
+        foreach ($items as $item) {
+            $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+            $qty = (float) ($item['jumlah'] ?? 1);
+            $qtyDasar = (int) round($qty * $konversi);
+            $hppPerSatuan = (float) ($item['hpp'] ?? 0);
+            $produkId = (int) ($item['produk_id'] ?? 0);
+
+            TransaksiItem::create([
+                'transaksi_id' => $transaksi->id,
+                'produk_id' => $produkId,
+                'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                'jumlah' => $qty,
+                'satuan' => $item['satuan'] ?? 'pcs',
+                'konversi' => $konversi,
+                'harga_satuan' => (float) ($item['harga_satuan'] ?? 0),
+                'diskon_nominal' => (float) ($item['diskon_nominal'] ?? 0),
+                'subtotal' => (float) ($item['subtotal'] ?? 0),
+                'harga_final' => $qty > 0 ? round((float) ($item['subtotal'] ?? 0) / $qty, 2) : (float) ($item['harga_satuan'] ?? 0),
+                'hpp' => $hppPerSatuan,
+                'catatan' => $item['catatan'] ?? null,
+            ]);
+
+            $totalHpp += ($hppPerSatuan * $qty);
+
+            // Potong stok fisik lokal karena barang terjual di failover cloud
+            if ($gudangId && $produkId > 0 && class_exists(StokItem::class)) {
+                $stokItem = StokItem::firstOrCreate(
+                    ['produk_id' => $produkId, 'gudang_id' => $gudangId],
+                    ['jumlah' => 0]
+                );
+                $stokItem->decrement('jumlah', $qtyDasar);
+            }
+        }
+
+        // 4. Update Akumulasi Belanja Pelanggan CRM di Lokal
+        if (! empty($payload['pelanggan_id']) && class_exists(PelangganService::class)) {
+            try {
+                app(PelangganService::class)->tambahBelanjaDanPoin(
+                    (int) $payload['pelanggan_id'],
+                    $totalAkhir,
+                    $transaksi->id
+                );
+            } catch (\Throwable $e) {
+                Log::warning("[HybridSync] Gagal update poin pelanggan failover {$payload['pelanggan_id']}: {$e->getMessage()}");
+            }
+        }
+
+        // 5. Posting Jurnal Double-Entry di Toko Lokal
+        if (class_exists(JurnalService::class)) {
+            try {
+                $jurnalService = app(JurnalService::class);
+                $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
+
+                $barisJurnal = [
+                    [
+                        'akun_kode' => '110-04', // Kas Toko / Kasir
+                        'nama_akun' => 'Kas',
+                        'debit' => $totalAkhir,
+                        'kredit' => 0.0,
+                        'keterangan' => "Penerimaan Kas Cloud POS Failover {$transaksi->no_transaksi}",
+                    ],
+                    [
+                        'akun_kode' => '410-01', // Pendapatan Penjualan
+                        'nama_akun' => 'Pendapatan Penjualan',
+                        'debit' => 0.0,
+                        'kredit' => $totalAkhir,
+                        'keterangan' => "Penjualan Cloud POS Failover {$transaksi->no_transaksi}",
+                    ],
+                ];
+
+                if ($totalHpp > 0) {
+                    $barisJurnal[] = [
+                        'akun_kode' => '510-02',
+                        'nama_akun' => 'Harga Pokok Penjualan',
+                        'debit' => $totalHpp,
+                        'kredit' => 0.0,
+                        'keterangan' => "HPP Cloud POS Failover {$transaksi->no_transaksi}",
+                    ];
+                    $barisJurnal[] = [
+                        'akun_kode' => '130-01',
+                        'nama_akun' => 'Persediaan Barang Dagang',
+                        'debit' => 0.0,
+                        'kredit' => $totalHpp,
+                        'keterangan' => "Pengurangan Persediaan Cloud POS Failover {$transaksi->no_transaksi}",
+                    ];
+                }
+
+                $jurnalService->post(
+                    noJurnal: $noJurnal,
+                    tanggal: $clientCreatedAt->toDateString(),
+                    sumber: 'pos',
+                    lines: $barisJurnal,
+                    deskripsi: "Jurnal Cloud POS Failover {$transaksi->no_transaksi}",
+                    cabangId: $cabangId,
+                    userId: $transaksi->kasir_id,
+                    referensiTipe: Transaksi::class,
+                    referensiId: $transaksi->id
+                );
+            } catch (\Throwable $jurnalEx) {
+                Log::warning("[HybridSync] Gagal membuat jurnal Cloud POS Failover {$transaksi->no_transaksi}: {$jurnalEx->getMessage()}");
+            }
+        }
     }
 
     /**

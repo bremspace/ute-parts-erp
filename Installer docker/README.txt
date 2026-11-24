@@ -19,3 +19,4 @@ Catatan:
 - Port host: 80.
 - Database MySQL tersimpan di volume Docker (ute_mysql).
 - Untuk reset data: pilih Fresh install (hapus volume) atau docker compose down -v lalu install ulang.
+- Hybrid Sync: Container sudah otomatis menjalankan background worker antrean (sync) dan scheduler. Untuk menghubungkan ke Cloud VPS, isi Cloud URL dan Shared Secret di menu Pengaturan ERP (/app/settings).

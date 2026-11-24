@@ -32,6 +32,68 @@ class SyncController extends Controller
     }
 
     /**
+     * POST /api/internal/sync/push-batch
+     * Terima array payload sinkronisasi massal (hingga 50 event) dalam 1 HTTP request.
+     */
+    public function pushBatch(Request $request, HybridSyncProcessorService $processor): JsonResponse
+    {
+        $events = $request->input('events', $request->all());
+
+        if (isset($events['events']) && is_array($events['events'])) {
+            $events = $events['events'];
+        }
+
+        if (! is_array($events) || empty($events)) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'message' => 'Parameter events wajib berupa array dan tidak boleh kosong.',
+            ], 422);
+        }
+
+        $processed = 0;
+        $failed = 0;
+        $results = [];
+
+        foreach ($events as $event) {
+            if (! is_array($event) || empty($event['sync_uuid']) || empty($event['event_type'])) {
+                $failed++;
+                $results[] = [
+                    'sync_uuid' => is_array($event) ? ($event['sync_uuid'] ?? null) : null,
+                    'success' => false,
+                    'message' => 'sync_uuid dan event_type wajib disertakan.',
+                ];
+
+                continue;
+            }
+
+            $res = $processor->process($event);
+            if ($res['success'] ?? false) {
+                $processed++;
+            } else {
+                $failed++;
+            }
+
+            $results[] = [
+                'sync_uuid' => $event['sync_uuid'],
+                'success' => $res['success'] ?? false,
+                'message' => $res['message'] ?? '',
+            ];
+        }
+
+        return response()->json([
+            'success' => $failed === 0,
+            'data' => [
+                'total' => count($events),
+                'processed' => $processed,
+                'failed' => $failed,
+                'results' => $results,
+            ],
+            'message' => "Batch sync selesai: {$processed} diproses, {$failed} gagal.",
+        ], ($failed > 0 && $processed === 0) ? 500 : 200);
+    }
+
+    /**
      * GET /api/internal/sync/pull
      * Fallback endpoint untuk node lokal menarik event yang belum tersinkronisasi.
      */
@@ -51,9 +113,21 @@ class SyncController extends Controller
             });
         }
 
-        // Jika node adalah cloud_storefront, yang ditarik oleh toko biasanya order.online_paid
+        // Jika node adalah cloud_storefront, yang ditarik oleh toko adalah pesanan online, master data, dan transaksi cloud pos
         if ($nodeRole === 'cloud_storefront') {
-            $query->where('event_type', 'order.online_paid');
+            $allowedEvents = [
+                'order.online_paid',
+                'produk.upsert',
+                'sku_variant.upsert',
+                'pelanggan.upsert',
+                'kategori_produk.upsert',
+                'brand.upsert',
+                'kualitas_produk.upsert',
+                'satuan_unit.upsert',
+                'tipe_hp.upsert',
+                'transaksi.pos_cloud',
+            ];
+            $query->whereIn('event_type', $allowedEvents);
         }
 
         $items = $query->get()->map(function ($item) {
