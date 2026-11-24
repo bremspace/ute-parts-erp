@@ -53,9 +53,24 @@
                             @endif
                         </span>
                     </span>
-                    <span class="shrink-0 text-right">
+                    <span class="shrink-0 flex flex-col items-end gap-1">
                         <span class="block text-[11px] font-bold text-up-primary tabular-nums">Rp {{ number_format($s['harga'], 0, ',', '.') }}</span>
                         <span class="block text-[9px] {{ $s['stok'] > 0 ? 'text-up-mint' : 'text-up-red' }}">{{ $s['stok'] > 0 ? 'Ready' : 'Habis' }}</span>
+                        @if($s['stok'] > 0)
+                            <button type="button"
+                                    wire:click.stop="addToCart({{ $s['id'] }})"
+                                    wire:loading.attr="disabled"
+                                    wire:target="addToCart({{ $s['id'] }})"
+                                    aria-label="Tambah {{ $s['nama'] }} ke keranjang"
+                                    title="Tambah ke keranjang"
+                                    class="w-7 h-7 rounded-lg bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white flex items-center justify-center font-bold text-sm cursor-pointer transition-colors active:scale-90 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="addToCart({{ $s['id'] }})">+</span>
+                                <svg wire:loading wire:target="addToCart({{ $s['id'] }})" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                                    <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path>
+                                </svg>
+                            </button>
+                        @endif
                     </span>
                 </a>
             @endforeach
