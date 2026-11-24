@@ -502,7 +502,7 @@ class ShopPage extends Component
         $query->filterKatalog($filters);
 
         if (trim($this->search) !== '') {
-            app(\App\Modules\Wms\Services\SmartSearchService::class)
+            app(SmartSearchService::class)
                 ->applySuggestionSearch($query, $this->search);
         }
 

@@ -29,6 +29,7 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportAtributService;
 use App\Traits\ParsesNominal;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -1271,7 +1272,7 @@ class SettingsRbac extends Component
         ];
 
         try {
-            $outbox = app(\Illuminate\Database\ConnectionResolverInterface::class)
+            $outbox = app(ConnectionResolverInterface::class)
                 ->connection()
                 ->table('hybrid_sync_outbox');
 
@@ -1285,6 +1286,7 @@ class SettingsRbac extends Component
 
         if (! $enabled) {
             $this->syncStatus = $status;
+
             return;
         }
 
@@ -1292,12 +1294,14 @@ class SettingsRbac extends Component
             $status['connected'] = true;
             $status['message'] = 'Node cloud aktif (cek koneksi dilakukan dari toko lokal)';
             $this->syncStatus = $status;
+
             return;
         }
 
         if ($remoteUrl === '' || $secret === '') {
             $status['message'] = 'Remote URL / Shared Secret belum diisi';
             $this->syncStatus = $status;
+
             return;
         }
 
