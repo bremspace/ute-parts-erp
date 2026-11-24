@@ -1,5 +1,5 @@
 {{-- Pencarian cepat di keranjang: mobile/tablet only, desktop sengaja tidak diubah --}}
-<div class="mt-3 pt-3 border-t border-ink-100/80 dark:border-white/10 lg:hidden"
+<div class="mt-3 pt-3 border-t border-ink-100/80 dark:border-white/10"
      x-data="{
          cartSuggestOpen: false,
          cartSuggestPos: { top: 0, left: 0, width: 0, max: 0, up: false },

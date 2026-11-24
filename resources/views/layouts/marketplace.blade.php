@@ -144,7 +144,7 @@
             <nav class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 <!-- Katalog (desktop only, mobile di bottom dock) -->
                 <a href="{{ url('/') }}"
-                   class="{{ $isCartFlow ? 'hidden lg:inline-flex' : 'hidden md:inline-flex' }} min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->is('shop') || request()->is('shop/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
+                   class="{{ $isCartFlow ? 'hidden' : 'hidden md:inline-flex' }} min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->is('shop') || request()->is('shop/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
                     <svg class="w-4 h-4 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
@@ -153,7 +153,7 @@
 
                 <!-- Panduan Lab & Edukasi (desktop) -->
                 <a href="{{ route('panduan.index') }}"
-                   class="{{ $isCartFlow ? 'hidden lg:inline-flex' : 'hidden md:inline-flex' }} min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->is('panduan') || request()->is('panduan/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
+                   class="{{ $isCartFlow ? 'hidden' : 'hidden md:inline-flex' }} min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->is('panduan') || request()->is('panduan/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
                     <svg class="w-4 h-4 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>
@@ -162,7 +162,7 @@
 
                 <!-- Booking (desktop only, mobile di bottom dock) -->
                 <a href="{{ route('servis.booking') }}"
-                   class="{{ $isCartFlow ? 'hidden lg:inline-flex' : 'hidden md:inline-flex' }} min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->routeIs('servis.booking') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
+                   class="{{ $isCartFlow ? 'hidden' : 'hidden md:inline-flex' }} min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->routeIs('servis.booking') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
                     <svg class="w-4 h-4 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
@@ -190,7 +190,7 @@
                 <div class="h-5 w-px bg-ink-200/60 dark:bg-white/10 mx-0.5 hidden md:block"></div>
 
                 <!-- [2026] Font Size Switcher (desktop only) -->
-                <div class="relative {{ $isCartFlow ? 'hidden lg:block' : 'hidden md:block' }}" x-data="fontSizeManager()" @click.outside="open = false">
+                <div class="relative {{ $isCartFlow ? 'hidden' : 'hidden md:block' }}" x-data="fontSizeManager()" @click.outside="open = false">
                     <button type="button" @click="open = !open"
                             title="Ukuran font tampilan" aria-label="Ukuran font tampilan"
                             class="min-h-[44px] min-w-[44px] p-2 rounded-full text-ink-500 hover:text-ink-900 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5 transition-[background-color,color,transform] duration-140 active:scale-[0.95] cursor-pointer flex items-center justify-center flex-shrink-0 gap-0.5">
@@ -422,7 +422,7 @@
     </header>
 
     <!-- Content -->
-    <main id="main-content" tabindex="-1" class="flex-1 {{ $isCartFlow ? 'pb-28' : 'pb-36' }} lg:pb-0 outline-none">
+    <main id="main-content" tabindex="-1" class="flex-1 {{ $isCartFlow ? 'pb-28' : 'pb-36 lg:pb-0' }} outline-none">
         {{ $slot }}
     </main>
 
@@ -525,7 +525,7 @@
     @endif
 
     <!-- Footer: disembunyikan di alur keranjang pada mobile/tablet agar fokus ke checkout -->
-    <footer class="mt-auto border-t border-ink-200/60 dark:border-white/[0.08] bg-white dark:bg-ink-950 {{ $isCartFlow ? 'hidden lg:block' : '' }}">
+    <footer class="mt-auto border-t border-ink-200/60 dark:border-white/[0.08] bg-white dark:bg-ink-950 {{ $isCartFlow ? 'hidden' : '' }}">
         <!-- Trust badges -->
         <div class="border-b border-ink-100 dark:border-white/[0.05]">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
