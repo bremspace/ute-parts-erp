@@ -111,6 +111,9 @@
         suggestionsOpen: false,
         previewImg: null,
         previewNama: '',
+        fitExpanded: {},
+        toggleFit(key) { this.fitExpanded[key] = !this.fitExpanded[key]; },
+        isFitExpanded(key) { return Boolean(this.fitExpanded[key]); },
         openPreview(url, nama = '') { this.previewImg = url; this.previewNama = nama; },
         closePreview() { this.previewImg = null; this.previewNama = ''; },
         setPreview(data) {

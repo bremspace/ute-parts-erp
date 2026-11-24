@@ -466,10 +466,11 @@ class ShopPage extends Component
             ->map(function (Produk $p) {
                 $price = app(PricingService::class)->resolve($p, auth('customer')->user());
                 $kompatibel = $p->daftarKompatibel;
-                $fit = $kompatibel->take(2)->join(', ');
-                if ($kompatibel->count() > 2) {
-                    $fit .= ' +'.($kompatibel->count() - 2);
-                }
+                $fit = $kompatibel->join(', ');
+                $fitNeedExpand = mb_strlen($fit) > 70;
+                $fitShort = $fitNeedExpand
+                    ? $kompatibel->take(2)->join(', ').($kompatibel->count() > 2 ? ' +'.($kompatibel->count() - 2) : '')
+                    : $fit;
 
                 return [
                     'id' => $p->id,
@@ -481,6 +482,9 @@ class ShopPage extends Component
                     'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
                     'kategori' => (string) ($p->kategori ?: $p->kategoriRelasi?->nama ?: ''),
                     'kompatibel' => $fit,
+                    'kompatibel_short' => $fitShort,
+                    'kompatibel_need_expand' => $fitNeedExpand,
+                    'kompatibel_count' => $kompatibel->count(),
                     'kualitas' => (string) ($p->kualitas?->nama ?: $p->kondisi ?: ''),
                 ];
             });

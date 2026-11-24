@@ -29,7 +29,25 @@
                                 <span class="px-1.5 py-0.5 rounded bg-up-primary/10 text-up-primary font-bold truncate max-w-[90px]" title="Kualitas {{ $s['kualitas'] }}">{{ $s['kualitas'] }}</span>
                             @endif
                             @if(!empty($s['kompatibel']))
-                                <span class="px-1.5 py-0.5 rounded bg-up-mint/10 text-up-mint font-bold truncate max-w-[120px]" title="Kompatibel: {{ $s['kompatibel'] }}">Fit: {{ $s['kompatibel'] }}</span>
+                                <span class="inline-flex items-center gap-1 rounded bg-up-mint/10 px-1.5 py-0.5 text-up-mint font-bold max-w-full">
+                                    <span class="truncate max-w-[180px]" x-show="!isFitExpanded({{ $loop->index }})" title="Persamaan: {{ $s['kompatibel'] }}">
+                                        Persamaan: {{ $s['kompatibel_short'] }}
+                                    </span>
+                                    <span class="break-words leading-snug" x-show="isFitExpanded({{ $loop->index }})" x-cloak>
+                                        Persamaan: {{ $s['kompatibel'] }}
+                                    </span>
+                                    @if(!empty($s['kompatibel_need_expand']))
+                                        <button type="button"
+                                                @click.stop.prevent="toggleFit({{ $loop->index }})"
+                                                class="shrink-0 rounded px-1 text-[9px] font-black text-up-mint hover:bg-up-mint/20 cursor-pointer"
+                                                :aria-expanded="isFitExpanded({{ $loop->index }})">
+                                            <span x-text="isFitExpanded({{ $loop->index }}) ? 'Collapse' : 'Expand'">Expand</span>
+                                            <svg class="inline w-2.5 h-2.5 transition-transform" :class="isFitExpanded({{ $loop->index }}) ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                    @endif
+                                </span>
                             @endif
                         </span>
                     </span>
