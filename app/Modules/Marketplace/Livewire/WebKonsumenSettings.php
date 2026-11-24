@@ -80,6 +80,7 @@ class WebKonsumenSettings extends Component
         'show_tier_teaser' => true,
         'catalog_per_page' => 24,
         'hide_out_of_stock' => false,
+        'default_product_photo' => false,
         'allowed_filters' => [
             'enabled' => true,
             'kategori' => true,
@@ -254,6 +255,7 @@ class WebKonsumenSettings extends Component
         $this->stockForm['show_tier_teaser'] = (bool) ($settings['show_tier_teaser'] ?? true);
         $this->stockForm['catalog_per_page'] = (int) ($settings['catalog_per_page'] ?? 24);
         $this->stockForm['hide_out_of_stock'] = (bool) ($settings['hide_out_of_stock'] ?? false);
+        $this->stockForm['default_product_photo'] = (bool) ($settings['default_product_photo'] ?? false);
         $allowedFilters = $asArray($settings['allowed_filters'] ?? null, []);
         if (! empty($allowedFilters)) {
             $this->stockForm['allowed_filters'] = array_merge($this->stockForm['allowed_filters'], $allowedFilters);
@@ -365,6 +367,7 @@ class WebKonsumenSettings extends Component
             'show_tier_teaser' => $this->stockForm['show_tier_teaser'],
             'catalog_per_page' => $this->stockForm['catalog_per_page'],
             'hide_out_of_stock' => (bool) $this->stockForm['hide_out_of_stock'],
+            'default_product_photo' => (bool) $this->stockForm['default_product_photo'],
             'allowed_filters' => $this->stockForm['allowed_filters'],
 
             // Contact & Popup

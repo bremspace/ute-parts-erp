@@ -964,7 +964,7 @@
                     $customer = auth('customer')->user();
                     $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                     $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
-                    $thumbImg = $p->thumbnail_url ?: $p->gambar;
+                    $thumbImg = $p->thumbnail_url ?: $p->gambar ?: $fotoDefault;
                     $catDisplay = ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? (is_array($p->kategori) ? implode(', ', $p->kategori) : (string) $p->kategori);
                     $catVal = $p->kategori_id ?: $catDisplay;
                     $firstModel = ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) ? $p->tipeHps->first()?->model : null;
@@ -1118,7 +1118,7 @@
                     $customer = auth('customer')->user();
                     $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                     $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
-                    $thumbImg = $p->thumbnail_url ?: $p->gambar;
+                    $thumbImg = $p->thumbnail_url ?: $p->gambar ?: $fotoDefault;
                     $catDisplay = ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? (is_array($p->kategori) ? implode(', ', $p->kategori) : (string) $p->kategori);
                     $catVal = $p->kategori_id ?: $catDisplay;
                     $firstModel = ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) ? $p->tipeHps->first()?->model : null;
@@ -1237,7 +1237,7 @@
                         $customer = auth('customer')->user();
                         $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                         $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
-                        $thumbImg = $p->thumbnail_url ?: $p->gambar;
+                        $thumbImg = $p->thumbnail_url ?: $p->gambar ?: $fotoDefault;
                     @endphp
                     <div class="px-2 py-1.5 sm:px-3 sm:py-2 lg:px-3.5 lg:py-2.5 flex flex-col lg:flex-row lg:items-center justify-start lg:justify-between gap-1 sm:gap-2 lg:gap-3 hover:bg-ink-50 dark:hover:bg-white/[0.03] transition-colors group">
                         <!-- Nama produk memakai penuh lebar sampai kanan -->
