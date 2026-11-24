@@ -486,7 +486,9 @@ class ShopPage extends Component
             ->with(['hargaTier', 'skuVariants', 'satuanKonversi']);
 
         $filters = [
-            'search' => $this->search,
+            // Pencarian teks memakai logika suggestion yang ketat (model + merek spesifik),
+            // bukan filterKatalog lama yang menyatukan semua keyword jadi satu daftar TipeHp.
+            'search' => '',
             'auto_relevance' => false,
             'kategori' => $this->filterKategori,
             'kondisi' => $this->filterKondisi,
@@ -498,6 +500,11 @@ class ShopPage extends Component
             'harga_max' => $this->hargaMax,
         ];
         $query->filterKatalog($filters);
+
+        if (trim($this->search) !== '') {
+            app(\App\Modules\Wms\Services\SmartSearchService::class)
+                ->applySuggestionSearch($query, $this->search);
+        }
 
         // [CMS] Sembunyikan produk kosong (stok 0) jika diaktifkan di pengaturan web-konsumen
         $hideOutOfStock = (bool) app(WebKonsumenService::class)->get('hide_out_of_stock', false);
