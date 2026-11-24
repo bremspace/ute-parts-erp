@@ -630,6 +630,22 @@
 
                 <div class="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-4">
                     <div>
+                        <div class="text-xs font-semibold text-white">Foto Default Produk</div>
+                        <div class="text-[11px] text-ink-400">Jika aktif, produk tanpa foto memakai gambar default UTEParts di katalog & suggestion.</div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <span class="text-[11px] font-semibold min-w-[56px] text-right {{ $stockForm['default_product_photo'] ? 'text-up-primary' : 'text-ink-500' }}">
+                            {{ $stockForm['default_product_photo'] ? 'Aktif' : 'Nonaktif' }}
+                        </span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" wire:model.live="stockForm.default_product_photo" class="sr-only peer">
+                            <div class="w-11 h-6 bg-white/10 border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-primary peer-checked:border-up-primary/50"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-4">
+                    <div>
                         <div class="text-xs font-semibold text-white">Sembunyikan Produk Kosong</div>
                         <div class="text-[11px] text-ink-400">Jika aktif, produk dengan stok 0 tidak ditampilkan di katalog toko publik.</div>
                     </div>
@@ -686,6 +702,22 @@
                         </div>
                         <input type="checkbox" wire:model.live="stockForm.show_tier_teaser" class="rounded border-white/20 text-up-primary focus:ring-0">
                     </label>
+                </div>
+
+                <div class="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-4">
+                    <div>
+                        <div class="text-xs font-semibold text-white">Jumlah Produk per Halaman Katalog</div>
+                        <div class="text-[11px] text-ink-400">Atur berapa produk ditampilkan sebelum pagination.</div>
+                    </div>
+                    <div class="w-36">
+                        <select wire:model.live="stockForm.catalog_per_page"
+                                class="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
+                            <option value="12">12 produk</option>
+                            <option value="24">24 produk</option>
+                            <option value="36">36 produk</option>
+                            <option value="48">48 produk</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="pt-3 border-t border-white/[0.06] space-y-3">

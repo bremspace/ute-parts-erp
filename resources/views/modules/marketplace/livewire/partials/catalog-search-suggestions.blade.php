@@ -2,13 +2,12 @@
     <div x-show="suggestionsOpen"
          x-cloak
          x-transition.opacity
-         class="absolute left-0 right-0 top-full mt-2 z-[80] rounded-2xl bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10 shadow-2xl overflow-hidden">
-        <div class="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-ink-400 border-b border-ink-100 dark:border-white/5">
+         class="absolute left-0 right-0 top-full mt-2 z-[80] rounded-2xl bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10 shadow-2xl overflow-y-auto overscroll-contain"
+         style="max-height: min(70vh, 420px); overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch;">
+        <div class="sticky top-0 z-20 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-ink-400 bg-white dark:bg-ink-900 border-b border-ink-100 dark:border-white/5">
             Saran produk
         </div>
-        <div class="max-h-[min(60vh,360px)] overflow-y-auto overscroll-contain divide-y divide-ink-100 dark:divide-white/5"
-             style="max-height: min(60vh, 360px); overscroll-behavior: contain; touch-action: pan-y;">
-
+        <div class="divide-y divide-ink-100 dark:divide-white/5">
             @foreach($searchSuggestions as $s)
                 <a href="{{ route('shop.detail', $s['slug']) }}"
                    @click="suggestionsOpen = false"
@@ -62,7 +61,7 @@
         </div>
         <button type="button"
                 @click="suggestionsOpen = false; document.getElementById('katalog-produk')?.scrollIntoView({ behavior: 'smooth' })"
-                class="w-full px-3 py-2.5 text-[11px] font-bold text-up-primary bg-up-primary/5 hover:bg-up-primary/10 cursor-pointer">
+                class="sticky bottom-0 z-20 w-full px-3 py-2.5 text-[11px] font-bold text-up-primary bg-white dark:bg-ink-900 border-t border-ink-100 dark:border-white/5 hover:bg-up-primary/5 cursor-pointer">
             Lihat semua hasil untuk “{{ $search }}”
         </button>
     </div>

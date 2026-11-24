@@ -390,6 +390,28 @@ class ShopPage extends Component
         });
     }
 
+    /**
+     * Jumlah produk per halaman katalog dari pengaturan web konsumen.
+     */
+    public function getCatalogPerPageProperty(): int
+    {
+        $perPage = (int) app(WebKonsumenService::class)->get('catalog_per_page', 24);
+
+        return max(6, min(96, $perPage > 0 ? $perPage : 24));
+    }
+
+    /**
+     * Foto default saat produk belum punya foto dan opsi aktif di pengaturan.
+     */
+    public function getFotoDefaultProperty(): ?string
+    {
+        if (! app(WebKonsumenService::class)->get('default_product_photo', false)) {
+            return null;
+        }
+
+        return '/images/default-product.svg';
+    }
+
     public function getProductsProperty()
     {
         // [B-15a] withSum (bukan withCount) supaya total stok per kartu datang
@@ -438,7 +460,7 @@ class ShopPage extends Component
             $query->urutKetersediaanDanTerlaris();
         }
 
-        return $query->paginate(24);
+        return $query->paginate($this->catalogPerPage);
     }
 
     /**
@@ -477,7 +499,7 @@ class ShopPage extends Component
                     'nama' => $p->nama,
                     'sku' => $p->sku,
                     'slug' => $p->slug,
-                    'gambar' => $p->thumbnail_url ?: $p->gambar,
+                    'gambar' => $p->thumbnail_url ?: $p->gambar ?: $this->fotoDefault,
                     'harga' => (float) ($price['harga'] ?? $p->harga_jual_retail ?? 0),
                     'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
                     'kategori' => (string) ($p->kategori ?: $p->kategoriRelasi?->nama ?: ''),
@@ -920,6 +942,7 @@ class ShopPage extends Component
             'filterKondisi' => $this->filterKondisi,
             'search' => $this->search,
             'searchSuggestions' => $this->searchSuggestions,
+            'fotoDefault' => $this->fotoDefault,
         ])->layout('layouts.marketplace', [
             'title' => $metaTitle,
         ]);
