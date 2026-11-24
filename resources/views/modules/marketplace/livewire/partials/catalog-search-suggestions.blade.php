@@ -21,6 +21,17 @@
                     <span class="min-w-0 flex-1">
                         <span class="block text-[11px] font-bold text-ink-900 dark:text-white leading-tight break-words">{{ $s['nama'] }}</span>
                         <span class="block text-[10px] text-ink-400 font-mono truncate">{{ $s['sku'] ?: '-' }}</span>
+                        <span class="mt-0.5 flex items-center gap-1 flex-wrap text-[9px] leading-none">
+                            @if(!empty($s['kategori']))
+                                <span class="px-1.5 py-0.5 rounded bg-ink-100 dark:bg-white/5 text-ink-500 dark:text-ink-300 font-semibold truncate max-w-[100px]" title="{{ $s['kategori'] }}">{{ $s['kategori'] }}</span>
+                            @endif
+                            @if(!empty($s['kualitas']))
+                                <span class="px-1.5 py-0.5 rounded bg-up-primary/10 text-up-primary font-bold truncate max-w-[90px]" title="Kualitas {{ $s['kualitas'] }}">{{ $s['kualitas'] }}</span>
+                            @endif
+                            @if(!empty($s['kompatibel']))
+                                <span class="px-1.5 py-0.5 rounded bg-up-mint/10 text-up-mint font-bold truncate max-w-[120px]" title="Kompatibel: {{ $s['kompatibel'] }}">Fit: {{ $s['kompatibel'] }}</span>
+                            @endif
+                        </span>
                     </span>
                     <span class="shrink-0 text-right">
                         <span class="block text-[11px] font-bold text-up-primary tabular-nums">Rp {{ number_format($s['harga'], 0, ',', '.') }}</span>

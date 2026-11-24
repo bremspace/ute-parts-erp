@@ -456,7 +456,7 @@ class ShopPage extends Component
         return Produk::query()
             ->where('produk.is_active', true)
             ->withSum('stokItems', 'jumlah')
-            ->with(['hargaTier', 'satuanKonversi'])
+            ->with(['hargaTier', 'satuanKonversi', 'kualitas', 'tipeHps'])
             ->filterKatalog([
                 'search' => $q,
                 'auto_relevance' => true,
@@ -465,6 +465,11 @@ class ShopPage extends Component
             ->get()
             ->map(function (Produk $p) {
                 $price = app(PricingService::class)->resolve($p, auth('customer')->user());
+                $kompatibel = $p->daftarKompatibel;
+                $fit = $kompatibel->take(2)->join(', ');
+                if ($kompatibel->count() > 2) {
+                    $fit .= ' +'.($kompatibel->count() - 2);
+                }
 
                 return [
                     'id' => $p->id,
@@ -474,6 +479,9 @@ class ShopPage extends Component
                     'gambar' => $p->thumbnail_url ?: $p->gambar,
                     'harga' => (float) ($price['harga'] ?? $p->harga_jual_retail ?? 0),
                     'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
+                    'kategori' => (string) ($p->kategori ?: $p->kategoriRelasi?->nama ?: ''),
+                    'kompatibel' => $fit,
+                    'kualitas' => (string) ($p->kualitas?->nama ?: $p->kondisi ?: ''),
                 ];
             });
     }
