@@ -15,7 +15,7 @@ class HybridSyncOutboxService
      */
     public function enqueue(string $eventType, Model $entity, array $payload, ?int $cabangId = null): ?HybridSyncOutbox
     {
-        if (! config('sync.enabled')) {
+        if (SyncExecutionGuard::isSuppressed() || ! config('sync.enabled')) {
             return null;
         }
 

@@ -87,6 +87,9 @@
                 </button>
             </div>
 
+            <!-- [Hybrid Sync Indicator] (T-14..T-16) -->
+            <x-prism.sync-badge class="flex-shrink-0" />
+
             @can('servis.create')
                 <button
                     type="button"

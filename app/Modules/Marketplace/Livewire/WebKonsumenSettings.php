@@ -323,6 +323,15 @@ class WebKonsumenSettings extends Component
 
     public function save(WebKonsumenService $service, AuditService $audit): void
     {
+        // Semua upload gambar wajib divalidasi di server. accept="image/*" di HTML
+        // bisa dilewati, jadi tanpa rule ini file .php/.svg bisa mendarat di disk publik.
+        $this->validate([
+            'uploadLogo' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',
+            'uploadLoginBg' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',
+            'uploadHeroBg' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',
+            'uploadDefaultProductPhoto' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',
+        ]);
+
         // Handle upload logo bila ada
         if ($this->uploadLogo) {
             $path = $this->uploadLogo->store('web-konsumen', 'public');

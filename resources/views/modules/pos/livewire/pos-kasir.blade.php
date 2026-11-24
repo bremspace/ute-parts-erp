@@ -1039,6 +1039,9 @@
                         <span class="min-w-[18px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-mono font-semibold flex items-center justify-center tabular-nums">{{ $ditahanList->count() }}</span>
                     @endif
                 </button>
+
+                <!-- [Hybrid Sync Indicator & Quick Trigger] (T-14..T-16) -->
+                <x-prism.sync-badge class="shrink-0" />
                 </div>
             </div>
 
