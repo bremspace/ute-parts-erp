@@ -19,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -69,6 +70,14 @@ class ShopPage extends Component
 
     #[Url(as: 'sort', except: '')]
     public string $sort = '';
+
+    /** Halaman tambahan yang sudah dimuat saat infinite scroll aktif. */
+    public int $loadedPages = 1;
+
+    /** Jumlah suggestion keyword yang sudah dimuat (auto-load saat scroll). */
+    public int $suggestionLimit = 6;
+
+    private ?array $suggestionsDataMemo = null;
 
     #[Url(as: 'hargaMax', except: null)]
     public ?int $hargaMax = null;
@@ -173,18 +182,21 @@ class ShopPage extends Component
     public function setFilterKategori(string $kategori): void
     {
         $this->filterKategori = ($this->filterKategori === $kategori) ? '' : $kategori;
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
     public function setFilterHpModel(string $model): void
     {
         $this->filterHpModel = ($this->filterHpModel === $model) ? '' : $model;
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
     public function setFilterBrand(string $brand): void
     {
         $this->filterBrand = ($this->filterBrand === $brand) ? '' : $brand;
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
@@ -203,9 +215,29 @@ class ShopPage extends Component
         return ucwords(str_replace(['-', '_'], ' ', $this->filterKategori));
     }
 
+    public function updated($propertyName, $value): void
+    {
+        $filterProps = [
+            'search', 'filterKategori', 'filterKondisi', 'filterBrand',
+            'filterHpMerk', 'filterHpModel', 'filterKualitas', 'filterStok',
+            'hargaMax', 'sort', 'selectedGadgetModel',
+        ];
+
+        if (in_array($propertyName, $filterProps, true)) {
+            $this->loadedPages = 1;
+            $this->resetPage();
+        }
+        if ($propertyName === 'search') {
+            $this->suggestionLimit = 6;
+            $this->suggestionsDataMemo = null;
+        }
+    }
+
     public function updatingSearch()
     {
         $this->resetPage();
+        $this->suggestionLimit = 6;
+        $this->suggestionsDataMemo = null;
     }
 
     public function updatedFilterKategori()
@@ -270,6 +302,7 @@ class ShopPage extends Component
             'sort' => $this->sort = '',
             default => null,
         };
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
@@ -285,6 +318,7 @@ class ShopPage extends Component
         $this->filterStok = '';
         $this->hargaMax = null;
         $this->sort = '';
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
@@ -389,6 +423,59 @@ class ShopPage extends Component
         });
     }
 
+    public function getLazyLoadEnabledProperty(): bool
+    {
+        return (bool) app(WebKonsumenService::class)->get('catalog_lazy_load', true);
+    }
+
+    public function getInfiniteScrollEnabledProperty(): bool
+    {
+        return (bool) app(WebKonsumenService::class)->get('catalog_infinite_scroll', false);
+    }
+
+    public function loadMoreSuggestions(): void
+    {
+        if (mb_strlen(trim($this->search)) < 2 || ! $this->suggestionsData()['has_more']) {
+            return;
+        }
+
+        $this->suggestionLimit = min(120, $this->suggestionLimit + 6);
+        $this->suggestionsDataMemo = null;
+    }
+
+    public function loadMoreProducts(): void
+    {
+        if (! $this->infiniteScrollEnabled) {
+            return;
+        }
+
+        $this->loadedPages = min(50, $this->loadedPages + 1);
+    }
+
+    /**
+     * Jumlah produk per halaman katalog dari pengaturan web konsumen.
+     */
+    public function getCatalogPerPageProperty(): int
+    {
+        $perPage = (int) app(WebKonsumenService::class)->get('catalog_per_page', 24);
+
+        return max(6, min(96, $perPage > 0 ? $perPage : 24));
+    }
+
+    /**
+     * Foto default saat produk belum punya foto dan opsi aktif di pengaturan.
+     */
+    public function getFotoDefaultProperty(): ?string
+    {
+        if (! app(WebKonsumenService::class)->get('default_product_photo', false)) {
+            return null;
+        }
+
+        $custom = (string) (app(WebKonsumenService::class)->get('default_product_photo_url', '') ?: '');
+
+        return $custom !== '' ? $custom : '/images/default-product.svg';
+    }
+
     public function getProductsProperty()
     {
         // [B-15a] withSum (bukan withCount) supaya total stok per kartu datang
@@ -399,7 +486,9 @@ class ShopPage extends Component
             ->with(['hargaTier', 'skuVariants', 'satuanKonversi']);
 
         $filters = [
-            'search' => $this->search,
+            // Pencarian teks memakai logika suggestion yang ketat (model + merek spesifik),
+            // bukan filterKatalog lama yang menyatukan semua keyword jadi satu daftar TipeHp.
+            'search' => '',
             'auto_relevance' => false,
             'kategori' => $this->filterKategori,
             'kondisi' => $this->filterKondisi,
@@ -411,6 +500,11 @@ class ShopPage extends Component
             'harga_max' => $this->hargaMax,
         ];
         $query->filterKatalog($filters);
+
+        if (trim($this->search) !== '') {
+            app(\App\Modules\Wms\Services\SmartSearchService::class)
+                ->applySuggestionSearch($query, $this->search);
+        }
 
         // [CMS] Sembunyikan produk kosong (stok 0) jika diaktifkan di pengaturan web-konsumen
         $hideOutOfStock = (bool) app(WebKonsumenService::class)->get('hide_out_of_stock', false);
@@ -428,7 +522,7 @@ class ShopPage extends Component
         } elseif ($this->sort === 'terbaru') {
             $query->latest('produk.id');
         } elseif ($this->sort === 'terlaris') {
-            $query->orderByDesc('total_terjual')->orderByDesc('stok_katalog');
+            $query->urutTerlaris();
         } elseif (! empty($this->search)) {
             $query->urutkanRelevansi($this->search);
         } elseif (! $this->sort && $this->filterHpModel) {
@@ -437,7 +531,78 @@ class ShopPage extends Component
             $query->urutKetersediaanDanTerlaris();
         }
 
-        return $query->paginate(24);
+        $perPage = $this->infiniteScrollEnabled
+            ? $this->catalogPerPage * $this->loadedPages
+            : $this->catalogPerPage;
+
+        return $query->paginate($perPage);
+    }
+
+    /**
+     * Auto suggestion pencarian katalog (mobile/tablet).
+     * Token cocok di nama/model/brand utama, SKU/barcode eksplisit, atau
+     * kompatibilitas tipe HP spesifik (model + merek), bukan perluasan merek saja.
+     */
+    private function suggestionsData(): array
+    {
+        if ($this->suggestionsDataMemo !== null) {
+            return $this->suggestionsDataMemo;
+        }
+
+        $q = trim($this->search);
+        if (mb_strlen($q) < 2) {
+            return $this->suggestionsDataMemo = ['rows' => collect(), 'has_more' => false];
+        }
+
+        $searchService = app(SmartSearchService::class);
+        $rows = Produk::query()
+            ->where('produk.is_active', true)
+            ->withSum('stokItems', 'jumlah')
+            ->with(['hargaTier', 'satuanKonversi', 'kualitas', 'tipeHps']);
+        $searchService->applySuggestionSearch($rows, $q);
+        $searchService->applyRelevanceRanking($rows, $q);
+        $rows = $rows->limit($this->suggestionLimit + 1)->get();
+
+        $hasMore = $rows->count() > $this->suggestionLimit;
+        $rows = $rows->take($this->suggestionLimit)->map(function (Produk $p) {
+            $price = app(PricingService::class)->resolve($p, auth('customer')->user());
+            $kompatibel = $p->daftarKompatibel;
+            $fit = $kompatibel->join(', ');
+            $fitNeedExpand = mb_strlen($fit) > 70;
+            $fitShort = $fitNeedExpand
+                ? $kompatibel->take(2)->join(', ').($kompatibel->count() > 2 ? ' +'.($kompatibel->count() - 2) : '')
+                : $fit;
+
+            return [
+                'id' => $p->id,
+                'nama' => $p->nama,
+                'sku' => $p->sku,
+                'slug' => $p->slug,
+                'gambar' => $p->thumbnail_url ?: $p->gambar ?: $this->fotoDefault,
+                'harga' => (float) ($price['harga'] ?? $p->harga_jual_retail ?? 0),
+                'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
+                'kategori' => (string) ($p->kategori ?: $p->kategoriRelasi?->nama ?: ''),
+                'kompatibel' => $fit,
+                'kompatibel_short' => $fitShort,
+                'kompatibel_need_expand' => $fitNeedExpand,
+                'kompatibel_count' => $kompatibel->count(),
+                'kualitas' => (string) ($p->kualitas?->nama ?: $p->kondisi ?: ''),
+            ];
+        });
+
+        return $this->suggestionsDataMemo = ['rows' => $rows, 'has_more' => $hasMore];
+    }
+
+    #[Computed]
+    public function searchSuggestions(): Collection
+    {
+        return $this->suggestionsData()['rows'];
+    }
+
+    #[Computed]
+    public function searchSuggestionsHasMore(): bool
+    {
+        return (bool) $this->suggestionsData()['has_more'];
     }
 
     public function getProductDetailProperty(): ?Produk
@@ -869,6 +1034,13 @@ class ShopPage extends Component
             'filterBrand' => $this->filterBrand,
             'filterKondisi' => $this->filterKondisi,
             'search' => $this->search,
+            'searchSuggestions' => $this->searchSuggestions,
+            'suggestionHasMore' => $this->searchSuggestionsHasMore,
+            'suggestionLimit' => $this->suggestionLimit,
+            'fotoDefault' => $this->fotoDefault,
+            'lazyLoad' => $this->lazyLoadEnabled,
+            'infiniteScroll' => $this->infiniteScrollEnabled,
+            'loadedPages' => $this->loadedPages,
         ])->layout('layouts.marketplace', [
             'title' => $metaTitle,
         ]);

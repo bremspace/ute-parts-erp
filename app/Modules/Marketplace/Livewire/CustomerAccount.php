@@ -6,6 +6,7 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Marketplace\Models\PelangganDeviceSession;
+use App\Modules\Marketplace\Support\HargaTampilan;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Services\SessionManagementService;
@@ -488,6 +489,23 @@ class CustomerAccount extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Kata sandi akun Anda berhasil diperbarui.']);
     }
 
+    /**
+     * Data coret/potongan item pada rincian pesanan.
+     */
+    public function getOrderHargaTampilanProperty(): array
+    {
+        if (! $this->selectedOrder) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($this->selectedOrder->items as $item) {
+            $rows[$item->id] = HargaTampilan::dariOrderItem($item);
+        }
+
+        return $rows;
+    }
+
     public function render()
     {
         // [B-15c] Computed property WAJIB di-pass eksplisit ke view — blade memakai
@@ -497,6 +515,7 @@ class CustomerAccount extends Component
             'customer' => auth('customer')->user(),
             'orders' => $this->orders,
             'selectedOrder' => $this->selectedOrder,
+            'orderHargaTampilan' => $this->orderHargaTampilan,
             'servis' => $this->servis,
             'notifikasi' => $this->notifikasi,
             'komisi' => $this->komisi,

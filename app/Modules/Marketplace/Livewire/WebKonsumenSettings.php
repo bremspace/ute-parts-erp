@@ -36,6 +36,8 @@ class WebKonsumenSettings extends Component
 
     public $uploadHeroBg = null;
 
+    public $uploadDefaultProductPhoto = null;
+
     public $uploadBannerDesktop = null;
 
     public $uploadBannerMobile = null;
@@ -80,6 +82,10 @@ class WebKonsumenSettings extends Component
         'show_tier_teaser' => true,
         'catalog_per_page' => 24,
         'hide_out_of_stock' => false,
+        'default_product_photo' => false,
+        'default_product_photo_url' => '',
+        'catalog_lazy_load' => true,
+        'catalog_infinite_scroll' => false,
         'allowed_filters' => [
             'enabled' => true,
             'kategori' => true,
@@ -254,6 +260,10 @@ class WebKonsumenSettings extends Component
         $this->stockForm['show_tier_teaser'] = (bool) ($settings['show_tier_teaser'] ?? true);
         $this->stockForm['catalog_per_page'] = (int) ($settings['catalog_per_page'] ?? 24);
         $this->stockForm['hide_out_of_stock'] = (bool) ($settings['hide_out_of_stock'] ?? false);
+        $this->stockForm['default_product_photo'] = (bool) ($settings['default_product_photo'] ?? false);
+        $this->stockForm['default_product_photo_url'] = (string) ($settings['default_product_photo_url'] ?? '');
+        $this->stockForm['catalog_lazy_load'] = (bool) ($settings['catalog_lazy_load'] ?? true);
+        $this->stockForm['catalog_infinite_scroll'] = (bool) ($settings['catalog_infinite_scroll'] ?? false);
         $allowedFilters = $asArray($settings['allowed_filters'] ?? null, []);
         if (! empty($allowedFilters)) {
             $this->stockForm['allowed_filters'] = array_merge($this->stockForm['allowed_filters'], $allowedFilters);
@@ -293,6 +303,12 @@ class WebKonsumenSettings extends Component
         $this->previewDevice = $device;
     }
 
+    public function removeDefaultProductPhoto(): void
+    {
+        $this->stockForm['default_product_photo_url'] = '';
+        $this->uploadDefaultProductPhoto = null;
+    }
+
     public function removeHeroBg(): void
     {
         $this->heroForm['hero_bg_image'] = '';
@@ -326,6 +342,13 @@ class WebKonsumenSettings extends Component
             $path = $this->uploadHeroBg->store('web-konsumen', 'public');
             $this->heroForm['hero_bg_image'] = '/storage/'.$path;
             $this->uploadHeroBg = null;
+        }
+
+        // Handle upload foto default produk bila ada
+        if ($this->uploadDefaultProductPhoto) {
+            $path = $this->uploadDefaultProductPhoto->store('web-konsumen', 'public');
+            $this->stockForm['default_product_photo_url'] = '/storage/'.$path;
+            $this->uploadDefaultProductPhoto = null;
         }
 
         $before = $service->getAll();
@@ -365,6 +388,10 @@ class WebKonsumenSettings extends Component
             'show_tier_teaser' => $this->stockForm['show_tier_teaser'],
             'catalog_per_page' => $this->stockForm['catalog_per_page'],
             'hide_out_of_stock' => (bool) $this->stockForm['hide_out_of_stock'],
+            'default_product_photo' => (bool) $this->stockForm['default_product_photo'],
+            'default_product_photo_url' => (string) $this->stockForm['default_product_photo_url'],
+            'catalog_lazy_load' => (bool) $this->stockForm['catalog_lazy_load'],
+            'catalog_infinite_scroll' => (bool) $this->stockForm['catalog_infinite_scroll'],
             'allowed_filters' => $this->stockForm['allowed_filters'],
 
             // Contact & Popup

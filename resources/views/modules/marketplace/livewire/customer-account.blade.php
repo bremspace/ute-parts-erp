@@ -1000,13 +1000,37 @@
                                                         Varian: {{ $item->skuVariant->warna ?? $item->skuVariant->kode_sku }}
                                                     </p>
                                                 @endif
-                                                <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">
-                                                    {{ $item->jumlah }}{{ ($item->satuan && $item->satuan !== 'pcs') ? ' '.$item->satuan : '' }} × Rp {{ number_format($item->harga_satuan, 0, ',', '.') }}@if(($item->satuan ?? 'pcs') !== 'pcs' && (float) ($item->konversi ?? 1) > 1) <span class="text-[9px] text-ink-400">({{ (int) ($item->jumlah * ($item->konversi ?? 1)) }} pcs)</span>@endif
+                                                @php $tampil = $orderHargaTampilan[$item->id] ?? []; @endphp
+                                                <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                                    <span>
+                                                        {{ (int) ($tampil['qty_pcs'] ?? $item->jumlah) }} pcs ×
+                                                        <span class="line-through text-ink-400 tabular-nums">Rp {{ number_format((float) ($tampil['asli_per_pcs'] ?? $item->harga_satuan), 0, ',', '.') }}</span>
+                                                        @if(($tampil['potongan_per_pcs'] ?? 0) > 0)
+                                                            <span class="text-up-mint font-bold tabular-nums">Rp {{ number_format((float) $tampil['akhir_per_pcs'], 0, ',', '.') }}/PCS</span>
+                                                        @endif
+                                                    </span>
+                                                    @if(($item->satuan ?? 'pcs') !== 'pcs' && (float) ($item->konversi ?? 1) > 1)
+                                                        <span class="px-1.5 py-0.2 rounded bg-up-mint/10 text-up-mint text-[9px] font-bold" title="Box penuh pakai harga box, sisa pcs pakai harga retail">
+                                                            {{ (int) $item->jumlah }} {{ $item->satuan }}
+                                                        </span>
+                                                    @endif
+                                                    @if(($tampil['potongan_total'] ?? 0) > 0)
+                                                        <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-black">
+                                                            {{ $tampil['label'] }} -Rp {{ number_format((float) $tampil['potongan_total'], 0, ',', '.') }}
+                                                        </span>
+                                                    @endif
                                                 </p>
                                             </div>
-                                            <span class="font-mono font-bold text-ink-900 dark:text-white tabular-nums shrink-0">
-                                                Rp {{ number_format($item->subtotal, 0, ',', '.') }}
-                                            </span>
+                                            <div class="text-right shrink-0">
+                                                @if(($tampil['potongan_total'] ?? 0) > 0)
+                                                    <div class="text-[9px] text-ink-400 line-through tabular-nums">
+                                                        Rp {{ number_format((float) $tampil['asli_total'], 0, ',', '.') }}
+                                                    </div>
+                                                @endif
+                                                <span class="font-mono font-bold text-ink-900 dark:text-white tabular-nums">
+                                                    Rp {{ number_format($item->subtotal, 0, ',', '.') }}
+                                                </span>
+                                            </div>
                                         </div>
                                     @endforeach
                                 </div>
@@ -1026,7 +1050,7 @@
                                 @endif
                                 @if((float) $selectedOrder->diskon_nominal > 0)
                                     <div class="flex justify-between text-up-mint">
-                                        <span>Potongan Diskon</span>
+                                        <span>Potongan Member</span>
                                         <span class="font-mono tabular-nums">-Rp {{ number_format($selectedOrder->diskon_nominal, 0, ',', '.') }}</span>
                                     </div>
                                 @endif

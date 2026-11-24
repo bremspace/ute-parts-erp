@@ -102,17 +102,100 @@
     </script>
 @endpush
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12"
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-5 lg:py-10 space-y-4 sm:space-y-6 lg:space-y-12"
      x-data="{
-        viewMode: localStorage.getItem('ute-shop-view-mode') || 'grid',
+        viewMode: ['grid', 'list', 'compact'].includes(localStorage.getItem('ute-shop-view-mode'))
+            ? localStorage.getItem('ute-shop-view-mode')
+            : 'grid',
+        mobileFilterOpen: false,
+        suggestionsOpen: false,
         previewImg: null,
-        openPreview(url) { this.previewImg = url; },
-        closePreview() { this.previewImg = null; },
+        previewNama: '',
+        suggestionLoading: false,
+        suggestionObserver: null,
+        fitExpanded: {},
+        toggleFit(key) { this.fitExpanded[key] = !this.fitExpanded[key]; },
+        isFitExpanded(key) { return Boolean(this.fitExpanded[key]); },
+        initSuggestionScroll() {
+            this.$nextTick(() => {
+                if (this.suggestionObserver) this.suggestionObserver.disconnect();
+                const panel = this.$refs.suggestionPanel;
+                const sentinel = this.$refs.suggestionSentinel;
+                if (!panel || !sentinel) return;
+                this.suggestionObserver = new IntersectionObserver((entries) => {
+                    if (entries[0].isIntersecting && document.contains(sentinel)) this.loadMoreSuggestions();
+                }, { root: panel, rootMargin: '120px 0px' });
+                this.suggestionObserver.observe(sentinel);
+            });
+        },
+        async loadMoreSuggestions() {
+            if (this.suggestionLoading) return;
+            this.suggestionLoading = true;
+            try {
+                if (typeof this.$wire.loadMoreSuggestions === 'function') await this.$wire.loadMoreSuggestions();
+            } finally {
+                setTimeout(() => { this.suggestionLoading = false; }, 500);
+            }
+        },
+        openPreview(url, nama = '') { this.previewImg = url; this.previewNama = nama; },
+        closePreview() { this.previewImg = null; this.previewNama = ''; },
+        setPreview(data) {
+            const d = Array.isArray(data) ? data[0] : data;
+            this.openPreview((d && typeof d === 'object') ? (d.url || '') : (d || ''), (d && typeof d === 'object') ? (d.nama || '') : '');
+        },
         setViewMode(mode) {
             this.viewMode = mode;
             try { localStorage.setItem('ute-shop-view-mode', mode); } catch (e) {}
         }
-     }">
+     }"
+     @open-preview.window="setPreview($event.detail)"
+     @keydown.escape.window="closePreview()">
+    <!-- MOBILE/TABLET: search-first bar + quick HP chips -->
+    <div class="lg:hidden sticky top-16 z-30 -mx-4 px-4 sm:-mx-6 sm:px-6 py-2 bg-white/95 dark:bg-[#090D16]/95 backdrop-blur-xl border-b border-ink-100 dark:border-white/10">
+        <div class="flex items-center gap-2">
+            <div class="relative flex-1 min-w-0" @click.outside="suggestionsOpen = false" @keydown.escape.window="suggestionsOpen = false">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input type="text"
+                       wire:model.live.debounce.250ms="search"
+                       @focus="suggestionsOpen = true"
+                       @input="suggestionsOpen = true"
+                       placeholder="Cari LCD, baterai, model HP, SKU..."
+                       class="w-full pl-9 pr-9 py-2.5 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-ink-900 dark:text-white placeholder-ink-400 text-[15px] font-medium focus:outline-none focus:border-up-primary focus:ring-4 focus:ring-up-primary/10">
+                @if(!empty($search))
+                    <button type="button" wire:click="$set('search', '')" class="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-ink-400 hover:text-up-red cursor-pointer" aria-label="Hapus pencarian">✕</button>
+                @endif
+
+                @include('modules.marketplace.livewire.partials.catalog-search-suggestions')
+            </div>
+            <button type="button"
+                    @click="mobileFilterOpen = !mobileFilterOpen"
+                    class="relative shrink-0 h-[42px] px-3 rounded-xl bg-ink-900 dark:bg-white text-white dark:text-ink-950 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                <span>Filter</span>
+                @if(!empty($hasActiveFilters ?? false))
+                    <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-up-accent ring-2 ring-white dark:ring-[#090D16]"></span>
+                @endif
+            </button>
+        </div>
+
+        @if(!empty($hpMerkList))
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-2 -mx-4 px-4 sm:-mx-6 sm:px-6">
+            <button type="button" wire:click="$set('filterHpMerk', '')"
+                    class="shrink-0 px-2.5 py-1 rounded-full border text-[11px] font-bold cursor-pointer {{ empty($filterHpMerk) ? 'bg-up-primary text-white border-up-primary' : 'bg-white dark:bg-ink-900 text-ink-600 dark:text-ink-300 border-ink-200 dark:border-white/10' }}">
+                Semua HP
+            </button>
+            @foreach(array_slice($hpMerkList, 0, 10) as $m)
+                <button type="button" wire:click="$set('filterHpMerk', @js($m))"
+                        class="shrink-0 px-2.5 py-1 rounded-full border text-[11px] font-bold cursor-pointer {{ $filterHpMerk === $m ? 'bg-up-primary text-white border-up-primary' : 'bg-white dark:bg-ink-900 text-ink-600 dark:text-ink-300 border-ink-200 dark:border-white/10' }}">
+                    {{ $m }}
+                </button>
+            @endforeach
+        </div>
+        @endif
+    </div>
+
     @php
         $heroDisplayMode = $webConfig['hero_display_mode'] ?? 'hero_standard';
         $heroBanners = $webBanners->where('posisi', 'hero_slider');
@@ -147,7 +230,7 @@
              @touchstart.passive="handleTouchStart($event)"
              @touchend.passive="handleTouchEnd($event)">
         <!-- Banner Slides Frame -->
-        <div class="relative w-full aspect-[16/9] sm:aspect-[21/9] min-h-[260px] sm:min-h-[360px] lg:min-h-[420px] overflow-hidden">
+        <div class="relative w-full aspect-[16/9] sm:aspect-[21/9] min-h-[170px] sm:min-h-[240px] lg:min-h-[420px] overflow-hidden">
             @foreach($heroBanners as $bIdx => $banner)
                 <a href="{{ $banner->target_url ?: '#' }}"
                    x-show="active === {{ $bIdx }}"
@@ -227,7 +310,7 @@
     </section>
     @elseif($webConfig['hero_active'] ?? true)
     <!-- Mode 2 & 3: Hero Standard atau Hero + Carousel -->
-    <section class="dark-surface relative overflow-hidden rounded-3xl bg-[#0F172A] text-white p-6 sm:p-8 lg:p-10 border border-white/10 shadow-lg shadow-black/20" data-theme-surface="dark">
+    <section class="dark-surface relative overflow-hidden rounded-3xl bg-[#0F172A] text-white p-4 sm:p-5 lg:p-10 border border-white/10 shadow-lg shadow-black/20" data-theme-surface="dark">
         <!-- Background Foto Hero Custom jika dikonfigurasi -->
         @if($hasHeroBg)
             <img src="{{ $webConfig['hero_bg_image'] }}" alt="Hero Background" class="absolute inset-0 w-full h-full object-cover pointer-events-none select-none z-0">
@@ -463,7 +546,7 @@
              @mouseleave="start()"
              @touchstart.passive="handleTouchStart($event)"
              @touchend.passive="handleTouchEnd($event)">
-        <div class="relative w-full aspect-[21/9] min-h-[220px] sm:min-h-[300px] overflow-hidden">
+        <div class="relative w-full aspect-[21/9] min-h-[150px] sm:min-h-[220px] lg:min-h-[300px] overflow-hidden">
             @foreach($heroBanners as $bIdx => $banner)
                 <a href="{{ $banner->target_url ?: '#' }}"
                    x-show="active === {{ $bIdx }}"
@@ -571,8 +654,10 @@
 
     <!-- Spotlight Search & Pill Filter System -->
     <section class="space-y-3 sm:space-y-4">
-        <!-- Raycast/Spotlight Style Search Bar -->
-        <div class="relative group">
+        <!-- Raycast/Spotlight Style Search Bar (desktop/tablet besar) -->
+        <div class="relative group hidden lg:block"
+             @click.outside="suggestionsOpen = false"
+             @keydown.escape.window="suggestionsOpen = false">
             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-ink-400 group-focus-within:text-up-primary transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -581,6 +666,8 @@
             <input
                 type="text"
                 wire:model.live.debounce.250ms="search"
+                @focus="suggestionsOpen = true"
+                @input="suggestionsOpen = true"
                 placeholder="Ketik tipe LCD, baterai iPhone, model Samsung, nomor part..."
                 class="w-full pl-12 pr-12 py-3.5 sm:py-4 rounded-2xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-ink-900 dark:text-white placeholder-ink-400 text-base sm:text-sm font-medium shadow-[0_4px_16px_rgba(0,0,0,0.02)] focus:outline-none focus:border-up-primary focus:ring-4 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140"
             />
@@ -595,6 +682,8 @@
                     </svg>
                 </button>
             @endif
+
+            @include('modules.marketplace.livewire.partials.catalog-search-suggestions')
         </div>
 
         @php
@@ -710,8 +799,26 @@
             }
         @endphp
         @if($filtersEnabled)
+        <!-- Backdrop filter (mobile/tablet) -->
+        <div x-show="mobileFilterOpen"
+             x-cloak
+             @click="mobileFilterOpen = false"
+             class="fixed inset-0 z-[65] bg-black/60 backdrop-blur-sm lg:hidden"></div>
+
         <!-- Filter Selectors Matrix -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5"
+             x-cloak
+             :class="mobileFilterOpen ? 'fixed inset-x-0 bottom-0 z-[70] max-h-[85vh] overflow-y-auto overscroll-contain p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] rounded-t-3xl bg-white dark:bg-[#0B1120] border-t border-ink-200 dark:border-white/10 shadow-2xl' : 'hidden lg:grid'">
+            <div class="lg:hidden flex items-center justify-between pb-2 mb-1 border-b border-ink-100 dark:border-white/10 col-span-full">
+                <div>
+                    <h3 class="text-sm font-bold text-ink-900 dark:text-white">Filter &amp; Urutkan</h3>
+                    <p class="text-[10px] text-ink-400">Perhalus pencarian Anda</p>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" wire:click="resetAllFilters" class="px-2 py-1 rounded-lg text-[11px] font-bold text-up-red hover:bg-up-red/10 cursor-pointer">Reset</button>
+                    <button type="button" @click="mobileFilterOpen = false" class="px-3 py-1 rounded-lg bg-ink-900 dark:bg-white text-white dark:text-ink-950 text-[11px] font-bold cursor-pointer">Selesai</button>
+                </div>
+            </div>
             @if($allowedFilters['kategori'] ?? true)
             <!-- Kategori -->
             <div class="relative min-w-0 w-full">
@@ -811,30 +918,24 @@
 
             <!-- Sortasi -->
             <div class="relative min-w-0 w-full">
-                <select wire:model.live="sort"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Paling Relevan</option>
-                    <option value="terlaris">Terlaris</option>
-                    <option value="terbaru">Terbaru</option>
-                    <option value="termurah">Harga Termurah</option>
-                    <option value="termahal">Harga Termahal</option>
-                </select>
-                @if(!empty($sort))
-                    <button type="button" wire:click="$set('sort', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Urutan">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="sort"
+                    :options="[
+                        ['value' => 'terlaris', 'label' => 'Terlaris'],
+                        ['value' => 'terbaru', 'label' => 'Terbaru'],
+                        ['value' => 'termurah', 'label' => 'Harga Termurah'],
+                        ['value' => 'termahal', 'label' => 'Harga Termahal'],
+                    ]"
+                    placeholder="Paling Relevan"
+                    searchPlaceholder="Cari urutan..."
+                />
             </div>
         </div>
         @endif
     </section>
 
     <!-- Product Section -->
-    <section class="space-y-6">
+    <section id="katalog-produk" class="space-y-3 sm:space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-ink-100/80 dark:border-white/[0.08]">
             <div>
                 <h2 class="text-lg sm:text-xl font-bold tracking-tight text-ink-900 dark:text-white">Koleksi Suku Cadang</h2>
@@ -879,14 +980,14 @@
         </div>
 
         <!-- 1. GRID VIEW -->
-        <div x-show="viewMode === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4.5">
+        <div x-show="viewMode === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 lg:gap-4.5">
             @forelse($products as $p)
                 @php
                     $stok = (int) ($p->stok_items_sum_jumlah ?? 0);
                     $customer = auth('customer')->user();
                     $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                     $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
-                    $thumbImg = $p->thumbnail_url ?: $p->gambar;
+                    $thumbImg = $p->thumbnail_url ?: $p->gambar ?: $fotoDefault;
                     $catDisplay = ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? (is_array($p->kategori) ? implode(', ', $p->kategori) : (string) $p->kategori);
                     $catVal = $p->kategori_id ?: $catDisplay;
                     $firstModel = ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) ? $p->tipeHps->first()?->model : null;
@@ -894,15 +995,27 @@
                 <div class="group bg-white dark:bg-ink-900 rounded-2xl border border-ink-200/80 dark:border-white/[0.08] hover:border-up-primary/40 dark:hover:border-up-primary/50 shadow-sm hover:shadow-md transition-[border-color,box-shadow,transform] duration-140 overflow-hidden flex flex-col justify-between min-w-0 w-full relative">
                     <div>
                         <!-- Image canvas -->
-                        <a href="{{ route('shop.detail', $p->slug) }}" class="block aspect-square w-full bg-ink-50 dark:bg-ink-950 relative overflow-hidden group/img">
+                        <a href="{{ route('shop.detail', $p->slug) }}" class="block aspect-[4/3] sm:aspect-[4/3] lg:aspect-square w-full bg-ink-50 dark:bg-ink-950 relative overflow-hidden group/img">
                             @if($thumbImg)
                                 <img src="{{ $thumbImg }}"
                                      alt="{{ $p->nama }}"
-                                     loading="lazy"
-                                     class="aspect-square w-full h-full object-contain transition-transform duration-200 ease-out group-hover/img:scale-105"
+                                     loading="{{ $lazyLoad ? 'lazy' : 'eager' }}"
+                                     class="w-full h-full object-contain transition-transform duration-200 ease-out group-hover/img:scale-105"
                                      onerror="this.style.display='none'; const ph=this.closest('a')?.querySelector('[data-img-placeholder]'); if(ph) ph.classList.remove('hidden');">
-                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="absolute top-2 right-2 z-20 inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/50 text-white hover:bg-black/70 transition" title="Lihat gambar produk">
-                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                 {{-- Mobile: badge zoom kecil, selalu terlihat --}}
+                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}', '{{ addslashes($p->nama) }}')" class="lg:hidden absolute top-2 right-2 z-20 inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/55 text-white backdrop-blur-sm cursor-zoom-in" title="Lihat gambar {{ $p->nama }}">
+                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m-3-3h6"/></svg>
+                                 </button>
+
+                                 {{-- Desktop: overlay penuh saat hover gambar --}}
+                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}', '{{ addslashes($p->nama) }}')" class="hidden lg:flex absolute inset-0 z-20 flex-col items-center justify-end pb-4 bg-gradient-to-t from-ink-950/80 via-ink-950/10 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-150 cursor-zoom-in" title="Lihat gambar {{ $p->nama }}">
+                                     <span class="max-w-[90%] rounded-2xl bg-black/60 backdrop-blur-md px-4 py-2.5 text-center shadow-xl">
+                                         <span class="flex items-center justify-center gap-2 text-[11px] font-bold text-white">
+                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m-3-3h6"/></svg>
+                                             Lihat gambar
+                                         </span>
+                                         <span class="mt-0.5 block text-[10px] font-medium leading-snug text-white/80 line-clamp-2 break-words">{{ $p->nama }}</span>
+                                     </span>
                                  </button>
                             @endif
                             <div data-img-placeholder class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-4 text-center {{ $thumbImg ? 'hidden' : '' }}">
@@ -913,7 +1026,7 @@
                             </div>
 
                             <!-- Badges top row -->
-                            <div class="absolute top-2 inset-x-2 flex items-center justify-between pointer-events-none overflow-hidden gap-1">
+                            <div class="absolute top-2 inset-x-2 z-30 flex items-center justify-between pointer-events-none overflow-hidden gap-1">
                                 @if((int) ($p->total_terjual ?? 0) > 0)
                                     <span class="text-[9px] font-bold bg-ink-900/80 dark:bg-white/90 backdrop-blur-md text-amber-300 dark:text-ink-950 px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
                                         ★ <span class="hidden xs:inline">Terlaris</span>
@@ -935,9 +1048,9 @@
                         </a>
 
                         <!-- Meta info & pricing -->
-                        <div class="p-3 sm:p-4 space-y-2.5 min-w-0">
+                        <div class="p-2 sm:p-3 lg:p-4 space-y-1.5 sm:space-y-2 lg:space-y-2.5 min-w-0">
                             <div class="space-y-1 min-w-0">
-                                <div class="flex items-center gap-1.5 flex-wrap overflow-hidden text-[10px] text-ink-500 dark:text-ink-400">
+                                <div class="hidden lg:flex items-center gap-1.5 flex-wrap overflow-hidden text-[10px] text-ink-500 dark:text-ink-400">
                                     <button type="button"
                                             wire:click="setFilterKategori('{{ $catVal }}')"
                                             class="font-bold uppercase tracking-wider truncate max-w-[100px] hover:text-up-primary transition-colors cursor-pointer"
@@ -954,7 +1067,7 @@
                                     @endif
                                 </div>
 
-                                <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white line-clamp-2 leading-snug break-words">
+                                <h3 class="text-[11px] sm:text-xs lg:text-sm font-bold text-ink-900 dark:text-white leading-tight break-words">
                                     <a href="{{ route('shop.detail', $p->slug) }}" class="hover:text-up-primary transition-colors">
                                         {{ $p->nama }}
                                     </a>
@@ -963,7 +1076,7 @@
                                 @if($firstModel)
                                     <button type="button"
                                             wire:click="setFilterHpModel('{{ $firstModel }}')"
-                                            class="text-[11px] text-up-primary hover:underline font-medium truncate block text-left cursor-pointer"
+                                            class="text-[10px] sm:text-[11px] text-up-primary hover:underline font-medium truncate block text-left cursor-pointer"
                                             title="Filter kompatibilitas {{ $firstModel }}">
                                         Fit: {{ $p->tipeHps->pluck('model')->take(2)->join(', ') }}
                                     </button>
@@ -971,14 +1084,14 @@
                             </div>
 
                             <!-- Price & stock -->
-                            <div class="pt-2 border-t border-ink-100 dark:border-white/[0.06] min-w-0">
+                            <div class="pt-1.5 sm:pt-2 border-t border-ink-100 dark:border-white/[0.06] min-w-0">
                                 @if($price['diskon_nominal'] > 0)
                                     <span class="block text-[10px] sm:text-xs text-ink-400 line-through tabular-nums truncate">
                                         Rp {{ number_format($price['harga_dasar'], 0, ',', '.') }}
                                     </span>
                                 @endif
                                 <div class="flex items-center justify-between gap-2">
-                                    <div class="text-sm sm:text-base font-bold text-ink-900 dark:text-white tracking-tight tabular-nums truncate">
+                                    <div class="text-xs sm:text-sm lg:text-base font-bold text-ink-900 dark:text-white tracking-tight tabular-nums truncate">
                                         Rp {{ number_format($price['harga'], 0, ',', '.') }}@if(collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')) <span class="text-[9px] text-ink-400 font-normal">/ box Rp {{ number_format((collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')->harga_jual) ?: 0, 0, ',', '.') }}</span>@endif
                                     </div>
                                     @if($stok > 0)
@@ -986,7 +1099,7 @@
                                                 wire:click="addToCart({{ $p->id }})"
                                                 wire:loading.attr="disabled"
                                                 wire:target="addToCart({{ $p->id }})"
-                                                class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-up-primary hover:bg-up-primary/90 text-white transition-colors cursor-pointer"
+                                                class="flex-shrink-0 inline-flex items-center justify-center w-11 h-11 sm:w-10 sm:h-10 lg:w-8 lg:h-8 rounded-xl lg:rounded-lg bg-up-primary hover:bg-up-primary/90 text-white transition-colors cursor-pointer active:scale-95"
                                                 title="Tambah ke Keranjang">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                                         </button>
@@ -995,10 +1108,10 @@
                                     @endif
                                 </div>
 
-                                <div class="flex items-center justify-between gap-1 mt-1.5 text-[10px] min-w-0">
+                                <div class="flex items-center justify-between gap-1 mt-1 sm:mt-1.5 text-[9px] sm:text-[10px] min-w-0">
                                     <span class="inline-flex items-center gap-1.5 font-medium truncate {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500 font-semibold' : 'text-up-mint') : 'text-up-red' }}">
                                         <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                                        <span class="truncate">{{ $stockInfo['label'] }}</span>
+                                        <span class="truncate">{{ $stockInfo['is_available'] ? 'Ready' : $stockInfo['label'] }}</span>
                                     </span>
                                     @if(($webConfig['show_sold_counter'] ?? true) && (int) ($p->total_terjual ?? 0) > 0)
                                         <span class="text-ink-400 tabular-nums hidden xs:inline flex-shrink-0">{{ $p->total_terjual }} terjual</span>
@@ -1021,14 +1134,14 @@
         </div>
 
         <!-- 2. LIST VIEW -->
-        <div x-show="viewMode === 'list'" class="space-y-2.5" x-cloak>
+        <div x-show="viewMode === 'list'" class="space-y-2 sm:space-y-2.5" x-cloak>
             @forelse($products as $p)
                 @php
                     $stok = (int) ($p->stok_items_sum_jumlah ?? 0);
                     $customer = auth('customer')->user();
                     $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                     $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
-                    $thumbImg = $p->thumbnail_url ?: $p->gambar;
+                    $thumbImg = $p->thumbnail_url ?: $p->gambar ?: $fotoDefault;
                     $catDisplay = ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? (is_array($p->kategori) ? implode(', ', $p->kategori) : (string) $p->kategori);
                     $catVal = $p->kategori_id ?: $catDisplay;
                     $firstModel = ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) ? $p->tipeHps->first()?->model : null;
@@ -1037,12 +1150,18 @@
                     <div class="flex items-center gap-3.5 min-w-0 flex-1">
                         <a href="{{ route('shop.detail', $p->slug) }}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-ink-50 dark:bg-ink-950 flex-shrink-0 overflow-hidden flex items-center justify-center relative group/img">
                             @if($thumbImg)
-                                <img src="{{ $thumbImg }}" alt="{{ $p->nama }}" class="w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105"
+                                <img src="{{ $thumbImg }}" alt="{{ $p->nama }}" loading="{{ $lazyLoad ? 'lazy' : 'eager' }}" class="w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105"
                                      onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                             @endif
                             <span class="text-xs font-bold text-ink-400 items-center justify-center w-full h-full" style="{{ $thumbImg ? 'display:none;' : 'display:flex;' }}">PART</span>
                              @if($thumbImg)
-                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="absolute bottom-1 right-1 z-10 inline-flex items-center px-1.5 py-0.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition text-[9px] font-semibold" title="Lihat gambar produk">Lihat gambar</button>
+                                 <span class="absolute bottom-1 right-1 z-10">
+                                     @include('modules.marketplace.livewire.partials.product-image-preview', [
+                                         'url' => $p->gambar ?: $thumbImg,
+                                         'nama' => $p->nama,
+                                         'class' => 'w-7 h-7',
+                                     ])
+                                 </span>
                              @endif
                         </a>
                         <div class="min-w-0 flex-1 space-y-1">
@@ -1064,7 +1183,7 @@
                                     <span class="hidden sm:inline font-mono">({{ $p->sku }})</span>
                                 @endif
                             </div>
-                            <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white truncate">
+                            <h3 class="text-[11px] sm:text-xs lg:text-sm font-bold text-ink-900 dark:text-white leading-tight break-words">
                                 <a href="{{ route('shop.detail', $p->slug) }}" class="hover:text-up-primary transition-colors">
                                     {{ $p->nama }}
                                 </a>
@@ -1072,7 +1191,7 @@
                             @if($firstModel)
                                 <button type="button"
                                         wire:click="setFilterHpModel('{{ $firstModel }}')"
-                                        class="text-[11px] text-up-primary hover:underline font-medium truncate block text-left cursor-pointer"
+                                        class="text-[10px] sm:text-[11px] text-up-primary hover:underline font-medium truncate block text-left cursor-pointer"
                                         title="Filter kompatibilitas {{ $firstModel }}">
                                     Kompatibel: {{ $p->tipeHps->pluck('model')->take(3)->join(', ') }}
                                 </button>
@@ -1092,7 +1211,7 @@
                             </div>
                             <div class="inline-flex items-center gap-1.5 text-[11px] font-semibold {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500' : 'text-up-mint') : 'text-up-red' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                                <span>{{ $stockInfo['label'] }}</span>
+                                <span>{{ $stockInfo['is_available'] ? 'Ready' : $stockInfo['label'] }}</span>
                             </div>
                         </div>
 
@@ -1103,7 +1222,7 @@
                                         wire:click="addToCart({{ $p->id }})"
                                         wire:loading.attr="disabled"
                                         wire:target="addToCart({{ $p->id }})"
-                                        class="py-1.5 px-3.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-[transform,background-color] duration-140 active:scale-95 cursor-pointer"
+                                        class="min-h-[44px] lg:min-h-0 py-1.5 px-3.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-[transform,background-color] duration-140 active:scale-95 cursor-pointer"
                                         title="Tambah ke Keranjang">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -1141,37 +1260,52 @@
                         $customer = auth('customer')->user();
                         $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                         $stockInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stok);
-                        $thumbImg = $p->thumbnail_url ?: $p->gambar;
+                        $thumbImg = $p->thumbnail_url ?: $p->gambar ?: $fotoDefault;
                     @endphp
-                    <div class="px-3.5 py-2.5 flex items-center justify-between gap-3 hover:bg-ink-50 dark:hover:bg-white/[0.03] transition-colors group">
-                        <div class="min-w-0 flex items-center gap-3">
-                            <span class="w-2 h-2 rounded-full flex-shrink-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                            <div class="truncate">
-                                <a href="{{ route('shop.detail', $p->slug) }}" class="text-xs sm:text-sm font-semibold text-ink-900 dark:text-white group-hover:text-up-primary transition-colors">
+                    <div class="px-2 py-1.5 sm:px-3 sm:py-2 lg:px-3.5 lg:py-2.5 flex flex-col lg:flex-row lg:items-center justify-start lg:justify-between gap-1 sm:gap-2 lg:gap-3 hover:bg-ink-50 dark:hover:bg-white/[0.03] transition-colors group">
+                        <!-- Nama produk memakai penuh lebar sampai kanan -->
+                        <div class="w-full lg:w-auto min-w-0 flex items-start gap-2 lg:gap-3">
+                            <span class="w-2 h-2 rounded-full flex-shrink-0 mt-1 lg:mt-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
+                            <div class="min-w-0 w-full">
+                                <a href="{{ route('shop.detail', $p->slug) }}" class="block text-[11px] sm:text-xs lg:text-sm font-semibold leading-snug break-words text-ink-900 dark:text-white group-hover:text-up-primary transition-colors">
                                     {{ $p->nama }}
                                 </a>
                                 @if($p->sku)
-                                    <span class="text-[10px] font-mono text-ink-400 ml-1.5 hidden sm:inline">{{ $p->sku }}</span>
+                                    <span class="block lg:hidden text-[9px] font-mono text-ink-400 mt-0.5 truncate">{{ $p->sku }}</span>
+                                    <span class="hidden lg:inline text-[10px] font-mono text-ink-400 ml-1.5">{{ $p->sku }}</span>
                                 @endif
                             </div>
                         </div>
-                        <div class="flex items-center gap-3 sm:gap-4 flex-shrink-0 text-right">
-                            <span class="text-xs text-ink-500 tabular-nums hidden xs:inline">{{ $stockInfo['label'] }}</span>
-                            <span class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white tabular-nums">
-                                Rp {{ number_format($price['harga'], 0, ',', '.') }}@if(collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')) <span class="text-[9px] text-ink-400 font-normal">/ box Rp {{ number_format((collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')->harga_jual) ?: 0, 0, ',', '.') }}</span>@endif
-                            </span>
-                            @if($stok > 0)
-                             @if($thumbImg)
-                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="text-[10px] font-semibold text-up-primary hover:underline cursor-pointer" title="Lihat gambar produk">Lihat gambar</button>
-                             @endif
-                                <button type="button"
-                                        wire:click="addToCart({{ $p->id }})"
-                                        wire:loading.attr="disabled"
-                                        class="p-1.5 rounded-lg bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white transition-colors cursor-pointer"
-                                        title="+ Keranjang">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                </button>
-                            @endif
+
+                        <!-- Baris bawah: kiri = ready + gambar, kanan = perbox + tambah -->
+                        <div class="w-full lg:w-auto flex items-center justify-between lg:justify-end gap-2 sm:gap-3 lg:gap-4 flex-shrink-0 text-right pl-4 lg:pl-0">
+                            <div class="flex items-center gap-2 text-left min-w-0">
+                                <span class="text-[9px] sm:text-[10px] font-semibold {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500' : 'text-up-mint') : 'text-up-red' }}">
+                                    {{ $stockInfo['is_available'] ? 'Ready' : $stockInfo['label'] }}
+                                </span>
+                                @if($thumbImg)
+                                    @include('modules.marketplace.livewire.partials.product-image-preview', [
+                                        'url' => $p->gambar ?: $thumbImg,
+                                        'nama' => $p->nama,
+                                        'class' => 'w-7 h-7 sm:w-8 sm:h-8',
+                                    ])
+                                @endif
+                            </div>
+
+                            <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                                <span class="text-[11px] sm:text-sm font-bold text-ink-900 dark:text-white tabular-nums whitespace-nowrap">
+                                    Rp {{ number_format($price['harga'], 0, ',', '.') }}@if(collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')) <span class="text-[8px] sm:text-[9px] text-ink-400 font-normal">/ box Rp {{ number_format((collect($p->satuanKonversi ?? [])->firstWhere('satuan_kode', 'box')->harga_jual) ?: 0, 0, ',', '.') }}</span>@endif
+                                </span>
+                                @if($stok > 0)
+                                    <button type="button"
+                                            wire:click="addToCart({{ $p->id }})"
+                                            wire:loading.attr="disabled"
+                                            class="w-10 h-10 sm:w-9 sm:h-9 lg:w-auto lg:h-auto flex items-center justify-center p-0 lg:p-1.5 rounded-xl lg:rounded-lg bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white transition-colors cursor-pointer active:scale-95"
+                                            title="+ Keranjang">
+                                        <svg class="w-4 h-4 lg:w-3.5 lg:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                    </button>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @empty
@@ -1224,12 +1358,58 @@
         @endif
 
         <div class="pt-6">
-            {{ $products->links() }}
+            @if($infiniteScroll)
+                @if($products->hasMorePages())
+                    <div x-data="{
+                            busy: false,
+                            init() {
+                                const io = new IntersectionObserver((entries) => {
+                                    if (entries[0].isIntersecting && ! this.busy) {
+                                        this.busy = true;
+                                        this.$wire.loadMoreProducts();
+                                        setTimeout(() => { this.busy = false; }, 1200);
+                                    }
+                                }, { rootMargin: '240px' });
+                                io.observe(this.$refs.sentinel);
+                            }
+                         }">
+                        <div x-ref="sentinel" class="h-6"></div>
+                        <div class="flex flex-col items-center gap-2 py-3">
+                            <span class="text-[11px] text-ink-400" wire:loading.remove wire:target="loadMoreProducts">Gulir untuk memuat produk lainnya</span>
+                            <span class="text-[11px] text-up-primary font-semibold" wire:loading wire:target="loadMoreProducts">Memuat produk berikutnya…</span>
+                            <button type="button"
+                                    wire:click="loadMoreProducts"
+                                    wire:loading.attr="disabled"
+                                    class="px-4 py-2 rounded-xl border border-ink-200 dark:border-white/10 text-[11px] font-bold text-ink-600 dark:text-ink-300 hover:border-up-primary hover:text-up-primary cursor-pointer disabled:opacity-50">
+                                Muat lebih banyak
+                            </button>
+                        </div>
+                    </div>
+                @else
+                    <p class="text-center text-[11px] text-ink-400 py-4">Semua produk telah ditampilkan.</p>
+                @endif
+            @else
+                {{ $products->links() }}
+            @endif
         </div>
     </section>
     <!-- Image Preview Modal -->
-    <div x-show="previewImg" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" @click="closePreview()">
-        <img :src="previewImg" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" @click.stop>
-        <button type="button" @click="closePreview()" class="absolute top-4 right-4 text-white text-3xl font-bold hover:text-up-primary">&times;</button>
+    <div x-show="previewImg"
+         x-cloak
+         x-transition.opacity
+         class="fixed inset-0 z-[9998] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 cursor-pointer"
+         @click="closePreview()">
+        <div class="relative max-w-lg w-full max-h-[85vh] rounded-3xl bg-white dark:bg-ink-900 border border-white/10 p-3 shadow-2xl cursor-default" @click.stop>
+            <button type="button"
+                    @click="closePreview()"
+                    aria-label="Tutup preview"
+                    class="absolute -top-3 -right-3 z-10 w-9 h-9 rounded-full bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-ink-200 dark:border-white/10 shadow-xl flex items-center justify-center text-sm font-bold hover:text-up-red cursor-pointer">
+                ✕
+            </button>
+            <template x-if="previewImg">
+                <img :src="previewImg" :alt="previewNama || 'Preview produk'" class="w-full h-full max-h-[74vh] object-contain rounded-2xl">
+            </template>
+            <p x-show="previewNama" x-text="previewNama" class="text-center text-[11px] font-bold text-ink-600 dark:text-ink-300 pt-2 break-words"></p>
+        </div>
     </div>
 </div>

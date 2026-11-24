@@ -46,6 +46,29 @@ class CartService
                 $cart[$k]['satuan'] = $baseSatuan;
                 $needSave = true;
             }
+            if (! array_key_exists('sku', $it)) {
+                $cart[$k]['sku'] = $produk?->sku;
+                $needSave = true;
+            }
+            if (! array_key_exists('gambar', $it)) {
+                $cart[$k]['gambar'] = $produk?->thumbnail_url ?: $produk?->gambar;
+                $needSave = true;
+            }
+            $gambarPreview = $this->gambarPreviewProduk($produk);
+            if (($cart[$k]['gambar_preview'] ?? null) !== $gambarPreview) {
+                $cart[$k]['gambar_preview'] = $gambarPreview;
+                $needSave = true;
+            }
+
+            // Info harga box dari master dipakai untuk iming-iming "beli box lebih murah"
+            $infoBox = $this->infoBoxProduk($produk);
+            if ((int) ($cart[$k]['box_faktor'] ?? 0) !== $infoBox['faktor']
+                || abs((float) ($cart[$k]['box_harga'] ?? 0) - $infoBox['harga']) > 0.001) {
+                $cart[$k]['box_faktor'] = $infoBox['faktor'];
+                $cart[$k]['box_harga'] = $infoBox['harga'];
+                $needSave = true;
+            }
+
             $satuan = $cart[$k]['satuan'];
 
             // faktor & harga per satuan dari master (bukan asumsi 1)
@@ -85,6 +108,15 @@ class CartService
                 }
                 $needSave = true;
             }
+            $faktorInt = max(1, (int) round($fk));
+            if (! array_key_exists('sisa_pcs', $it)) {
+                $cart[$k]['sisa_pcs'] = $fk > 1 ? ((int) ($it['qty'] ?? 1) % $faktorInt) : 0;
+                $needSave = true;
+            }
+            if (empty($cart[$k]['breakdown']) && $fk > 1 && (int) ($cart[$k]['qty_satuan'] ?? 0) > 0 && (int) ($cart[$k]['sisa_pcs'] ?? 0) > 0) {
+                $cart[$k]['breakdown'] = (int) $cart[$k]['qty_satuan'].' '.$satuan.' + '.(int) $cart[$k]['sisa_pcs'].' pcs';
+                $needSave = true;
+            }
             if (! isset($it['harga_satuan'])) {
                 if ($hargaSatuanMaster !== null) {
                     $cart[$k]['harga_satuan'] = $hargaSatuanMaster;
@@ -95,13 +127,14 @@ class CartService
             } elseif ($hargaSatuanMaster !== null && (float) $cart[$k]['harga_satuan'] !== $hargaSatuanMaster) {
                 // koreksi harga per satuan jika master berbeda (mis. harga lama salah)
                 $cart[$k]['harga_satuan'] = $hargaSatuanMaster;
-                $cart[$k]['harga'] = round($hargaSatuanMaster / $fk, 2);
+                $cart[$k]['harga'] = $this->hargaBaseEfektif($cart[$k], $produk);
                 $needSave = true;
             }
 
-            // Pastikan harga (per base unit) konsisten dengan harga_satuan per satuan
+            // Pastikan harga (per base unit) konsisten dengan harga_satuan per satuan.
+            // Untuk campuran box + pcs, sisa pcs tetap diharga retail (bukan harga box).
             if (isset($cart[$k]['harga_satuan']) && (float) $cart[$k]['harga_satuan'] > 0 && $fk > 0) {
-                $expectedBase = round((float) $cart[$k]['harga_satuan'] / $fk, 2);
+                $expectedBase = $this->hargaBaseEfektif($cart[$k], $produk);
                 if (abs((float) $cart[$k]['harga'] - $expectedBase) > 0.001) {
                     $cart[$k]['harga'] = $expectedBase;
                     $needSave = true;
@@ -183,6 +216,8 @@ class CartService
     public function isi(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null, ?string $satuan = null): array
     {
         $produk = Produk::findOrFail($produkId);
+        $infoBox = $this->infoBoxProduk($produk);
+        $gambarPreview = $this->gambarPreviewProduk($produk);
         $cleanCatatan = $catatan ? trim($catatan) : null;
         $cleanSatuan = $satuan ? trim($satuan) : null;
         $key = $this->cartKey($produkId, $variantId, $cleanCatatan, $cleanSatuan);
@@ -224,9 +259,20 @@ class CartService
         $faktorKonversi = (float) $satuanInfo['faktor_konversi'];
         $hargaSatuanPilih = (float) $satuanInfo['harga']; // per base unit
         // qty_satuan = jumlah satuan yang dibeli (bukan base unit)
+        $faktorInt = max(1, (int) round($faktorKonversi));
         $qtySatuan = (int) round($newQty / max(0.0001, $faktorKonversi));
         if ($qtySatuan < 1) {
             $qtySatuan = 1;
+        }
+        $sisaPcs = $faktorKonversi > 1 ? ($newQty % $faktorInt) : 0;
+        $breakdown = '';
+        if ($faktorKonversi > 1) {
+            $breakdown = $qtySatuan.' '.$cleanSatuan.($sisaPcs > 0 ? ' + '.$sisaPcs.' pcs' : '');
+        }
+        $hargaSatuanPilihPerSatuan = round($hargaSatuanPilih * $faktorKonversi, 2);
+        $hargaEfektif = $hargaSatuanPilih;
+        if ($sisaPcs > 0 && $qtySatuan > 0) {
+            $hargaEfektif = round((($qtySatuan * $hargaSatuanPilihPerSatuan) + ($sisaPcs * $hargaRetail)) / max(1, $newQty), 2);
         }
 
         $cart[$key] = [
@@ -235,11 +281,14 @@ class CartService
             'variant_id' => $variantId,
             'catatan' => $cleanCatatan,
             'name' => $produk->nama,
+            'sku' => $produk->sku,
+            'gambar' => $produk->thumbnail_url ?: $produk->gambar,
+            'gambar_preview' => $gambarPreview,
             'variant_name' => $variant?->nama_varian,
             'satuan' => $cleanSatuan ?: $baseSatuan,
-            'harga' => $hargaSatuanPilih,
+            'harga' => $hargaEfektif,
             'harga_tier' => (float) $pricing['harga'],
-            'harga_satuan' => round($hargaSatuanPilih * $faktorKonversi, 2),
+            'harga_satuan' => $hargaSatuanPilihPerSatuan,
             'faktor_konversi' => $faktorKonversi,
             'qty' => $newQty,
             'qty_satuan' => $qtySatuan,
@@ -248,8 +297,12 @@ class CartService
             'potensi_komisi' => (float) ($pricing['potensi_komisi'] ?? 0.0),
             'mode_reward' => $pricing['mode_reward'] ?? 'diskon_langsung',
             'tier_nama' => $pricing['tier'] ?? null,
-            'alasan_harga' => $pricing['alasan'],
+            'alasan_harga' => $faktorKonversi > 1 ? 'Harga Kemasan / Per Box' : $pricing['alasan'],
+            'box_faktor' => $infoBox['faktor'],
+            'box_harga' => $infoBox['harga'],
             'stok_max' => (int) $stokTotal,
+            'sisa_pcs' => $sisaPcs,
+            'breakdown' => $breakdown,
         ];
 
         Session::put('shop.cart', $cart);
@@ -308,6 +361,9 @@ class CartService
                 // pastikan faktor_konversi tersimpan
                 $cart[$key]['faktor_konversi'] = $faktor;
                 $cart[$key]['harga_satuan'] = $boxPrice > 0 ? $boxPrice : (float) ($item['harga'] ?? 0) * $faktor;
+                $item['satuan'] = 'box';
+                $item['faktor_konversi'] = $faktor;
+                $item['harga_satuan'] = $cart[$key]['harga_satuan'];
             }
         }
 
@@ -342,7 +398,8 @@ class CartService
             $cart[$key]['harga'] = $effectiveBase;
             $cart[$key]['diskon_tier'] = 0.0;
             $cart[$key]['sisa_pcs'] = $rem;
-            $cart[$key]['breakdown'] = $boxes.' box'.($rem > 0 ? ' + '.$rem.' pcs' : '');
+            $cart[$key]['breakdown'] = $boxes.' '.$satuan.($rem > 0 ? ' + '.$rem.' pcs' : '');
+            $cart[$key]['alasan_harga'] = 'Harga Kemasan / Per Box';
         } elseif ($satuan !== 'pcs' && $qty < $faktorInt) {
             // Tidak cukup untuk 1 box -> revert ke pcs
             $cart[$key]['satuan'] = $baseSatuan;
@@ -391,11 +448,86 @@ class CartService
         Session::forget('shop.cart');
     }
 
+    /**
+     * URL gambar full-size (utama) untuk preview.
+     */
+    private function gambarPreviewProduk(?Produk $produk): ?string
+    {
+        if (! $produk) {
+            return null;
+        }
+
+        foreach ($produk->galeri_foto as $foto) {
+            if (! empty($foto['is_primary']) && ! empty($foto['url'])) {
+                return (string) $foto['url'];
+            }
+        }
+
+        return ! empty($produk->gambar)
+            ? Produk::formatFotoUrl($produk->gambar)
+            : null;
+    }
+
+    /**
+     * Faktor & harga jual box dari master produk (0 bila tidak ada).
+     *
+     * @return array{faktor: int, harga: float}
+     */
+    private function infoBoxProduk(?Produk $produk): array
+    {
+        if (! $produk) {
+            return ['faktor' => 0, 'harga' => 0.0];
+        }
+
+        foreach ($produk->getDaftarSatuan() as $s) {
+            if (strcasecmp((string) ($s['satuan_kode'] ?? ''), 'box') === 0) {
+                return [
+                    'faktor' => max(0, (int) round((float) ($s['faktor_konversi'] ?? 0))),
+                    'harga' => (float) ($s['harga_jual'] ?? 0),
+                ];
+            }
+        }
+
+        return ['faktor' => 0, 'harga' => 0.0];
+    }
+
+    /**
+     * Harga per base unit yang benar untuk satu baris keranjang.
+     * Box penuh memakai harga box; sisa pcs memakai harga retail.
+     */
+    private function hargaBaseEfektif(array $item, ?Produk $produk): float
+    {
+        $fk = max(1.0, (float) ($item['faktor_konversi'] ?? 1));
+        $satuan = (string) ($item['satuan'] ?? 'pcs');
+        $baseSatuan = $produk?->satuan ?: 'pcs';
+        $qty = max(1, (int) ($item['qty'] ?? 1));
+        $hargaSatuan = (float) ($item['harga_satuan'] ?? 0);
+        $pcsPrice = (float) ($item['harga_retail'] ?? $produk?->harga_jual_retail ?? $item['harga'] ?? 0);
+
+        if ($fk <= 1 || strcasecmp($satuan, $baseSatuan) === 0 || $hargaSatuan <= 0 || $pcsPrice <= 0) {
+            return (float) ($item['harga'] ?? $pcsPrice);
+        }
+
+        $faktorInt = max(1, (int) round($fk));
+        $boxes = (int) ($item['qty_satuan'] ?? intdiv($qty, $faktorInt));
+        $rem = (int) ($item['sisa_pcs'] ?? ($qty % $faktorInt));
+
+        if ($boxes <= 0) {
+            return $pcsPrice;
+        }
+        if ($rem <= 0) {
+            return round($hargaSatuan / $fk, 2);
+        }
+
+        return round((($boxes * $hargaSatuan) + ($rem * $pcsPrice)) / $qty, 2);
+    }
+
     public function hitungSubtotal(): float
     {
         $total = 0.0;
         foreach ($this->all() as $item) {
-            $total += (float) $item['harga'] * (int) $item['qty'];
+            $produk = ! empty($item['product_id']) ? Produk::find($item['product_id']) : null;
+            $total += $this->hargaBaseEfektif($item, $produk) * (int) $item['qty'];
         }
 
         return $total;

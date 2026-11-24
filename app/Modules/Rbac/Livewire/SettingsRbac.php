@@ -310,6 +310,17 @@ class SettingsRbac extends Component
 
     public array $syncStatusData = [];
 
+    public array $syncStatus = [
+        'checked_at' => null,
+        'connected' => false,
+        'message' => 'Belum diperiksa',
+        'local_pending' => 0,
+        'local_failed' => 0,
+        'local_synced' => 0,
+        'last_synced_at' => null,
+        'remote' => [],
+    ];
+
     public function mount(?string $tab = null): void
     {
         $tabParam = $tab ?: (string) request('tab', '');
@@ -1231,6 +1242,91 @@ class SettingsRbac extends Component
             $this->integrasiForm['sync_api_secret'] = (string) config('sync.api_secret', '');
             $this->integrasiForm['sync_pull_interval_seconds'] = (int) config('sync.pull_interval_seconds', 30);
         }
+
+        $this->refreshSyncStatus();
+    }
+
+    /**
+     * Cek status operasional Hybrid Sync:
+     - kondisi node lokal (outbox pending/failed/synced),
+     - koneksi + kondisi node remote via endpoint /health yang ditandatangani.
+     */
+    public function refreshSyncStatus(): void
+    {
+        $enabled = (bool) config('sync.enabled', false);
+        $role = (string) config('sync.node_role', 'primary_store');
+        $nodeId = (string) config('sync.node_id', 'STORE-01');
+        $remoteUrl = (string) config('sync.remote_url', '');
+        $secret = (string) config('sync.api_secret', '');
+
+        $status = [
+            'checked_at' => now()->format('H:i:s'),
+            'connected' => false,
+            'message' => 'Sinkronisasi nonaktif',
+            'local_pending' => 0,
+            'local_failed' => 0,
+            'local_synced' => 0,
+            'last_synced_at' => null,
+            'remote' => [],
+        ];
+
+        try {
+            $outbox = app(\Illuminate\Database\ConnectionResolverInterface::class)
+                ->connection()
+                ->table('hybrid_sync_outbox');
+
+            $status['local_pending'] = (int) (clone $outbox)->where('status', 'pending')->count();
+            $status['local_failed'] = (int) (clone $outbox)->where('status', 'failed')->count();
+            $status['local_synced'] = (int) (clone $outbox)->where('status', 'synced')->count();
+            $status['last_synced_at'] = optional((clone $outbox)->whereNotNull('synced_at')->latest('synced_at')->first())->synced_at;
+        } catch (\Throwable $e) {
+            $status['message'] = 'Tabel outbox belum tersedia';
+        }
+
+        if (! $enabled) {
+            $this->syncStatus = $status;
+            return;
+        }
+
+        if ($role !== 'primary_store') {
+            $status['connected'] = true;
+            $status['message'] = 'Node cloud aktif (cek koneksi dilakukan dari toko lokal)';
+            $this->syncStatus = $status;
+            return;
+        }
+
+        if ($remoteUrl === '' || $secret === '') {
+            $status['message'] = 'Remote URL / Shared Secret belum diisi';
+            $this->syncStatus = $status;
+            return;
+        }
+
+        try {
+            $timestamp = time();
+            $signature = hash_hmac('sha256', $timestamp.'.', $secret);
+
+            $response = Http::timeout(10)->withHeaders([
+                'X-Sync-Node' => $nodeId,
+                'X-Sync-Timestamp' => (string) $timestamp,
+                'X-Sync-Signature' => $signature,
+                'Accept' => 'application/json',
+            ])->get(rtrim($remoteUrl, '/').'/api/internal/sync/health');
+
+            $body = $response->json();
+            $remote = is_array($body) && ($body['success'] ?? false) ? ($body['data'] ?? []) : [];
+            $status['remote'] = is_array($remote) ? $remote : [];
+
+            if ($response->successful() && $remote !== []) {
+                $status['connected'] = true;
+                $status['message'] = 'Terhubung ke cloud';
+            } else {
+                $status['message'] = 'Gagal terhubung (HTTP '.$response->status().')';
+            }
+        } catch (\Throwable $e) {
+            $status['message'] = 'Gagal terhubung: '.$e->getMessage();
+        }
+
+        $this->syncStatus = $status;
     }
 
     public function updatedIntegrasiFormWaProvider(): void
