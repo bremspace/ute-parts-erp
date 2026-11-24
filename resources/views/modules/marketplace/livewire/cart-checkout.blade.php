@@ -176,7 +176,7 @@
                                 @foreach($cart as $itemKey => $item)
                                     @php $tampil = $hargaTampilan[$itemKey] ?? []; @endphp
                                     <div class="flex items-center justify-between gap-3 py-2 border-b border-ink-100/60 dark:border-white/[0.06] last:border-0">
-                                        @include('modules.marketplace.livewire.partials.cart-product-thumb', [
+                                        @include('modules.marketplace.livewire.partials.product-image-preview', [
                                             'url' => $item['gambar_preview'] ?? $item['gambar'] ?? null,
                                             'nama' => $item['name'],
                                             'class' => 'w-10 h-10 sm:w-12 sm:h-12',
@@ -401,7 +401,7 @@
                             @php $tampil = $hargaTampilan[$itemKey] ?? []; @endphp
                             <div class="py-2 sm:py-2.5 border-b border-ink-100/70 dark:border-white/[0.06] last:border-0 min-w-0 w-full lg:flex lg:items-center lg:justify-between lg:gap-4">
                                 <div class="flex items-start gap-2 sm:gap-3 lg:flex-1 lg:items-center">
-                                    @include('modules.marketplace.livewire.partials.cart-product-thumb', [
+                                    @include('modules.marketplace.livewire.partials.product-image-preview', [
                                         'url' => $item['gambar_preview'] ?? $item['gambar'] ?? null,
                                         'nama' => $item['name'],
                                         'class' => 'w-12 h-12 sm:w-14 sm:h-14',

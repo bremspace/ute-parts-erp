@@ -108,13 +108,20 @@
         mobileFilterOpen: false,
         suggestionsOpen: false,
         previewImg: null,
-        openPreview(url) { this.previewImg = url; },
-        closePreview() { this.previewImg = null; },
+        previewNama: '',
+        openPreview(url, nama = '') { this.previewImg = url; this.previewNama = nama; },
+        closePreview() { this.previewImg = null; this.previewNama = ''; },
+        setPreview(data) {
+            const d = Array.isArray(data) ? data[0] : data;
+            this.openPreview((d && typeof d === 'object') ? (d.url || '') : (d || ''), (d && typeof d === 'object') ? (d.nama || '') : '');
+        },
         setViewMode(mode) {
             this.viewMode = mode;
             try { localStorage.setItem('ute-shop-view-mode', mode); } catch (e) {}
         }
-     }">
+     }
+     @open-preview.window="setPreview($event.detail)"
+     @keydown.escape.window="closePreview()">
     <!-- MOBILE/TABLET: search-first bar + quick HP chips -->
     <div class="lg:hidden sticky top-16 z-30 -mx-4 px-4 sm:-mx-6 sm:px-6 py-2 bg-white/95 dark:bg-[#090D16]/95 backdrop-blur-xl border-b border-ink-100 dark:border-white/10">
         <div class="flex items-center gap-2">
@@ -883,23 +890,17 @@
 
             <!-- Sortasi -->
             <div class="relative min-w-0 w-full">
-                <select wire:model.live="sort"
-                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Paling Relevan</option>
-                    <option value="terlaris">Terlaris</option>
-                    <option value="terbaru">Terbaru</option>
-                    <option value="termurah">Harga Termurah</option>
-                    <option value="termahal">Harga Termahal</option>
-                </select>
-                @if(!empty($sort))
-                    <button type="button" wire:click="$set('sort', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Urutan">✕</button>
-                @else
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </div>
-                @endif
+                <x-prism.searchable-select
+                    model="sort"
+                    :options="[
+                        ['value' => 'terlaris', 'label' => 'Terlaris'],
+                        ['value' => 'terbaru', 'label' => 'Terbaru'],
+                        ['value' => 'termurah', 'label' => 'Harga Termurah'],
+                        ['value' => 'termahal', 'label' => 'Harga Termahal'],
+                    ]"
+                    placeholder="Paling Relevan"
+                    searchPlaceholder="Cari urutan..."
+                />
             </div>
         </div>
         @endif
@@ -973,8 +974,9 @@
                                      loading="lazy"
                                      class="w-full h-full object-contain transition-transform duration-200 ease-out group-hover/img:scale-105"
                                      onerror="this.style.display='none'; const ph=this.closest('a')?.querySelector('[data-img-placeholder]'); if(ph) ph.classList.remove('hidden');">
-                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="absolute top-2 right-2 z-20 inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/50 text-white hover:bg-black/70 transition" title="Lihat gambar produk">
-                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}', '{{ addslashes($p->nama) }}')" class="absolute top-2 right-2 z-20 inline-flex items-center gap-1 rounded-full bg-black/55 text-white px-2 py-1 backdrop-blur-sm transition-all duration-150 cursor-zoom-in lg:opacity-0 lg:group-hover/img:opacity-100" title="Lihat gambar {{ $p->nama }}">
+                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m-3-3h6"/></svg>
+                                     <span class="hidden lg:inline text-[9px] font-bold">Lihat gambar</span>
                                  </button>
                             @endif
                             <div data-img-placeholder class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-4 text-center {{ $thumbImg ? 'hidden' : '' }}">
@@ -1114,7 +1116,13 @@
                             @endif
                             <span class="text-xs font-bold text-ink-400 items-center justify-center w-full h-full" style="{{ $thumbImg ? 'display:none;' : 'display:flex;' }}">PART</span>
                              @if($thumbImg)
-                                 <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="absolute bottom-1 right-1 z-10 inline-flex items-center px-1.5 py-0.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition text-[9px] font-semibold" title="Lihat gambar produk">Lihat gambar</button>
+                                 <span class="absolute bottom-1 right-1 z-10">
+                                     @include('modules.marketplace.livewire.partials.product-image-preview', [
+                                         'url' => $p->gambar ?: $thumbImg,
+                                         'nama' => $p->nama,
+                                         'class' => 'w-7 h-7',
+                                     ])
+                                 </span>
                              @endif
                         </a>
                         <div class="min-w-0 flex-1 space-y-1">
@@ -1237,10 +1245,11 @@
                                     {{ $stockInfo['is_available'] ? 'Ready' : $stockInfo['label'] }}
                                 </span>
                                 @if($thumbImg)
-                                    <button type="button" @click.prevent="openPreview('{{ $p->gambar ?: $thumbImg }}')" class="inline-flex items-center text-[9px] sm:text-[10px] font-semibold text-up-primary hover:underline cursor-pointer shrink-0" title="Lihat gambar produk">
-                                        <img src="{{ $thumbImg }}" alt="" loading="lazy" class="w-6 h-6 sm:w-7 sm:h-7 rounded-md border border-ink-200/80 dark:border-white/10 bg-white dark:bg-ink-950 object-contain lg:hidden">
-                                        <span class="hidden lg:inline">Lihat gambar</span>
-                                    </button>
+                                    @include('modules.marketplace.livewire.partials.product-image-preview', [
+                                        'url' => $p->gambar ?: $thumbImg,
+                                        'nama' => $p->nama,
+                                        'class' => 'w-7 h-7 sm:w-8 sm:h-8',
+                                    ])
                                 @endif
                             </div>
 
@@ -1314,8 +1323,22 @@
         </div>
     </section>
     <!-- Image Preview Modal -->
-    <div x-show="previewImg" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" @click="closePreview()">
-        <img :src="previewImg" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" @click.stop>
-        <button type="button" @click="closePreview()" class="absolute top-4 right-4 text-white text-3xl font-bold hover:text-up-primary">&times;</button>
+    <div x-show="previewImg"
+         x-cloak
+         x-transition.opacity
+         class="fixed inset-0 z-[9998] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 cursor-pointer"
+         @click="closePreview()">
+        <div class="relative max-w-lg w-full max-h-[85vh] rounded-3xl bg-white dark:bg-ink-900 border border-white/10 p-3 shadow-2xl cursor-default" @click.stop>
+            <button type="button"
+                    @click="closePreview()"
+                    aria-label="Tutup preview"
+                    class="absolute -top-3 -right-3 z-10 w-9 h-9 rounded-full bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-ink-200 dark:border-white/10 shadow-xl flex items-center justify-center text-sm font-bold hover:text-up-red cursor-pointer">
+                ✕
+            </button>
+            <template x-if="previewImg">
+                <img :src="previewImg" :alt="previewNama || 'Preview produk'" class="w-full h-full max-h-[74vh] object-contain rounded-2xl">
+            </template>
+            <p x-show="previewNama" x-text="previewNama" class="text-center text-[11px] font-bold text-ink-600 dark:text-ink-300 pt-2 break-words"></p>
+        </div>
     </div>
 </div>

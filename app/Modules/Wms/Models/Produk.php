@@ -812,6 +812,31 @@ class Produk extends Model
             ->orderBy('produk.id', 'asc');
     }
 
+    /**
+     * Urutkan murni oleh jumlah terjual dengan alias yang tersedia.
+     * Dipakai filter "Terlaris" agar tidak ORDER BY kolom yang belum di-select.
+     */
+    public function scopeUrutTerlaris($query)
+    {
+        $terjualSubquery = TransaksiItem::query()
+            ->selectRaw('COALESCE(SUM(transaksi_item.jumlah), 0)')
+            ->whereColumn('transaksi_item.produk_id', 'produk.id');
+        $stokSubquery = StokItem::query()
+            ->selectRaw('COALESCE(SUM(stok_items.jumlah), 0)')
+            ->whereColumn('stok_items.produk_id', 'produk.id');
+
+        if (empty($query->getQuery()->columns)) {
+            $query->select('produk.*');
+        }
+
+        return $query
+            ->selectSub($terjualSubquery, 'total_terjual')
+            ->selectSub($stokSubquery, 'stok_katalog')
+            ->orderByDesc('total_terjual')
+            ->orderByDesc('stok_katalog')
+            ->orderBy('produk.id', 'asc');
+    }
+
     public function reviews(): HasMany
     {
         return $this->hasMany(WebReview::class, 'produk_id');
