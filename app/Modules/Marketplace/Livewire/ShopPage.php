@@ -71,6 +71,9 @@ class ShopPage extends Component
     #[Url(as: 'sort', except: '')]
     public string $sort = '';
 
+    /** Halaman tambahan yang sudah dimuat saat infinite scroll aktif. */
+    public int $loadedPages = 1;
+
     #[Url(as: 'hargaMax', except: null)]
     public ?int $hargaMax = null;
 
@@ -174,18 +177,21 @@ class ShopPage extends Component
     public function setFilterKategori(string $kategori): void
     {
         $this->filterKategori = ($this->filterKategori === $kategori) ? '' : $kategori;
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
     public function setFilterHpModel(string $model): void
     {
         $this->filterHpModel = ($this->filterHpModel === $model) ? '' : $model;
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
     public function setFilterBrand(string $brand): void
     {
         $this->filterBrand = ($this->filterBrand === $brand) ? '' : $brand;
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
@@ -202,6 +208,20 @@ class ShopPage extends Component
         }
 
         return ucwords(str_replace(['-', '_'], ' ', $this->filterKategori));
+    }
+
+    public function updated($propertyName, $value): void
+    {
+        $filterProps = [
+            'search', 'filterKategori', 'filterKondisi', 'filterBrand',
+            'filterHpMerk', 'filterHpModel', 'filterKualitas', 'filterStok',
+            'hargaMax', 'sort', 'selectedGadgetModel',
+        ];
+
+        if (in_array($propertyName, $filterProps, true)) {
+            $this->loadedPages = 1;
+            $this->resetPage();
+        }
     }
 
     public function updatingSearch()
@@ -271,6 +291,7 @@ class ShopPage extends Component
             'sort' => $this->sort = '',
             default => null,
         };
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
@@ -286,6 +307,7 @@ class ShopPage extends Component
         $this->filterStok = '';
         $this->hargaMax = null;
         $this->sort = '';
+        $this->loadedPages = 1;
         $this->resetPage();
     }
 
@@ -390,6 +412,25 @@ class ShopPage extends Component
         });
     }
 
+    public function getLazyLoadEnabledProperty(): bool
+    {
+        return (bool) app(WebKonsumenService::class)->get('catalog_lazy_load', true);
+    }
+
+    public function getInfiniteScrollEnabledProperty(): bool
+    {
+        return (bool) app(WebKonsumenService::class)->get('catalog_infinite_scroll', false);
+    }
+
+    public function loadMoreProducts(): void
+    {
+        if (! $this->infiniteScrollEnabled) {
+            return;
+        }
+
+        $this->loadedPages = min(50, $this->loadedPages + 1);
+    }
+
     /**
      * Jumlah produk per halaman katalog dari pengaturan web konsumen.
      */
@@ -409,7 +450,9 @@ class ShopPage extends Component
             return null;
         }
 
-        return '/images/default-product.svg';
+        $custom = (string) (app(WebKonsumenService::class)->get('default_product_photo_url', '') ?: '');
+
+        return $custom !== '' ? $custom : '/images/default-product.svg';
     }
 
     public function getProductsProperty()
@@ -460,7 +503,11 @@ class ShopPage extends Component
             $query->urutKetersediaanDanTerlaris();
         }
 
-        return $query->paginate($this->catalogPerPage);
+        $perPage = $this->infiniteScrollEnabled
+            ? $this->catalogPerPage * $this->loadedPages
+            : $this->catalogPerPage;
+
+        return $query->paginate($perPage);
     }
 
     /**
@@ -943,6 +990,9 @@ class ShopPage extends Component
             'search' => $this->search,
             'searchSuggestions' => $this->searchSuggestions,
             'fotoDefault' => $this->fotoDefault,
+            'lazyLoad' => $this->lazyLoadEnabled,
+            'infiniteScroll' => $this->infiniteScrollEnabled,
+            'loadedPages' => $this->loadedPages,
         ])->layout('layouts.marketplace', [
             'title' => $metaTitle,
         ]);

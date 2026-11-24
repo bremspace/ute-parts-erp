@@ -7,7 +7,7 @@
         <img src="{{ $url }}"
              alt="{{ $nama }}"
              class="w-full h-full object-contain transition-transform duration-200 group-hover/thumb:scale-105"
-             loading="lazy">
+             loading="{{ ($lazyLoad ?? true) ? 'lazy' : 'eager' }}">
 
         {{-- Mobile: badge zoom selalu terlihat (tidak ada pointer/hover) --}}
         <span class="absolute bottom-0.5 right-0.5 z-10 w-5 h-5 rounded-full bg-black/55 text-white flex items-center justify-center backdrop-blur-sm lg:hidden"

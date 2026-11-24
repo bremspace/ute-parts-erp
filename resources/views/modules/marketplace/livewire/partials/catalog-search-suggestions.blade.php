@@ -14,7 +14,7 @@
                    class="flex items-center gap-2.5 px-3 py-2 hover:bg-ink-50 dark:hover:bg-white/5 transition-colors cursor-pointer">
                     <span class="w-9 h-9 shrink-0 rounded-lg bg-ink-50 dark:bg-ink-950 border border-ink-100 dark:border-white/10 overflow-hidden flex items-center justify-center">
                         @if($s['gambar'])
-                            <img src="{{ $s['gambar'] }}" alt="" class="w-full h-full object-contain" loading="lazy">
+                            <img src="{{ $s['gambar'] }}" alt="" class="w-full h-full object-contain" loading="{{ ($lazyLoad ?? true) ? 'lazy' : 'eager' }}">
                         @else
                             <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                         @endif

@@ -976,7 +976,7 @@
                             @if($thumbImg)
                                 <img src="{{ $thumbImg }}"
                                      alt="{{ $p->nama }}"
-                                     loading="lazy"
+                                     loading="{{ $lazyLoad ? 'lazy' : 'eager' }}"
                                      class="w-full h-full object-contain transition-transform duration-200 ease-out group-hover/img:scale-105"
                                      onerror="this.style.display='none'; const ph=this.closest('a')?.querySelector('[data-img-placeholder]'); if(ph) ph.classList.remove('hidden');">
                                  {{-- Mobile: badge zoom kecil, selalu terlihat --}}
@@ -1127,7 +1127,7 @@
                     <div class="flex items-center gap-3.5 min-w-0 flex-1">
                         <a href="{{ route('shop.detail', $p->slug) }}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-ink-50 dark:bg-ink-950 flex-shrink-0 overflow-hidden flex items-center justify-center relative group/img">
                             @if($thumbImg)
-                                <img src="{{ $thumbImg }}" alt="{{ $p->nama }}" class="w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105"
+                                <img src="{{ $thumbImg }}" alt="{{ $p->nama }}" loading="{{ $lazyLoad ? 'lazy' : 'eager' }}" class="w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105"
                                      onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                             @endif
                             <span class="text-xs font-bold text-ink-400 items-center justify-center w-full h-full" style="{{ $thumbImg ? 'display:none;' : 'display:flex;' }}">PART</span>
@@ -1335,7 +1335,39 @@
         @endif
 
         <div class="pt-6">
-            {{ $products->links() }}
+            @if($infiniteScroll)
+                @if($products->hasMorePages())
+                    <div x-data="{
+                            busy: false,
+                            init() {
+                                const io = new IntersectionObserver((entries) => {
+                                    if (entries[0].isIntersecting && ! this.busy) {
+                                        this.busy = true;
+                                        this.$wire.loadMoreProducts();
+                                        setTimeout(() => { this.busy = false; }, 1200);
+                                    }
+                                }, { rootMargin: '240px' });
+                                io.observe(this.$refs.sentinel);
+                            }
+                         }">
+                        <div x-ref="sentinel" class="h-6"></div>
+                        <div class="flex flex-col items-center gap-2 py-3">
+                            <span class="text-[11px] text-ink-400" wire:loading.remove wire:target="loadMoreProducts">Gulir untuk memuat produk lainnya</span>
+                            <span class="text-[11px] text-up-primary font-semibold" wire:loading wire:target="loadMoreProducts">Memuat produk berikutnya…</span>
+                            <button type="button"
+                                    wire:click="loadMoreProducts"
+                                    wire:loading.attr="disabled"
+                                    class="px-4 py-2 rounded-xl border border-ink-200 dark:border-white/10 text-[11px] font-bold text-ink-600 dark:text-ink-300 hover:border-up-primary hover:text-up-primary cursor-pointer disabled:opacity-50">
+                                Muat lebih banyak
+                            </button>
+                        </div>
+                    </div>
+                @else
+                    <p class="text-center text-[11px] text-ink-400 py-4">Semua produk telah ditampilkan.</p>
+                @endif
+            @else
+                {{ $products->links() }}
+            @endif
         </div>
     </section>
     <!-- Image Preview Modal -->
