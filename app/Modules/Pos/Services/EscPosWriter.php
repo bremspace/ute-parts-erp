@@ -230,9 +230,7 @@ class EscPosWriter
             'Web: '.$qrUrl,
             (($data['show_waktu'] ?? true) && ! empty($tglStr)) ? 'Tgl: '.$tglStr : null,
         ]));
-        if ($metaLine !== '') {
-            $this->text($metaLine);
-        }
+        $this->text($metaLine);
 
         // ========== ITEMS ==========
         $strikethroughMode = $data['strikethrough_mode'] ?? 'esc_b';

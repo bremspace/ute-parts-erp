@@ -307,7 +307,7 @@ class OrderService
                     'satuan' => $row['satuan'],
                     'konversi' => $row['konversi'],
                     'harga_satuan' => $row['harga_satuan'],
-                    'harga_retail' => $row['harga_retail'] ?? null,
+                    'harga_retail' => $row['harga_retail'],
                     'diskon_nominal' => $row['diskon_nominal'],
                     'subtotal' => $row['subtotal'],
                     'hpp' => $row['hpp'],

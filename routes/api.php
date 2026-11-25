@@ -300,6 +300,8 @@ Route::middleware(['throttle:60,1'])->group(function () {
 Route::prefix('internal/sync')->middleware(['throttle:300,1'])->group(function () {
     Route::post('/push', [SyncController::class, 'push'])
         ->middleware('verify.sync');
+    Route::post('/push-batch', [SyncController::class, 'pushBatch'])
+        ->middleware('verify.sync');
     Route::get('/pull', [SyncController::class, 'pull'])
         ->middleware('verify.sync');
     Route::post('/ack', [SyncController::class, 'ack'])

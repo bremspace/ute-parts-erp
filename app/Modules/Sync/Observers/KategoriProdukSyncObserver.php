@@ -2,39 +2,49 @@
 
 namespace App\Modules\Sync\Observers;
 
-use App\Modules\Sync\Services\HybridSyncOutboxService;
+use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
 use App\Modules\Wms\Models\KategoriProduk;
-use Illuminate\Support\Facades\Log;
 
 class KategoriProdukSyncObserver
 {
-    public function saved(KategoriProduk $kategori): void
+    use SyncsModelEvents;
+
+    public function created(KategoriProduk $kategori): void
     {
-        if (! config('sync.enabled')) {
-            return;
-        }
+        $this->enqueueSync($kategori);
+    }
 
-        try {
-            $payload = [
-                'id' => $kategori->id,
-                'parent_id' => $kategori->parent_id,
-                'nama' => $kategori->nama,
-                'slug' => $kategori->slug,
-                'icon' => $kategori->icon,
-                'urutan' => $kategori->urutan,
-                'is_active' => (bool) $kategori->is_active,
-                'is_default' => (bool) $kategori->is_default,
-                'updated_at' => $kategori->updated_at?->toIso8601String(),
-            ];
+    public function updated(KategoriProduk $kategori): void
+    {
+        $this->enqueueSync($kategori);
+    }
 
-            app(HybridSyncOutboxService::class)->enqueue(
-                'kategori_produk.upsert',
-                $kategori,
-                $payload,
-                null
-            );
-        } catch (\Throwable $e) {
-            Log::warning('[HybridSync] Observer KategoriProduk gagal: '.$e->getMessage());
-        }
+    private function enqueueSync(KategoriProduk $kategori): void
+    {
+        $this->enqueueModelEvent(
+            $kategori,
+            'kategori_produk.upsert',
+            function (KategoriProduk $model): array {
+                $syncUuid = $this->ensureSyncUuid($model);
+                $model->loadMissing('parent');
+
+                return [
+                    'id' => $model->id,
+                    'sync_uuid' => $syncUuid,
+                    'parent_id' => $model->parent_id,
+                    'parent_sync_uuid' => $model->parent?->getAttribute('sync_uuid'),
+                    'parent_slug' => $model->parent?->getAttribute('slug'),
+                    'nama' => $model->nama,
+                    'slug' => $model->slug,
+                    'icon' => $model->icon,
+                    'urutan' => (int) ($model->urutan ?? 0),
+                    'is_active' => (bool) ($model->is_active ?? true),
+                    'is_default' => (bool) ($model->getAttribute('is_default') ?? false),
+                    'created_at' => $model->created_at?->toIso8601String(),
+                    'updated_at' => $model->updated_at?->toIso8601String(),
+                ];
+            },
+            logLabel: 'KategoriProdukSyncObserver'
+        );
     }
 }

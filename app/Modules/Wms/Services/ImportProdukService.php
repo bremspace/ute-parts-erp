@@ -3934,11 +3934,17 @@ class ImportProdukService
      *
      * Chunk PERTAMA memakai format lama (tanpa suffix) supaya laporan/assert
      * yang sudah ada tetap cocok; chunk berikutnya diberi suffix -C{n}.
-     * Deterministik → idempoten (tidak dobel bila job di-retry).
+     *
+     * [F-16] Deterministik PENUH: komponen tanggal diambil dari import_log
+     * (stabil), bukan now() yang berubah bila retry melewati tengah malam →
+     * nomor baru → jurnal stok awal dobel. Isolasi lintas cabang ditegakkan
+     * guard per-cabang di postJurnalStokAwal + unique index (cabang_key,
+     * no_jurnal), sehingga format tanpa komponen cabang tetap aman.
      */
     protected function noJurnalChunk(int $importLogId, int $indexChunk): string
     {
-        $dasar = 'JRL-IMP-'.now()->format('Ymd').'-IL'.str_pad((string) $importLogId, 4, '0', STR_PAD_LEFT);
+        $tanggalLog = ImportLog::find($importLogId)?->created_at ?? now();
+        $dasar = 'JRL-IMP-'.$tanggalLog->format('Ymd').'-IL'.str_pad((string) $importLogId, 4, '0', STR_PAD_LEFT);
 
         return $indexChunk > 0
             ? $dasar.'-C'.($indexChunk + 1)
@@ -3954,7 +3960,10 @@ class ImportProdukService
     protected function postJurnalStokAwal(int $importLogId, ?int $cabangId, float $totalNilai, ?int $userId, ?string $noJurnal = null): void
     {
         $noJurnal = $noJurnal ?: $this->noJurnalChunk($importLogId, 0);
-        if (JurnalAkuntansi::where('no_jurnal', $noJurnal)->exists()) {
+        // [F-16] Guard di-scope per cabang (selaras unique index cabang_key):
+        // import_log/chunk sama yang diproses untuk dua cabang berbeda masing-
+        // masing berhak atas jurnal stok awalnya; retry cabang sama tetap ditolak.
+        if (JurnalAkuntansi::where('no_jurnal', $noJurnal)->where('cabang_id', $cabangId)->exists()) {
             // [B-10f] Retry parsial: ada mutasi stok baru untuk chunk yang sama.
             // Jurnal idempoten tidak boleh dobel → tandai agar bisa direkonsiliasi.
             Log::warning('Jurnal stok awal import sudah pernah diposting — mutasi baru tidak dijurnalkan', [

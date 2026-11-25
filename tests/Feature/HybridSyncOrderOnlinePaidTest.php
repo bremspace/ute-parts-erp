@@ -327,17 +327,21 @@ class HybridSyncOrderOnlinePaidTest extends TestCase
         $this->assertSame(1, JurnalAkuntansi::whereHas('akun', fn ($q) => $q->where('kode', '120-02'))->count());
     }
 
+    /** HPP=0 tidak lagi menolak pesanan — transaksi tetap dibuat, jurnal HPP/Persediaan dilewati. */
     public function test_hpp_nol_karena_harga_beli_nol_ditolak_dengan_error_jelas(): void
     {
         $this->produk->update(['harga_beli' => 0]);
 
         $res = $this->proses($this->payload()); // tanpa hpp cloud
 
-        $this->assertFalse($res['success']);
-        $this->assertStringContainsString('hpp', strtolower($res['message']));
-        $this->assertDatabaseMissing('transaksi', ['no_transaksi' => 'ORDER-C4-555']);
-        $this->assertSame(100, $this->stokJumlah());
-        $this->assertSame(0, JurnalAkuntansi::count());
+        // Pesanan online tetap diterima; hanya baris HPP/Persediaan yang dilewati
+        $this->assertTrue($res['success'], $res['message'] ?? '');
+        $this->assertDatabaseHas('transaksi', ['no_transaksi' => 'ORDER-C4-555']);
+        // Stok tetap dipotong karena pesanan fisik sudah lunas
+        $this->assertSame(98, $this->stokJumlah());
+        // Jurnal pendapatan tetap dibuat; baris 510-02/130-01 tidak ada
+        $this->assertSame(0, JurnalAkuntansi::whereHas('akun', fn ($q) => $q->where('kode', '510-02'))->count());
+        $this->assertGreaterThan(0, JurnalAkuntansi::whereHas('akun', fn ($q) => $q->where('kode', '410-03'))->count());
     }
 
     public function test_konversi_nol_ditolak(): void

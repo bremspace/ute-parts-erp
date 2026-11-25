@@ -18,6 +18,11 @@ class TransaksiSequenceService
      */
     public function generateNoTransaksi(int $cabangId, string $prefixTag = 'TRX'): string
     {
+        // Deteksi otomatis node role jika prefixTag default 'TRX' dan sync aktif
+        if ($prefixTag === 'TRX' && config('sync.enabled')) {
+            $prefixTag = config('sync.node_role') === 'cloud_storefront' ? 'VPS' : 'POS';
+        }
+
         $generate = function () use ($cabangId, $prefixTag) {
             $today = now()->format('Ymd');
             $prefix = sprintf('%s-C%02d-%s', strtoupper($prefixTag), $cabangId, $today);

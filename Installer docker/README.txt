@@ -1,9 +1,10 @@
-UTE PARTS ERP - Docker Installer (Windows)
+UTE PARTS ERP - Docker Installer (Windows & Linux/VPS)
 
 Cara pakai:
-1. Pastikan Docker Desktop terinstall dan berjalan.
-2. Buka folder ini (boleh dicopy ke PC baru / flashdisk).
-3. Double-click install.bat (atau jalankan install.ps1).
+1. Pastikan Docker & Docker Compose terinstall dan berjalan.
+2. Buka folder ini (boleh dicopy ke PC baru / VPS / flashdisk).
+3. Windows: Double-click install.bat (atau jalankan install.ps1).
+   Linux/VPS: Jalankan bash install.sh (untuk Cloud VPS gunakan SYNC_NODE_ROLE=cloud_storefront di .env).
 4. Pilih aksi: Fresh install atau Update.
 5. Pilih sumber:
    - Git: clone/pull dari URL (folder target bisa dipilih; installer clone dan salin folder Installer ke repo)
@@ -19,3 +20,4 @@ Catatan:
 - Port host: 80.
 - Database MySQL tersimpan di volume Docker (ute_mysql).
 - Untuk reset data: pilih Fresh install (hapus volume) atau docker compose down -v lalu install ulang.
+- Hybrid Sync: Container sudah otomatis menjalankan background worker antrean (default,sync) dan scheduler. Untuk menghubungkan node ke server remote, isi `SYNC_REMOTE_URL` & `SYNC_API_SECRET` di `.env` atau menu Pengaturan Integrasi (/app/settings).

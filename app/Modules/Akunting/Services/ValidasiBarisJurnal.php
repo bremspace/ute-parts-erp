@@ -85,6 +85,19 @@ class ValidasiBarisJurnal
         );
     }
 
+    /**
+     * [F-11] Nominal negatif dilarang: arah mutasi dinyatakan oleh sisi
+     * (debit/kredit), bukan oleh tanda. Negatif di satu sisi = mutasi terselubung
+     * ke sisi lawan yang melewati aturan saldo normal.
+     */
+    public static function pesanNominalNegatif(AkunCOA $akun): string
+    {
+        return sprintf(
+            'Nominal jurnal pada akun %s tidak boleh negatif.',
+            $akun->kode
+        );
+    }
+
     public static function pesanSatuSisi(AkunCOA $akun): string
     {
         return sprintf(
@@ -183,6 +196,15 @@ class ValidasiBarisJurnal
                 continue;
             }
 
+            // [F-11] Cek negatif SEBELUM cek nol/satu-sisi: baris mixed-sign
+            // (mis. D=-100 K=50) lolos max()>0 dan cek satu-sisi lama.
+            if ($debit < 0 || $kredit < 0) {
+                $galat[] = ['field' => 'jumlah', 'pesan' => static::pesanNominalNegatif($akun)];
+                $hasil[$index] = $galat;
+
+                continue;
+            }
+
             if (max($debit, $kredit) <= 0) {
                 $galat[] = ['field' => 'jumlah', 'pesan' => static::pesanNominalNol($akun)];
                 $hasil[$index] = $galat;
@@ -206,5 +228,34 @@ class ValidasiBarisJurnal
         }
 
         return $hasil;
+    }
+
+    /**
+     * [F-20] Apakah ada baris yang sisinya kontra terhadap saldo_normal akun?
+     * Dipakai jalur manual (API/UI) untuk menentukan jurnal penyesuaian yang
+     * benar-benar memakai kontra-sisi wajib maker-checker (approval tambahan).
+     * Baris dengan akun tidak ditemukan dilewati (sudah divalidasi terpisah).
+     *
+     * @param  array<int,mixed>  $lines
+     */
+    public static function adaKontraSisi(array $lines): bool
+    {
+        foreach ($lines as $baris) {
+            $line = is_array($baris) ? $baris : [];
+            $akun = static::cari(trim((string) ($line['akun_kode'] ?? '')));
+            if (! $akun) {
+                continue;
+            }
+            $debit = round((float) ($line['debit'] ?? 0), 2);
+            $kredit = round((float) ($line['kredit'] ?? 0), 2);
+            if ($debit > 0 && $akun->saldo_normal !== 'debit') {
+                return true;
+            }
+            if ($kredit > 0 && $akun->saldo_normal !== 'kredit') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -253,6 +253,9 @@ class IntegrasiModulTest extends TestCase
         $this->postJson("/api/servis/{$tiket->id}/estimasi", [
             'estimasi_biaya' => 150000,
             'alasan' => 'Ganti LCD + jasa',
+            'items' => [
+                ['tipe' => 'jasa', 'nama_item' => 'Jasa Ganti LCD', 'qty' => 1, 'harga' => 50000],
+            ],
         ])->assertSuccessful();
 
         // Reload tiket — setEstimasi membuat token_approval baru

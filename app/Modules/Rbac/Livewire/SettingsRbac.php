@@ -1257,11 +1257,32 @@ class SettingsRbac extends Component
      */
     public function refreshSyncStatus(): void
     {
-        $enabled = (bool) config('sync.enabled', false);
-        $role = (string) config('sync.node_role', 'primary_store');
-        $nodeId = (string) config('sync.node_id', 'STORE-01');
-        $remoteUrl = (string) config('sync.remote_url', '');
-        $secret = (string) config('sync.api_secret', '');
+        $probe = $this->probeHybridSyncEndpoint(
+            enabled: (bool) config('sync.enabled', false),
+            role: (string) config('sync.node_role', 'primary_store'),
+            nodeId: (string) config('sync.node_id', 'STORE-01'),
+            remoteUrl: (string) config('sync.remote_url', ''),
+            secret: (string) config('sync.api_secret', '')
+        );
+
+        $this->syncStatus = $probe['status'];
+    }
+
+    /**
+     * Helper tunggal untuk memeriksa status outbox lokal & kesehatan node remote via /health.
+     *
+     * @return array{connected: bool, status: array<string, mixed>, detail: array<string, mixed>, alert_message: string}
+     */
+    private function probeHybridSyncEndpoint(
+        bool $enabled,
+        string $role,
+        string $nodeId,
+        string $remoteUrl,
+        string $secret,
+        bool $requireCredentials = false
+    ): array {
+        $remoteUrl = trim($remoteUrl);
+        $secret = trim($secret);
 
         $status = [
             'checked_at' => now()->format('H:i:s'),
@@ -1274,6 +1295,7 @@ class SettingsRbac extends Component
             'remote' => [],
         ];
 
+        $outboxError = false;
         try {
             $outbox = app(ConnectionResolverInterface::class)
                 ->connection()
@@ -1285,36 +1307,64 @@ class SettingsRbac extends Component
             $status['last_synced_at'] = optional((clone $outbox)->whereNotNull('synced_at')->latest('synced_at')->first())->synced_at;
         } catch (\Throwable $e) {
             $status['message'] = 'Tabel outbox belum tersedia';
+            $outboxError = true;
         }
 
-        if (! $enabled) {
-            $this->syncStatus = $status;
+        $detail = [
+            'local_enabled' => $enabled,
+            'local_role' => $role ?: '-',
+            'local_node' => $nodeId,
+            'remote_url' => $remoteUrl ?: '-',
+            'outbox_pending' => $status['local_pending'],
+            'outbox_failed' => $status['local_failed'],
+            'outbox_synced' => $status['local_synced'],
+            'cloud_connected' => false,
+            'cloud_node' => '-',
+            'cloud_role' => '-',
+            'cloud_pending' => null,
+            'cloud_message' => '-',
+        ];
 
-            return;
+        if (! $requireCredentials && ! $enabled) {
+            return [
+                'connected' => false,
+                'status' => $status,
+                'detail' => $detail,
+                'alert_message' => $status['message'],
+            ];
         }
 
-        if ($role !== 'primary_store') {
-            $status['connected'] = true;
+        if (! $requireCredentials && $role !== 'primary_store') {
+            $status['connected'] = ! $outboxError;
             $status['message'] = 'Node cloud aktif (cek koneksi dilakukan dari toko lokal)';
-            $this->syncStatus = $status;
 
-            return;
+            return [
+                'connected' => true,
+                'status' => $status,
+                'detail' => $detail,
+                'alert_message' => $status['message'],
+            ];
         }
 
         if ($remoteUrl === '' || $secret === '') {
-            $status['message'] = 'Remote URL / Shared Secret belum diisi';
-            $this->syncStatus = $status;
+            $msg = 'Remote URL atau Shared Secret belum diisi.';
+            $status['message'] = $msg;
 
-            return;
+            return [
+                'connected' => false,
+                'status' => $status,
+                'detail' => $detail,
+                'alert_message' => $msg,
+            ];
         }
 
         try {
-            $timestamp = time();
+            $timestamp = (string) time();
             $signature = hash_hmac('sha256', $timestamp.'.', $secret);
 
             $response = Http::timeout(10)->withHeaders([
                 'X-Sync-Node' => $nodeId,
-                'X-Sync-Timestamp' => (string) $timestamp,
+                'X-Sync-Timestamp' => $timestamp,
                 'X-Sync-Signature' => $signature,
                 'Accept' => 'application/json',
             ])->get(rtrim($remoteUrl, '/').'/api/internal/sync/health');
@@ -1323,17 +1373,48 @@ class SettingsRbac extends Component
             $remote = is_array($body) && ($body['success'] ?? false) ? ($body['data'] ?? []) : [];
             $status['remote'] = is_array($remote) ? $remote : [];
 
-            if ($response->successful() && $remote !== []) {
+            if ($response->successful()) {
                 $status['connected'] = true;
                 $status['message'] = 'Terhubung ke cloud';
-            } else {
-                $status['message'] = 'Gagal terhubung (HTTP '.$response->status().')';
-            }
-        } catch (\Throwable $e) {
-            $status['message'] = 'Gagal terhubung: '.$e->getMessage();
-        }
 
-        $this->syncStatus = $status;
+                $detail['cloud_connected'] = true;
+                $detail['cloud_node'] = (string) ($remote['node_id'] ?? '-');
+                $detail['cloud_role'] = (string) ($remote['node_role'] ?? '-');
+                $detail['cloud_pending'] = isset($remote['pending_count']) ? (int) $remote['pending_count'] : 0;
+                $detail['cloud_message'] = (string) ($body['message'] ?? 'OK');
+
+                Cache::put('hybrid_sync:remote_reachable', true, now()->addSeconds(60));
+
+                return [
+                    'connected' => true,
+                    'status' => $status,
+                    'detail' => $detail,
+                    'alert_message' => 'Koneksi ke cloud BERHASIL. Node cloud: '.$detail['cloud_node'].' ('.$detail['cloud_role'].').',
+                ];
+            }
+
+            $detail['cloud_message'] = 'HTTP '.$response->status().': '.$response->body();
+            $status['message'] = 'Gagal terhubung (HTTP '.$response->status().')';
+            Cache::put('hybrid_sync:remote_reachable', false, now()->addSeconds(60));
+
+            return [
+                'connected' => false,
+                'status' => $status,
+                'detail' => $detail,
+                'alert_message' => 'Cloud menolak koneksi: HTTP '.$response->status().'.',
+            ];
+        } catch (\Throwable $e) {
+            $detail['cloud_message'] = $e->getMessage();
+            $status['message'] = 'Gagal terhubung: '.$e->getMessage();
+            Cache::put('hybrid_sync:remote_reachable', false, now()->addSeconds(60));
+
+            return [
+                'connected' => false,
+                'status' => $status,
+                'detail' => $detail,
+                'alert_message' => 'Gagal terhubung ke cloud: '.$e->getMessage(),
+            ];
+        }
     }
 
     public function updatedIntegrasiFormWaProvider(): void
@@ -1415,14 +1496,36 @@ class SettingsRbac extends Component
         $config->set('payment_mp_qris_toko_enabled', (bool) ($this->integrasiForm['payment_mp_qris_toko_enabled'] ?? true), 'Aktivasi QRIS Dinamis Toko MP');
 
         // 5. Asymmetric Hybrid Sync
+        $syncEnabled = (bool) ($this->integrasiForm['sync_enabled'] ?? false);
+        $syncRole = (string) ($this->integrasiForm['sync_node_role'] ?? 'primary_store');
+        $syncNodeId = (string) ($this->integrasiForm['sync_node_id'] ?? 'STORE-01');
+        $syncRemoteUrl = trim((string) ($this->integrasiForm['sync_remote_url'] ?? ''));
+        $syncSecret = trim((string) ($this->integrasiForm['sync_api_secret'] ?? ''));
+        $syncPullInterval = max(5, (int) ($this->integrasiForm['sync_pull_interval_seconds'] ?? 30));
+
         $config->set('hybrid_sync_config', [
-            'enabled' => (bool) ($this->integrasiForm['sync_enabled'] ?? false),
-            'node_role' => $this->integrasiForm['sync_node_role'] ?? 'primary_store',
-            'node_id' => $this->integrasiForm['sync_node_id'] ?? 'STORE-01',
-            'remote_url' => $this->integrasiForm['sync_remote_url'] ?? '',
-            'api_secret' => $this->integrasiForm['sync_api_secret'] ?? '',
-            'pull_interval_seconds' => (int) ($this->integrasiForm['sync_pull_interval_seconds'] ?? 30),
+            'enabled' => $syncEnabled,
+            'node_role' => $syncRole,
+            'node_id' => $syncNodeId,
+            'remote_url' => $syncRemoteUrl,
+            'api_secret' => $syncSecret,
+            'pull_interval_seconds' => $syncPullInterval,
         ], 'Konfigurasi Asymmetric Hybrid Sync');
+
+        config([
+            'sync.enabled' => $syncEnabled,
+            'sync.node_role' => in_array($syncRole, ['primary_store', 'cloud_storefront'], true) ? $syncRole : 'primary_store',
+            'sync.node_id' => $syncNodeId,
+            'sync.pull_interval_seconds' => $syncPullInterval,
+        ]);
+        if ($syncRemoteUrl !== '') {
+            config(['sync.remote_url' => $syncRemoteUrl]);
+        }
+        if ($syncSecret !== '') {
+            config(['sync.api_secret' => $syncSecret]);
+        }
+        Cache::forget('hybrid_sync:remote_reachable');
+        $this->refreshSyncStatus();
 
         app(AuditService::class)->catat(
             'Konfigurasi',
@@ -1478,83 +1581,33 @@ class SettingsRbac extends Component
         }
     }
 
-    /** [T-22] Simpan strategi loyalitas → tabel konfigurasi + diskon tier + skema komisi default. Non-retroaktif: hanya berlaku utk transaksi baru. */
     public function testSyncConnection(): void
     {
         if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengecek sinkronisasi.')) {
             return;
         }
 
-        $remoteUrl = trim((string) ($this->integrasiForm['sync_remote_url'] ?? ''));
-        $secret = trim((string) ($this->integrasiForm['sync_api_secret'] ?? ''));
-        $nodeId = trim((string) ($this->integrasiForm['sync_node_id'] ?? 'STORE-01'));
+        $probe = $this->probeHybridSyncEndpoint(
+            enabled: (bool) ($this->integrasiForm['sync_enabled'] ?? false),
+            role: (string) ($this->integrasiForm['sync_node_role'] ?? 'primary_store'),
+            nodeId: trim((string) ($this->integrasiForm['sync_node_id'] ?? 'STORE-01')),
+            remoteUrl: trim((string) ($this->integrasiForm['sync_remote_url'] ?? '')),
+            secret: trim((string) ($this->integrasiForm['sync_api_secret'] ?? '')),
+            requireCredentials: true
+        );
 
-        $pending = (int) DB::table('hybrid_sync_outbox')->where('status', 'pending')->count();
-        $failed = (int) DB::table('hybrid_sync_outbox')->where('status', 'failed')->count();
-        $synced = (int) DB::table('hybrid_sync_outbox')->where('status', 'synced')->count();
+        $this->syncStatus = $probe['status'];
+        $this->syncTestStatus = $probe['connected'] ? 'success' : 'error';
+        $this->syncStatusMessage = $probe['alert_message'];
+        $this->syncStatusData = $probe['detail'];
 
-        $data = [
-            'local_enabled' => (bool) ($this->integrasiForm['sync_enabled'] ?? false),
-            'local_role' => (string) ($this->integrasiForm['sync_node_role'] ?? '-'),
-            'local_node' => $nodeId,
-            'remote_url' => $remoteUrl ?: '-',
-            'outbox_pending' => $pending,
-            'outbox_failed' => $failed,
-            'outbox_synced' => $synced,
-            'cloud_connected' => false,
-            'cloud_node' => '-',
-            'cloud_role' => '-',
-            'cloud_pending' => null,
-            'cloud_message' => '-',
-        ];
-
-        if ($remoteUrl === '' || $secret === '') {
-            $this->syncTestStatus = 'error';
-            $this->syncStatusMessage = 'Remote URL atau Shared Secret belum diisi.';
-            $this->syncStatusData = $data;
-            $this->dispatch('alert', ['type' => 'error', 'message' => $this->syncStatusMessage]);
-
-            return;
-        }
-
-        try {
-            $timestamp = (string) time();
-            $hmac = hash_hmac('sha256', $timestamp.'.', $secret);
-            $response = Http::timeout(10)->withHeaders([
-                'X-Sync-Node' => $nodeId,
-                'X-Sync-Signature' => $hmac,
-                'X-Sync-Timestamp' => $timestamp,
-                'Accept' => 'application/json',
-            ])->get(rtrim($remoteUrl, '/').'/api/internal/sync/health');
-
-            if ($response->successful()) {
-                $json = $response->json();
-                $data['cloud_connected'] = true;
-                $data['cloud_node'] = (string) ($json['data']['node_id'] ?? '-');
-                $data['cloud_role'] = (string) ($json['data']['node_role'] ?? '-');
-                $data['cloud_pending'] = (int) ($json['data']['pending_count'] ?? 0);
-                $data['cloud_message'] = (string) ($json['message'] ?? 'OK');
-
-                $this->syncTestStatus = 'success';
-                $this->syncStatusMessage = 'Koneksi ke cloud BERHASIL. Node cloud: '.$data['cloud_node'].' ('.$data['cloud_role'].').';
-            } else {
-                $data['cloud_message'] = 'HTTP '.$response->status().': '.$response->body();
-                $this->syncTestStatus = 'error';
-                $this->syncStatusMessage = 'Cloud menolak koneksi: HTTP '.$response->status().'.';
-            }
-        } catch (\Throwable $e) {
-            $data['cloud_message'] = $e->getMessage();
-            $this->syncTestStatus = 'error';
-            $this->syncStatusMessage = 'Gagal terhubung ke cloud: '.$e->getMessage();
-        }
-
-        $this->syncStatusData = $data;
         $this->dispatch('alert', [
-            'type' => $this->syncTestStatus === 'success' ? 'success' : 'error',
+            'type' => $this->syncTestStatus,
             'message' => $this->syncStatusMessage,
         ]);
     }
 
+    /** [T-22] Simpan strategi loyalitas → tabel konfigurasi + diskon tier + skema komisi default. Non-retroaktif: hanya berlaku utk transaksi baru. */
     public function simpanLoyalitas()
     {
         if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi loyalitas.')) {

@@ -1111,7 +1111,7 @@
                                 <div class="flex items-center justify-between gap-1 mt-1 sm:mt-1.5 text-[9px] sm:text-[10px] min-w-0">
                                     <span class="inline-flex items-center gap-1.5 font-medium truncate {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500 font-semibold' : 'text-up-mint') : 'text-up-red' }}">
                                         <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                                        <span class="truncate">{{ $stockInfo['is_available'] ? 'Ready' : $stockInfo['label'] }}</span>
+                                        <span class="truncate">{{ $stockInfo['label'] }}</span>
                                     </span>
                                     @if(($webConfig['show_sold_counter'] ?? true) && (int) ($p->total_terjual ?? 0) > 0)
                                         <span class="text-ink-400 tabular-nums hidden xs:inline flex-shrink-0">{{ $p->total_terjual }} terjual</span>
@@ -1211,7 +1211,7 @@
                             </div>
                             <div class="inline-flex items-center gap-1.5 text-[11px] font-semibold {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'text-amber-500' : 'text-up-mint') : 'text-up-red' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $stockInfo['is_available'] ? ($stockInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
-                                <span>{{ $stockInfo['is_available'] ? 'Ready' : $stockInfo['label'] }}</span>
+                                <span>{{ $stockInfo['label'] }}</span>
                             </div>
                         </div>
 

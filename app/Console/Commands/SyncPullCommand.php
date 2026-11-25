@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Modules\Sync\Services\HybridSyncProcessorService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class SyncPullCommand extends Command
@@ -11,7 +12,7 @@ class SyncPullCommand extends Command
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'sync:pull {--limit=50 : Jumlah maksimum event yang ditarik}';
+    protected $signature = 'sync:pull {--limit=50 : Jumlah maksimum event yang ditarik per batch} {--cabang_id= : Cabang ID spesifik} {--all : Tarik semua antrean hingga habis}';
 
     /**
      * The console command description.
@@ -42,70 +43,101 @@ class SyncPullCommand extends Command
             return Command::FAILURE;
         }
 
-        $limit = (int) $this->option('limit');
-        $endpoint = rtrim($remoteUrl, '/').'/api/internal/sync/pull?limit='.$limit;
+        $limit = max(1, (int) $this->option('limit'));
+        $cabangId = $this->option('cabang_id');
+        $pullAll = (bool) $this->option('all');
+        $apiSecret = (string) config('sync.api_secret', '');
 
-        $apiSecret = config('sync.api_secret');
-        $timestamp = time();
-        $signature = hash_hmac('sha256', $timestamp.'.', $apiSecret);
+        $totalProcessed = 0;
+        $totalFailed = 0;
+        $maxIterations = 100;
+        $iteration = 0;
 
-        $this->info("Menghubungi VPS: {$endpoint} ...");
+        do {
+            $iteration++;
+            $queryParams = ['limit' => $limit];
+            if (! empty($cabangId)) {
+                $queryParams['cabang_id'] = $cabangId;
+            }
 
-        try {
-            $response = Http::timeout(15)
-                ->withHeaders([
-                    'X-Sync-Node' => config('sync.node_id'),
-                    'X-Sync-Signature' => $signature,
-                    'X-Sync-Timestamp' => (string) $timestamp,
-                    'Accept' => 'application/json',
-                ])
-                ->get($endpoint);
+            $queryString = http_build_query($queryParams);
+            $endpoint = rtrim($remoteUrl, '/').'/api/internal/sync/pull?'.$queryString;
+            $timestamp = time();
+            $signature = hash_hmac('sha256', $timestamp.'.'.$queryString, $apiSecret);
 
-            if ($response->failed()) {
-                $this->error("Gagal menarik data dari remote node (HTTP {$response->status()}): ".$response->body());
+            $this->info("Menghubungi VPS: {$endpoint} ...");
+
+            try {
+                $response = Http::timeout(15)
+                    ->withHeaders([
+                        'X-Sync-Node' => config('sync.node_id'),
+                        'X-Sync-Signature' => $signature,
+                        'X-Sync-Timestamp' => (string) $timestamp,
+                        'Accept' => 'application/json',
+                    ])
+                    ->get($endpoint);
+
+                if ($response->failed()) {
+                    Cache::put('hybrid_sync:remote_reachable', false, now()->addMinutes(2));
+                    $this->error("Gagal menarik data dari remote node (HTTP {$response->status()}): ".$response->body());
+
+                    return Command::FAILURE;
+                }
+
+                Cache::put('hybrid_sync:remote_reachable', true, now()->addMinutes(5));
+
+                $items = $response->json('data', []);
+                $count = count($items);
+                $this->info("Berhasil mengambil {$count} event dari remote node.");
+
+                if ($count === 0) {
+                    break;
+                }
+
+                $batchProcessed = 0;
+                $batchFailed = 0;
+                $processedUuids = [];
+
+                foreach ($items as $item) {
+                    $result = $processor->process($item);
+                    if ($result['success']) {
+                        $batchProcessed++;
+                        $processedUuids[] = $item['sync_uuid'];
+                    } else {
+                        $batchFailed++;
+                        $this->warn("Gagal memproses event {$item['sync_uuid']}: ".$result['message']);
+                    }
+                }
+
+                $totalProcessed += $batchProcessed;
+                $totalFailed += $batchFailed;
+
+                // Kirim ACK ke VPS untuk item yang berhasil diproses agar tidak ditarik ulang
+                if (! empty($processedUuids)) {
+                    $ackPayload = json_encode(['sync_uuids' => $processedUuids]);
+                    $ackTs = time();
+                    $ackSig = hash_hmac('sha256', $ackTs.'.'.$ackPayload, $apiSecret);
+                    Http::timeout(10)->withHeaders([
+                        'X-Sync-Node' => config('sync.node_id'),
+                        'X-Sync-Signature' => $ackSig,
+                        'X-Sync-Timestamp' => (string) $ackTs,
+                        'Content-Type' => 'application/json',
+                    ])->withBody($ackPayload, 'application/json')->post(rtrim($remoteUrl, '/').'/api/internal/sync/ack');
+                }
+
+                if (! $pullAll || $count < $limit) {
+                    break;
+                }
+            } catch (\Throwable $e) {
+                Cache::put('hybrid_sync:remote_reachable', false, now()->addMinutes(2));
+                $this->error('Koneksi ke remote node terputus: '.$e->getMessage());
 
                 return Command::FAILURE;
             }
+        } while ($iteration < $maxIterations);
 
-            $items = $response->json('data', []);
-            $count = count($items);
-            $this->info("Berhasil mengambil {$count} event dari remote node.");
+        $this->info("Sinkronisasi pull selesai: {$totalProcessed} diproses, {$totalFailed} gagal.");
 
-            $processed = 0;
-            $failed = 0;
-
-            $processedUuids = [];
-            foreach ($items as $item) {
-                $result = $processor->process($item);
-                if ($result['success'] ?? false) {
-                    $processed++;
-                    $processedUuids[] = $item['sync_uuid'];
-                } else {
-                    $failed++;
-                    $this->warn("Gagal memproses event {$item['sync_uuid']}: ".($result['message'] ?? 'Unknown error'));
-                }
-            }
-
-            // Kirim ACK ke VPS untuk item yang berhasil diproses agar tidak ditarik ulang
-            if (! empty($processedUuids)) {
-                $ackPayload = json_encode(['sync_uuids' => $processedUuids]);
-                $ackTs = time();
-                $ackSig = hash_hmac('sha256', $ackTs.'.'.$ackPayload, $apiSecret);
-                Http::timeout(10)->withHeaders([
-                    'X-Sync-Node' => config('sync.node_id'),
-                    'X-Sync-Signature' => $ackSig,
-                    'X-Sync-Timestamp' => (string) $ackTs,
-                    'Content-Type' => 'application/json',
-                ])->withBody($ackPayload, 'application/json')->post(rtrim($remoteUrl, '/').'/api/internal/sync/ack');
-            }
-
-            $this->info("Sinkronisasi pull selesai: {$processed} diproses, {$failed} gagal.");
-
-            return Command::SUCCESS;
-        } catch (\Throwable $e) {
-            $this->error('Koneksi ke remote node terputus: '.$e->getMessage());
-
-            return Command::FAILURE;
-        }
+        return Command::SUCCESS;
     }
 }

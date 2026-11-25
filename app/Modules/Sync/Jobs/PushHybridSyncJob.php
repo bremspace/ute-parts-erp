@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class PushHybridSyncJob implements ShouldQueue
@@ -34,7 +35,7 @@ class PushHybridSyncJob implements ShouldQueue
                 return;
             }
 
-            if (! config('sync.enabled') || empty(config('sync.remote_url'))) {
+            if (! config('sync.enabled') || config('sync.node_role') !== 'primary_store' || empty(config('sync.remote_url'))) {
                 return;
             }
 
@@ -52,7 +53,7 @@ class PushHybridSyncJob implements ShouldQueue
 
             $jsonPayload = json_encode($body);
             $timestamp = time();
-            $signature = hash_hmac('sha256', $timestamp.'.'.$jsonPayload, config('sync.api_secret'));
+            $signature = hash_hmac('sha256', $timestamp.'.'.$jsonPayload, (string) config('sync.api_secret'));
 
             $response = Http::timeout(10)
                 ->connectTimeout(5)
@@ -61,23 +62,31 @@ class PushHybridSyncJob implements ShouldQueue
                     'X-Sync-Signature' => $signature,
                     'X-Sync-Timestamp' => (string) $timestamp,
                     'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
                 ])
                 ->withBody($jsonPayload, 'application/json')
-                ->post(rtrim(config('sync.remote_url'), '/').'/api/internal/sync/push');
+                ->post(rtrim((string) config('sync.remote_url'), '/').'/api/internal/sync/push');
 
             if ($response->status() === 200 && ($response->json('success') === true)) {
                 $outbox->update([
                     'status' => 'synced',
+                    'last_error' => null,
                     'synced_at' => now(),
                 ]);
+                Cache::put('hybrid_sync:remote_reachable', true, now()->addMinutes(5));
             } else {
-                $attempts = $this->attempts();
+                $attempts = max($this->attempts(), (int) $outbox->attempts + 1);
                 $outbox->update([
                     'status' => 'failed',
                     'attempts' => $attempts,
                     'last_error' => 'HTTP '.$response->status().': '.$response->body(),
                 ]);
-                $this->release($this->backoff()[$attempts - 1] ?? 900);
+                if ($response->serverError() || $response->status() === 0) {
+                    Cache::put('hybrid_sync:remote_reachable', false, now()->addMinutes(2));
+                }
+                if ($this->job) {
+                    $this->release($this->backoff()[$this->attempts() - 1] ?? 900);
+                }
             }
         } catch (\Throwable $e) {
             $attempts = $this->attempts();
@@ -85,12 +94,16 @@ class PushHybridSyncJob implements ShouldQueue
             if (isset($outbox)) {
                 $outbox->update([
                     'status' => 'failed',
-                    'attempts' => $attempts,
+                    'attempts' => max($attempts, (int) $outbox->attempts + 1),
                     'last_error' => $e->getMessage(),
                 ]);
             }
 
-            $this->release($this->backoff()[$attempts - 1] ?? 900);
+            Cache::put('hybrid_sync:remote_reachable', false, now()->addMinutes(2));
+
+            if ($this->job) {
+                $this->release($this->backoff()[$attempts - 1] ?? 900);
+            }
         }
     }
 }

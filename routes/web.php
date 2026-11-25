@@ -54,6 +54,7 @@ use App\Modules\Servis\Livewire\KomplainDashboard;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
+use App\Modules\Sync\Http\Controllers\SyncStatusController;
 use App\Modules\Wms\Controllers\BulkFotoUploadController;
 use App\Modules\Wms\Livewire\CycleCountPage;
 use App\Modules\Wms\Livewire\ImportExportPage;
@@ -704,6 +705,14 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
 
     // Dashboard (DASH-01 widget per role)
     Route::get('/dashboard', DashboardIndex::class)->name('dashboard');
+
+    // [Hybrid Sync] Status & Manual Trigger Real-Time
+    Route::get('/sync/status', [SyncStatusController::class, 'status'])
+        ->middleware('permission:pos.view|pos.view-own|servis.view|pengaturan.manage')
+        ->name('sync.status');
+    Route::post('/sync/trigger', [SyncStatusController::class, 'trigger'])
+        ->middleware(['permission:pos.view|pos.view-own|servis.view|pengaturan.manage', 'throttle:10,1'])
+        ->name('sync.trigger');
 
     // POS Kasir Screen — RBAC: permission pos.view (admin-toko/super-admin) ATAU
     // pos.view-own (role kasir) — pola pipe spatie, sama dgn permission:role|role

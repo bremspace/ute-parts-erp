@@ -1039,6 +1039,9 @@
                         <span class="min-w-[18px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-mono font-semibold flex items-center justify-center tabular-nums">{{ $ditahanList->count() }}</span>
                     @endif
                 </button>
+
+                <!-- [Hybrid Sync Indicator & Quick Trigger] (T-14..T-16) -->
+                <x-prism.sync-badge class="shrink-0" />
                 </div>
             </div>
 
@@ -1047,6 +1050,7 @@
                 <!-- Status & Info Konsumen Terpilih -->
                 <div class="flex items-center gap-1.5 text-xs">
                     <div class="sm:hidden flex w-auto max-w-full items-center gap-1 flex-nowrap overflow-visible">
+                        <x-prism.sync-badge :compact="true" class="shrink-0" />
                         <button type="button" wire:click="openDiskonModal" class="pos-top-pill inline-flex items-center justify-center rounded-md bg-up-primary/10 border border-up-primary/30 text-up-primary">
                             Diskon
                         </button>

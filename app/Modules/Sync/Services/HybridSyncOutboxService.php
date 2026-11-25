@@ -11,11 +11,11 @@ use Illuminate\Support\Str;
 class HybridSyncOutboxService
 {
     /**
-     * Enqueue data to outbox and dispatch background job.
+     * Enqueue data to outbox and dispatch background push job only when node acts as active pusher.
      */
     public function enqueue(string $eventType, Model $entity, array $payload, ?int $cabangId = null): ?HybridSyncOutbox
     {
-        if (! config('sync.enabled')) {
+        if (SyncExecutionGuard::isSuppressed() || ! config('sync.enabled')) {
             return null;
         }
 
@@ -30,7 +30,11 @@ class HybridSyncOutboxService
             'attempts' => 0,
         ]);
 
-        PushHybridSyncJob::dispatch($outbox->id);
+        // Node cloud_storefront menunggu ditarik via sync:pull (primary_store di balik NAT),
+        // sehingga tidak perlu memenuhi tabel jobs dengan push job tanpa target.
+        if (config('sync.node_role') === 'primary_store' && ! empty(config('sync.remote_url'))) {
+            PushHybridSyncJob::dispatch($outbox->id);
+        }
 
         return $outbox;
     }
@@ -41,6 +45,7 @@ class HybridSyncOutboxService
     public function getPendingItems(int $limit = 50): Collection
     {
         return HybridSyncOutbox::whereIn('status', ['pending', 'failed'])
+            ->where('attempts', '<', 10)
             ->orderBy('created_at', 'asc')
             ->limit($limit)
             ->get();
