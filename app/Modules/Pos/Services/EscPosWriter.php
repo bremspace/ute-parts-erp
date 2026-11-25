@@ -59,6 +59,26 @@ class EscPosWriter
         '→' => '->',
     ];
 
+    /** Font 5x7 minimal untuk harga Retail yang dicoret via raster GS v 0. */
+    private const STRIKE_FONT = [
+        '0' => ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
+        '1' => ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+        '2' => ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
+        '3' => ['11110', '00001', '00001', '01110', '00001', '00001', '11110'],
+        '4' => ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+        '5' => ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
+        '6' => ['00110', '01000', '10000', '11110', '10001', '10001', '01110'],
+        '7' => ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+        '8' => ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+        '9' => ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
+        'R' => ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
+        'P' => ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+        'p' => ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+        '.' => ['00000', '00000', '00000', '00000', '00000', '01100', '01100'],
+        '-' => ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
+        ' ' => ['00000', '00000', '00000', '00000', '00000', '00000', '00000'],
+    ];
+
     /**
      * Build full thermal receipt bytes with the paper-efficient Opsi B layout:
      * - Centered header (shop name, slogan, alamat + telepon in one line)
@@ -117,7 +137,6 @@ class EscPosWriter
         // ========== QR + TRANSAKSI — QR tengah, ukuran penuh, ada jarak ke bawah ==========
         $this->alignCenter();
         $noTrx = $data['no_transaksi'] ?? '-';
-        $qrCaption = $data['qr_caption'] ?? '';
         $tglStr = $data['tanggal'] ?? $data['waktu'] ?? '';
         $qrShown = ($data['show_qr_retur'] ?? true) && ! empty($noTrx) && $noTrx !== '-';
 
@@ -180,6 +199,7 @@ class EscPosWriter
 
         // ========== ITEMS ==========
         $strikethroughMode = $data['strikethrough_mode'] ?? 'esc_b';
+        $opsiBItem = false;
 
         foreach ($data['items'] ?? [] as $item) {
             $nama = $item['nama'] ?? 'Item';
@@ -196,25 +216,19 @@ class EscPosWriter
             $hargaJual = (float) ($item['harga'] ?? 0);
 
             if ($hargaRetail > $hargaJual && in_array($strikethroughMode, ['esc_b', 'reverse'], true)) {
-                // Harga lama diberi garis (underline) tanpa bold/reverse.
+                // Opsi B: harga Retail dicoret, Harga Box, qty x box = subtotal, Potongan Box.
+                $opsiBItem = true;
+                $qty = (int) ($item['qty'] ?? 1);
                 $normal = $this->money($hargaRetail);
                 $disc = $this->money($hargaJual);
-                $prefix = "{$qtySatuan} x ";
-                $totalLineLen = strlen($prefix) + strlen($normal) + 1 + strlen($disc) + strlen($rightVal);
+                $potongan = $this->money(($hargaRetail - $hargaJual) * $qty);
 
-                if ($totalLineLen >= $this->columns) {
-                    $this->raw($prefix);
-                    $this->underline(true)->raw($normal)->underline(false);
-                    $this->raw(' '.$disc."\n");
-                    $padRight = max(0, $this->columns - strlen($rightVal));
-                    $this->raw(str_repeat(' ', $padRight).$rightVal."\n");
-                } else {
-                    $gap = $this->columns - $totalLineLen;
-                    $this->raw($prefix);
-                    $this->underline(true)->raw($normal)->underline(false);
-                    $this->raw(' '.$disc);
-                    $this->raw(str_repeat(' ', $gap).$rightVal."\n");
-                }
+                $this->raw('Harga Retail: ');
+                $this->strikeRaster($normal);
+
+                $this->text('Harga Box: '.$disc);
+                $this->text($qtySatuan.' x '.$disc.' = '.$rightVal);
+                $this->text('Potongan Box: -'.$potongan);
             } elseif ($hargaRetail > $hargaJual) {
                 $this->text($this->pad("{$qtySatuan} x (".$this->money($hargaRetail).') -> '.$this->money($hargaJual), $rightVal));
             } else {
@@ -228,24 +242,27 @@ class EscPosWriter
             }
         }
 
-        // ========== SUBTOTAL BREAKDOWN & TOTALS (Directly follows items) ==========
-        $showBreakdown = $data['show_subtotal_breakdown'] ?? true;
+        // ========== SUBTOTAL BREAKDOWN & TOTALS ==========
+        // Opsi B sudah menampilkan subtotal dan Potongan Box di baris item.
+        if (! $opsiBItem) {
+            $showBreakdown = $data['show_subtotal_breakdown'] ?? true;
 
-        if ($showBreakdown && ! empty($data['diskon_tier']) && (float) $data['diskon_tier'] > 0) {
-            $subRetail = $data['subtotal_retail'] ?? ((float) ($data['subtotal'] ?? 0) + (float) $data['diskon_tier']);
-            $this->text($this->pad('Subtotal Retail:', $this->money($subRetail)));
+            if ($showBreakdown && ! empty($data['diskon_tier']) && (float) $data['diskon_tier'] > 0) {
+                $subRetail = $data['subtotal_retail'] ?? ((float) ($data['subtotal'] ?? 0) + (float) $data['diskon_tier']);
+                $this->text($this->pad('Subtotal Retail:', $this->money($subRetail)));
 
-            $tierLbl = (! empty($data['tier']) && $data['tier'] !== 'Retail')
-                ? "Pot {$data['tier']}:"
-                : (in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Pot Mitra:' : 'Pot Tier:');
-            $this->text($this->pad($tierLbl, '-'.$this->money($data['diskon_tier'])));
-            $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
-        } else {
-            $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
-        }
+                $tierLbl = (! empty($data['tier']) && $data['tier'] !== 'Retail')
+                    ? "Pot {$data['tier']}:"
+                    : (in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Pot Mitra:' : 'Pot Tier:');
+                $this->text($this->pad($tierLbl, '-'.$this->money($data['diskon_tier'])));
+                $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
+            } else {
+                $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
+            }
 
-        if (! empty($data['diskon_box']) && (float) $data['diskon_box'] > 0) {
-            $this->text($this->pad('Diskon Box/Kemasan:', '-'.$this->money($data['diskon_box'])));
+            if (! empty($data['diskon_box']) && (float) $data['diskon_box'] > 0) {
+                $this->text($this->pad('Diskon Box/Kemasan:', '-'.$this->money($data['diskon_box'])));
+            }
         }
 
         if (! empty($data['diskon_partai']) && (float) $data['diskon_partai'] > 0) {
@@ -320,17 +337,10 @@ class EscPosWriter
 
         $this->rule();
 
-        // ========== FOOTER — setiap catatan/catatan kaki tampil per baris ==========
+        // ========== FOOTER — Opsi B: cukup garansi satu baris di paling bawah ==========
         $this->alignCenter();
-        $footerLines = array_filter([
-            $data['footer_text'] ?? null,
-            ($qrShown && ! empty($qrCaption)) ? $qrCaption : null,
-            ! empty($data['garansi']) ? 'Garansi: '.$data['garansi'] : null,
-            $data['kebijakan_retur'] ?? null,
-            $data['catatan_kaki'] ?? null,
-        ]);
-        foreach ($footerLines as $footerLine) {
-            foreach ($this->wrap((string) $footerLine) as $ln) {
+        if (! empty($data['garansi'])) {
+            foreach ($this->wrap('Garansi: '.$data['garansi']) as $ln) {
                 $this->text($ln);
             }
         }
@@ -378,10 +388,69 @@ class EscPosWriter
         return self::normalizeQrSize($value);
     }
 
-    /** ESC - n — underline. Printer RPP02 tidak mendukung coret tengah/overprint. */
+    /** ESC - n — underline (fallback bila raster tidak didukung). */
     private function underline(bool $on): self
     {
         $this->buf .= "\x1b\x2d".chr($on ? 1 : 0);
+
+        return $this;
+    }
+
+    /**
+     * Cetak teks dengan coret tengah memakai raster GS v 0.
+     * Dipakai untuk "Harga Retail" karena printer tidak punya perintah strikethrough.
+     */
+    private function strikeRaster(string $text): self
+    {
+        $chars = str_split($this->ascii($text));
+        if ($chars === []) {
+            return $this;
+        }
+
+        $scaleY = 2;
+        $width = count($chars) * 6;
+        $height = 7 * $scaleY;
+        $bytesPerRow = (int) ceil($width / 8);
+        $rows = [];
+
+        foreach ([0, 1, 2, 3, 4, 5, 6] as $gy) {
+            for ($sy = 0; $sy < $scaleY; $sy++) {
+                $bits = array_fill(0, $bytesPerRow * 8, 0);
+
+                foreach ($chars as $i => $ch) {
+                    $glyph = self::STRIKE_FONT[$ch] ?? self::STRIKE_FONT[' '];
+                    for ($gx = 0; $gx < 5; $gx++) {
+                        if (($glyph[$gy][$gx] ?? '0') === '1') {
+                            $bits[$i * 6 + $gx] = 1;
+                        }
+                    }
+                }
+
+                // Garis coret di tengah (baris ke-4 dari 7).
+                if ($gy === 3) {
+                    for ($x = 0; $x < $width; $x++) {
+                        $bits[$x] = 1;
+                    }
+                }
+
+                $row = '';
+                for ($b = 0; $b < $bytesPerRow; $b++) {
+                    $byte = 0;
+                    for ($bit = 0; $bit < 8; $bit++) {
+                        if ($bits[$b * 8 + $bit]) {
+                            $byte |= 1 << (7 - $bit);
+                        }
+                    }
+                    $row .= chr($byte);
+                }
+                $rows[] = $row;
+            }
+        }
+
+        $this->buf .= "\x1d\x76\x30\x00"
+            .chr($bytesPerRow & 0xFF).chr(($bytesPerRow >> 8) & 0xFF)
+            .chr($height & 0xFF).chr(($height >> 8) & 0xFF)
+            .implode('', $rows);
 
         return $this;
     }

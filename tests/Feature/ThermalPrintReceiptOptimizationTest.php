@@ -337,10 +337,10 @@ class ThermalPrintReceiptOptimizationTest extends TestCase
         $this->assertStringNotContainsString('Telp/WA:', $output);
         $this->assertStringContainsString('Cabang Sukabumi', $output);
         $this->assertStringNotContainsString('Web:', $output);
-        $this->assertStringContainsString('Barang yang dibeli tidak dapat ditukar', $output);
-        // Footer per baris, tidak digabung dengan " | ".
-        $this->assertStringContainsString("Maksimal 3 hari kerja\n", $output);
-        $this->assertStringContainsString("Wajib bawa nota fisik\n", $output);
+        // Opsi B: footer_text/kebijakan/catatan tidak dicetak; hanya garansi bila ada.
+        $this->assertStringNotContainsString('Barang yang dibeli tidak dapat ditukar', $output);
+        $this->assertStringNotContainsString('Maksimal 3 hari kerja', $output);
+        $this->assertStringNotContainsString('Wajib bawa nota fisik', $output);
         // Karena show_qr_retur = false, QR bytes dan caption QR tidak boleh dicetak
         $this->assertStringNotContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
         $this->assertStringNotContainsString('Scan QR ini untuk retur', $output);

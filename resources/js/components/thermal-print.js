@@ -5,6 +5,26 @@
  * Supports Web Bluetooth (auto-reconnect) and CUPS raw printing via backend.
  */
 class EscPos {
+  /** Font 5x7 minimal untuk coret harga via raster GS v 0. */
+  static STRIKE_FONT = {
+    '0': ['01110','10001','10011','10101','11001','10001','01110'],
+    '1': ['00100','01100','00100','00100','00100','00100','01110'],
+    '2': ['01110','10001','00001','00010','00100','01000','11111'],
+    '3': ['11110','00001','00001','01110','00001','00001','11110'],
+    '4': ['00010','00110','01010','10010','11111','00010','00010'],
+    '5': ['11111','10000','11110','00001','00001','10001','01110'],
+    '6': ['00110','01000','10000','11110','10001','10001','01110'],
+    '7': ['11111','00001','00010','00100','01000','01000','01000'],
+    '8': ['01110','10001','10001','01110','10001','10001','01110'],
+    '9': ['01110','10001','10001','01111','00001','00010','01100'],
+    'R': ['11110','10001','10001','11110','10100','10010','10001'],
+    'P': ['11110','10001','10001','11110','10000','10000','10000'],
+    'p': ['11110','10001','10001','11110','10000','10000','10000'],
+    '.': ['00000','00000','00000','00000','00000','01100','01100'],
+    '-': ['00000','00000','00000','11111','00000','00000','00000'],
+    ' ': ['00000','00000','00000','00000','00000','00000','00000'],
+  };
+
   constructor(paperWidth = 58) {
     this.paperWidth = Number(paperWidth) === 80 ? 80 : 58;
     this.compressed = true; // Always small font for paper saving
@@ -134,8 +154,52 @@ class EscPos {
   /** Raw text tanpa LF — untuk baris yang disusun dengan escape di tengah (ESC B). */
   raw(str) { this.buf.push(...this.ascii(str)); return this; }
 
-  /** ESC - n — underline, menggantikan coret tengah yang tidak didukung printer. */
+  /** ESC - n — underline (fallback). */
   underline(on) { this.buf.push(0x1b, 0x2d, on ? 1 : 0); return this; }
+
+  /** Cetak teks bercoret tengah memakai raster GS v 0. */
+  strikeRaster(text) {
+    const chars = this.clean(text).split('');
+    if (!chars.length) return this;
+
+    const scaleY = 2;
+    const width = chars.length * 6;
+    const height = 7 * scaleY;
+    const bytesPerRow = Math.ceil(width / 8);
+    const rows = [];
+
+    for (let gy = 0; gy < 7; gy++) {
+      for (let sy = 0; sy < scaleY; sy++) {
+        const bits = new Array(bytesPerRow * 8).fill(0);
+        chars.forEach((ch, i) => {
+          const glyph = EscPos.STRIKE_FONT[ch] || EscPos.STRIKE_FONT[' '];
+          for (let gx = 0; gx < 5; gx++) {
+            if (glyph[gy][gx] === '1') bits[i * 6 + gx] = 1;
+          }
+        });
+        if (gy === 3) {
+          for (let x = 0; x < width; x++) bits[x] = 1;
+        }
+        const row = [];
+        for (let b = 0; b < bytesPerRow; b++) {
+          let byte = 0;
+          for (let bit = 0; bit < 8; bit++) {
+            if (bits[b * 8 + bit]) byte |= 1 << (7 - bit);
+          }
+          row.push(byte);
+        }
+        rows.push(row);
+      }
+    }
+
+    this.buf.push(
+      0x1d, 0x76, 0x30, 0x00,
+      bytesPerRow & 0xff, (bytesPerRow >> 8) & 0xff,
+      height & 0xff, (height >> 8) & 0xff,
+      ...rows.flat()
+    );
+    return this;
+  }
 
   /** ESC B n — strikethrough on/off (Epson ESC/POS standar). */
   escB(on) { this.buf.push(0x1b, 0x42, on ? 1 : 0); return this; }
@@ -314,6 +378,7 @@ class EscPos {
     if (metaLine) this.text(metaLine);
 
     // ======== ITEMS ========
+    let opsiBItem = false;
     for (const item of items) {
       const nama = item.nama || 'Item';
       for (const line of this.wrap(nama)) {
@@ -327,25 +392,19 @@ class EscPos {
       const hargaJual = Number(item.harga ?? 0);
 
       if (hargaRetail > hargaJual && ['esc_b', 'reverse'].includes(strikethrough_mode)) {
-        // Harga lama diberi garis (underline) tanpa bold/reverse.
+        // Opsi B: Harga Retail dicoret, Harga Box, qty x box = subtotal, Potongan Box.
+        opsiBItem = true;
+        const qty = Number(item.qty ?? 1);
         const normal = this.money(hargaRetail);
         const disc = this.money(hargaJual);
-        const prefix = qtySatuan + ' x ';
-        const totalLineLen = prefix.length + normal.length + 1 + disc.length + rightVal.length;
+        const potongan = this.money((hargaRetail - hargaJual) * qty);
 
-        if (totalLineLen >= this.columns) {
-          this.raw(prefix);
-          this.underline(true).raw(normal).underline(false);
-          this.raw(' ' + disc + '\n');
-          const padRight = Math.max(0, this.columns - rightVal.length);
-          this.buf.push(...this.ascii(' '.repeat(padRight) + rightVal), 0x0a);
-        } else {
-          const gap = this.columns - totalLineLen;
-          this.raw(prefix);
-          this.underline(true).raw(normal).underline(false);
-          this.raw(' ' + disc);
-          this.buf.push(...this.ascii(' '.repeat(gap) + rightVal), 0x0a);
-        }
+        this.raw('Harga Retail: ');
+        this.strikeRaster(normal);
+
+        this.text('Harga Box: ' + disc);
+        this.text(`${qtySatuan} x ${disc} = ${rightVal}`);
+        this.text('Potongan Box: -' + potongan);
       } else if (hargaRetail > hargaJual) {
         this.text(this.pad(`${qtySatuan} x (${this.money(hargaRetail)}) -> ${this.money(hargaJual)}`, rightVal));
       } else {
@@ -359,22 +418,25 @@ class EscPos {
       }
     }
 
-    // ======== SUBTOTAL BREAKDOWN & TOTALS (Directly follows items) ========
-    if (show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0' && diskon_tier && Number(diskon_tier) > 0) {
-      const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
-      this.text(this.pad('Subtotal Retail:', this.money(subRetail)));
+    // ======== SUBTOTAL BREAKDOWN & TOTALS ========
+    // Opsi B sudah memuat subtotal dan Potongan Box di baris item.
+    if (!opsiBItem) {
+      if (show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0' && diskon_tier && Number(diskon_tier) > 0) {
+        const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
+        this.text(this.pad('Subtotal Retail:', this.money(subRetail)));
 
-      const tierLbl = (tier && tier !== 'Retail')
-        ? 'Pot ' + tier + ':'
-        : (['reseller', 'agen'].includes(tipe_konsumen) ? 'Pot Mitra:' : 'Pot Tier:');
-      this.text(this.pad(tierLbl, '-' + this.money(diskon_tier)));
-      this.text(this.pad('Subtotal:', this.money(subtotal ?? total)));
-    } else {
-      this.text(this.pad('Subtotal:', this.money(subtotal ?? total)));
-    }
+        const tierLbl = (tier && tier !== 'Retail')
+          ? 'Pot ' + tier + ':'
+          : (['reseller', 'agen'].includes(tipe_konsumen) ? 'Pot Mitra:' : 'Pot Tier:');
+        this.text(this.pad(tierLbl, '-' + this.money(diskon_tier)));
+        this.text(this.pad('Subtotal:', this.money(subtotal ?? total)));
+      } else {
+        this.text(this.pad('Subtotal:', this.money(subtotal ?? total)));
+      }
 
-    if (diskon_box && Number(diskon_box) > 0) {
-      this.text(this.pad('Diskon Box/Kemasan:', '-' + this.money(diskon_box)));
+      if (diskon_box && Number(diskon_box) > 0) {
+        this.text(this.pad('Diskon Box/Kemasan:', '-' + this.money(diskon_box)));
+      }
     }
 
     if (diskon_partai && Number(diskon_partai) > 0) {
@@ -440,17 +502,10 @@ class EscPos {
 
     this.rule();
 
-    // ======== FOOTER — setiap catatan tampil per baris ========
+    // ======== FOOTER — Opsi B: cukup garansi satu baris di bawah ========
     this.alignCenter();
-    const footerLines = [
-      footer_text || '',
-      qrShown && captionStr ? captionStr : '',
-      garansi ? 'Garansi: ' + garansi : '',
-      kebijakan_retur || '',
-      catatan_kaki || '',
-    ].filter(Boolean);
-    for (const footerLine of footerLines) {
-      for (const ln of this.wrap(footerLine)) {
+    if (garansi) {
+      for (const ln of this.wrap('Garansi: ' + garansi)) {
         this.text(ln);
       }
     }
@@ -609,6 +664,7 @@ class EscPos {
     if (metaLineText) html += line(metaLineText);
 
     // ITEMS — sama dengan buildReceipt()
+    let opsiBItem = false;
     for (const item of items) {
       const nama = item.nama || 'Item';
       for (const namaLine of wrap(nama)) html += line(namaLine, 'font-weight:800;');
@@ -618,18 +674,18 @@ class EscPos {
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
 
-      if (hargaRetail > hargaJual && strikethrough_mode === 'esc_b') {
+      if (hargaRetail > hargaJual && ['esc_b', 'reverse'].includes(strikethrough_mode)) {
+        // Opsi B — Harga Retail dicoret, Harga Box, qty x box = subtotal, Potongan Box.
+        opsiBItem = true;
         const normal = money(hargaRetail);
         const disc = money(hargaJual);
-        const prefix = qtySatuan + ' x ';
-        const totalLineLen = prefix.length + normal.length + 1 + disc.length + rightVal.length;
-        if (totalLineLen >= cols) {
-          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:underline;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>');
-          html += line(' '.repeat(Math.max(0, cols - rightVal.length)) + rightVal);
-        } else {
-          const gap = cols - totalLineLen;
-          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:underline;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>' + ' '.repeat(gap) + '<span>' + esc(rightVal) + '</span>');
-        }
+        const qty = Number(item.qty ?? 1);
+        const potongan = money((hargaRetail - hargaJual) * qty);
+
+        html += lineHtml('Harga Retail: <span style="text-decoration:line-through;">' + esc(normal) + '</span>');
+        html += line('Harga Box: ' + disc);
+        html += line(qtySatuan + ' x ' + disc + ' = ' + rightVal);
+        html += line('Potongan Box: -' + potongan);
       } else if (hargaRetail > hargaJual) {
         html += line(row(qtySatuan + ' x (' + money(hargaRetail) + ') -> ' + money(hargaJual), rightVal));
       } else {
@@ -641,20 +697,22 @@ class EscPos {
       }
     }
 
-    // TOTAL & RINCIAN — sama dengan buildReceipt()
-    const showBreakdown = show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0';
-    if (showBreakdown && diskon_tier && Number(diskon_tier) > 0) {
-      const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
-      html += line(row('Subtotal Retail:', money(subRetail)));
-      const tierLbl = (tier && tier !== 'Retail')
-        ? 'Pot ' + tier + ':'
-        : (['reseller', 'agen'].includes(String(tipe_konsumen || '').toLowerCase()) ? 'Pot Mitra:' : 'Pot Tier:');
-      html += line(row(tierLbl, '-' + money(diskon_tier)));
-      html += line(row('Subtotal:', money(subtotal ?? total)));
-    } else {
-      html += line(row('Subtotal:', money(subtotal ?? total)));
+    // TOTAL & RINCIAN — Opsi B sudah memuat subtotal di baris item.
+    if (!opsiBItem) {
+      const showBreakdown = show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0';
+      if (showBreakdown && diskon_tier && Number(diskon_tier) > 0) {
+        const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
+        html += line(row('Subtotal Retail:', money(subRetail)));
+        const tierLbl = (tier && tier !== 'Retail')
+          ? 'Pot ' + tier + ':'
+          : (['reseller', 'agen'].includes(String(tipe_konsumen || '').toLowerCase()) ? 'Pot Mitra:' : 'Pot Tier:');
+        html += line(row(tierLbl, '-' + money(diskon_tier)));
+        html += line(row('Subtotal:', money(subtotal ?? total)));
+      } else {
+        html += line(row('Subtotal:', money(subtotal ?? total)));
+      }
+      if (diskon_box && Number(diskon_box) > 0) html += line(row('Diskon Box/Kemasan:', '-' + money(diskon_box)));
     }
-    if (diskon_box && Number(diskon_box) > 0) html += line(row('Diskon Box/Kemasan:', '-' + money(diskon_box)));
     if (diskon_partai && Number(diskon_partai) > 0) html += line(row('Diskon Partai:', '-' + money(diskon_partai)));
     if (diskon_poin && Number(diskon_poin) > 0) html += line(row('Tukar Poin (' + (poin_ditukar || 0) + 'pts):', '-' + money(diskon_poin)));
     if (diskon && Number(diskon) > 0) {
@@ -692,16 +750,9 @@ class EscPos {
 
     html += line(rule);
 
-    // FOOTER — setiap catatan tampil per baris, sama dengan buildReceipt()
-    const footerLinesText = [
-      footer_text || '',
-      qrShown && captionStr ? captionStr : '',
-      garansi ? 'Garansi: ' + garansi : '',
-      kebijakan_retur || '',
-      catatan_kaki || '',
-    ].filter(Boolean);
-    for (const footerLine of footerLinesText) {
-      for (const kakiLine of wrap(footerLine)) {
+    // FOOTER — Opsi B: cukup garansi satu baris, sama dengan buildReceipt()
+    if (garansi) {
+      for (const kakiLine of wrap('Garansi: ' + garansi)) {
         html += center('<div>' + esc(kakiLine) + '</div>');
       }
     }

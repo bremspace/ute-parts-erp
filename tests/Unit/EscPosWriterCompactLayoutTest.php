@@ -65,18 +65,18 @@ class EscPosWriterCompactLayoutTest extends TestCase
         $this->assertStringContainsString('No. TRX:', $output);
         $this->assertStringContainsString('MP-C01-20261124-0001', $output);
 
-        // Web dihapus, tanggal tetap ada; caption QR dan saldo poin 0 kembali seperti Opsi B.
+        // Web/caption dihapus; tanggal dan saldo poin tetap ada.
         $this->assertStringNotContainsString('Web:', $output);
         $this->assertStringContainsString('Tgl: 24-11-2026', $output);
-        $this->assertStringContainsString("\nScan QR ini untuk retur & klaim garansi\n", $output);
+        $this->assertStringNotContainsString('Scan QR ini untuk retur & klaim garansi', $output);
         $this->assertStringContainsString('Sisa Saldo Poin:', $output);
 
         // TOTAL lebih besar (double width), bold, ringkas satu baris.
         $this->assertStringNotContainsString("\x1d\x21\x10TOTAL:", $output);
         $this->assertStringContainsString("\x1b\x45\x01\x1d\x21\x80TOTAL: Rp 13.000", $output);
 
-        // Footer tetap terbawa, margin bawah dipepet (tanpa baris kosong sebelum cut).
-        $this->assertStringContainsString('Terima kasih atas kunjungan Anda!', $output);
+        // Footer teks/caption tidak dicetak; yang ada hanya garansi bila tersedia.
+        $this->assertStringNotContainsString('Terima kasih atas kunjungan Anda!', $output);
         $this->assertStringContainsString('BAYAR (MENUNGGU):', $output);
         $this->assertStringNotContainsString("\n\n\x1d\x56\x42\x00", $output);
     }
