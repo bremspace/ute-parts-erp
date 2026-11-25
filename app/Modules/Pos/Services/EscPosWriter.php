@@ -84,8 +84,7 @@ class EscPosWriter
     public function receipt(array $data): string
     {
         $paperWidth = $data['paper_width'] ?? self::WIDTH_58MM;
-        // Selalu pakai font compressed agar struk tetap 42 kolom dan hemat kertas.
-        $this->compressed = true;
+        $this->compressed = ($data['font_size'] ?? 'small') === 'small';
         $this->columns = $this->compressed
             ? (self::COLUMNS_COMPRESSED[$paperWidth] ?? 42)
             : (self::COLUMNS_NORMAL[$paperWidth] ?? 32);
@@ -114,12 +113,10 @@ class EscPosWriter
         // ========== QR + TRANSAKSI — QR kecil menyatu dengan blok No. TRX ==========
         $this->alignLeft();
         $noTrx = $data['no_transaksi'] ?? '-';
-        $qrUrl = $data['website_medsos'] ?? $data['qr_url'] ?? 'www.bremspace.com';
+        $qrCaption = $data['qr_caption'] ?? '';
         $tglStr = $data['tanggal'] ?? $data['waktu'] ?? '';
         $qrShown = ($data['show_qr_retur'] ?? true) && ! empty($noTrx) && $noTrx !== '-';
 
-        // QR native ESC/POS (didukung semua printer) —Bit image terbukti tidak stabil
-        // pada printer thermal lapangan, jadi tidak dipakai lagi.
         if ($qrShown) {
             $this->qrcode($noTrx, self::normalizeQrSize($data['qr_size'] ?? 4));
         }
@@ -130,12 +127,7 @@ class EscPosWriter
             $this->alignLeft();
         }
 
-        // Sesuai permintaan: cukup nomor transaksi saja, tanpa label "No. TRX:".
-        if ($qrShown) {
-            $this->bold(true)->text($noTrx)->bold(false);
-        } else {
-            $this->text($this->pad('No. TRX:', $noTrx));
-        }
+        $this->text($this->pad('No. TRX:', $noTrx));
 
         if (! empty($data['no_transaksi_asal']) && $data['no_transaksi_asal'] !== '-') {
             $this->text($this->pad('Asal TRX:', $data['no_transaksi_asal']));
@@ -173,12 +165,11 @@ class EscPosWriter
             }
         }
 
-        // Web + tanggal digabung jadi satu baris ringkas.
-        $metaLine = implode(' | ', array_filter([
-            'Web: '.$qrUrl,
-            (($data['show_waktu'] ?? true) && ! empty($tglStr)) ? 'Tgl: '.$tglStr : null,
-        ]));
-        $this->text($metaLine);
+        // Web sengaja tidak dicetak; cukup tanggal bila diaktifkan.
+        $metaLine = (($data['show_waktu'] ?? true) && ! empty($tglStr)) ? 'Tgl: '.$tglStr : '';
+        if ($metaLine !== '') {
+            $this->text($metaLine);
+        }
 
         // ========== ITEMS ==========
         $strikethroughMode = $data['strikethrough_mode'] ?? 'esc_b';
@@ -275,7 +266,7 @@ class EscPosWriter
             $this->text($this->pad('Ongkir:', '+'.$this->money($data['ongkir'])));
         }
 
-        // Total dalam satu baris (bold, tinggi normal).
+        // Total sejajar dalam satu baris (bold, tinggi normal).
         $this->bold(true)->text($this->pad('TOTAL:', $this->money($data['total'])))->bold(false);
 
         if (! empty($data['is_piutang'])) {
@@ -290,7 +281,7 @@ class EscPosWriter
             $this->text($this->pad('KEMBALI:', $this->money($data['kembali'] ?? $data['kembalian'] ?? 0)));
         }
 
-        if (! empty($data['saldo_poin']) && (float) $data['saldo_poin'] > 0) {
+        if (isset($data['saldo_poin'])) {
             $this->text($this->pad('Sisa Saldo Poin:', $this->numberOnly($data['saldo_poin']).' pts'));
         }
 
@@ -324,8 +315,8 @@ class EscPosWriter
             $this->text($data['footer_text']);
         }
 
-        // Catatan QR sengaja tidak dicetak; hanya field yang memang ada di template.
         $footerInfo = implode(' | ', array_filter([
+            ($qrShown && ! empty($qrCaption)) ? $qrCaption : null,
             ! empty($data['garansi']) ? 'Garansi: '.$data['garansi'] : null,
             $data['kebijakan_retur'] ?? null,
             $data['catatan_kaki'] ?? null,
@@ -343,8 +334,8 @@ class EscPosWriter
             $this->text('(............)        (............)');
         }
 
-        // Tanpa feed kosong — potong langsung di ujung teks terakhir.
-        $this->feed(0)->cut();
+        // Minimal feed then cut (paper-saving)
+        $this->feed(1)->cut();
 
         return $this->buf;
     }

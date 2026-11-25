@@ -5,12 +5,13 @@
         $showQrRetur = $strukConfig['show_qr_retur'] ?? true;
         $qrSize = \App\Modules\Pos\Services\EscPosWriter::normalizeQrSize($strukConfig['qr_size'] ?? 4);
         $qrPx = $qrSize * 12; // module 4 → 48px, sesuai mockup Opsi B
+        $qrCaption = $strukConfig['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi';
         $defaultPaperSize = str_contains($strukConfig['default_width'] ?? '', '80') ? '80' : '58';
         $autoPrint = !empty($strukConfig['auto_print']) || !empty($strukConfig['thermal_auto_print']);
-        $qrService = app(\App\Modules\Wms\Services\QrCodeService::class);
         $qrSvg = (!empty($receiptData['no_transaksi']) && $showQrRetur)
-            ? $qrService->generateSvg($receiptData['no_transaksi'], $qrPx, 2)
+            ? app(\App\Modules\Wms\Services\QrCodeService::class)->generateSvg($receiptData['no_transaksi'], $qrPx, 2)
             : '';
+
         // Preserve pelanggan's phone/address before merging so template
         // config (toko phone/address) is not overwritten by receipt data.
         $receiptSafe = $receiptData;
@@ -31,10 +32,7 @@
             'show_qr_retur','qr_size','qr_caption','footer_text','kebijakan_retur','catatan_kaki',
             'default_width','font_size','thermal_printer_name','thermal_bluetooth_mac','thermal_auto_print'];
         // After merging receiptSafe on top, re-apply template keys so settings always win for display.
-        $mergedData = array_merge($strukConfig, $receiptSafe, [
-            'qr_svg' => $qrSvg,
-            'paper_width' => (int) ($defaultPaperSize === '80' ? 80 : 58),
-        ]);
+        $mergedData = array_merge($strukConfig, $receiptSafe, ['qr_svg' => $qrSvg, 'paper_width' => (int) ($defaultPaperSize === '80' ? 80 : 58)]);
         foreach ($templateKeys as $tk) {
             if (array_key_exists($tk, $strukConfig)) {
                 $mergedData[$tk] = $strukConfig[$tk];

@@ -49,26 +49,26 @@ class EscPosWriterCompactLayoutTest extends TestCase
         // Alamat + telepon digabung dalam satu baris.
         $this->assertStringContainsString('Jl. Veteran No. 12 - Telp/WA: 0812-3456', $output);
 
-        // QR memakai perintah native (printer lapangan tidak stabil dengan bit-image).
+        // QR native sesuai Opsi B, tanpa bit-image.
         $this->assertStringContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
         $this->assertStringContainsString("\x1d\x28\x6b\x03\x00\x31\x43\x04", $output);
         $this->assertStringNotContainsString("\x1b\x2a\x00", $output);
-        // Label No. TRX dihapus, cukup nomor transaksi saja.
-        $this->assertStringNotContainsString('No. TRX:', $output);
+        $this->assertStringContainsString('No. TRX:', $output);
         $this->assertStringContainsString('MP-C01-20261124-0001', $output);
 
-        // Web + tanggal digabung; caption QR dan saldo poin 0 tidak dicetak.
-        $this->assertStringContainsString('Web: www.bremspace.com | Tgl: 24-11-2026', $output);
-        $this->assertStringNotContainsString('Scan QR ini untuk retur & klaim garansi', $output);
-        $this->assertStringNotContainsString('Sisa Saldo Poin:', $output);
+        // Web dihapus, tanggal tetap ada; caption QR dan saldo poin 0 kembali seperti Opsi B.
+        $this->assertStringNotContainsString('Web:', $output);
+        $this->assertStringContainsString('Tgl: 24-11-2026', $output);
+        $this->assertStringContainsString('Scan QR ini untuk retur & klaim garansi', $output);
+        $this->assertStringContainsString('Sisa Saldo Poin:', $output);
 
-        // TOTAL satu baris, tanpa sizeDoubleHeight.
+        // TOTAL sejajar satu baris, tanpa sizeDoubleHeight.
         $this->assertStringNotContainsString("\x1d\x21\x10TOTAL:", $output);
         $this->assertMatchesRegularExpression('/TOTAL: +Rp 13\.000/', $output);
 
-        // Footer padat masih terbawa, tanpa feed kosong sebelum cut.
+        // Footer Opsi B tetap terbawa dengan feed satu baris sebelum cut.
         $this->assertStringContainsString('Terima kasih atas kunjungan Anda!', $output);
         $this->assertStringContainsString('BAYAR (MENUNGGU):', $output);
-        $this->assertStringNotContainsString("\n\n\x1d\x56\x42\x00", $output);
+        $this->assertStringContainsString("\n\x1d\x56\x42\x00", $output);
     }
 }

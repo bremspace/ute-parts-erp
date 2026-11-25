@@ -208,15 +208,14 @@ class EscPos {
       nama_toko, slogan, alamat, telepon, website_medsos,
       show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
       show_subtotal_breakdown = true,
-      show_qr_retur = true, qr_size = 3, qr_url,
+      show_qr_retur = true, qr_caption, qr_size = 3, qr_url,
       font_size = 'small',
       strikethrough_mode = 'esc_b',
     } = data;
 
     // Re-init with correct paper width
     this.paperWidth = Number(paperWidthOverride ?? data.paper_width) === 80 ? 80 : 58;
-    // Selalu compressed agar 42 kolom dan hemat kertas, apa pun pengaturan lama.
-    this.compressed = true;
+    this.compressed = font_size === 'small';
     this.columns = this.compressed
       ? (this.paperWidth === 80 ? 64 : 42)
       : (this.paperWidth === 80 ? 48 : 32);
@@ -241,10 +240,9 @@ class EscPos {
     // ======== QR + TRANSAKSI — QR kecil menyatu dengan blok No. TRX ========
     this.alignLeft();
     const qrContent = no_transaksi || '-';
-    const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
     const tglStr = tanggal || waktu || '';
+    const captionStr = qr_caption || '';
 
-    // QR native ESC/POS — bit-image tidak stabil di printer lapangan.
     if (qrShown) {
       this.qrcode(qrContent, this.normalizeQrSize(qr_size));
     }
@@ -254,13 +252,7 @@ class EscPos {
       this.bold(true).text(label_struk).bold(false);
       this.alignLeft();
     }
-
-    // Sesuai permintaan: cukup nomor transaksi, tanpa label "No. TRX:".
-    if (qrShown) {
-      this.bold(true).text(qrContent).bold(false);
-    } else {
-      this.text(this.pad('No. TRX:', qrContent));
-    }
+    this.text(this.pad('No. TRX:', qrContent));
     if (no_transaksi_asal && no_transaksi_asal !== '-') {
       this.text(this.pad('Asal TRX:', no_transaksi_asal));
     }
@@ -297,11 +289,8 @@ class EscPos {
       }
     }
 
-    // Web + tanggal digabung jadi satu baris ringkas.
-    const metaLine = [
-      qrUrlDomain ? 'Web: ' + qrUrlDomain : '',
-      tglVisible ? 'Tgl: ' + tglStr : '',
-    ].filter(Boolean).join(' | ');
+    // Web sengaja tidak dicetak; cukup tanggal bila diaktifkan.
+    const metaLine = tglVisible ? 'Tgl: ' + tglStr : '';
     if (metaLine) this.text(metaLine);
 
     // ======== ITEMS ========
@@ -388,7 +377,7 @@ class EscPos {
       this.text(this.pad('Ongkir:', '+' + this.money(ongkir)));
     }
 
-    // Total dalam satu baris (bold, tinggi normal).
+    // Total sejajar dalam satu baris (bold, tinggi normal).
     this.bold(true).text(this.pad('TOTAL:', this.money(total))).bold(false);
 
     if (is_piutang) {
@@ -401,7 +390,7 @@ class EscPos {
       this.text(this.pad('KEMBALI:', this.money(kembali ?? 0)));
     }
 
-    if (Number(saldo_poin) > 0) {
+    if (saldo_poin !== undefined) {
       this.text(this.pad('Sisa Saldo Poin:', this.numberOnly(saldo_poin) + ' pts'));
     }
 
@@ -431,8 +420,8 @@ class EscPos {
     this.alignCenter();
     if (footer_text) this.text(footer_text);
 
-    // Catatan QR sengaja tidak dicetak; hanya field yang memang ada di template.
     const footerInfo = [
+      qrShown && captionStr ? captionStr : '',
       garansi ? 'Garansi: ' + garansi : '',
       kebijakan_retur || '',
       catatan_kaki || '',
@@ -450,8 +439,7 @@ class EscPos {
       this.text('(............)        (............)');
     }
 
-    // Tanpa feed kosong — potong langsung di ujung teks terakhir.
-    this.feed(0).cut();
+    this.feed(1).cut();
 
     return new Uint8Array(this.buf);
   }
@@ -485,14 +473,13 @@ class EscPos {
       nama_toko, slogan, alamat, telepon, website_medsos,
       show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
       show_subtotal_breakdown = true,
-      show_qr_retur = true, qr_url, qr_svg,
+      show_qr_retur = true, qr_caption, qr_url, qr_svg,
       paper_width = 58, font_size = 'small', strikethrough_mode = 'esc_b',
     } = data;
 
     const widthNum = Number(paperWidthOverride ?? paper_width) === 80 ? 80 : 58;
     const paperClass = widthNum === 80 ? 'paper-80' : 'paper-58';
-    // Selalu compressed, mengikuti buildReceipt().
-    const cols = widthNum === 80 ? 64 : 42;
+    const cols = (font_size === 'small') ? (widthNum === 80 ? 64 : 42) : (widthNum === 80 ? 48 : 32);
 
     const money = (v) => this.money(v);
     const numberOnly = (v) => this.numberOnly(v);
@@ -529,8 +516,8 @@ class EscPos {
     const qrShown = Boolean(show_qr_retur && no_transaksi && no_transaksi !== '-');
     const tglVisible = Boolean(show_waktu && (tanggal || waktu));
     const qrContent = no_transaksi || '-';
-    const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
     const tglStr = tanggal || waktu || '';
+    const captionStr = qr_caption || '';
     const renderedQr = qr_svg || '';
 
     const fallbackQr = `<svg width="48" height="48" viewBox="0 0 100 100" style="border:1px solid #d1d5db;background:#fff;">
@@ -566,18 +553,14 @@ class EscPos {
     }
     html += line(rule);
 
-    // QR + TRANSAKSI — QR native, nomor TRX tepat di bawahnya.
+    // QR + TRANSAKSI — QR kecil di awal blok identitas (sejajar area No. TRX)
     if (qrShown) {
       html += lineHtml('<div style="display:inline-block;line-height:0;">' + (renderedQr || fallbackQr) + '</div>');
     }
 
     // TRANSAKSI — sama dengan buildReceipt()
     if (label_struk) html += center('<div style="font-weight:800;">' + esc(label_struk) + '</div>');
-    if (qrShown) {
-      html += lineHtml('<div style="font-weight:800;">' + esc(qrContent) + '</div>');
-    } else {
-      html += line(row('No. TRX:', qrContent));
-    }
+    html += line(row('No. TRX:', qrContent));
     if (no_transaksi_asal && no_transaksi_asal !== '-') html += line(row('Asal TRX:', no_transaksi_asal));
     if (sumber && !['pos', 'offline'].includes(String(sumber).toLowerCase())) html += line(row('Pesanan:', String(sumber).toUpperCase()));
     if (no_tiket) html += line(row('No. Tiket:', no_tiket));
@@ -596,10 +579,7 @@ class EscPos {
       }
     }
 
-    const metaLineText = [
-      qrUrlDomain ? 'Web: ' + qrUrlDomain : '',
-      tglVisible ? 'Tgl: ' + tglStr : '',
-    ].filter(Boolean).join(' | ');
+    const metaLineText = tglVisible ? 'Tgl: ' + tglStr : '';
     if (metaLineText) html += line(metaLineText);
 
     // ITEMS — sama dengan buildReceipt()
@@ -675,7 +655,7 @@ class EscPos {
       html += line(row('KEMBALI:', money(kembali ?? 0)));
     }
 
-    if (Number(saldo_poin) > 0) html += line(row('Sisa Saldo Poin:', numberOnly(saldo_poin) + ' pts'));
+    if (saldo_poin !== undefined) html += line(row('Sisa Saldo Poin:', numberOnly(saldo_poin) + ' pts'));
     if (hemat_total && Number(hemat_total) > 0) html += line(row('HEMAT:', money(hemat_total)));
     if (komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0) html += line(row('Komisi:', '+' + money(komisi_mitra_nominal) + ' (Saldo)'));
     if (goodwill) html += line(row('Goodwill:', String(goodwill)));
@@ -689,6 +669,7 @@ class EscPos {
     // FOOTER — digabung jadi beberapa baris padat, sama dengan buildReceipt()
     if (footer_text) html += center('<div>' + esc(footer_text) + '</div>');
     const footerInfoText = [
+      qrShown && captionStr ? captionStr : '',
       garansi ? 'Garansi: ' + garansi : '',
       kebijakan_retur || '',
       catatan_kaki || '',
