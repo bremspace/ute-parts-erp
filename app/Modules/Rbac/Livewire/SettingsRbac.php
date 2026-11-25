@@ -256,7 +256,7 @@ class SettingsRbac extends Component
         'show_subtotal_breakdown' => true,
         'show_qr_retur' => true,
         'qr_size' => 4,
-        'qr_caption' => 'Scan QR ini untuk retur & klaim garansi',
+        'qr_caption' => '',
         'footer_text' => 'Terima kasih atas kunjungan Anda!',
         'kebijakan_retur' => 'Maksimal klaim retur / garansi 3 hari dengan membawa struk ber-QR ini.',
         'catatan_kaki' => 'Segel toko wajib utuh & fisik barang tidak cacat.',

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Wms\Services;
 
+use BaconQrCode\Common\ErrorCorrectionLevel;
+use BaconQrCode\Encoder\Encoder;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
@@ -12,6 +14,33 @@ use Throwable;
 
 class QrCodeService
 {
+    /**
+     * Matriks modul QR (true = hitam) untuk dirender sebagai bit-image ESC/POS.
+     * Dipakai agar nomor transaksi bisa ditempatkan di samping QR pada satu baris.
+     *
+     * @return array<int, array<int, bool>>
+     */
+    public function generateMatrix(string $data): array
+    {
+        try {
+            $qr = Encoder::encode($data, ErrorCorrectionLevel::forBits(0));
+            $matrix = $qr->getMatrix();
+            $rows = [];
+
+            for ($y = 0; $y < $matrix->getHeight(); $y++) {
+                $row = [];
+                for ($x = 0; $x < $matrix->getWidth(); $x++) {
+                    $row[] = $matrix->get($x, $y) === 1;
+                }
+                $rows[] = $row;
+            }
+
+            return $rows;
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
     /**
      * Generate vector SVG string untuk QR Code.
      * Output aman di-embed langsung ke dalam HTML template.
