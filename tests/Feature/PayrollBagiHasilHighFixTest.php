@@ -224,10 +224,13 @@ class PayrollBagiHasilHighFixTest extends TestCase
         $this->assertSame('JRL-PR-BAYAR-1-'.$this->periode, $bayar1['no_jurnal']);
         $this->assertSame('JRL-PR-BAYAR-'.$cabang2->id.'-'.$this->periode, $bayar2['no_jurnal']);
 
-        // Kedua cabang punya accrual (3 baris: 520-01, 520-09, 210-02) +
-        // pembayaran sendiri, terisolasi per cabang.
-        $this->assertSame(3, JurnalAkuntansi::where('no_jurnal', $final1['no_jurnal'])->where('cabang_id', 1)->count());
-        $this->assertSame(3, JurnalAkuntansi::where('no_jurnal', $final2['no_jurnal'])->where('cabang_id', $cabang2->id)->count());
+        // [F-12] Accrual dikirim 3 baris (520-01, 520-09, 210-02), tetapi baris
+        // komisi bernilai 0-0 dibuang saat normalisasi — GL hanya menyimpan
+        // baris meaningful (2: 520-01, 210-02); total debit/kredit tidak berubah.
+        // Pembayaran sendiri, terisolasi per cabang.
+        $this->assertSame(2, JurnalAkuntansi::where('no_jurnal', $final1['no_jurnal'])->where('cabang_id', 1)->count());
+        $this->assertSame(2, JurnalAkuntansi::where('no_jurnal', $final2['no_jurnal'])->where('cabang_id', $cabang2->id)->count());
+        $this->assertSame(0, JurnalAkuntansi::where('no_jurnal', $final1['no_jurnal'])->where('debit', 0)->where('kredit', 0)->count());
         $this->assertEquals(5000000, (float) JurnalAkuntansi::where('no_jurnal', $bayar1['no_jurnal'])->sum('debit'));
         $this->assertEquals(4000000, (float) JurnalAkuntansi::where('no_jurnal', $bayar2['no_jurnal'])->sum('debit'));
     }

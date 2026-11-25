@@ -23,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class AkuntingController extends Controller
@@ -249,10 +250,21 @@ class AkuntingController extends Controller
             || in_array($request->input('sumber'), ['penyesuaian', 'ajustment', 'adjustment'], true)
             || in_array($request->input('tipe'), ['penyesuaian', 'ajustment', 'adjustment'], true);
 
+        // [F-20] Flag penyesuaian self-declared hanya dihormati untuk role
+        // finance/super-admin/owner; role lain tetap tunduk pada aturan sisi
+        // saldo normal (flag diabaikan, bukan error khusus).
+        if ($isPenyesuaian && ! auth()->user()?->hasRole(['finance', 'super-admin', 'owner'])) {
+            $isPenyesuaian = false;
+        }
+
         $galat = ValidasiBarisJurnal::cekBaris($lines, $isPenyesuaian);
         if ($galat !== []) {
             return $this->error(implode(' ', $galat), 422, ['errors' => $galat]);
         }
+
+        // [F-20] Penyesuaian yang benar-benar memakai kontra-sisi wajib
+        // maker-checker (pending + approver lain), meskipun tanpa ApprovalRule.
+        $penyesuaianKontra = $isPenyesuaian && ValidasiBarisJurnal::adaKontraSisi($lines);
 
         try {
             $cabangId = $this->cabangAktif();
@@ -276,27 +288,36 @@ class AkuntingController extends Controller
                 })
                 ->exists();
 
-            $statusApproval = $hasApprovalRule ? 'pending' : 'disetujui';
+            $statusApproval = ($hasApprovalRule || $penyesuaianKontra) ? 'pending' : 'disetujui';
 
-            $noJurnal = $this->jurnalService->generateNoJurnal('manual', $cabangId);
-            $this->jurnalService->post(
-                noJurnal: $noJurnal,
-                tanggal: $request->tanggal,
-                sumber: 'manual',
-                lines: $request->lines,
-                deskripsi: $request->deskripsi,
-                cabangId: $cabangId,
-                userId: $userId,
-                statusApproval: $statusApproval,
-                lampiranPath: $lampiranPath,
-                lampiranNama: $lampiranNama
-            );
+            // [F-15] generate + post dalam SATU transaksi: lock counter
+            // generateNoJurnal (lockForUpdate) bertahan sampai header+lines
+            // commit — dua posting manual concurrent tidak lagi berebut nomor
+            // sama lalu gagal dengan pesan idempotency yang menyesatkan
+            // (pola sama dengan POS/Servis/TutupBuku).
+            $noJurnal = DB::transaction(function () use ($request, $cabangId, $userId, $statusApproval, $lampiranPath, $lampiranNama): string {
+                $no = $this->jurnalService->generateNoJurnal('manual', $cabangId);
+                $this->jurnalService->post(
+                    noJurnal: $no,
+                    tanggal: $request->tanggal,
+                    sumber: 'manual',
+                    lines: $request->lines,
+                    deskripsi: $request->deskripsi,
+                    cabangId: $cabangId,
+                    userId: $userId,
+                    statusApproval: $statusApproval,
+                    lampiranPath: $lampiranPath,
+                    lampiranNama: $lampiranNama
+                );
+
+                return $no;
+            });
 
             $header = JurnalHeader::where('no_jurnal', $noJurnal)
                 ->where('cabang_key', $cabangId)
                 ->first();
 
-            if ($hasApprovalRule && $header) {
+            if (($hasApprovalRule || $penyesuaianKontra) && $header) {
                 $approvalService->ajukan(
                     entityType: 'jurnal_manual',
                     entityId: $header->id,

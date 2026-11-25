@@ -40,7 +40,11 @@ class JurnalHeader extends Model
 
     public function lines(): HasMany
     {
-        return $this->hasMany(JurnalAkuntansi::class, 'no_jurnal', 'no_jurnal');
+        // [F-18] Isolasi per cabang: nomor jurnal sama boleh ada di cabang
+        // berbeda (unique index (cabang_key, no_jurnal)). Kunci relasi komposit
+        // jurnal_rel_key = cabang_key:no_jurnal (generated column) memastikan
+        // baris lintas cabang tidak tercampur — benar untuk lazy & eager load.
+        return $this->hasMany(JurnalAkuntansi::class, 'jurnal_rel_key', 'jurnal_rel_key');
     }
 
     public function user(): BelongsTo
