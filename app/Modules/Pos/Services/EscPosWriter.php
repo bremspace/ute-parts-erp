@@ -73,6 +73,14 @@ class EscPosWriter
         '9' => ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
         'R' => ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
         'P' => ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+        'H' => ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
+        'A' => ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
+        'G' => ['01111', '10000', '10000', '10111', '10001', '10001', '01111'],
+        'E' => ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+        'T' => ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+        'L' => ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
+        'I' => ['01110', '00100', '00100', '00100', '00100', '00100', '01110'],
+        ':' => ['00000', '00100', '00100', '00000', '00100', '00100', '00000'],
         'p' => ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
         '.' => ['00000', '00000', '00000', '00000', '00000', '01100', '01100'],
         '-' => ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
@@ -229,9 +237,8 @@ class EscPosWriter
                 $disc = $this->money($hargaJual);
                 $potongan = $this->money(($hargaRetail - $hargaJual) * $qty);
 
-                $this->text('Harga Retail:');
-                $this->strikeRaster($normal);
-                // Raster tidak mengembalikan kursor ke margin kiri; paksa baris baru.
+                // Seluruh baris dicetak sebagai raster agar label + nominal tetap searis.
+                $this->strikeRaster('Harga Retail: '.$normal, strlen('Harga Retail: '), strlen($normal));
                 $this->feed(1)->alignLeft();
 
                 $this->text('Harga Box: '.$disc);
@@ -408,7 +415,7 @@ class EscPosWriter
      * Cetak teks dengan coret tengah memakai raster GS v 0.
      * Dipakai untuk "Harga Retail" karena printer tidak punya perintah strikethrough.
      */
-    private function strikeRaster(string $text): self
+    private function strikeRaster(string $text, int $strikeFrom = 0, ?int $strikeLength = null): self
     {
         $chars = str_split($this->ascii($text));
         if ($chars === []) {
@@ -420,13 +427,17 @@ class EscPosWriter
         $height = 7 * $scaleY;
         $bytesPerRow = (int) ceil($width / 8);
         $rows = [];
+        $strikeEnd = $strikeLength === null
+            ? count($chars)
+            : min(count($chars), $strikeFrom + $strikeLength);
 
         foreach ([0, 1, 2, 3, 4, 5, 6] as $gy) {
             for ($sy = 0; $sy < $scaleY; $sy++) {
                 $bits = array_fill(0, $bytesPerRow * 8, 0);
 
                 foreach ($chars as $i => $ch) {
-                    $glyph = self::STRIKE_FONT[$ch] ?? self::STRIKE_FONT[' '];
+                    $key = strtoupper($ch);
+                    $glyph = self::STRIKE_FONT[$key] ?? self::STRIKE_FONT[' '];
                     for ($gx = 0; $gx < 5; $gx++) {
                         if (($glyph[$gy][$gx] ?? '0') === '1') {
                             $bits[$i * 6 + $gx] = 1;
@@ -434,10 +445,12 @@ class EscPosWriter
                     }
                 }
 
-                // Garis coret di tengah (baris ke-4 dari 7).
+                // Garis coret hanya pada rentang nominal (baris ke-4 dari 7).
                 if ($gy === 3) {
-                    for ($x = 0; $x < $width; $x++) {
-                        $bits[$x] = 1;
+                    for ($i = max(0, $strikeFrom); $i < $strikeEnd; $i++) {
+                        for ($gx = 0; $gx < 6; $gx++) {
+                            $bits[$i * 6 + $gx] = 1;
+                        }
                     }
                 }
 
