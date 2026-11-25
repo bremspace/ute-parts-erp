@@ -35,7 +35,6 @@ class EscPosWriter
     /** Double-size flags for GS ! n. */
     private const SIZE_NORMAL = 0x00;
 
-    private const SIZE_DBL_H = 0x10;   // double height
 
     private const SIZE_DBL_W = 0x80;   // double width
 
