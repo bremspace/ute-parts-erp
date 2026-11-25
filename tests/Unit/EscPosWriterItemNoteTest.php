@@ -65,13 +65,14 @@ class EscPosWriterItemNoteTest extends TestCase
         $output = $writer->receipt($data);
 
         // Opsi B: Harga Retail dicoret via raster GS v 0, lalu Harga Box & Potongan Box.
-        $this->assertStringContainsString('Harga Retail: ', $output);
+        $this->assertStringContainsString('Harga Retail:', $output);
         $this->assertStringContainsString("\x1d\x76\x30\x00", $output);
         $this->assertStringContainsString('Harga Box: Rp 110.000', $output);
         $this->assertStringContainsString('1 PCS x Rp 110.000 = 110.000', $output);
         $this->assertStringContainsString('Potongan Box: -Rp 15.000', $output);
         $this->assertStringNotContainsString('Subtotal:', $output);
         $this->assertStringContainsString('BAYAR (TUNAI):', $output);
-        $this->assertStringContainsString('Garansi: 3 Hari Toko (s/d 16/11/2026)', $output);
+        $this->assertStringContainsString('Garansi: 3 Hari Toko s/d 16/11', $output);
+        $this->assertStringNotContainsString('2026)', $output);
     }
 }
