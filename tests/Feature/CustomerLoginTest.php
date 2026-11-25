@@ -8,6 +8,7 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Marketplace\Livewire\CustomerAccount;
 use App\Modules\Workflow\Livewire\ApprovalInbox;
 use App\Modules\Workflow\Models\ApprovalRequest;
+use App\Modules\Workflow\Models\ApprovalRule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
@@ -263,6 +264,87 @@ class CustomerLoginTest extends TestCase
         $response = $this->post('/login-pelanggan', [
             'telepon' => '081555555555',
             'password' => 'passwordBaruPending',
+        ]);
+        $response->assertRedirect('/shop');
+        $this->assertAuthenticated('customer');
+    }
+
+    public function test_reset_password_tanpa_approval_rule_langsung_diterapkan_dan_bisa_login(): void
+    {
+        ApprovalRule::where('entity_type', 'reset_password_pelanggan')->delete();
+
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Tanpa Rule',
+            'telepon' => '081444444444',
+            'username' => 'tanpa_rule',
+            'password' => Hash::make('password_lama'),
+            'status' => 'pending',
+        ]);
+
+        $staff = User::factory()->create();
+        $staff->assignRole(Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']));
+
+        $this->actingAs($staff);
+        auth('customer')->logout();
+
+        Livewire::test(CrmDashboard::class)
+            ->call('openResetPasswordModal', $pelanggan->id)
+            ->set('resetPasswordForm.new_password', 'passwordLangsung123')
+            ->set('resetPasswordForm.alasan', 'Tidak ada rule approval')
+            ->call('ajukanResetPassword');
+
+        $pelanggan->refresh();
+        $this->assertSame('aktif', $pelanggan->status);
+        $this->assertTrue(Hash::check('passwordLangsung123', $pelanggan->password));
+        $this->assertSame(0, ApprovalRequest::where('entity_type', 'reset_password_pelanggan')->count());
+
+        $response = $this->post('/login-pelanggan', [
+            'telepon' => '081444444444',
+            'password' => 'passwordLangsung123',
+        ]);
+        $response->assertRedirect('/shop');
+        $this->assertAuthenticated('customer');
+    }
+
+    public function test_pelanggan_dibuat_staf_tanpa_password_bisa_login_setelah_reset_disetujui(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Walk In Member',
+            'telepon' => '081333333333',
+            'username' => 'walk_in_member',
+            'status' => 'pending',
+        ]);
+        $this->assertNull($pelanggan->password);
+
+        $csUser = User::factory()->create();
+        $ownerUser = User::factory()->create();
+        $ownerUser->assignRole(Role::firstOrCreate(['name' => 'owner', 'guard_name' => 'web']));
+
+        $this->actingAs($csUser);
+        auth('customer')->logout();
+        Livewire::test(CrmDashboard::class)
+            ->call('openResetPasswordModal', $pelanggan->id)
+            ->set('resetPasswordForm.new_password', 'passwordWalkIn123')
+            ->set('resetPasswordForm.alasan', 'Member walk-in butuh login')
+            ->call('ajukanResetPassword');
+
+        $request = ApprovalRequest::where('entity_type', 'reset_password_pelanggan')
+            ->where('entity_id', $pelanggan->id)
+            ->firstOrFail();
+
+        $this->actingAs($ownerUser);
+        auth('customer')->logout();
+        Livewire::test(ApprovalInbox::class)
+            ->call('openApproveResetPasswordModal', $request->id)
+            ->call('approveResetPasswordSubmit');
+
+        $pelanggan->refresh();
+        $this->assertSame('aktif', $pelanggan->status);
+        $this->assertTrue(Hash::check('passwordWalkIn123', $pelanggan->password));
+
+        $response = $this->post('/login-pelanggan', [
+            'telepon' => '081333333333',
+            'password' => 'passwordWalkIn123',
         ]);
         $response->assertRedirect('/shop');
         $this->assertAuthenticated('customer');

@@ -186,6 +186,40 @@ class ApprovalService
     }
 
     /**
+     * Terapkan reset kata sandi pelanggan + aktifkan akun pending.
+     * Dipakai baik oleh approval yang disetujui maupun oleh jalur tanpa approval rule.
+     */
+    public function terapkanResetPasswordPelanggan(
+        Pelanggan $pelanggan,
+        string $newPassword,
+        int $actionedBy,
+        ?string $catatan = null
+    ): void {
+        $update = ['password' => Hash::make($newPassword)];
+
+        // Akun pending tidak bisa login walau kata sandinya sudah direset.
+        $statusLama = (string) ($pelanggan->status ?? 'aktif');
+        if (in_array($statusLama, ['pending', 'approved'], true)) {
+            $update['status'] = 'aktif';
+            $update['approved_at'] = now();
+            $update['approved_by'] = $actionedBy;
+            $update['catatan_approval'] = $catatan ?: 'Akun diaktifkan saat reset kata sandi disetujui';
+
+            ApprovalRequest::where('entity_type', 'member')
+                ->where('entity_id', $pelanggan->id)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'disetujui',
+                    'actioned_by' => $actionedBy,
+                    'actioned_at' => now(),
+                    'catatan' => 'Aktivasi otomatis via reset kata sandi',
+                ]);
+        }
+
+        $pelanggan->update($update);
+    }
+
+    /**
      * [F2-2] Efek samping rantai final pada entitas — hook khusus GRN & Cycle Count.
      * GRN: disetujui → GrnService finalisasi (jurnal AP + stok masuk); ditolak → status ditolak.
      * [F3-7] Cycle Count MAJOR: disetujui → CycleCountService koreksi stok; ditolak → task ditolak.
@@ -357,36 +391,13 @@ class ApprovalService
             $pelanggan = Pelanggan::find($request->entity_id);
             if ($pelanggan && $status === 'disetujui') {
                 $newPassword = $options['new_password'] ?? ($request->payload_json['new_password'] ?? null);
-                $update = [];
-
                 if (! empty($newPassword)) {
-                    $update['password'] = Hash::make($newPassword);
-                }
-
-                // Akun pending tidak bisa login walau kata sandinya sudah direset.
-                // Persetujuan reset oleh owner/approver dianggap juga mengaktifkan
-                // akun yang masih menunggu approval, supaya member tidak mentok.
-                $statusLama = (string) ($pelanggan->status ?? 'aktif');
-                if (in_array($statusLama, ['pending', 'approved'], true)) {
-                    $update['status'] = 'aktif';
-                    $update['approved_at'] = now();
-                    $update['approved_by'] = $actionedBy;
-                    $update['catatan_approval'] = $catatan ?: 'Akun diaktifkan saat reset kata sandi disetujui';
-
-                    // Tutup approval pendaftaran yang masih menggantung agar inbox bersih.
-                    ApprovalRequest::where('entity_type', 'member')
-                        ->where('entity_id', $pelanggan->id)
-                        ->where('status', 'pending')
-                        ->update([
-                            'status' => 'disetujui',
-                            'actioned_by' => $actionedBy,
-                            'actioned_at' => now(),
-                            'catatan' => 'Aktivasi otomatis via persetujuan reset kata sandi',
-                        ]);
-                }
-
-                if ($update !== []) {
-                    $pelanggan->update($update);
+                    $this->terapkanResetPasswordPelanggan(
+                        $pelanggan,
+                        (string) $newPassword,
+                        $actionedBy,
+                        $catatan
+                    );
                 }
             }
 
