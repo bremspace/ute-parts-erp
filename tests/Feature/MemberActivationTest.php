@@ -55,7 +55,7 @@ class MemberActivationTest extends TestCase
             'password' => 'secret123',
         ]);
 
-        $response->assertRedirect('/shop');
+        $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 
@@ -104,7 +104,7 @@ class MemberActivationTest extends TestCase
             'telepon' => '081987654321',
             'password' => 'sandiBaru123',
         ]);
-        $login->assertRedirect('/shop');
+        $login->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 
@@ -217,7 +217,7 @@ class MemberActivationTest extends TestCase
             'telepon' => '081999888777',
             'password' => 'secret123',
         ]);
-        $login->assertRedirect('/shop');
+        $login->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 
