@@ -332,8 +332,9 @@ class ThermalPrintReceiptOptimizationTest extends TestCase
         $this->assertStringContainsString('TOKO SPAREPART BERKAH', $output);
         $this->assertStringContainsString('Cepat & Terpercaya', $output);
         $this->assertStringContainsString('Jl. Cempaka No. 88', $output);
-        // Opsi B: alamat + telepon digabung; bila kepanjangan, label telepon dipangkas.
-        $this->assertStringContainsString('Jl. Cempaka No. 88 | 0877-1234-5678', $output);
+        // Header: nomor HP langsung tanpa label Telp/WA.
+        $this->assertStringContainsString('Jl. Cempaka No. 88 - 0877-1234-5678', $output);
+        $this->assertStringNotContainsString('Telp/WA:', $output);
         $this->assertStringContainsString('Cabang Sukabumi', $output);
         $this->assertStringNotContainsString('Web:', $output);
         $this->assertStringContainsString('Barang yang dibeli tidak dapat ditukar', $output);

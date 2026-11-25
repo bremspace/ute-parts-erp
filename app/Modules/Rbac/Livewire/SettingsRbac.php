@@ -255,7 +255,7 @@ class SettingsRbac extends Component
         'show_waktu' => true,
         'show_subtotal_breakdown' => true,
         'show_qr_retur' => true,
-        'qr_size' => 4,
+        'qr_size' => 3,
         'qr_caption' => '',
         'footer_text' => 'Terima kasih atas kunjungan Anda!',
         'kebijakan_retur' => 'Maksimal klaim retur / garansi 3 hari dengan membawa struk ber-QR ini.',
@@ -790,7 +790,7 @@ class SettingsRbac extends Component
         $strukCfg = $config->getStrukConfig();
 
         // Migrasi nilai lama (px) ke module size printer (2..8).
-        $strukCfg['qr_size'] = EscPosWriter::normalizeQrSize($strukCfg['qr_size'] ?? 4);
+        $strukCfg['qr_size'] = EscPosWriter::effectiveQrSize($strukCfg['qr_size'] ?? 3);
         $this->strukForm = array_merge($this->strukForm, $strukCfg);
         $this->wmsDocForm = array_merge($this->wmsDocForm, $config->getWmsDocConfig());
         $this->hrSlipForm = array_merge($this->hrSlipForm, $config->getSlipGajiConfig());
@@ -1045,7 +1045,7 @@ class SettingsRbac extends Component
             'strukForm.kebijakan_retur' => 'nullable|string|max:500',
             'strukForm.catatan_kaki' => 'nullable|string|max:300',
             'strukForm.default_width' => 'required|in:80mm,58mm,a4',
-            'strukForm.qr_size' => 'required|numeric|min:2|max:8',
+            'strukForm.qr_size' => 'required|numeric|min:2|max:3',
             'strukForm.thermal_printer_name' => 'nullable|string|max:100',
             'strukForm.thermal_bluetooth_mac' => 'nullable|string|max:17|regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
             'strukForm.thermal_auto_print' => 'boolean',

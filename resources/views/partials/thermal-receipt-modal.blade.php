@@ -3,8 +3,8 @@
     @php
         $strukConfig = app(\App\Modules\Crm\Services\KonfigurasiService::class)->getStrukConfig();
         $showQrRetur = $strukConfig['show_qr_retur'] ?? true;
-        $qrSize = \App\Modules\Pos\Services\EscPosWriter::normalizeQrSize($strukConfig['qr_size'] ?? 4);
-        $qrPx = $qrSize * 12; // module 4 → 48px, sesuai mockup Opsi B
+        $qrSize = \App\Modules\Pos\Services\EscPosWriter::effectiveQrSize($strukConfig['qr_size'] ?? 3);
+        $qrPx = $qrSize * 12; // module 3 → 36px di preview
         $qrCaption = $strukConfig['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi';
         $defaultPaperSize = str_contains($strukConfig['default_width'] ?? '', '80') ? '80' : '58';
         $autoPrint = !empty($strukConfig['auto_print']) || !empty($strukConfig['thermal_auto_print']);
