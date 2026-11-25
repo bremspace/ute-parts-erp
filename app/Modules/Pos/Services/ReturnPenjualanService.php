@@ -514,8 +514,13 @@ class ReturnPenjualanService
 
         // Buat transaksi POS pengganti
         $today = now()->format('Ymd');
-        $count = Transaksi::whereDate('created_at', now()->toDateString())->count() + 1;
+        $count = Transaksi::whereDate('created_at', now()->toDateString())
+            ->where('cabang_id', $cabangId)->count() + 1;
         $noTransaksiTukar = sprintf('TRX-TUKAR-%s-%04d', $today, $count);
+        while (Transaksi::where('no_transaksi', $noTransaksiTukar)->exists()) {
+            $count++;
+            $noTransaksiTukar = sprintf('TRX-TUKAR-%s-%04d', $today, $count);
+        }
 
         $metodeBayarSelisih = $retur->metode_bayar_selisih ?? 'tunai';
         $catatanBayar = $selisih > 0

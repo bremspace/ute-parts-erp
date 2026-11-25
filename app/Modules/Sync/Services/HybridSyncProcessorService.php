@@ -1507,10 +1507,37 @@ class HybridSyncProcessorService
         }
 
         if ($metodeBayar === 'split' && is_array($splitDetail) && $splitDetail !== []) {
+            // Format baru dari PosKasir: {tunai: N, non_tunai: N, metode_non_tunai: 'transfer'}
+            // Format lama dari PosController free-form: {channel => nominal, ...}
+            if (array_key_exists('tunai', $splitDetail) || array_key_exists('non_tunai', $splitDetail)) {
+                $porsiTunai = max(0.0, (float) ($splitDetail['tunai'] ?? 0));
+                $porsiNonTunai = max(0.0, (float) ($splitDetail['non_tunai'] ?? 0));
+                $debitLines = [];
+                if ($porsiTunai > 0.0) {
+                    $debitLines[] = ['akun_kode' => '110-04', 'debit' => $porsiTunai, 'kredit' => 0.0];
+                }
+                if ($porsiNonTunai > 0.0) {
+                    $debitLines[] = ['akun_kode' => '110-02', 'debit' => $porsiNonTunai, 'kredit' => 0.0];
+                }
+                if ($debitLines !== []) {
+                    $sisa = round($totalAkhir - $porsiTunai - $porsiNonTunai, 2);
+                    if ($sisa > 0.01) {
+                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $sisa, 'kredit' => 0.0];
+                    }
+
+                    return $debitLines;
+                }
+            }
+
+            // Format lama: {channel => nominal, ...} — skip key non-numerik seperti 'metode_non_tunai'
             $debitLines = [];
             $teralokasi = 0.0;
 
             foreach ($splitDetail as $key => $val) {
+                // Skip key yang bukan nominal (misalnya 'metode_non_tunai' berisi string channel)
+                if (is_string($val) && ! is_numeric($val)) {
+                    continue;
+                }
                 $nominal = is_array($val) ? (float) ($val['jumlah'] ?? $val['nominal'] ?? 0) : (float) $val;
                 $channel = is_array($val) ? strtolower((string) ($val['metode'] ?? $key)) : strtolower((string) $key);
                 if (! is_finite($nominal) || $nominal <= 0.0) {
@@ -2023,7 +2050,9 @@ class HybridSyncProcessorService
         $totalHpp = round($totalHpp, 2);
 
         if ($totalHpp <= 0) {
-            throw new \RuntimeException("HPP pesanan online {$nomorOrder} nol — perbarui harga_beli produk lokal atau kirim hpp valid dari cloud sebelum sinkronisasi.");
+            // shortcut: jurnal HPP/Persediaan dilewati jika harga_beli belum diisi, bukan reject pesanan
+            Log::warning("[HybridSync] HPP pesanan online {$nomorOrder} nol — jurnal HPP/Persediaan dilewati. Perbarui harga_beli produk lokal.");
+            $totalHpp = 0.0;
         }
 
         // 2. Pisah DPP/PPN/ongkir dari kolom cloud (pola DuitkuPaymentProcessor).
@@ -2102,8 +2131,10 @@ class HybridSyncProcessorService
         foreach (app(PajakService::class)->jurnalLines($ppn, $noJurnal, $cabangId, 0) as $ppnLine) {
             $lines[] = $ppnLine;
         }
-        $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
-        $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
+        if ($totalHpp > 0.0) {
+            $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
+            $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
+        }
 
         $jurnalService->post(
             $noJurnal,

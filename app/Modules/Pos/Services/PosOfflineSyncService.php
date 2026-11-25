@@ -230,9 +230,11 @@ class PosOfflineSyncService
             // 5. Kalkulasi PPN & Nilai Akhir
             // Fakta fisik kasir: kasir sudah menerima uang fisik sesuai $clientTotalNominal.
             // Nilai total_akhir dicatat sesuai kesepakatan transaksi fisik kasir.
-            $dpp = $clientTotalNominal;
+            $diskonHeader = (float) ($tx['diskon_nominal'] ?? 0);
             $ppnNominal = 0.0;
-            $pajak = $this->pajakService->hitung($cabangId, $dpp);
+            // Konsisten dengan PosCheckoutService: hitungPenjualan memperhitungkan diskon header dalam DPP
+            $pajak = $this->pajakService->hitungPenjualan($cabangId, $rawClientSubtotal, $diskonHeader);
+            $dpp = $pajak['dpp'];
             if (! empty($pajak['ppn_nominal'])) {
                 $ppnNominal = (float) $pajak['ppn_nominal'];
             }
@@ -251,7 +253,7 @@ class PosOfflineSyncService
                 'sumber' => 'pos',
                 'subtotal' => $rawClientSubtotal,
                 'diskon_persen' => 0,
-                'diskon_nominal' => 0,
+                'diskon_nominal' => $diskonHeader,
                 'dpp' => $dpp,
                 'pajak_nominal' => $ppnNominal,
                 'ppn_nominal' => $ppnNominal,

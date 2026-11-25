@@ -20,16 +20,16 @@ trait SyncsModelEvents
      *
      * @var array<string, bool>
      */
-    protected static array $syncUuidColumnCache = [];
+    protected array $syncUuidColumnCache = [];
 
     protected function hasSyncUuidColumn(Model $model): bool
     {
         $table = $model->getTable();
-        if (! array_key_exists($table, self::$syncUuidColumnCache)) {
-            self::$syncUuidColumnCache[$table] = Schema::hasColumn($table, 'sync_uuid');
+        if (! array_key_exists($table, $this->syncUuidColumnCache)) {
+            $this->syncUuidColumnCache[$table] = Schema::hasColumn($table, 'sync_uuid');
         }
 
-        return self::$syncUuidColumnCache[$table];
+        return $this->syncUuidColumnCache[$table];
     }
 
     /**
