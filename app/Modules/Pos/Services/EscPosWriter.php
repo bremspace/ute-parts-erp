@@ -706,7 +706,6 @@ class EscPosWriter
     /** Raw text tanpa LF — untuk baris yang disusun dengan escape di tengah (ESC B). */
 
     /** ESC B n — strikethrough on/off (Epson ESC/POS standar). */
-
     private function ascii(string $text): string
     {
         return preg_replace('/[^\x20-\x7E]/', '', strtr($text, self::TRANSLIT));
