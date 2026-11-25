@@ -310,11 +310,15 @@ class ApprovalService
                         default => 'Member Retail',
                     };
 
+                    $pesanApproval = empty($pelanggan->password)
+                        ? "Pendaftaran akun member Anda telah DISETUJUI sebagai {$label}. Akun Anda belum memiliki kata sandi—ambil kode aktivasi di CS toko lalu buat kata sandi di /aktivasi-akun."
+                        : "Pendaftaran akun member Anda telah DISETUJUI sebagai {$label}. Silakan masuk dengan nomor HP dan kata sandi Anda.";
+
                     app(NotificationService::class)->kirim(
                         'inapp',
                         $pelanggan->telepon,
                         'Pendaftaran Akun Member Disetujui',
-                        "Pendaftaran akun member Anda telah DISETUJUI sebagai {$label}. Silakan masuk dengan nomor HP dan kata sandi Anda.",
+                        $pesanApproval,
                         [
                             'pelanggan_id' => $pelanggan->id,
                             'kategori' => 'membership',
@@ -353,10 +357,36 @@ class ApprovalService
             $pelanggan = Pelanggan::find($request->entity_id);
             if ($pelanggan && $status === 'disetujui') {
                 $newPassword = $options['new_password'] ?? ($request->payload_json['new_password'] ?? null);
+                $update = [];
+
                 if (! empty($newPassword)) {
-                    $pelanggan->update([
-                        'password' => Hash::make($newPassword),
-                    ]);
+                    $update['password'] = Hash::make($newPassword);
+                }
+
+                // Akun pending tidak bisa login walau kata sandinya sudah direset.
+                // Persetujuan reset oleh owner/approver dianggap juga mengaktifkan
+                // akun yang masih menunggu approval, supaya member tidak mentok.
+                $statusLama = (string) ($pelanggan->status ?? 'aktif');
+                if (in_array($statusLama, ['pending', 'approved'], true)) {
+                    $update['status'] = 'aktif';
+                    $update['approved_at'] = now();
+                    $update['approved_by'] = $actionedBy;
+                    $update['catatan_approval'] = $catatan ?: 'Akun diaktifkan saat reset kata sandi disetujui';
+
+                    // Tutup approval pendaftaran yang masih menggantung agar inbox bersih.
+                    ApprovalRequest::where('entity_type', 'member')
+                        ->where('entity_id', $pelanggan->id)
+                        ->where('status', 'pending')
+                        ->update([
+                            'status' => 'disetujui',
+                            'actioned_by' => $actionedBy,
+                            'actioned_at' => now(),
+                            'catatan' => 'Aktivasi otomatis via persetujuan reset kata sandi',
+                        ]);
+                }
+
+                if ($update !== []) {
+                    $pelanggan->update($update);
                 }
             }
 

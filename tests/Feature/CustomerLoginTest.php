@@ -224,4 +224,47 @@ class CustomerLoginTest extends TestCase
         $response->assertRedirect('/shop');
         $this->assertAuthenticated('customer');
     }
+
+    public function test_reset_password_disetujui_juga_mengaktifkan_akun_pending(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Pending Member',
+            'telepon' => '081555555555',
+            'username' => 'pending_member',
+            'password' => Hash::make('password_lama'),
+            'status' => 'pending',
+        ]);
+
+        $csUser = User::factory()->create();
+        $ownerUser = User::factory()->create();
+        $ownerUser->assignRole(Role::firstOrCreate(['name' => 'owner', 'guard_name' => 'web']));
+
+        $this->actingAs($csUser);
+        Livewire::test(CrmDashboard::class)
+            ->call('openResetPasswordModal', $pelanggan->id)
+            ->set('resetPasswordForm.new_password', 'passwordBaruPending')
+            ->set('resetPasswordForm.alasan', 'Member belum bisa login')
+            ->call('ajukanResetPassword');
+
+        $request = ApprovalRequest::where('entity_type', 'reset_password_pelanggan')
+            ->where('entity_id', $pelanggan->id)
+            ->firstOrFail();
+
+        $this->actingAs($ownerUser);
+        auth('customer')->logout();
+        Livewire::test(ApprovalInbox::class)
+            ->call('openApproveResetPasswordModal', $request->id)
+            ->call('approveResetPasswordSubmit');
+
+        $pelanggan->refresh();
+        $this->assertSame('aktif', $pelanggan->status);
+        $this->assertTrue(Hash::check('passwordBaruPending', $pelanggan->password));
+
+        $response = $this->post('/login-pelanggan', [
+            'telepon' => '081555555555',
+            'password' => 'passwordBaruPending',
+        ]);
+        $response->assertRedirect('/shop');
+        $this->assertAuthenticated('customer');
+    }
 }

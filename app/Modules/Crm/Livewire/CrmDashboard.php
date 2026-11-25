@@ -267,6 +267,15 @@ class CrmDashboard extends Component
             $pesan = $pelanggan->status === 'pending'
                 ? 'Pelanggan baru disimpan dan diajukan ke approval owner (status: pending)'
                 : 'Pelanggan baru disimpan (tersedia di POS & Servis)';
+
+            // Akun yang dibuat staf biasanya belum punya kata sandi. Beri kode aktivasi
+            // sekali tampil agar langsung bisa disampaikan ke member.
+            if (empty($pelanggan->password)) {
+                $kodeAktivasi = app(PelangganService::class)->buatKodeAktivasi($pelanggan);
+                $pesan .= ' Member belum memiliki kata sandi. Kode aktivasi: '.$kodeAktivasi
+                    .'. Sampaikan ke member untuk membuat kata sandi di halaman aktivasi akun.';
+            }
+
             $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
         } catch (ValidationException $e) {
             $this->setErrorBag($e->validator->getMessageBag());
