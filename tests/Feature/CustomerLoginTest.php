@@ -35,6 +35,9 @@ class CustomerLoginTest extends TestCase
 
         $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
+
+        // Tujuan redirect benar-benar bisa dibuka (tidak redirect balik / error).
+        $this->get('/account')->assertSuccessful();
     }
 
     public function test_customer_login_redirects_to_account_even_when_cart_is_not_empty(): void
