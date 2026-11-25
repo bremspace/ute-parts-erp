@@ -134,8 +134,8 @@ class EscPos {
   /** Raw text tanpa LF — untuk baris yang disusun dengan escape di tengah (ESC B). */
   raw(str) { this.buf.push(...this.ascii(str)); return this; }
 
-  /** CR — kembali ke awal baris tanpa feed, untuk overprint coret tengah. */
-  cr() { this.buf.push(0x0d); return this; }
+  /** ESC - n — underline, menggantikan coret tengah yang tidak didukung printer. */
+  underline(on) { this.buf.push(0x1b, 0x2d, on ? 1 : 0); return this; }
 
   /** ESC B n — strikethrough on/off (Epson ESC/POS standar). */
   escB(on) { this.buf.push(0x1b, 0x42, on ? 1 : 0); return this; }
@@ -327,7 +327,7 @@ class EscPos {
       const hargaJual = Number(item.harga ?? 0);
 
       if (hargaRetail > hargaJual && ['esc_b', 'reverse'].includes(strikethrough_mode)) {
-        // Harga lama dicoret tengah dengan overprint hyphen, tanpa bold/reverse.
+        // Harga lama diberi garis (underline) tanpa bold/reverse.
         const normal = this.money(hargaRetail);
         const disc = this.money(hargaJual);
         const prefix = qtySatuan + ' x ';
@@ -335,16 +335,14 @@ class EscPos {
 
         if (totalLineLen >= this.columns) {
           this.raw(prefix);
-          this.raw(normal);
-          this.cr().raw(' '.repeat(prefix.length) + '-'.repeat(normal.length));
+          this.underline(true).raw(normal).underline(false);
           this.raw(' ' + disc + '\n');
           const padRight = Math.max(0, this.columns - rightVal.length);
           this.buf.push(...this.ascii(' '.repeat(padRight) + rightVal), 0x0a);
         } else {
           const gap = this.columns - totalLineLen;
           this.raw(prefix);
-          this.raw(normal);
-          this.cr().raw(' '.repeat(prefix.length) + '-'.repeat(normal.length));
+          this.underline(true).raw(normal).underline(false);
           this.raw(' ' + disc);
           this.buf.push(...this.ascii(' '.repeat(gap) + rightVal), 0x0a);
         }
@@ -626,11 +624,11 @@ class EscPos {
         const prefix = qtySatuan + ' x ';
         const totalLineLen = prefix.length + normal.length + 1 + disc.length + rightVal.length;
         if (totalLineLen >= cols) {
-          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:line-through;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>');
+          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:underline;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>');
           html += line(' '.repeat(Math.max(0, cols - rightVal.length)) + rightVal);
         } else {
           const gap = cols - totalLineLen;
-          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:line-through;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>' + ' '.repeat(gap) + '<span>' + esc(rightVal) + '</span>');
+          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:underline;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>' + ' '.repeat(gap) + '<span>' + esc(rightVal) + '</span>');
         }
       } else if (hargaRetail > hargaJual) {
         html += line(row(qtySatuan + ' x (' + money(hargaRetail) + ') -> ' + money(hargaJual), rightVal));
