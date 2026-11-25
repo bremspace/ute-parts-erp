@@ -19,6 +19,14 @@ class EscPos {
     '9': ['01110','10001','10001','01111','00001','00010','01100'],
     'R': ['11110','10001','10001','11110','10100','10010','10001'],
     'P': ['11110','10001','10001','11110','10000','10000','10000'],
+    'H': ['10001','10001','10001','11111','10001','10001','10001'],
+    'A': ['01110','10001','10001','11111','10001','10001','10001'],
+    'G': ['01111','10000','10000','10111','10001','10001','01111'],
+    'E': ['11111','10000','10000','11110','10000','10000','11111'],
+    'T': ['11111','00100','00100','00100','00100','00100','00100'],
+    'L': ['10000','10000','10000','10000','10000','10000','11111'],
+    'I': ['01110','00100','00100','00100','00100','00100','01110'],
+    ':': ['00000','00100','00100','00000','00100','00100','00000'],
     'p': ['11110','10001','10001','11110','10000','10000','10000'],
     '.': ['00000','00000','00000','00000','00000','01100','01100'],
     '-': ['00000','00000','00000','11111','00000','00000','00000'],
@@ -158,7 +166,7 @@ class EscPos {
   underline(on) { this.buf.push(0x1b, 0x2d, on ? 1 : 0); return this; }
 
   /** Cetak teks bercoret tengah memakai raster GS v 0. */
-  strikeRaster(text) {
+  strikeRaster(text, strikeFrom = 0, strikeLength = null) {
     const chars = this.clean(text).split('');
     if (!chars.length) return this;
 
@@ -167,18 +175,21 @@ class EscPos {
     const height = 7 * scaleY;
     const bytesPerRow = Math.ceil(width / 8);
     const rows = [];
+    const strikeEnd = strikeLength === null ? chars.length : Math.min(chars.length, strikeFrom + strikeLength);
 
     for (let gy = 0; gy < 7; gy++) {
       for (let sy = 0; sy < scaleY; sy++) {
         const bits = new Array(bytesPerRow * 8).fill(0);
         chars.forEach((ch, i) => {
-          const glyph = EscPos.STRIKE_FONT[ch] || EscPos.STRIKE_FONT[' '];
+          const glyph = EscPos.STRIKE_FONT[ch.toUpperCase()] || EscPos.STRIKE_FONT[' '];
           for (let gx = 0; gx < 5; gx++) {
             if (glyph[gy][gx] === '1') bits[i * 6 + gx] = 1;
           }
         });
         if (gy === 3) {
-          for (let x = 0; x < width; x++) bits[x] = 1;
+          for (let i = Math.max(0, strikeFrom); i < strikeEnd; i++) {
+            for (let gx = 0; gx < 6; gx++) bits[i * 6 + gx] = 1;
+          }
         }
         const row = [];
         for (let b = 0; b < bytesPerRow; b++) {
@@ -401,9 +412,8 @@ class EscPos {
         const disc = this.money(hargaJual);
         const potongan = this.money((hargaRetail - hargaJual) * qty);
 
-        this.text('Harga Retail:');
-        this.strikeRaster(normal);
-        // Raster tidak mengembalikan kursor ke margin kiri; paksa baris baru.
+        // Seluruh baris raster agar label + nominal tetap searis.
+        this.strikeRaster('Harga Retail: ' + normal, 'Harga Retail: '.length, normal.length);
         this.feed(1).alignLeft();
 
         this.text('Harga Box: ' + disc);
@@ -681,8 +691,7 @@ class EscPos {
         const qty = Number(item.qty ?? 1);
         const potongan = money((hargaRetail - hargaJual) * qty);
 
-        html += lineHtml('Harga Retail:');
-        html += lineHtml('<span style="text-decoration:line-through;">' + esc(normal) + '</span>');
+        html += lineHtml('Harga Retail: <span style="text-decoration:line-through;">' + esc(normal) + '</span>');
         html += line('Harga Box: ' + disc);
         html += line(qtySatuan + ' x ' + disc + ' = ' + rightVal);
         html += line('Potongan Box: -' + potongan);
