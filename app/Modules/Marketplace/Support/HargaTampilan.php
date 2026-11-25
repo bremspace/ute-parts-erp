@@ -72,7 +72,9 @@ final class HargaTampilan
             'asli_total' => $asliTotal,
             'akhir_total' => $akhirTotal,
             'potongan_total' => $potonganTotal,
-            'label' => $potonganTotal > 0 ? 'Potongan Kemasan' : '',
+            'label' => $potonganTotal > 0
+                ? ($isKemasan ? 'Potongan Kemasan' : 'Potongan Member (Tier)')
+                : '',
         ];
     }
 
@@ -115,7 +117,9 @@ final class HargaTampilan
             'asli_total' => $asliTotal,
             'akhir_total' => $akhirTotal,
             'potongan_total' => $potonganTotal,
-            'label' => $potonganTotal > 0 ? 'Potongan Kemasan' : '',
+            'label' => $potonganTotal > 0
+                ? ($isKemasan ? 'Potongan Kemasan' : 'Potongan Member (Tier)')
+                : '',
         ];
     }
 }
