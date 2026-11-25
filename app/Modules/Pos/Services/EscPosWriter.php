@@ -93,7 +93,11 @@ class EscPosWriter
 
         // ========== HEADER — alamat + telepon digabung jadi satu baris ==========
         $this->alignCenter();
-        $this->bold(true)->sizeDoubleWidth(true)->text($data['nama_toko'] ?? 'BREMSPACE')->sizeDoubleWidth(false)->bold(false);
+        $this->bold(true)
+            ->size(0x90) // double width + double height
+            ->text($data['nama_toko'] ?? 'BREMSPACE')
+            ->size(0x00)
+            ->bold(false);
 
         $slogan = $data['slogan'] ?? 'Pusat Sparepart & Servis Gadget';
         if ($slogan) {
@@ -110,7 +114,7 @@ class EscPosWriter
         }
         $this->rule();
 
-        // ========== QR + TRANSAKSI — QR dipusatkan dan diperkecil ==========
+        // ========== QR + TRANSAKSI — QR tengah, ukuran penuh, ada jarak ke bawah ==========
         $this->alignCenter();
         $noTrx = $data['no_transaksi'] ?? '-';
         $qrCaption = $data['qr_caption'] ?? '';
@@ -118,7 +122,9 @@ class EscPosWriter
         $qrShown = ($data['show_qr_retur'] ?? true) && ! empty($noTrx) && $noTrx !== '-';
 
         if ($qrShown) {
-            $this->qrcode($noTrx, self::effectiveQrSize($data['qr_size'] ?? 3));
+            $this->qrcode($noTrx, self::effectiveQrSize($data['qr_size'] ?? 4));
+            // Beri satu baris kosong agar QR tidak menempel pada No. TRX.
+            $this->feed(1);
         }
         $this->alignLeft();
 
@@ -189,8 +195,8 @@ class EscPosWriter
             $hargaRetail = (float) ($item['harga_retail'] ?? 0);
             $hargaJual = (float) ($item['harga'] ?? 0);
 
-            if ($hargaRetail > $hargaJual && $strikethroughMode === 'esc_b') {
-                // Baris disusun manual: "1 PCS x " + [ESC B 1]harga normal[ESC B 0] + " harga final" + spasi + subtotal.
+            if ($hargaRetail > $hargaJual && in_array($strikethroughMode, ['esc_b', 'reverse'], true)) {
+                // Harga lama ditandai dengan reverse print (GS B) — ESC B bukan perintah coret.
                 $normal = $this->money($hargaRetail);
                 $disc = $this->money($hargaJual);
                 $prefix = "{$qtySatuan} x ";
@@ -198,14 +204,14 @@ class EscPosWriter
 
                 if ($totalLineLen >= $this->columns) {
                     $this->raw($prefix);
-                    $this->escB(true)->raw($normal)->escB(false);
+                    $this->reverse(true)->raw($normal)->reverse(false);
                     $this->raw(' '.$disc."\n");
                     $padRight = max(0, $this->columns - strlen($rightVal));
                     $this->raw(str_repeat(' ', $padRight).$rightVal."\n");
                 } else {
                     $gap = $this->columns - $totalLineLen;
                     $this->raw($prefix);
-                    $this->escB(true)->raw($normal)->escB(false);
+                    $this->reverse(true)->raw($normal)->reverse(false);
                     $this->raw(' '.$disc);
                     $this->raw(str_repeat(' ', $gap).$rightVal."\n");
                 }
@@ -267,10 +273,12 @@ class EscPosWriter
             $this->text($this->pad('Ongkir:', '+'.$this->money($data['ongkir'])));
         }
 
-        // TOTAL sejajar satu baris, ditebalkan (bold + double-strike).
-        $this->bold(true)->doubleStrike(true)
-            ->text($this->pad('TOTAL:', $this->money($data['total'])))
-            ->doubleStrike(false)->bold(false);
+        // TOTAL dibuat lebih besar (double width) tapi tetap satu baris.
+        $this->bold(true)
+            ->sizeDoubleWidth(true)
+            ->text('TOTAL: '.$this->money($data['total']))
+            ->sizeDoubleWidth(false)
+            ->bold(false);
 
         if (! empty($data['is_piutang'])) {
             $this->text($this->pad('Status:', 'BELUM LUNAS (PIUTANG)'));
@@ -312,20 +320,19 @@ class EscPosWriter
 
         $this->rule();
 
-        // ========== FOOTER — digabung jadi beberapa baris padat ==========
+        // ========== FOOTER — setiap catatan/catatan kaki tampil per baris ==========
         $this->alignCenter();
-        if (! empty($data['footer_text'])) {
-            $this->text($data['footer_text']);
-        }
-
-        $footerInfo = implode(' | ', array_filter([
+        $footerLines = array_filter([
+            $data['footer_text'] ?? null,
             ($qrShown && ! empty($qrCaption)) ? $qrCaption : null,
             ! empty($data['garansi']) ? 'Garansi: '.$data['garansi'] : null,
             $data['kebijakan_retur'] ?? null,
             $data['catatan_kaki'] ?? null,
-        ]));
-        foreach ($this->wrap($footerInfo) as $ln) {
-            $this->text($ln);
+        ]);
+        foreach ($footerLines as $footerLine) {
+            foreach ($this->wrap((string) $footerLine) as $ln) {
+                $this->text($ln);
+            }
         }
 
         if (! empty($data['is_piutang'])) {
@@ -365,10 +372,10 @@ class EscPosWriter
         return max(2, min(8, $n));
     }
 
-    /** Ukuran QR efektif yang dipakai struk: dibatasi maksimal modul 3 agar lebih ringkas. */
+    /** Ukuran QR efektif yang dipakai struk: ukuran normal modul 4 agar mudah dipindai. */
     public static function effectiveQrSize(mixed $value): int
     {
-        return min(3, self::normalizeQrSize($value));
+        return self::normalizeQrSize($value);
     }
 
     /** ESC/POS standard Model 2 QR Code. */
@@ -435,6 +442,14 @@ class EscPosWriter
     private function doubleStrike(bool $on): self
     {
         $this->buf .= "\x1b\x47".chr($on ? 1 : 0);
+
+        return $this;
+    }
+
+    /** GS B n — white/black reverse. Dipakai untuk menandai harga lama. */
+    private function reverse(bool $on): self
+    {
+        $this->buf .= "\x1d\x42".chr($on ? 1 : 0);
 
         return $this;
     }

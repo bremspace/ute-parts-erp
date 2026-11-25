@@ -504,7 +504,7 @@ class KonfigurasiService
 
             // QR Code Faktur Retur & Garansi
             'show_qr_retur' => true,
-            'qr_size' => 3,
+            'qr_size' => 4,
             'qr_caption' => 'Scan QR ini untuk retur & klaim garansi',
 
             // Footer & Ketentuan

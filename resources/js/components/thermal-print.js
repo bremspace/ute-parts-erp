@@ -34,6 +34,9 @@ class EscPos {
 
   /** ESC G n — double-strike, huruf lebih tebal di printer thermal. */
   doubleStrike(on) { this.buf.push(0x1b, 0x47, on ? 1 : 0); return this; }
+
+  /** GS B n — white/black reverse untuk harga lama. */
+  reverse(on) { this.buf.push(0x1d, 0x42, on ? 1 : 0); return this; }
   size(n) { this.buf.push(0x1d, 0x21, n); return this; }
   sizeDoubleWidth(on) { this.size(on ? 0x80 : 0x00); return this; }
   sizeDoubleHeight(on) { this.size(on ? 0x10 : 0x00); return this; }
@@ -64,7 +67,7 @@ class EscPos {
 
   /** Ukuran QR efektif struk: dibatasi maksimal modul 3 agar lebih ringkas. */
   effectiveQrSize(value) {
-    return Math.min(3, this.normalizeQrSize(value));
+    return this.normalizeQrSize(value);
   }
 
   /** Model 2 QR Code — mirrors PHP EscPosWriter::qrcode() */
@@ -235,7 +238,11 @@ class EscPos {
 
     // ======== HEADER — ringkas: alamat + telepon jadi satu baris ========
     this.alignCenter();
-    this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'BREMSPACE').sizeDoubleWidth(false).bold(false);
+    this.bold(true)
+      .size(0x90) // double width + double height
+      .text(nama_toko || 'BREMSPACE')
+      .size(0x00)
+      .bold(false);
     if (slogan) this.text(slogan);
 
     const headerContact = this.contactLine(alamat, telepon);
@@ -245,7 +252,7 @@ class EscPos {
     if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) this.text(cabang);
     this.rule();
 
-    // ======== QR + TRANSAKSI — QR dipusatkan dan diperkecil ========
+    // ======== QR + TRANSAKSI — QR tengah, ukuran penuh, jarak ke bawah ========
     this.alignCenter();
     const qrContent = no_transaksi || '-';
     const tglStr = tanggal || waktu || '';
@@ -253,6 +260,7 @@ class EscPos {
 
     if (qrShown) {
       this.qrcode(qrContent, this.effectiveQrSize(qr_size));
+      this.feed(1); // jarak antara QR dan No. TRX
     }
     this.alignLeft();
 
@@ -315,8 +323,8 @@ class EscPos {
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
 
-      if (hargaRetail > hargaJual && strikethrough_mode === 'esc_b') {
-        // Baris disusun manual: "1 PCS x " + [ESC B 1]harga normal[ESC B 0] + " harga final" + spasi + subtotal.
+      if (hargaRetail > hargaJual && ['esc_b', 'reverse'].includes(strikethrough_mode)) {
+        // Harga lama ditandai reverse print (GS B), bukan ESC B.
         const normal = this.money(hargaRetail);
         const disc = this.money(hargaJual);
         const prefix = qtySatuan + ' x ';
@@ -324,14 +332,14 @@ class EscPos {
 
         if (totalLineLen >= this.columns) {
           this.raw(prefix);
-          this.escB(true).raw(normal).escB(false);
+          this.reverse(true).raw(normal).reverse(false);
           this.raw(' ' + disc + '\n');
           const padRight = Math.max(0, this.columns - rightVal.length);
           this.buf.push(...this.ascii(' '.repeat(padRight) + rightVal), 0x0a);
         } else {
           const gap = this.columns - totalLineLen;
           this.raw(prefix);
-          this.escB(true).raw(normal).escB(false);
+          this.reverse(true).raw(normal).reverse(false);
           this.raw(' ' + disc);
           this.buf.push(...this.ascii(' '.repeat(gap) + rightVal), 0x0a);
         }
@@ -386,10 +394,12 @@ class EscPos {
       this.text(this.pad('Ongkir:', '+' + this.money(ongkir)));
     }
 
-    // TOTAL sejajar satu baris, ditebalkan (bold + double-strike).
-    this.bold(true).doubleStrike(true)
-      .text(this.pad('TOTAL:', this.money(total)))
-      .doubleStrike(false).bold(false);
+    // TOTAL lebih besar (double width), tetap satu baris.
+    this.bold(true)
+      .sizeDoubleWidth(true)
+      .text('TOTAL: ' + this.money(total))
+      .sizeDoubleWidth(false)
+      .bold(false);
 
     if (is_piutang) {
       this.text(this.pad('Status:', 'BELUM LUNAS (PIUTANG)'));
@@ -427,18 +437,19 @@ class EscPos {
 
     this.rule();
 
-    // ======== FOOTER — digabung jadi beberapa baris padat ========
+    // ======== FOOTER — setiap catatan tampil per baris ========
     this.alignCenter();
-    if (footer_text) this.text(footer_text);
-
-    const footerInfo = [
+    const footerLines = [
+      footer_text || '',
       qrShown && captionStr ? captionStr : '',
       garansi ? 'Garansi: ' + garansi : '',
       kebijakan_retur || '',
       catatan_kaki || '',
-    ].filter(Boolean).join(' | ');
-    for (const ln of this.wrap(footerInfo)) {
-      this.text(ln);
+    ].filter(Boolean);
+    for (const footerLine of footerLines) {
+      for (const ln of this.wrap(footerLine)) {
+        this.text(ln);
+      }
     }
 
     if (is_piutang) {
@@ -553,7 +564,7 @@ class EscPos {
     let html = '<div class="thermal-receipt-doc ' + paperClass + '" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:' + (widthNum === 80 ? '8.5px' : '8px') + ';line-height:1.2;color:#000;background:#fff;">';
 
     // HEADER — sama dengan buildReceipt()
-    html += center('<div style="font-weight:900;letter-spacing:.04em;">' + esc(nama_toko || 'BREMSPACE') + '</div>');
+    html += center('<div style="font-size:15px;font-weight:900;letter-spacing:.04em;">' + esc(nama_toko || 'BREMSPACE') + '</div>');
     if (slogan) html += center('<div>' + esc(slogan) + '</div>');
 
     const headerContactText = contact(alamat, telepon);
@@ -565,9 +576,9 @@ class EscPos {
     }
     html += line(rule);
 
-    // QR + TRANSAKSI — QR dipusatkan, mengikuti buildReceipt().
+    // QR + TRANSAKSI — QR dipusatkan; satu baris kosong setelah QR mengikuti buildReceipt().
     if (qrShown) {
-      html += center('<div style="display:inline-block;line-height:0;">' + (renderedQr || fallbackQr) + '</div>');
+      html += center('<div style="display:inline-block;line-height:0;margin-bottom:10px;">' + (renderedQr || fallbackQr) + '</div>');
     }
 
     // TRANSAKSI — sama dengan buildReceipt()
@@ -610,11 +621,11 @@ class EscPos {
         const prefix = qtySatuan + ' x ';
         const totalLineLen = prefix.length + normal.length + 1 + disc.length + rightVal.length;
         if (totalLineLen >= cols) {
-          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:line-through;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>');
+          html += lineHtml('<span>' + esc(prefix) + '</span><span style="background:#000;color:#fff;text-decoration:line-through;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>');
           html += line(' '.repeat(Math.max(0, cols - rightVal.length)) + rightVal);
         } else {
           const gap = cols - totalLineLen;
-          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:line-through;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>' + ' '.repeat(gap) + '<span>' + esc(rightVal) + '</span>');
+          html += lineHtml('<span>' + esc(prefix) + '</span><span style="background:#000;color:#fff;text-decoration:line-through;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>' + ' '.repeat(gap) + '<span>' + esc(rightVal) + '</span>');
         }
       } else if (hargaRetail > hargaJual) {
         html += line(row(qtySatuan + ' x (' + money(hargaRetail) + ') -> ' + money(hargaJual), rightVal));
@@ -655,7 +666,7 @@ class EscPos {
     }
     if (ongkir && Number(ongkir) > 0) html += line(row('Ongkir:', '+' + money(ongkir)));
 
-    html += center('<div style="font-size:11px;font-weight:900;">' + esc(row('TOTAL:', money(total))) + '</div>');
+    html += center('<div style="font-size:14px;font-weight:900;">' + esc('TOTAL: ' + money(total)) + '</div>');
 
     if (is_piutang) {
       html += line(row('Status:', 'BELUM LUNAS (PIUTANG)'));
@@ -678,16 +689,18 @@ class EscPos {
 
     html += line(rule);
 
-    // FOOTER — digabung jadi beberapa baris padat, sama dengan buildReceipt()
-    if (footer_text) html += center('<div>' + esc(footer_text) + '</div>');
-    const footerInfoText = [
+    // FOOTER — setiap catatan tampil per baris, sama dengan buildReceipt()
+    const footerLinesText = [
+      footer_text || '',
       qrShown && captionStr ? captionStr : '',
       garansi ? 'Garansi: ' + garansi : '',
       kebijakan_retur || '',
       catatan_kaki || '',
-    ].filter(Boolean).join(' | ');
-    for (const kakiLine of wrap(footerInfoText)) {
-      html += center('<div>' + esc(kakiLine) + '</div>');
+    ].filter(Boolean);
+    for (const footerLine of footerLinesText) {
+      for (const kakiLine of wrap(footerLine)) {
+        html += center('<div>' + esc(kakiLine) + '</div>');
+      }
     }
     if (is_piutang) {
       html += center('<div style="margin-top:8px;">&quot;Barang diterima &amp; berjanji melunasi sblm jatuh tempo&quot;</div>');
