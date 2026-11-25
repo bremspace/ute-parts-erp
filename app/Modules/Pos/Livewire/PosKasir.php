@@ -139,6 +139,9 @@ class PosKasir extends Component
 
     public float $diskonPartai = 0.0;
 
+    /** Persentase partai yang benar-benar dipakai PartaiPricingService. */
+    public float $diskonPartaiPersen = 0.0;
+
     public string $alasanPartai = '';
 
     public string $modeRewardMitra = 'diskon_langsung'; // diskon_langsung | komisi_akumulasi
@@ -438,6 +441,7 @@ class PosKasir extends Component
             'poinDitukar' => $this->poinDitukar,
             'diskonPoin' => $this->diskonPoin,
             'diskonPartai' => $this->diskonPartai,
+            'diskonPartaiPersen' => $this->diskonPartaiPersen,
             'alasanPartai' => $this->alasanPartai,
             'showPaymentModal' => $this->showPaymentModal,
             'metodeBayar' => $this->metodeBayar,
@@ -487,6 +491,7 @@ class PosKasir extends Component
         $this->poinDitukar = (int) ($draft['poinDitukar'] ?? 0);
         $this->diskonPoin = (float) ($draft['diskonPoin'] ?? 0);
         $this->diskonPartai = (float) ($draft['diskonPartai'] ?? 0);
+        $this->diskonPartaiPersen = (float) ($draft['diskonPartaiPersen'] ?? 0);
         $this->alasanPartai = $draft['alasanPartai'] ?? '';
 
         if (! empty($draft['showPaymentModal'])) {
@@ -1228,6 +1233,7 @@ class PosKasir extends Component
         $hasil = $partaiService->hitung($this->cart, $this->customer, $this->modeRewardMitra);
 
         $this->diskonPartai = $hasil['diskon_nominal'];
+        $this->diskonPartaiPersen = (float) ($hasil['persen'] ?? 0);
         $this->alasanPartai = $hasil['alasan'];
     }
 
@@ -1861,6 +1867,7 @@ class PosKasir extends Component
         $this->poinDitukar = 0;
         $this->diskonPoin = 0.0;
         $this->diskonPartai = 0.0;
+        $this->diskonPartaiPersen = 0.0;
         $this->alasanPartai = '';
         $this->pajakNominal = 0.0;
         $this->dpp = 0.0;
@@ -2749,6 +2756,7 @@ class PosKasir extends Component
                     'poin_ditukar' => $this->poinDitukar,
                     'diskon_poin' => $this->diskonPoin,
                     'diskon_partai' => $this->diskonPartai,
+                    'diskon_partai_persen' => $this->diskonPartaiPersen,
                     'alasan_partai' => $this->alasanPartai,
                     'mode_reward_mitra' => $this->modeRewardMitra,
                     'komisi_mitra_nominal' => $totalKomisiMitra,
