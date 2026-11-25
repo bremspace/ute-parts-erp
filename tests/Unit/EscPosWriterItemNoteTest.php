@@ -64,11 +64,13 @@ class EscPosWriterItemNoteTest extends TestCase
 
         $output = $writer->receipt($data);
 
-        // Harga lama diberi underline (ESC -) tanpa bold/reverse.
-        $this->assertStringContainsString('1 PCS x ', $output);
-        $this->assertStringContainsString("\x1b\x2d\x01".'Rp 125.000'."\x1b\x2d\x00", $output);
-        $this->assertStringNotContainsString("\x1d\x42\x01", $output);
-        $this->assertStringContainsString('Rp 110.000', $output);
+        // Opsi B: Harga Retail dicoret via raster GS v 0, lalu Harga Box & Potongan Box.
+        $this->assertStringContainsString('Harga Retail: ', $output);
+        $this->assertStringContainsString("\x1d\x76\x30\x00", $output);
+        $this->assertStringContainsString('Harga Box: Rp 110.000', $output);
+        $this->assertStringContainsString('1 PCS x Rp 110.000 = 110.000', $output);
+        $this->assertStringContainsString('Potongan Box: -Rp 15.000', $output);
+        $this->assertStringNotContainsString('Subtotal:', $output);
         $this->assertStringContainsString('BAYAR (TUNAI):', $output);
         $this->assertStringContainsString('Garansi: 3 Hari Toko (s/d 16/11/2026)', $output);
     }
