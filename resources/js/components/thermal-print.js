@@ -5,51 +5,6 @@
  * Supports Web Bluetooth (auto-reconnect) and CUPS raw printing via backend.
  */
 class EscPos {
-  /** Font 5x7 untuk nomor TRX di samping QR (bit-image ESC/POS). */
-  static FONT_5X7 = {
-    '0': ['01110','10001','10011','10101','11001','10001','01110'],
-    '1': ['00100','01100','00100','00100','00100','00100','01110'],
-    '2': ['01110','10001','00001','00010','00100','01000','11111'],
-    '3': ['11110','00001','00001','01110','00001','00001','11110'],
-    '4': ['00010','00110','01010','10010','11111','00010','00010'],
-    '5': ['11111','10000','11110','00001','00001','10001','01110'],
-    '6': ['00110','01000','10000','11110','10001','10001','01110'],
-    '7': ['11111','00001','00010','00100','01000','01000','01000'],
-    '8': ['01110','10001','10001','01110','10001','10001','01110'],
-    '9': ['01110','10001','10001','01111','00001','00010','01100'],
-    'A': ['01110','10001','10001','11111','10001','10001','10001'],
-    'B': ['11110','10001','10001','11110','10001','10001','11110'],
-    'C': ['01111','10000','10000','10000','10000','10000','01111'],
-    'D': ['11110','10001','10001','10001','10001','10001','11110'],
-    'E': ['11111','10000','10000','11110','10000','10000','11111'],
-    'F': ['11111','10000','10000','11110','10000','10000','10000'],
-    'G': ['01111','10000','10000','10111','10001','10001','01111'],
-    'H': ['10001','10001','10001','11111','10001','10001','10001'],
-    'I': ['01110','00100','00100','00100','00100','00100','01110'],
-    'J': ['00111','00010','00010','00010','00010','10010','01100'],
-    'K': ['10001','10010','10100','11000','10100','10010','10001'],
-    'L': ['10000','10000','10000','10000','10000','10000','11111'],
-    'M': ['10001','11011','10101','10101','10001','10001','10001'],
-    'N': ['10001','11001','10101','10011','10001','10001','10001'],
-    'O': ['01110','10001','10001','10001','10001','10001','01110'],
-    'P': ['11110','10001','10001','11110','10000','10000','10000'],
-    'Q': ['01110','10001','10001','10001','10101','10010','01101'],
-    'R': ['11110','10001','10001','11110','10100','10010','10001'],
-    'S': ['01111','10000','10000','01110','00001','00001','11110'],
-    'T': ['11111','00100','00100','00100','00100','00100','00100'],
-    'U': ['10001','10001','10001','10001','10001','10001','01110'],
-    'V': ['10001','10001','10001','10001','10001','01010','00100'],
-    'W': ['10001','10001','10001','10101','10101','10101','01010'],
-    'X': ['10001','10001','01010','00100','01010','10001','10001'],
-    'Y': ['10001','10001','01010','00100','00100','00100','00100'],
-    'Z': ['11111','00001','00010','00100','01000','10000','11111'],
-    '-': ['00000','00000','00000','11111','00000','00000','00000'],
-    ':': ['00000','00100','00100','00000','00100','00100','00000'],
-    '.': ['00000','00000','00000','00000','00000','01100','01100'],
-    '/': ['00001','00010','00010','00100','01000','01000','10000'],
-    ' ': ['00000','00000','00000','00000','00000','00000','00000'],
-  };
-
   constructor(paperWidth = 58) {
     this.paperWidth = Number(paperWidth) === 80 ? 80 : 58;
     this.compressed = true; // Always small font for paper saving
@@ -91,73 +46,6 @@ class EscPos {
   feed(n) { this.buf.push(...Array(n).fill(0x0a)); return this; }
 
   cut() { this.buf.push(0x1d, 0x56, 0x42, 0x00); return this; } // GS V B 0
-
-  /**
-   * Gambar QR + nomor transaksi dalam satu bit-image (QR kiri, nomor kanan).
-   * ESC * mode 0: satu byte = satu kolom dot horizontal, 8 dot vertikal.
-   */
-  bitImageWithText(matrix, module, text) {
-    if (!Array.isArray(matrix) || matrix.length === 0 || !matrix[0]?.length) return this;
-
-    const quiet = module; // 1 modul margin putih agar QR tetap mudah dipindai
-    const qrWidth = matrix[0].length * module;
-    const qrHeight = matrix.length * module;
-    const qrX = quiet;
-    const qrY = quiet;
-    const gap = 4;
-    const available = this.columns * 8;
-
-    const chars = this.clean(text).split('');
-    let scale = 1;
-    for (const candidate of [3, 2, 1]) {
-      if (qrWidth + 2 * quiet + gap + chars.length * 6 * candidate <= available) {
-        scale = candidate;
-        break;
-      }
-    }
-    while (chars.length && qrWidth + 2 * quiet + gap + chars.length * 6 * scale > available) {
-      chars.pop();
-    }
-
-    const textX = qrX + qrWidth + gap;
-    const totalWidth = textX + chars.length * 6 * scale + quiet;
-    const totalHeight = qrHeight + 2 * quiet;
-    if (totalWidth <= 0) return this;
-    const textTop = qrY + Math.max(0, Math.floor((qrHeight - 7 * scale) / 2));
-
-    for (let y = 0; y < totalHeight; y += 8) {
-      const bytes = [];
-      for (let x = 0; x < totalWidth; x++) {
-        let byte = 0;
-        for (let b = 0; b < 8; b++) {
-          const py = y + b;
-          const mask = 1 << (7 - b);
-
-          if (x >= qrX && x < qrX + qrWidth && py >= qrY && py < qrY + qrHeight) {
-            const mx = Math.floor((x - qrX) / module);
-            const my = Math.floor((py - qrY) / module);
-            if (matrix[my]?.[mx]) byte |= mask;
-          }
-
-          if (x >= textX && py >= textTop) {
-            const tx = x - textX;
-            const charIndex = Math.floor(tx / (6 * scale));
-            const glyphX = Math.floor((tx % (6 * scale)) / scale);
-            const glyphY = Math.floor((py - textTop) / scale);
-            const ch = chars[charIndex] || ' ';
-            const glyph = EscPos.FONT_5X7[ch] || EscPos.FONT_5X7[' '];
-            if (glyphX < 5 && glyphY >= 0 && glyphY < 7 && glyph[glyphY][glyphX] === '1') {
-              byte |= mask;
-            }
-          }
-        }
-        bytes.push(byte);
-      }
-      this.buf.push(0x1b, 0x2a, 0x00, bytes.length & 0xff, (bytes.length >> 8) & 0xff, ...bytes);
-    }
-
-    return this;
-  }
 
   /**
    * Ukuran QR lama disimpan dalam "px" (40/60/80/100/150).
@@ -320,7 +208,7 @@ class EscPos {
       nama_toko, slogan, alamat, telepon, website_medsos,
       show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
       show_subtotal_breakdown = true,
-      show_qr_retur = true, qr_size = 3, qr_url, qr_matrix,
+      show_qr_retur = true, qr_size = 3, qr_url,
       font_size = 'small',
       strikethrough_mode = 'esc_b',
     } = data;
@@ -356,11 +244,8 @@ class EscPos {
     const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
     const tglStr = tanggal || waktu || '';
 
-    const qrInline = qrShown && Array.isArray(qr_matrix) && qr_matrix.length > 0;
-    if (qrInline) {
-      // QR + nomor TRX digambar sebagai satu bit-image satu baris.
-      this.bitImageWithText(qr_matrix, this.normalizeQrSize(qr_size), qrContent);
-    } else if (qrShown) {
+    // QR native ESC/POS — bit-image tidak stabil di printer lapangan.
+    if (qrShown) {
       this.qrcode(qrContent, this.normalizeQrSize(qr_size));
     }
 
@@ -370,8 +255,10 @@ class EscPos {
       this.alignLeft();
     }
 
-    // Label "No. TRX:" sengaja dihilangkan saat nomor sudah ada di samping QR.
-    if (!qrInline) {
+    // Sesuai permintaan: cukup nomor transaksi, tanpa label "No. TRX:".
+    if (qrShown) {
+      this.bold(true).text(qrContent).bold(false);
+    } else {
       this.text(this.pad('No. TRX:', qrContent));
     }
     if (no_transaksi_asal && no_transaksi_asal !== '-') {
@@ -598,7 +485,7 @@ class EscPos {
       nama_toko, slogan, alamat, telepon, website_medsos,
       show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
       show_subtotal_breakdown = true,
-      show_qr_retur = true, qr_url, qr_svg, qr_matrix,
+      show_qr_retur = true, qr_url, qr_svg,
       paper_width = 58, font_size = 'small', strikethrough_mode = 'esc_b',
     } = data;
 
@@ -645,7 +532,6 @@ class EscPos {
     const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
     const tglStr = tanggal || waktu || '';
     const renderedQr = qr_svg || '';
-    const qrInline = qrShown && Array.isArray(qr_matrix) && qr_matrix.length > 0;
 
     const fallbackQr = `<svg width="48" height="48" viewBox="0 0 100 100" style="border:1px solid #d1d5db;background:#fff;">
       <rect width="100" height="100" fill="white"/>
@@ -680,23 +566,18 @@ class EscPos {
     }
     html += line(rule);
 
-    // QR + TRANSAKSI — nomor TRX persis di samping QR saat matrix tersedia.
+    // QR + TRANSAKSI — QR native, nomor TRX tepat di bawahnya.
     if (qrShown) {
-      const qrMarkup = renderedQr || fallbackQr;
-      const trxMarkup = qrInline
-        ? '<div style="font-size:9px;font-weight:800;white-space:pre;">' + esc(qrContent) + '</div>'
-        : '';
-      html += lineHtml(
-        '<div style="display:flex;align-items:center;gap:6px;width:100%;">'
-        + '<div style="line-height:0;flex:none;">' + qrMarkup + '</div>'
-        + trxMarkup
-        + '</div>'
-      );
+      html += lineHtml('<div style="display:inline-block;line-height:0;">' + (renderedQr || fallbackQr) + '</div>');
     }
 
     // TRANSAKSI — sama dengan buildReceipt()
     if (label_struk) html += center('<div style="font-weight:800;">' + esc(label_struk) + '</div>');
-    if (!qrInline) html += line(row('No. TRX:', qrContent));
+    if (qrShown) {
+      html += lineHtml('<div style="font-weight:800;">' + esc(qrContent) + '</div>');
+    } else {
+      html += line(row('No. TRX:', qrContent));
+    }
     if (no_transaksi_asal && no_transaksi_asal !== '-') html += line(row('Asal TRX:', no_transaksi_asal));
     if (sumber && !['pos', 'offline'].includes(String(sumber).toLowerCase())) html += line(row('Pesanan:', String(sumber).toUpperCase()));
     if (no_tiket) html += line(row('No. Tiket:', no_tiket));

@@ -2,8 +2,6 @@
 
 namespace App\Modules\Pos\Services;
 
-use App\Modules\Wms\Services\QrCodeService;
-
 /**
  * ESC/POS byte builder for 58mm & 80mm thermal receipts — paper-efficient Opsi B layout.
  * Header alamat+telepon digabung, QR kecil di blok No. TRX, footer padat.
@@ -59,51 +57,6 @@ class EscPosWriter
         '–' => '-', '—' => '-', '’' => "'", '‘' => "'",
         '“' => '"', '”' => '"',
         '→' => '->',
-    ];
-
-    /** Font 5x7 untuk nomor TRX di samping QR (bit-image ESC/POS). */
-    private const FONT_5X7 = [
-        '0' => ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
-        '1' => ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
-        '2' => ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
-        '3' => ['11110', '00001', '00001', '01110', '00001', '00001', '11110'],
-        '4' => ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
-        '5' => ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
-        '6' => ['00110', '01000', '10000', '11110', '10001', '10001', '01110'],
-        '7' => ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
-        '8' => ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
-        '9' => ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
-        'A' => ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
-        'B' => ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
-        'C' => ['01111', '10000', '10000', '10000', '10000', '10000', '01111'],
-        'D' => ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
-        'E' => ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
-        'F' => ['11111', '10000', '10000', '11110', '10000', '10000', '10000'],
-        'G' => ['01111', '10000', '10000', '10111', '10001', '10001', '01111'],
-        'H' => ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
-        'I' => ['01110', '00100', '00100', '00100', '00100', '00100', '01110'],
-        'J' => ['00111', '00010', '00010', '00010', '00010', '10010', '01100'],
-        'K' => ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
-        'L' => ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
-        'M' => ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
-        'N' => ['10001', '11001', '10101', '10011', '10001', '10001', '10001'],
-        'O' => ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
-        'P' => ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
-        'Q' => ['01110', '10001', '10001', '10001', '10101', '10010', '01101'],
-        'R' => ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
-        'S' => ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
-        'T' => ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
-        'U' => ['10001', '10001', '10001', '10001', '10001', '10001', '01110'],
-        'V' => ['10001', '10001', '10001', '10001', '10001', '01010', '00100'],
-        'W' => ['10001', '10001', '10001', '10101', '10101', '10101', '01010'],
-        'X' => ['10001', '10001', '01010', '00100', '01010', '10001', '10001'],
-        'Y' => ['10001', '10001', '01010', '00100', '00100', '00100', '00100'],
-        'Z' => ['11111', '00001', '00010', '00100', '01000', '10000', '11111'],
-        '-' => ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
-        ':' => ['00000', '00100', '00100', '00000', '00100', '00100', '00000'],
-        '.' => ['00000', '00000', '00000', '00000', '00000', '01100', '01100'],
-        '/' => ['00001', '00010', '00010', '00100', '01000', '01000', '10000'],
-        ' ' => ['00000', '00000', '00000', '00000', '00000', '00000', '00000'],
     ];
 
     /**
@@ -165,16 +118,9 @@ class EscPosWriter
         $tglStr = $data['tanggal'] ?? $data['waktu'] ?? '';
         $qrShown = ($data['show_qr_retur'] ?? true) && ! empty($noTrx) && $noTrx !== '-';
 
-        $qrMatrix = $data['qr_matrix'] ?? null;
-        if ($qrShown && ! is_array($qrMatrix)) {
-            $qrMatrix = (new QrCodeService)->generateMatrix($noTrx);
-        }
-        $qrInline = $qrShown && ! empty($qrMatrix);
-
-        if ($qrInline) {
-            // QR + nomor transaksi digambar sebagai satu bit-image satu baris.
-            $this->bitImageWithText($qrMatrix, self::normalizeQrSize($data['qr_size'] ?? 4), $noTrx);
-        } elseif ($qrShown) {
+        // QR native ESC/POS (didukung semua printer) —Bit image terbukti tidak stabil
+        // pada printer thermal lapangan, jadi tidak dipakai lagi.
+        if ($qrShown) {
             $this->qrcode($noTrx, self::normalizeQrSize($data['qr_size'] ?? 4));
         }
 
@@ -184,8 +130,10 @@ class EscPosWriter
             $this->alignLeft();
         }
 
-        // Label "No. TRX:" sengaja dihilangkan saat nomor sudah ada di samping QR.
-        if (! $qrInline) {
+        // Sesuai permintaan: cukup nomor transaksi saja, tanpa label "No. TRX:".
+        if ($qrShown) {
+            $this->bold(true)->text($noTrx)->bold(false);
+        } else {
             $this->text($this->pad('No. TRX:', $noTrx));
         }
 
@@ -401,87 +349,6 @@ class EscPosWriter
         $this->feed(0)->cut();
 
         return $this->buf;
-    }
-
-    /**
-     * Gambar QR + nomor transaksi dalam satu bit-image (QR di kiri, nomor di kanan).
-     * ESC * mode 0: satu byte = satu kolom dot horizontal, 8 dot vertikal.
-     */
-    private function bitImageWithText(array $matrix, int $module, string $text): self
-    {
-        $rows = count($matrix);
-        if ($rows === 0) {
-            return $this;
-        }
-        $cols = count($matrix[0]);
-        if ($cols === 0) {
-            return $this;
-        }
-
-        $quiet = $module; // 1 modul margin putih agar QR tetap mudah dipindai
-        $qrWidth = $cols * $module;
-        $qrHeight = $rows * $module;
-        $qrX = $quiet;
-        $qrY = $quiet;
-        $gap = 4;
-        $available = $this->columns * 8;
-
-        $chars = str_split($this->ascii($text));
-        $scale = 1;
-        foreach ([3, 2, 1] as $candidate) {
-            if ($qrWidth + 2 * $quiet + $gap + count($chars) * 6 * $candidate <= $available) {
-                $scale = $candidate;
-                break;
-            }
-        }
-        while ($chars !== [] && $qrWidth + 2 * $quiet + $gap + count($chars) * 6 * $scale > $available) {
-            array_pop($chars);
-        }
-
-        $textWidth = count($chars) * 6 * $scale;
-        $textX = $qrX + $qrWidth + $gap;
-        $totalWidth = $textX + $textWidth + $quiet;
-        $totalHeight = $qrHeight + 2 * $quiet;
-        if ($totalWidth <= 0) {
-            return $this;
-        }
-        $textTop = $qrY + max(0, (int) floor(($qrHeight - 7 * $scale) / 2));
-
-        for ($y = 0; $y < $totalHeight; $y += 8) {
-            $bytes = '';
-            for ($x = 0; $x < $totalWidth; $x++) {
-                $byte = 0;
-                for ($b = 0; $b < 8; $b++) {
-                    $py = $y + $b;
-                    $mask = 1 << (7 - $b);
-
-                    if ($x >= $qrX && $x < $qrX + $qrWidth && $py >= $qrY && $py < $qrY + $qrHeight) {
-                        $mx = (int) floor(($x - $qrX) / $module);
-                        $my = (int) floor(($py - $qrY) / $module);
-                        if (! empty($matrix[$my][$mx])) {
-                            $byte |= $mask;
-                        }
-                    }
-
-                    if ($x >= $textX && $py >= $textTop) {
-                        $tx = $x - $textX;
-                        $charIndex = (int) floor($tx / (6 * $scale));
-                        $glyphX = (int) floor(($tx % (6 * $scale)) / $scale);
-                        $glyphY = (int) floor(($py - $textTop) / $scale);
-                        $ch = $chars[$charIndex] ?? ' ';
-                        $glyph = self::FONT_5X7[$ch] ?? self::FONT_5X7[' '];
-                        if ($glyphX < 5 && $glyphY >= 0 && $glyphY < 7 && ($glyph[$glyphY][$glyphX] ?? '0') === '1') {
-                            $byte |= $mask;
-                        }
-                    }
-                }
-                $bytes .= chr($byte);
-            }
-
-            $this->buf .= "\x1b\x2a\x00".chr(strlen($bytes) & 0xFF).chr((strlen($bytes) >> 8) & 0xFF).$bytes;
-        }
-
-        return $this;
     }
 
     /**

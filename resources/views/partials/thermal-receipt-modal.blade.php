@@ -11,11 +11,6 @@
         $qrSvg = (!empty($receiptData['no_transaksi']) && $showQrRetur)
             ? $qrService->generateSvg($receiptData['no_transaksi'], $qrPx, 2)
             : '';
-        // Matriks QR dipakai JS untuk menggambar QR + No. TRX dalam satu baris bit-image.
-        $qrMatrix = (!empty($receiptData['no_transaksi']) && $showQrRetur)
-            ? $qrService->generateMatrix($receiptData['no_transaksi'])
-            : [];
-
         // Preserve pelanggan's phone/address before merging so template
         // config (toko phone/address) is not overwritten by receipt data.
         $receiptSafe = $receiptData;
@@ -38,7 +33,6 @@
         // After merging receiptSafe on top, re-apply template keys so settings always win for display.
         $mergedData = array_merge($strukConfig, $receiptSafe, [
             'qr_svg' => $qrSvg,
-            'qr_matrix' => $qrMatrix,
             'paper_width' => (int) ($defaultPaperSize === '80' ? 80 : 58),
         ]);
         foreach ($templateKeys as $tk) {
