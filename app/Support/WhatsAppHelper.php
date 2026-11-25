@@ -13,20 +13,9 @@ class WhatsAppHelper
             return null;
         }
 
-        // Ambil hanya angka
-        $digits = preg_replace('/[^0-9]/', '', (string) $nomor);
-        if (blank($digits)) {
-            return null;
-        }
+        $standar = NomorTeleponIndonesia::standar($nomor);
 
-        // Ubah 08xxx -> 628xxx
-        if (str_starts_with($digits, '0')) {
-            $digits = '62'.substr($digits, 1);
-        } elseif (str_starts_with($digits, '8')) {
-            $digits = '62'.$digits;
-        }
-
-        return $digits;
+        return $standar !== '' ? $standar : null;
     }
 
     /**

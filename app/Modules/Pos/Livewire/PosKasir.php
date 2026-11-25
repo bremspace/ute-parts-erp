@@ -41,6 +41,7 @@ use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Wms\Services\StockReservationService;
+use App\Support\NomorTeleponIndonesia;
 use App\Traits\ParsesNominal;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -2246,10 +2247,7 @@ class PosKasir extends Component
                 $this->customer?->nama ?? 'Pelanggan'
             );
 
-            $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->qrisCustomerPhone);
-            if (str_starts_with($cleanPhone, '0')) {
-                $cleanPhone = '62'.substr($cleanPhone, 1);
-            }
+            $cleanPhone = NomorTeleponIndonesia::standar($this->qrisCustomerPhone);
 
             $this->waQrisUrl = filled($cleanPhone)
                 ? 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($msg)
@@ -2285,10 +2283,7 @@ class PosKasir extends Component
             $this->customer?->nama ?? 'Pelanggan'
         );
 
-        $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->qrisCustomerPhone);
-        if (str_starts_with($cleanPhone, '0')) {
-            $cleanPhone = '62'.substr($cleanPhone, 1);
-        }
+        $cleanPhone = NomorTeleponIndonesia::standar($this->qrisCustomerPhone);
 
         $this->waQrisUrl = filled($cleanPhone)
             ? 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($msg)
@@ -2439,10 +2434,7 @@ class PosKasir extends Component
             $this->customer?->nama ?? 'Pelanggan'
         );
 
-        $cleanPhone = preg_replace('/[^0-9]/', '', (string) $custPhone);
-        if (str_starts_with($cleanPhone, '0')) {
-            $cleanPhone = '62'.substr($cleanPhone, 1);
-        }
+        $cleanPhone = NomorTeleponIndonesia::standar($custPhone);
 
         if (filled($cleanPhone)) {
             try {

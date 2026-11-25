@@ -14,6 +14,7 @@ use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Workflow\Services\ApprovalService;
+use App\Support\NomorTeleponIndonesia;
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -43,21 +44,7 @@ class PelangganService
 {
     public function normalizePhone(?string $telepon): string
     {
-        if (empty($telepon)) {
-            return '';
-        }
-
-        $teleponBersih = preg_replace('/[^0-9]/', '', (string) $telepon);
-        if (str_starts_with($teleponBersih, '628')) {
-            $teleponBersih = '08'.substr($teleponBersih, 3);
-        } elseif (str_starts_with($teleponBersih, '62')) {
-            $teleponBersih = '0'.substr($teleponBersih, 2);
-        } elseif (str_starts_with($teleponBersih, '8') && strlen($teleponBersih) >= 10) {
-            // Pengguna sering mengetik HP tanpa prefix 0 (mis. 81234567890).
-            $teleponBersih = '0'.$teleponBersih;
-        }
-
-        return $teleponBersih;
+        return NomorTeleponIndonesia::standar($telepon);
     }
 
     /**
@@ -70,26 +57,7 @@ class PelangganService
      */
     public function kandidatTelepon(?string $telepon): array
     {
-        $kanonik = $this->normalizePhone($telepon);
-
-        if ($kanonik === '') {
-            return [];
-        }
-
-        $kandidat = [$kanonik];
-
-        if (str_starts_with($kanonik, '08')) {
-            $kandidat[] = '8'.substr($kanonik, 2);
-            $kandidat[] = '62'.substr($kanonik, 1);
-        } elseif (str_starts_with($kanonik, '8')) {
-            $kandidat[] = '0'.$kanonik;
-            $kandidat[] = '62'.$kanonik;
-        } elseif (str_starts_with($kanonik, '62')) {
-            $kandidat[] = '0'.substr($kanonik, 2);
-            $kandidat[] = substr($kanonik, 2);
-        }
-
-        return array_values(array_unique($kandidat));
+        return NomorTeleponIndonesia::kandidat($telepon);
     }
 
     /**
@@ -258,6 +226,16 @@ class PelangganService
             $data['tier_membership_id'] = null;
         }
 
+        // Cek duplikat lintas format (62 / 08 / 8) sebelum validasi unik standar.
+        if (! empty($data['telepon'])) {
+            $kandidat = $this->kandidatTelepon($data['telepon']);
+            if ($kandidat !== [] && Pelanggan::whereIn('telepon', $kandidat)->exists()) {
+                throw ValidationException::withMessages([
+                    'telepon' => $this->messages()['telepon.unique'],
+                ]);
+            }
+        }
+
         $validated = Validator::make($data, $this->rules(), $this->messages())->validate();
 
         $tierTerendah = TierMembership::where('is_active', true)
@@ -345,6 +323,18 @@ class PelangganService
 
         if (array_key_exists('tier_membership_id', $data) && ($data['tier_membership_id'] === '' || $data['tier_membership_id'] === null)) {
             $data['tier_membership_id'] = null;
+        }
+
+        if (! empty($data['telepon'])) {
+            $kandidat = $this->kandidatTelepon($data['telepon']);
+            $ada = $kandidat !== []
+                ? Pelanggan::whereIn('telepon', $kandidat)->where('id', '!=', $pelanggan->id)->exists()
+                : false;
+            if ($ada) {
+                throw ValidationException::withMessages([
+                    'telepon' => $this->messages()['telepon.unique'],
+                ]);
+            }
         }
 
         $validated = Validator::make($data, $this->rules(true, $pelanggan->id), $this->messages())->validate();

@@ -8,6 +8,7 @@ use App\Modules\Hr\Models\KaryawanRiwayat;
 use App\Modules\Hr\Services\UserHrSyncService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
+use App\Support\NomorTeleponIndonesia;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -219,7 +220,7 @@ class KaryawanPage extends Component
                 $karyawan = Karyawan::create([
                     'nik' => trim($this->karyawanForm['nik']),
                     'nama' => trim($this->karyawanForm['nama']),
-                    'telepon' => trim($this->karyawanForm['telepon'] ?? ''),
+                    'telepon' => NomorTeleponIndonesia::standar($this->karyawanForm['telepon'] ?? ''),
                     'email' => trim($this->karyawanForm['email'] ?? ''),
                     'jabatan' => $this->karyawanForm['jabatan'],
                     'metode_penghasilan' => $this->karyawanForm['metode_penghasilan'] ?? 'gaji',
@@ -271,7 +272,7 @@ class KaryawanPage extends Component
                 $karyawan->update([
                     'nik' => trim($this->karyawanForm['nik']),
                     'nama' => trim($this->karyawanForm['nama']),
-                    'telepon' => trim($this->karyawanForm['telepon'] ?? ''),
+                    'telepon' => NomorTeleponIndonesia::standar($this->karyawanForm['telepon'] ?? ''),
                     'email' => trim($this->karyawanForm['email'] ?? ''),
                     'jabatan' => $newJabatan,
                     'metode_penghasilan' => $this->karyawanForm['metode_penghasilan'] ?? 'gaji',

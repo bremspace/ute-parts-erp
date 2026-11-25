@@ -114,7 +114,7 @@ class PrintThermalJob implements ShouldQueue
             'nama_toko' => $strukConfig['nama_toko'] ?? config('app.name', 'BREMSPACE'),
             'slogan' => $strukConfig['slogan'] ?? 'Pusat Sparepart & Servis Gadget',
             'alamat' => $strukConfig['alamat'] ?? 'Jl. Veteran No. 12',
-            'telepon' => $strukConfig['telepon'] ?? '0812-3456-7890',
+            'telepon' => $strukConfig['telepon'] ?? '6281234567890',
             'website_medsos' => $strukConfig['website_medsos'] ?? 'www.bremspace.com',
 
             // Display options

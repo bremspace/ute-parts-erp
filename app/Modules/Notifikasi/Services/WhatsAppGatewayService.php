@@ -222,19 +222,13 @@ class WhatsAppGatewayService
      */
     public static function nomorInternasional(?string $telepon): ?string
     {
-        $bersih = preg_replace('/[^0-9]/', '', (string) $telepon);
+        $kanonik = app(PelangganService::class)->normalizePhone($telepon);
 
-        if ($bersih === '') {
+        if ($kanonik === '' || ! str_starts_with($kanonik, '62')) {
             return null;
         }
 
-        $kanonik = app(PelangganService::class)->normalizePhone($bersih);
-
-        if ($kanonik === '' || ! str_starts_with($kanonik, '08')) {
-            return null;
-        }
-
-        return '62'.substr($kanonik, 1);
+        return $kanonik;
     }
 
     /**
