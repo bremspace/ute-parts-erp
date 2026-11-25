@@ -10,6 +10,7 @@ use App\Modules\Marketplace\Livewire\CustomerAccount;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
+use App\Support\NomorTeleponIndonesia;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -69,7 +70,7 @@ class ServisBookingMarketplaceTest extends TestCase
             ->set('keluhan', 'Layar blank setelah jatuh')
             ->call('simpanBooking');
 
-        $tiket = TiketServis::where('telepon_pelanggan', '081299998888')->first();
+        $tiket = TiketServis::where('telepon_pelanggan', NomorTeleponIndonesia::standar('081299998888'))->first();
         $this->assertNotNull($tiket);
         $this->assertEquals('diajukan_online', $tiket->status);
         $this->assertEquals('online', $tiket->sumber);

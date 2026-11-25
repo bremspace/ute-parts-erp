@@ -8,6 +8,7 @@ use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisProgress;
 use App\Modules\Servis\Services\ServisService;
+use App\Support\NomorTeleponIndonesia;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -70,7 +71,7 @@ class ServisFase4FixTest extends TestCase
         ], $this->user);
 
         $this->assertDatabaseHas('pelanggan', [
-            'telepon' => '081298765432',
+            'telepon' => NomorTeleponIndonesia::standar('081298765432'),
             'nama' => 'Budi Santoso',
         ]);
         $this->assertNotNull($tiket->pelanggan_id);
@@ -85,7 +86,7 @@ class ServisFase4FixTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('pelanggan', [
-            'telepon' => '081311223344',
+            'telepon' => NomorTeleponIndonesia::standar('081311223344'),
             'nama' => 'Siti Aminah',
         ]);
         $this->assertNotNull($booking->pelanggan_id);
