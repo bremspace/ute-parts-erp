@@ -1233,7 +1233,7 @@ class PosKasir extends Component
         $hasil = $partaiService->hitung($this->cart, $this->customer, $this->modeRewardMitra);
 
         $this->diskonPartai = $hasil['diskon_nominal'];
-        $this->diskonPartaiPersen = (float) ($hasil['persen'] ?? 0);
+        $this->diskonPartaiPersen = (float) $hasil['persen'];
         $this->alasanPartai = $hasil['alasan'];
     }
 
