@@ -35,8 +35,6 @@ class EscPosWriter
     /** Double-size flags for GS ! n. */
     private const SIZE_NORMAL = 0x00;
 
-    private const SIZE_DBL_H = 0x10;   // double height
-
     private const SIZE_DBL_W = 0x80;   // double width
 
     private int $columns = 32;
@@ -461,12 +459,6 @@ class EscPosWriter
     }
 
     /** ESC - n — underline (fallback bila raster tidak didukung). */
-    private function underline(bool $on): self
-    {
-        $this->buf .= "\x1b\x2d".chr($on ? 1 : 0);
-
-        return $this;
-    }
 
     /**
      * Cetak teks dengan coret tengah memakai raster GS v 0.
@@ -496,7 +488,7 @@ class EscPosWriter
                     $key = strtoupper($ch);
                     $glyph = self::STRIKE_FONT[$key] ?? self::STRIKE_FONT[' '];
                     for ($gx = 0; $gx < 5; $gx++) {
-                        if (($glyph[$gy][$gx] ?? '0') === '1') {
+                        if ($glyph[$gy][$gx] === '1') {
                             $bits[$i * 6 + $gx] = 1;
                         }
                     }
@@ -594,20 +586,8 @@ class EscPosWriter
     }
 
     /** ESC G n — double-strike, membuat huruf lebih tebal pada printer thermal. */
-    private function doubleStrike(bool $on): self
-    {
-        $this->buf .= "\x1b\x47".chr($on ? 1 : 0);
-
-        return $this;
-    }
 
     /** GS B n — white/black reverse. Dipakai untuk menandai harga lama. */
-    private function reverse(bool $on): self
-    {
-        $this->buf .= "\x1d\x42".chr($on ? 1 : 0);
-
-        return $this;
-    }
 
     /** GS ! n — size flags: 0 normal, 0x10 double height, 0x80 double width, 0x90 both. */
     private function size(int $n): self
@@ -620,13 +600,6 @@ class EscPosWriter
     private function sizeDoubleWidth(bool $on): self
     {
         $this->size($on ? self::SIZE_DBL_W : self::SIZE_NORMAL);
-
-        return $this;
-    }
-
-    private function sizeDoubleHeight(bool $on): self
-    {
-        $this->size($on ? self::SIZE_DBL_H : self::SIZE_NORMAL);
 
         return $this;
     }
@@ -731,21 +704,8 @@ class EscPosWriter
     }
 
     /** Raw text tanpa LF — untuk baris yang disusun dengan escape di tengah (ESC B). */
-    private function raw(string $text): self
-    {
-        $this->buf .= $this->ascii($text);
-
-        return $this;
-    }
 
     /** ESC B n — strikethrough on/off (Epson ESC/POS standar). */
-    private function escB(bool $on): self
-    {
-        $this->buf .= "\x1b\x42".chr($on ? 1 : 0);
-
-        return $this;
-    }
-
     private function ascii(string $text): string
     {
         return preg_replace('/[^\x20-\x7E]/', '', strtr($text, self::TRANSLIT));
