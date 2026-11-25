@@ -196,7 +196,7 @@ class EscPosWriter
             $hargaJual = (float) ($item['harga'] ?? 0);
 
             if ($hargaRetail > $hargaJual && in_array($strikethroughMode, ['esc_b', 'reverse'], true)) {
-                // Harga lama ditandai dengan reverse print (GS B) — ESC B bukan perintah coret.
+                // Harga lama dicoret tengah dengan overprint hyphen, tanpa bold/reverse.
                 $normal = $this->money($hargaRetail);
                 $disc = $this->money($hargaJual);
                 $prefix = "{$qtySatuan} x ";
@@ -204,14 +204,16 @@ class EscPosWriter
 
                 if ($totalLineLen >= $this->columns) {
                     $this->raw($prefix);
-                    $this->reverse(true)->raw($normal)->reverse(false);
+                    $this->raw($normal);
+                    $this->cr()->raw(str_repeat(' ', strlen($prefix)).str_repeat('-', strlen($normal)));
                     $this->raw(' '.$disc."\n");
                     $padRight = max(0, $this->columns - strlen($rightVal));
                     $this->raw(str_repeat(' ', $padRight).$rightVal."\n");
                 } else {
                     $gap = $this->columns - $totalLineLen;
                     $this->raw($prefix);
-                    $this->reverse(true)->raw($normal)->reverse(false);
+                    $this->raw($normal);
+                    $this->cr()->raw(str_repeat(' ', strlen($prefix)).str_repeat('-', strlen($normal)));
                     $this->raw(' '.$disc);
                     $this->raw(str_repeat(' ', $gap).$rightVal."\n");
                 }
@@ -376,6 +378,14 @@ class EscPosWriter
     public static function effectiveQrSize(mixed $value): int
     {
         return self::normalizeQrSize($value);
+    }
+
+    /** CR — kembali ke awal baris tanpa feed, dipakai untuk overprint coret tengah. */
+    private function cr(): self
+    {
+        $this->buf .= "\x0d";
+
+        return $this;
     }
 
     /** ESC/POS standard Model 2 QR Code. */
