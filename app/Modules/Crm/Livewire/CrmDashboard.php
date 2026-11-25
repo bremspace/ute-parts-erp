@@ -531,7 +531,7 @@ class CrmDashboard extends Component
             'amount' => 0,
         ];
 
-        $approvalService->ajukan(
+        $approvalRequest = $approvalService->ajukan(
             'reset_password_pelanggan',
             $pelanggan->id,
             $cabangId,
@@ -541,6 +541,26 @@ class CrmDashboard extends Component
 
         Cache::forget('backoffice-approval-badge-'.($cabangId ?? 'all'));
         Cache::forget('backoffice-approval-badge-all');
+
+        // Tanpa approval rule aktif (atau request lama sudah selesai), ajukan()
+        // tidak membuat antrean. Terapkan langsung agar reset tidak hanya jadi
+        // pesan sukses tanpa perubahan kata sandi.
+        if (! $approvalRequest || $approvalRequest->status !== 'pending') {
+            $approvalService->terapkanResetPasswordPelanggan(
+                $pelanggan,
+                $payload['new_password'],
+                $user->id,
+                'Reset kata sandi langsung (tanpa approval rule aktif)'
+            );
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Kata sandi pelanggan '{$pelanggan->nama}' berhasil diperbarui langsung (tidak memerlukan approval).",
+            ]);
+            $this->closeResetPasswordModal();
+
+            return;
+        }
 
         $this->dispatch('alert', [
             'type' => 'success',
