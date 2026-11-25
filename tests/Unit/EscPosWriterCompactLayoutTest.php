@@ -49,10 +49,13 @@ class EscPosWriterCompactLayoutTest extends TestCase
         // Alamat + telepon digabung dalam satu baris.
         $this->assertStringContainsString('Jl. Veteran No. 12 - Telp/WA: 0812-3456', $output);
 
-        // QR + No. TRX digambar sebagai bit-image ESC * 0, label No. TRX dihapus.
-        $this->assertStringContainsString("\x1b\x2a\x00", $output);
+        // QR memakai perintah native (printer lapangan tidak stabil dengan bit-image).
+        $this->assertStringContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
+        $this->assertStringContainsString("\x1d\x28\x6b\x03\x00\x31\x43\x04", $output);
+        $this->assertStringNotContainsString("\x1b\x2a\x00", $output);
+        // Label No. TRX dihapus, cukup nomor transaksi saja.
         $this->assertStringNotContainsString('No. TRX:', $output);
-        $this->assertStringNotContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
+        $this->assertStringContainsString('MP-C01-20261124-0001', $output);
 
         // Web + tanggal digabung; caption QR dan saldo poin 0 tidak dicetak.
         $this->assertStringContainsString('Web: www.bremspace.com | Tgl: 24-11-2026', $output);

@@ -293,9 +293,10 @@ class ThermalPrintReceiptOptimizationTest extends TestCase
         $this->assertStringContainsString('iPhone 13 Pro', $output);
         $this->assertStringContainsString('[Jasa] Ganti LCD', $output);
         $this->assertStringContainsString('[Part] LCD Original OLED', $output);
-        // QR + No. TRX digambar sebagai bit-image, bukan perintah QR native.
-        $this->assertStringContainsString("\x1b\x2a\x00", $output);
-        $this->assertStringNotContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
+        // QR native ESC/POS (bit-image tidak dipakai karena tidak stabil di lapangan).
+        $this->assertStringContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
+        $this->assertStringNotContainsString("\x1b\x2a\x00", $output);
+        $this->assertStringContainsString('TRX-C01-20261003-0001', $output);
         // Caption QR tidak lagi memakan baris tersendiri di footer.
         $this->assertStringNotContainsString('Scan QR ini untuk retur & klaim garansi', $output);
     }
