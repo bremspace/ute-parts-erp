@@ -74,4 +74,31 @@ class EscPosWriterItemNoteTest extends TestCase
         $this->assertStringContainsString('Garansi: 3 Hari Toko s/d 16/11', $output);
         $this->assertStringNotContainsString('2026)', $output);
     }
+
+    public function test_escpos_writer_menampilkan_harga_satuan_setelah_diskon_partai(): void
+    {
+        $writer = new EscPosWriter;
+
+        $output = $writer->receipt([
+            'no_transaksi' => 'TRX-PARTAI-001',
+            'items' => [
+                [
+                    'nama' => 'LCD REDMI 9A',
+                    'qty' => 10,
+                    'satuan' => 'PCS',
+                    'harga' => 106000,
+                    'subtotal' => 1060000,
+                ],
+            ],
+            'subtotal' => 1264500,
+            'diskon_partai' => 38520,
+            'total' => 1225980,
+            'bayar' => 1225980,
+        ]);
+
+        // Faktor partai = 1 - 38.520/1.264.500 ≈ 0,96953.
+        // Harga 106.000 × faktor ≈ 102.771.
+        $this->assertStringContainsString('Harga Partai/PCS: Rp 102.771', $output);
+        $this->assertStringContainsString('Diskon Partai:', $output);
+    }
 }
