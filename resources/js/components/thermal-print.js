@@ -392,6 +392,13 @@ class EscPos {
 
     // ======== ITEMS ========
     let opsiBItem = false;
+    // Diskon partai = persentase dari subtotal sebelum potongan partai.
+    const diskonPartaiVal = Number(diskon_partai || 0);
+    const subtotalSebelumPartai = Number(subtotal || 0);
+    const faktorPartai = diskonPartaiVal > 0 && subtotalSebelumPartai > 0
+      ? Math.max(0, Math.min(1, 1 - (diskonPartaiVal / subtotalSebelumPartai)))
+      : null;
+
     for (const item of items) {
       const nama = item.nama || 'Item';
       for (const line of this.wrap(nama)) {
@@ -403,6 +410,7 @@ class EscPos {
       const rightVal = this.numberOnly(item.subtotal);
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
+      const unitLbl = this.unitLabel(item.satuan);
 
       if (hargaRetail > hargaJual && ['esc_b', 'reverse'].includes(strikethrough_mode)) {
         // Opsi B: Harga Retail dicoret, Harga Box, qty x box = subtotal, Potongan Box.
@@ -423,6 +431,12 @@ class EscPos {
         this.text(this.pad(`${qtySatuan} x (${this.money(hargaRetail)}) -> ${this.money(hargaJual)}`, rightVal));
       } else {
         this.text(this.pad(`${qtySatuan} x ${harga}`, rightVal));
+      }
+
+      // Harga per PCS setelah diskon partai.
+      if (faktorPartai !== null && hargaJual > 0) {
+        const hargaPartai = Math.round(hargaJual * faktorPartai);
+        this.text('Harga Partai/' + unitLbl + ': ' + this.money(hargaPartai));
       }
 
       if (item.catatan) {
@@ -674,6 +688,12 @@ class EscPos {
 
     // ITEMS — sama dengan buildReceipt()
     let opsiBItem = false;
+    const diskonPartaiVal = Number(diskon_partai || 0);
+    const subtotalSebelumPartai = Number(subtotal || 0);
+    const faktorPartai = diskonPartaiVal > 0 && subtotalSebelumPartai > 0
+      ? Math.max(0, Math.min(1, 1 - (diskonPartaiVal / subtotalSebelumPartai)))
+      : null;
+
     for (const item of items) {
       const nama = item.nama || 'Item';
       for (const namaLine of wrap(nama)) html += line(namaLine, 'font-weight:800;');
@@ -682,6 +702,7 @@ class EscPos {
       const rightVal = numberOnly(item.subtotal);
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
+      const unitLbl = unitLabel(item.satuan);
 
       if (hargaRetail > hargaJual && ['esc_b', 'reverse'].includes(strikethrough_mode)) {
         // Opsi B — Harga Retail dicoret, Harga Box, qty x box = subtotal, Potongan Box.
@@ -699,6 +720,11 @@ class EscPos {
         html += line(row(qtySatuan + ' x (' + money(hargaRetail) + ') -> ' + money(hargaJual), rightVal));
       } else {
         html += line(row(qtySatuan + ' x ' + money(hargaJual), rightVal));
+      }
+
+      if (faktorPartai !== null && hargaJual > 0) {
+        const hargaPartai = Math.round(hargaJual * faktorPartai);
+        html += line('Harga Partai/' + unitLbl + ': ' + money(hargaPartai));
       }
 
       if (item.catatan) {

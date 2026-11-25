@@ -215,6 +215,15 @@ class EscPosWriter
         $strikethroughMode = $data['strikethrough_mode'] ?? 'esc_b';
         $opsiBItem = false;
 
+        // Diskon partai adalah persentase dari subtotal sebelum potongan partai.
+        // Faktor ini dipakai untuk menampilkan harga satuan "versi partai".
+        $faktorPartai = null;
+        $diskonPartai = (float) ($data['diskon_partai'] ?? 0);
+        $subtotalSebelumPartai = (float) ($data['subtotal'] ?? 0);
+        if ($diskonPartai > 0 && $subtotalSebelumPartai > 0) {
+            $faktorPartai = max(0.0, min(1.0, 1 - ($diskonPartai / $subtotalSebelumPartai)));
+        }
+
         foreach ($data['items'] ?? [] as $item) {
             $nama = $item['nama'] ?? 'Item';
             foreach ($this->wrap($nama) as $namaLine) {
@@ -228,6 +237,7 @@ class EscPosWriter
             // Inline strikethrough: normal price next to final price without extra rows
             $hargaRetail = (float) ($item['harga_retail'] ?? 0);
             $hargaJual = (float) ($item['harga'] ?? 0);
+            $unitLbl = $this->unitLabel($item['satuan'] ?? null);
 
             if ($hargaRetail > $hargaJual && in_array($strikethroughMode, ['esc_b', 'reverse'], true)) {
                 // Opsi B: harga Retail dicoret, Harga Box, qty x box = subtotal, Potongan Box.
@@ -248,6 +258,12 @@ class EscPosWriter
                 $this->text($this->pad("{$qtySatuan} x (".$this->money($hargaRetail).') -> '.$this->money($hargaJual), $rightVal));
             } else {
                 $this->text($this->pad("{$qtySatuan} x {$harga}", $rightVal));
+            }
+
+            // Harga satuan setelah diskon partai, biar konsumen tahu harga per PCS versi partai.
+            if ($faktorPartai !== null && $hargaJual > 0) {
+                $hargaPartai = round($hargaJual * $faktorPartai);
+                $this->text('Harga Partai/'.$unitLbl.': '.$this->money($hargaPartai));
             }
 
             if (! empty($item['catatan'])) {
