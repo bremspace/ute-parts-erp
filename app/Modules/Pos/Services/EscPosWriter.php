@@ -248,6 +248,10 @@ class EscPosWriter
             $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
         }
 
+        if (! empty($data['diskon_box']) && (float) $data['diskon_box'] > 0) {
+            $this->text($this->pad('Diskon Box/Kemasan:', '-'.$this->money($data['diskon_box'])));
+        }
+
         if (! empty($data['diskon_partai']) && (float) $data['diskon_partai'] > 0) {
             $this->text($this->pad('Diskon Partai:', '-'.$this->money($data['diskon_partai'])));
         }
