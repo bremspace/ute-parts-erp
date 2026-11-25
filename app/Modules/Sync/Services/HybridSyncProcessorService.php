@@ -310,7 +310,7 @@ class HybridSyncProcessorService
      *
      * @param  class-string<TModel>  $modelClass
      * @param  array<string, mixed>  $payload
-     * @param  array<int, array<string, mixed>>  $naturalMatchers
+     * @param  array<int, array<string, mixed>|callable>  $naturalMatchers
      */
     protected function resolveForeignId(
         string $modelClass,
@@ -333,25 +333,35 @@ class HybridSyncProcessorService
         }
 
         foreach ($naturalMatchers as $matcher) {
-            if ($matcher === []) {
-                continue;
-            }
-
             $query = $baseQuery();
-            $valid = true;
-            foreach ($matcher as $col => $val) {
-                if ($val === null || $val === '') {
-                    $valid = false;
-                    break;
+
+            if (is_callable($matcher)) {
+                // Matcher closure menyusun WHERE sendiri; nilai false = tidak cocok.
+                if (! $matcher($query)) {
+                    continue;
                 }
-                $query->where($col, $val);
+            } else {
+                if ($matcher === []) {
+                    continue;
+                }
+
+                $valid = true;
+                foreach ($matcher as $col => $val) {
+                    if ($val === null || $val === '') {
+                        $valid = false;
+                        break;
+                    }
+                    $query->where($col, $val);
+                }
+
+                if (! $valid) {
+                    continue;
+                }
             }
 
-            if ($valid) {
-                $id = $query->value('id');
-                if ($id) {
-                    return (int) $id;
-                }
+            $id = $query->value('id');
+            if ($id) {
+                return (int) $id;
             }
         }
 
