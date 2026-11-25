@@ -1505,10 +1505,11 @@
                                             <div>
                                                 <label class="block text-xs font-semibold text-ink-300 mb-1">Ukuran QR Code (modul)</label>
                                                 <select wire:model.live="strukForm.qr_size" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900">
-                                                    <option value="2">Paling kecil (2) — ~24px</option>
-                                                    <option value="3">Kecil (3) — ~36px, direkomendasikan</option>
+                                                    <option value="3">Kecil (3) — ~36px</option>
+                                                    <option value="4">Sedang (4) — ~48px, direkomendasikan</option>
+                                                    <option value="5">Besar (5) — ~60px</option>
                                                 </select>
-                                                <p class="text-[11px] text-ink-300 mt-1">Ukuran modul printer. Maksimal modul 3 dipakai agar kertas lebih hemat.</p>
+                                                <p class="text-[11px] text-ink-300 mt-1">Ukuran modul printer. Pilih lebih besar bila QR kurang terbaca.</p>
                                             </div>
                                         </div>
                                     @endif

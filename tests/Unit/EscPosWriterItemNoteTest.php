@@ -64,9 +64,9 @@ class EscPosWriterItemNoteTest extends TestCase
 
         $output = $writer->receipt($data);
 
-        // Inline strikethrough discount on same row: harga normal diapit ESC B (strikethrough)
+        // Harga lama ditandai reverse print (GS B), bukan ESC B.
         $this->assertStringContainsString('1 PCS x ', $output);
-        $this->assertStringContainsString("\x1b\x42\x01".'Rp 125.000'."\x1b\x42\x00", $output);
+        $this->assertStringContainsString("\x1d\x42\x01".'Rp 125.000'."\x1d\x42\x00", $output);
         $this->assertStringContainsString('Rp 110.000', $output);
         $this->assertStringContainsString('BAYAR (TUNAI):', $output);
         $this->assertStringContainsString('Garansi: 3 Hari Toko (s/d 16/11/2026)', $output);

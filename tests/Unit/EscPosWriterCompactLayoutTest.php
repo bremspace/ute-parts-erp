@@ -15,9 +15,10 @@ class EscPosWriterCompactLayoutTest extends TestCase
         $this->assertSame(2, EscPosWriter::normalizeQrSize(1));
         $this->assertSame(4, EscPosWriter::normalizeQrSize(null));
 
-        // Ukuran efektif struk selalu dibatasi maksimal modul 3.
-        $this->assertSame(3, EscPosWriter::effectiveQrSize(80));
-        $this->assertSame(3, EscPosWriter::effectiveQrSize(4));
+        // Ukuran efektif mengikuti ukuran QR yang dipilih (default modul 4).
+        $this->assertSame(4, EscPosWriter::effectiveQrSize(80));
+        $this->assertSame(4, EscPosWriter::effectiveQrSize(4));
+        $this->assertSame(3, EscPosWriter::effectiveQrSize(3));
         $this->assertSame(2, EscPosWriter::effectiveQrSize(2));
     }
 
@@ -27,6 +28,7 @@ class EscPosWriterCompactLayoutTest extends TestCase
 
         $output = $writer->receipt([
             'no_transaksi' => 'MP-C01-20261124-0001',
+            'nama_toko' => 'UTEParts',
             'alamat' => 'Jl. Veteran No. 12',
             'telepon' => '0812-3456',
             'website_medsos' => 'www.bremspace.com',
@@ -51,13 +53,14 @@ class EscPosWriterCompactLayoutTest extends TestCase
             'saldo_poin' => 0,
         ]);
 
-        // Header: alamat + nomor HP langsung, tanpa label Telp/WA.
+        // Header: nama toko besar (double width + height), alamat + nomor HP tanpa label.
+        $this->assertStringContainsString("\x1b\x45\x01\x1d\x21\x90UTEParts", $output);
         $this->assertStringContainsString('Jl. Veteran No. 12 - 0812-3456', $output);
         $this->assertStringNotContainsString('Telp/WA:', $output);
 
-        // QR native dipusatkan, ukuran modul 3 (lebih kecil).
+        // QR native ukuran penuh (modul 4), ada jarak setelah QR.
         $this->assertStringContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
-        $this->assertStringContainsString("\x1d\x28\x6b\x03\x00\x31\x43\x03", $output);
+        $this->assertStringContainsString("\x1d\x28\x6b\x03\x00\x31\x43\x04", $output);
         $this->assertStringNotContainsString("\x1b\x2a\x00", $output);
         $this->assertStringContainsString('No. TRX:', $output);
         $this->assertStringContainsString('MP-C01-20261124-0001', $output);
@@ -65,13 +68,12 @@ class EscPosWriterCompactLayoutTest extends TestCase
         // Web dihapus, tanggal tetap ada; caption QR dan saldo poin 0 kembali seperti Opsi B.
         $this->assertStringNotContainsString('Web:', $output);
         $this->assertStringContainsString('Tgl: 24-11-2026', $output);
-        $this->assertStringContainsString('Scan QR ini untuk retur & klaim garansi', $output);
+        $this->assertStringContainsString("\nScan QR ini untuk retur & klaim garansi\n", $output);
         $this->assertStringContainsString('Sisa Saldo Poin:', $output);
 
-        // TOTAL sejajar satu baris, bold + double-strike, tanpa sizeDoubleHeight.
+        // TOTAL lebih besar (double width), bold, ringkas satu baris.
         $this->assertStringNotContainsString("\x1d\x21\x10TOTAL:", $output);
-        $this->assertStringContainsString("\x1b\x45\x01\x1b\x47\x01TOTAL:", $output);
-        $this->assertMatchesRegularExpression('/TOTAL: +Rp 13\.000/', $output);
+        $this->assertStringContainsString("\x1b\x45\x01\x1d\x21\x80TOTAL: Rp 13.000", $output);
 
         // Footer tetap terbawa, margin bawah dipepet (tanpa baris kosong sebelum cut).
         $this->assertStringContainsString('Terima kasih atas kunjungan Anda!', $output);
