@@ -196,7 +196,7 @@ class EscPosWriter
             $hargaJual = (float) ($item['harga'] ?? 0);
 
             if ($hargaRetail > $hargaJual && in_array($strikethroughMode, ['esc_b', 'reverse'], true)) {
-                // Harga lama dicoret tengah dengan overprint hyphen, tanpa bold/reverse.
+                // Harga lama diberi garis (underline) tanpa bold/reverse.
                 $normal = $this->money($hargaRetail);
                 $disc = $this->money($hargaJual);
                 $prefix = "{$qtySatuan} x ";
@@ -204,16 +204,14 @@ class EscPosWriter
 
                 if ($totalLineLen >= $this->columns) {
                     $this->raw($prefix);
-                    $this->raw($normal);
-                    $this->cr()->raw(str_repeat(' ', strlen($prefix)).str_repeat('-', strlen($normal)));
+                    $this->underline(true)->raw($normal)->underline(false);
                     $this->raw(' '.$disc."\n");
                     $padRight = max(0, $this->columns - strlen($rightVal));
                     $this->raw(str_repeat(' ', $padRight).$rightVal."\n");
                 } else {
                     $gap = $this->columns - $totalLineLen;
                     $this->raw($prefix);
-                    $this->raw($normal);
-                    $this->cr()->raw(str_repeat(' ', strlen($prefix)).str_repeat('-', strlen($normal)));
+                    $this->underline(true)->raw($normal)->underline(false);
                     $this->raw(' '.$disc);
                     $this->raw(str_repeat(' ', $gap).$rightVal."\n");
                 }
@@ -380,10 +378,10 @@ class EscPosWriter
         return self::normalizeQrSize($value);
     }
 
-    /** CR — kembali ke awal baris tanpa feed, dipakai untuk overprint coret tengah. */
-    private function cr(): self
+    /** ESC - n — underline. Printer RPP02 tidak mendukung coret tengah/overprint. */
+    private function underline(bool $on): self
     {
-        $this->buf .= "\x0d";
+        $this->buf .= "\x1b\x2d".chr($on ? 1 : 0);
 
         return $this;
     }
