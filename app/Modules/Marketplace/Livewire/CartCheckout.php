@@ -9,10 +9,28 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Produk;
+use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
+/**
+ * @property-read array<string, array<string, mixed>> $cart
+ * @property-read float $subtotal
+ * @property-read float $subtotalRetail
+ * @property-read float $diskonTier
+ * @property-read float $potensiKomisi
+ * @property-read array<string, mixed> $partaiInfo
+ * @property-read float $diskonPartai
+ * @property-read int $jumlahItem
+ * @property-read array<string, array<string, mixed>> $hargaTampilan
+ * @property-read float $potonganKemasan
+ * @property-read float $potonganMember
+ * @property-read array<int, array<string, mixed>> $rekomendasi
+ * @property-read array<int, array<string, mixed>> $cartSearchSuggestions
+ * @property-read Collection<int, Cabang> $cabangs
+ * @property-read array<string, mixed> $pajakPreview
+ */
 class CartCheckout extends Component
 {
     public string $mode = 'cart'; // cart | checkout
@@ -193,7 +211,7 @@ class CartCheckout extends Component
                     'nama' => $p->nama,
                     'sku' => $p->sku,
                     'gambar' => $p->thumbnail_url ?: $p->gambar,
-                    'harga' => (float) ($price['harga'] ?? $p->harga_jual_retail ?? 0),
+                    'harga' => (float) $price['harga'],
                     'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
                 ];
             })

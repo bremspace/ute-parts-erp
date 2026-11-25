@@ -9,6 +9,7 @@ use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use App\Modules\Wms\Services\SmartSearchService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -349,11 +350,17 @@ class Produk extends Model
         return $this->belongsTo(Brand::class);
     }
 
+    /**
+     * @return BelongsTo<KualitasProduk, $this>
+     */
     public function kualitas(): BelongsTo
     {
         return $this->belongsTo(KualitasProduk::class, 'kualitas_id');
     }
 
+    /**
+     * @return BelongsTo<KategoriProduk, $this>
+     */
     public function kategoriRelasi(): BelongsTo
     {
         return $this->belongsTo(KategoriProduk::class, 'kategori_id');
@@ -384,6 +391,9 @@ class Produk extends Model
         )->withPivot('catatan')->withTimestamps();
     }
 
+    /**
+     * @return BelongsToMany<TipeHp, $this>
+     */
     public function tipeHps(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -398,7 +408,7 @@ class Produk extends Model
      * Daftar tipe HP kompatibel yang terformat rapi ({Merk} {Model}).
      * Selaras antara Master Produk, POS Kasir, dan Katalog Online.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, covariant string>
      */
     public function getDaftarKompatibelAttribute(): Collection
     {
@@ -816,7 +826,11 @@ class Produk extends Model
      * Urutkan murni oleh jumlah terjual dengan alias yang tersedia.
      * Dipakai filter "Terlaris" agar tidak ORDER BY kolom yang belum di-select.
      */
-    public function scopeUrutTerlaris($query)
+    /**
+     * @param  Builder<Produk>  $query
+     * @return Builder<Produk>
+     */
+    public function scopeUrutTerlaris(Builder $query): Builder
     {
         $terjualSubquery = TransaksiItem::query()
             ->selectRaw('COALESCE(SUM(transaksi_item.jumlah), 0)')

@@ -24,6 +24,28 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
+/**
+ * @property-read string|null $activeCategoryName
+ * @property-read array<string, mixed> $facetedOptions
+ * @property-read array<int, mixed> $kualitasList
+ * @property-read mixed $categories
+ * @property-read array<int, string> $hpMerkList
+ * @property-read array<int, string> $hpModelList
+ * @property-read mixed $brands
+ * @property-read bool $lazyLoadEnabled
+ * @property-read bool $infiniteScrollEnabled
+ * @property-read int $catalogPerPage
+ * @property-read string|null $fotoDefault
+ * @property-read mixed $products
+ * @property-read Produk|null $productDetail
+ * @property-read array<string, mixed> $stokSummary
+ * @property-read array<int, mixed> $stokPerCabang
+ * @property-read array<int, mixed> $stokPerVariant
+ * @property-read int $stokTotal
+ * @property-read array<string, mixed> $hargaInfo
+ * @property-read Collection<int, array<string, mixed>> $searchSuggestions
+ * @property-read bool $searchSuggestionsHasMore
+ */
 class ShopPage extends Component
 {
     use WithPagination;
@@ -215,7 +237,7 @@ class ShopPage extends Component
         return ucwords(str_replace(['-', '_'], ' ', $this->filterKategori));
     }
 
-    public function updated($propertyName, $value): void
+    public function updated(string $propertyName, mixed $value): void
     {
         $filterProps = [
             'search', 'filterKategori', 'filterKondisi', 'filterBrand',
@@ -564,7 +586,7 @@ class ShopPage extends Component
         $rows = $rows->limit($this->suggestionLimit + 1)->get();
 
         $hasMore = $rows->count() > $this->suggestionLimit;
-        $rows = $rows->take($this->suggestionLimit)->map(function (Produk $p) {
+        $rows = $rows->take($this->suggestionLimit)->toBase()->map(function (Produk $p) {
             $price = app(PricingService::class)->resolve($p, auth('customer')->user());
             $kompatibel = $p->daftarKompatibel;
             $fit = $kompatibel->join(', ');
@@ -579,7 +601,7 @@ class ShopPage extends Component
                 'sku' => $p->sku,
                 'slug' => $p->slug,
                 'gambar' => $p->thumbnail_url ?: $p->gambar ?: $this->fotoDefault,
-                'harga' => (float) ($price['harga'] ?? $p->harga_jual_retail ?? 0),
+                'harga' => (float) $price['harga'],
                 'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
                 'kategori' => (string) ($p->kategori ?: $p->kategoriRelasi?->nama ?: ''),
                 'kompatibel' => $fit,

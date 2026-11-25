@@ -271,7 +271,7 @@ class CartService
         }
         $hargaSatuanPilihPerSatuan = round($hargaSatuanPilih * $faktorKonversi, 2);
         $hargaEfektif = $hargaSatuanPilih;
-        if ($sisaPcs > 0 && $qtySatuan > 0) {
+        if ($sisaPcs > 0) {
             $hargaEfektif = round((($qtySatuan * $hargaSatuanPilihPerSatuan) + ($sisaPcs * $hargaRetail)) / max(1, $newQty), 2);
         }
 

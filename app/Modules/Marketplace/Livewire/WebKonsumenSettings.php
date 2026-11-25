@@ -36,7 +36,7 @@ class WebKonsumenSettings extends Component
 
     public $uploadHeroBg = null;
 
-    public $uploadDefaultProductPhoto = null;
+    public mixed $uploadDefaultProductPhoto = null;
 
     public $uploadBannerDesktop = null;
 

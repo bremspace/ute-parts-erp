@@ -23,6 +23,15 @@ use Livewire\WithFileUploads;
  * serta manajemen profil konsumen (ganti username, profil picture, & password).
  *
  * @property-read Collection<int, PelangganDeviceSession> $perangkat
+ * @property-read Transaksi|null $selectedOrder
+ * @property-read array<int, array<string, mixed>> $orderHargaTampilan
+ * @property-read mixed $orders
+ * @property-read mixed $notifikasi
+ * @property-read mixed $servis
+ * @property-read mixed $komisi
+ * @property-read mixed $downlines
+ * @property-read mixed $tiers
+ * @property-read array<string, mixed> $membershipInfo
  */
 class CustomerAccount extends Component
 {

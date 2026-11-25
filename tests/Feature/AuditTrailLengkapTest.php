@@ -277,8 +277,8 @@ class AuditTrailLengkapTest extends TestCase
             tanggal: now(),
             sumber: 'pembelian',
             lines: [
-                ['akun_kode' => '130-01', 'debit' => 100000, 'kredit' => 0],
-                ['akun_kode' => '510-02', 'debit' => 0, 'kredit' => 0],
+                ['akun_kode' => '130-01', 'debit' => 50000, 'kredit' => 0],
+                ['akun_kode' => '510-02', 'debit' => 50000, 'kredit' => 0],
                 ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => 100000],
             ],
             deskripsi: 'Pembelian 3 baris',
