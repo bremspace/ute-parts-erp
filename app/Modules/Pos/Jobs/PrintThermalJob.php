@@ -124,7 +124,7 @@ class PrintThermalJob implements ShouldQueue
             'show_waktu' => $strukConfig['show_waktu'] ?? true,
             'show_subtotal_breakdown' => $strukConfig['show_subtotal_breakdown'] ?? true,
             'show_qr_retur' => $strukConfig['show_qr_retur'] ?? true,
-            'qr_caption' => $strukConfig['qr_caption'] ?? '',
+            'qr_caption' => $strukConfig['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi',
             'qr_size' => EscPosWriter::normalizeQrSize($strukConfig['qr_size'] ?? 4),
             'qr_url' => $strukConfig['website_medsos'] ?? 'www.bremspace.com',
 

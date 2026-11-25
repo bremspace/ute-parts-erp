@@ -335,7 +335,7 @@ class ThermalPrintReceiptOptimizationTest extends TestCase
         // Opsi B: alamat + telepon digabung; bila kepanjangan, label telepon dipangkas.
         $this->assertStringContainsString('Jl. Cempaka No. 88 | 0877-1234-5678', $output);
         $this->assertStringContainsString('Cabang Sukabumi', $output);
-        $this->assertStringContainsString('Web: www.tokoberkah.com', $output);
+        $this->assertStringNotContainsString('Web:', $output);
         $this->assertStringContainsString('Barang yang dibeli tidak dapat ditukar', $output);
         $this->assertStringContainsString('Maksimal 3 hari kerja | Wajib bawa nota', $output);
         // Karena show_qr_retur = false, QR bytes dan caption QR tidak boleh dicetak
