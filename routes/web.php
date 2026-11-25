@@ -438,10 +438,8 @@ Route::post('/login-pelanggan', function (Request $request) {
         );
         session(['customer_device_token' => $deviceToken]);
 
-        $cart = session()->get('shop.cart', []);
-        $fallback = ! empty($cart) ? '/checkout' : '/shop';
-
-        return redirect()->intended($fallback);
+        // Setelah login, konsumen langsung diarahkan ke dashboard akunnya.
+        return redirect()->route('customer.account');
     }
 
     // Diagnosa kegagalan: akun yang belum pernah mendapat kata sandi tidak akan
