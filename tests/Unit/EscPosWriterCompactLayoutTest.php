@@ -43,21 +43,29 @@ class EscPosWriterCompactLayoutTest extends TestCase
             'bayar' => 13000,
             'kembali' => 0,
             'metode_bayar' => 'MENUNGGU',
+            'saldo_poin' => 0,
         ]);
 
         // Alamat + telepon digabung dalam satu baris.
         $this->assertStringContainsString('Jl. Veteran No. 12 - Telp/WA: 0812-3456', $output);
 
-        // QR memakai module size 4 (bukan 8 dari nilai lama 80).
-        $this->assertStringContainsString("\x1d\x28\x6b\x03\x00\x31\x43\x04", $output);
+        // QR + No. TRX digambar sebagai bit-image ESC * 0, label No. TRX dihapus.
+        $this->assertStringContainsString("\x1b\x2a\x00", $output);
+        $this->assertStringNotContainsString('No. TRX:', $output);
+        $this->assertStringNotContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
 
-        // Web + tanggal digabung, caption QR ikut baris footer (bukan blok besar di header).
+        // Web + tanggal digabung; caption QR dan saldo poin 0 tidak dicetak.
         $this->assertStringContainsString('Web: www.bremspace.com | Tgl: 24-11-2026', $output);
-        $this->assertStringContainsString("Terima kasih atas kunjungan Anda!\nScan QR ini untuk retur & klaim garansi", $output);
-        $this->assertStringNotContainsString("\x1b\x61\x01Scan QR ini untuk retur & klaim garansi\n", $output);
+        $this->assertStringNotContainsString('Scan QR ini untuk retur & klaim garansi', $output);
+        $this->assertStringNotContainsString('Sisa Saldo Poin:', $output);
 
-        // Footer padat masih terbawa.
+        // TOTAL satu baris, tanpa sizeDoubleHeight.
+        $this->assertStringNotContainsString("\x1d\x21\x10TOTAL:", $output);
+        $this->assertMatchesRegularExpression('/TOTAL: +Rp 13\.000/', $output);
+
+        // Footer padat masih terbawa, tanpa feed kosong sebelum cut.
         $this->assertStringContainsString('Terima kasih atas kunjungan Anda!', $output);
         $this->assertStringContainsString('BAYAR (MENUNGGU):', $output);
+        $this->assertStringNotContainsString("\n\n\x1d\x56\x42\x00", $output);
     }
 }
