@@ -110,16 +110,17 @@ class EscPosWriter
         }
         $this->rule();
 
-        // ========== QR + TRANSAKSI — QR kecil menyatu dengan blok No. TRX ==========
-        $this->alignLeft();
+        // ========== QR + TRANSAKSI — QR dipusatkan dan diperkecil ==========
+        $this->alignCenter();
         $noTrx = $data['no_transaksi'] ?? '-';
         $qrCaption = $data['qr_caption'] ?? '';
         $tglStr = $data['tanggal'] ?? $data['waktu'] ?? '';
         $qrShown = ($data['show_qr_retur'] ?? true) && ! empty($noTrx) && $noTrx !== '-';
 
         if ($qrShown) {
-            $this->qrcode($noTrx, self::normalizeQrSize($data['qr_size'] ?? 4));
+            $this->qrcode($noTrx, self::effectiveQrSize($data['qr_size'] ?? 3));
         }
+        $this->alignLeft();
 
         if (! empty($data['label_struk'])) {
             $this->alignCenter();
@@ -266,8 +267,10 @@ class EscPosWriter
             $this->text($this->pad('Ongkir:', '+'.$this->money($data['ongkir'])));
         }
 
-        // Total sejajar dalam satu baris (bold, tinggi normal).
-        $this->bold(true)->text($this->pad('TOTAL:', $this->money($data['total'])))->bold(false);
+        // TOTAL sejajar satu baris, ditebalkan (bold + double-strike).
+        $this->bold(true)->doubleStrike(true)
+            ->text($this->pad('TOTAL:', $this->money($data['total'])))
+            ->doubleStrike(false)->bold(false);
 
         if (! empty($data['is_piutang'])) {
             $this->text($this->pad('Status:', 'BELUM LUNAS (PIUTANG)'));
@@ -334,8 +337,8 @@ class EscPosWriter
             $this->text('(............)        (............)');
         }
 
-        // Minimal feed then cut (paper-saving)
-        $this->feed(1)->cut();
+        // Margin bawah dipepet: potong langsung setelah baris terakhir.
+        $this->feed(0)->cut();
 
         return $this->buf;
     }
@@ -360,6 +363,12 @@ class EscPosWriter
         }
 
         return max(2, min(8, $n));
+    }
+
+    /** Ukuran QR efektif yang dipakai struk: dibatasi maksimal modul 3 agar lebih ringkas. */
+    public static function effectiveQrSize(mixed $value): int
+    {
+        return min(3, self::normalizeQrSize($value));
     }
 
     /** ESC/POS standard Model 2 QR Code. */
@@ -418,6 +427,14 @@ class EscPosWriter
     private function bold(bool $on): self
     {
         $this->buf .= "\x1b\x45".chr($on ? 1 : 0);
+
+        return $this;
+    }
+
+    /** ESC G n — double-strike, membuat huruf lebih tebal pada printer thermal. */
+    private function doubleStrike(bool $on): self
+    {
+        $this->buf .= "\x1b\x47".chr($on ? 1 : 0);
 
         return $this;
     }
@@ -488,13 +505,10 @@ class EscPosWriter
         return $left.str_repeat(' ', $pad).$right;
     }
 
-    /** Baris kontak toko: verbose bila muat, jika tidak pakai versi pendek tanpa label telepon. */
+    /** Baris kontak toko: alamat + nomor HP langsung, tanpa label "Telp/WA:". */
     private function contactLine(?string $alamat, ?string $telepon): string
     {
-        $verbose = implode(' - ', array_filter([
-            $alamat,
-            ! empty($telepon) ? 'Telp/WA: '.$telepon : null,
-        ]));
+        $verbose = implode(' - ', array_filter([$alamat, $telepon]));
 
         if (strlen($verbose) <= $this->columns) {
             return $verbose;

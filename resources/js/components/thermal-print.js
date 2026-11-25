@@ -31,6 +31,9 @@ class EscPos {
 
   // --- Font styling ---
   bold(on) { this.buf.push(0x1b, 0x45, on ? 1 : 0); return this; }
+
+  /** ESC G n — double-strike, huruf lebih tebal di printer thermal. */
+  doubleStrike(on) { this.buf.push(0x1b, 0x47, on ? 1 : 0); return this; }
   size(n) { this.buf.push(0x1d, 0x21, n); return this; }
   sizeDoubleWidth(on) { this.size(on ? 0x80 : 0x00); return this; }
   sizeDoubleHeight(on) { this.size(on ? 0x10 : 0x00); return this; }
@@ -57,6 +60,11 @@ class EscPos {
     if (!Number.isFinite(n) || n <= 0) return 4;
     if (n > 8) return 4;
     return Math.max(2, Math.min(8, Math.round(n)));
+  }
+
+  /** Ukuran QR efektif struk: dibatasi maksimal modul 3 agar lebih ringkas. */
+  effectiveQrSize(value) {
+    return Math.min(3, this.normalizeQrSize(value));
   }
 
   /** Model 2 QR Code — mirrors PHP EscPosWriter::qrcode() */
@@ -158,9 +166,9 @@ class EscPos {
       .replace(/[^\x20-\x7E]/g, '');
   }
 
-  /** Baris kontak toko: verbose bila muat, jika tidak pakai versi pendek tanpa label telepon. */
+  /** Baris kontak toko: alamat + nomor HP langsung, tanpa label "Telp/WA:". */
   contactLine(alamat, telepon) {
-    const verbose = [alamat, telepon ? 'Telp/WA: ' + telepon : '']
+    const verbose = [alamat, telepon]
       .filter(Boolean)
       .join(' - ');
     if (verbose.length <= this.columns) return verbose;
@@ -237,15 +245,16 @@ class EscPos {
     if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) this.text(cabang);
     this.rule();
 
-    // ======== QR + TRANSAKSI — QR kecil menyatu dengan blok No. TRX ========
-    this.alignLeft();
+    // ======== QR + TRANSAKSI — QR dipusatkan dan diperkecil ========
+    this.alignCenter();
     const qrContent = no_transaksi || '-';
     const tglStr = tanggal || waktu || '';
     const captionStr = qr_caption || '';
 
     if (qrShown) {
-      this.qrcode(qrContent, this.normalizeQrSize(qr_size));
+      this.qrcode(qrContent, this.effectiveQrSize(qr_size));
     }
+    this.alignLeft();
 
     if (label_struk) {
       this.alignCenter();
@@ -377,8 +386,10 @@ class EscPos {
       this.text(this.pad('Ongkir:', '+' + this.money(ongkir)));
     }
 
-    // Total sejajar dalam satu baris (bold, tinggi normal).
-    this.bold(true).text(this.pad('TOTAL:', this.money(total))).bold(false);
+    // TOTAL sejajar satu baris, ditebalkan (bold + double-strike).
+    this.bold(true).doubleStrike(true)
+      .text(this.pad('TOTAL:', this.money(total)))
+      .doubleStrike(false).bold(false);
 
     if (is_piutang) {
       this.text(this.pad('Status:', 'BELUM LUNAS (PIUTANG)'));
@@ -439,7 +450,8 @@ class EscPos {
       this.text('(............)        (............)');
     }
 
-    this.feed(1).cut();
+    // Margin bawah dipepet: potong langsung setelah baris terakhir.
+    this.feed(0).cut();
 
     return new Uint8Array(this.buf);
   }
@@ -553,9 +565,9 @@ class EscPos {
     }
     html += line(rule);
 
-    // QR + TRANSAKSI — QR kecil di awal blok identitas (sejajar area No. TRX)
+    // QR + TRANSAKSI — QR dipusatkan, mengikuti buildReceipt().
     if (qrShown) {
-      html += lineHtml('<div style="display:inline-block;line-height:0;">' + (renderedQr || fallbackQr) + '</div>');
+      html += center('<div style="display:inline-block;line-height:0;">' + (renderedQr || fallbackQr) + '</div>');
     }
 
     // TRANSAKSI — sama dengan buildReceipt()

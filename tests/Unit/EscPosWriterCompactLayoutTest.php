@@ -14,6 +14,11 @@ class EscPosWriterCompactLayoutTest extends TestCase
         $this->assertSame(3, EscPosWriter::normalizeQrSize(3));
         $this->assertSame(2, EscPosWriter::normalizeQrSize(1));
         $this->assertSame(4, EscPosWriter::normalizeQrSize(null));
+
+        // Ukuran efektif struk selalu dibatasi maksimal modul 3.
+        $this->assertSame(3, EscPosWriter::effectiveQrSize(80));
+        $this->assertSame(3, EscPosWriter::effectiveQrSize(4));
+        $this->assertSame(2, EscPosWriter::effectiveQrSize(2));
     }
 
     public function test_struk_memakai_layout_padat_opsi_b(): void
@@ -46,12 +51,13 @@ class EscPosWriterCompactLayoutTest extends TestCase
             'saldo_poin' => 0,
         ]);
 
-        // Alamat + telepon digabung dalam satu baris.
-        $this->assertStringContainsString('Jl. Veteran No. 12 - Telp/WA: 0812-3456', $output);
+        // Header: alamat + nomor HP langsung, tanpa label Telp/WA.
+        $this->assertStringContainsString('Jl. Veteran No. 12 - 0812-3456', $output);
+        $this->assertStringNotContainsString('Telp/WA:', $output);
 
-        // QR native sesuai Opsi B, tanpa bit-image.
+        // QR native dipusatkan, ukuran modul 3 (lebih kecil).
         $this->assertStringContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
-        $this->assertStringContainsString("\x1d\x28\x6b\x03\x00\x31\x43\x04", $output);
+        $this->assertStringContainsString("\x1d\x28\x6b\x03\x00\x31\x43\x03", $output);
         $this->assertStringNotContainsString("\x1b\x2a\x00", $output);
         $this->assertStringContainsString('No. TRX:', $output);
         $this->assertStringContainsString('MP-C01-20261124-0001', $output);
@@ -62,13 +68,14 @@ class EscPosWriterCompactLayoutTest extends TestCase
         $this->assertStringContainsString('Scan QR ini untuk retur & klaim garansi', $output);
         $this->assertStringContainsString('Sisa Saldo Poin:', $output);
 
-        // TOTAL sejajar satu baris, tanpa sizeDoubleHeight.
+        // TOTAL sejajar satu baris, bold + double-strike, tanpa sizeDoubleHeight.
         $this->assertStringNotContainsString("\x1d\x21\x10TOTAL:", $output);
+        $this->assertStringContainsString("\x1b\x45\x01\x1b\x47\x01TOTAL:", $output);
         $this->assertMatchesRegularExpression('/TOTAL: +Rp 13\.000/', $output);
 
-        // Footer Opsi B tetap terbawa dengan feed satu baris sebelum cut.
+        // Footer tetap terbawa, margin bawah dipepet (tanpa baris kosong sebelum cut).
         $this->assertStringContainsString('Terima kasih atas kunjungan Anda!', $output);
         $this->assertStringContainsString('BAYAR (MENUNGGU):', $output);
-        $this->assertStringContainsString("\n\x1d\x56\x42\x00", $output);
+        $this->assertStringNotContainsString("\n\n\x1d\x56\x42\x00", $output);
     }
 }
