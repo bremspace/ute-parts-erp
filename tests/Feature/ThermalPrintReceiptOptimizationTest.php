@@ -293,9 +293,11 @@ class ThermalPrintReceiptOptimizationTest extends TestCase
         $this->assertStringContainsString('iPhone 13 Pro', $output);
         $this->assertStringContainsString('[Jasa] Ganti LCD', $output);
         $this->assertStringContainsString('[Part] LCD Original OLED', $output);
-        // QR Code ESC/POS header Model 2
+        // QR Code ESC/POS Model 2, ukuran modul ringkas (Opsi B).
         $this->assertStringContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
-        $this->assertStringContainsString('Scan QR ini untuk retur & klaim garansi', $output);
+        $this->assertStringContainsString("\x1d\x28\x6b\x03\x00\x31\x43\x04", $output);
+        // Caption QR tidak lagi memakan baris tersendiri di header.
+        $this->assertStringNotContainsString('Scan QR ini untuk retur & klaim garansi', $output);
     }
 
     public function test_escpos_writer_respects_custom_template_struk_settings(): void
@@ -329,12 +331,12 @@ class ThermalPrintReceiptOptimizationTest extends TestCase
         $this->assertStringContainsString('TOKO SPAREPART BERKAH', $output);
         $this->assertStringContainsString('Cepat & Terpercaya', $output);
         $this->assertStringContainsString('Jl. Cempaka No. 88', $output);
-        $this->assertStringContainsString('Telp/WA: 0877-1234-5678', $output);
+        // Opsi B: alamat + telepon digabung; bila kepanjangan, label telepon dipangkas.
+        $this->assertStringContainsString('Jl. Cempaka No. 88 | 0877-1234-5678', $output);
         $this->assertStringContainsString('Cabang Sukabumi', $output);
         $this->assertStringContainsString('Web: www.tokoberkah.com', $output);
         $this->assertStringContainsString('Barang yang dibeli tidak dapat ditukar', $output);
-        $this->assertStringContainsString('Maksimal 3 hari kerja', $output);
-        $this->assertStringContainsString('Wajib bawa nota fisik', $output);
+        $this->assertStringContainsString('Maksimal 3 hari kerja | Wajib bawa nota', $output);
         // Karena show_qr_retur = false, QR bytes dan caption QR tidak boleh dicetak
         $this->assertStringNotContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);
         $this->assertStringNotContainsString('Scan QR ini untuk retur', $output);
