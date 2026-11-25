@@ -153,6 +153,23 @@ class EscPos {
   /** Angka mentah tanpa "Rp" — dipakai kolom kanan baris item (senilai contoh pengaturan). */
   numberOnly(v) { return Number(v || 0).toLocaleString('id-ID'); }
 
+  /** Persentase diskon partai: utamakan nilai settingan, fallback dari diskon/subtotal. */
+  diskonPartaiPersen(override, diskon, subtotal) {
+    diskon = Number(diskon || 0);
+    subtotal = Number(subtotal || 0);
+    if (diskon <= 0) return null;
+    if (Number.isFinite(Number(override)) && Number(override) > 0) {
+      return Math.round(Number(override) * 100) / 100;
+    }
+    if (subtotal <= 0) return null;
+    return Math.round((diskon / subtotal) * 10000) / 100;
+  }
+
+  formatPersen(persen) {
+    if (persen === null) return '';
+    return String(persen).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+  }
+
   /** Satuan singkat (pcs/box/set) ditampilkan UPPERCASE agar padan dengan contoh struk. */
   unitLabel(satuan) {
     const u = this.clean(satuan || 'PCS');
@@ -287,7 +304,7 @@ class EscPos {
       total = 0, bayar = 0, kembali = 0,
       no_transaksi = '-', metode_bayar = 'TUNAI', metode = 'TUNAI', tanggal, waktu, kasir, cabang,
       pelanggan, tier, tipe_konsumen, saldo_poin, poin_ditukar,
-      diskon_tier, diskon_partai, diskon_poin, diskon, diskon_persen, diskon_nominal, diskon_box,
+      diskon_tier, diskon_partai, diskon_partai_persen, diskon_poin, diskon, diskon_persen, diskon_nominal, diskon_box,
       pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
       is_piutang, jatuh_tempo, sisa_piutang, komisi_mitra_nominal,
       no_tiket, jenis_hp, kurir, is_pickup, resi, sumber,
@@ -468,7 +485,10 @@ class EscPos {
     }
 
     if (diskon_partai && Number(diskon_partai) > 0) {
-      this.text(this.pad('Diskon Partai:', '-' + this.money(diskon_partai)));
+      const persenPartai = this.diskonPartaiPersen(diskon_partai_persen, diskon_partai, subtotal);
+      const labelPartai = 'Diskon Partai:'
+        + (persenPartai !== null ? ' ' + this.formatPersen(persenPartai) + '%' : '');
+      this.text(this.pad(labelPartai, '-' + this.money(diskon_partai)));
     }
     if (diskon_poin && Number(diskon_poin) > 0) {
       this.text(this.pad('Tukar Poin (' + (poin_ditukar || 0) + 'pts):', '-' + this.money(diskon_poin)));
@@ -573,7 +593,7 @@ class EscPos {
       items = [], total = 0, bayar = 0, kembali = 0,
       no_transaksi = '-', metode_bayar = 'TUNAI', metode = 'TUNAI', tanggal, waktu, kasir, cabang,
       pelanggan, tier, tipe_konsumen, saldo_poin, poin_ditukar,
-      diskon_tier, diskon_partai, diskon_poin, diskon, diskon_persen, diskon_nominal, diskon_box,
+      diskon_tier, diskon_partai, diskon_partai_persen, diskon_poin, diskon, diskon_persen, diskon_nominal, diskon_box,
       pajak, ppn_persen, ongkir, subtotal, subtotal_retail, hemat_total,
       is_piutang, jatuh_tempo, sisa_piutang, komisi_mitra_nominal,
       no_tiket, jenis_hp, kurir, is_pickup, resi, sumber,
@@ -748,7 +768,12 @@ class EscPos {
       }
       if (diskon_box && Number(diskon_box) > 0) html += line(row('Diskon Box/Kemasan:', '-' + money(diskon_box)));
     }
-    if (diskon_partai && Number(diskon_partai) > 0) html += line(row('Diskon Partai:', '-' + money(diskon_partai)));
+    if (diskon_partai && Number(diskon_partai) > 0) {
+      const persenPartai = this.diskonPartaiPersen(diskon_partai_persen, diskon_partai, subtotal);
+      const labelPartai = 'Diskon Partai:'
+        + (persenPartai !== null ? ' ' + this.formatPersen(persenPartai) + '%' : '');
+      html += line(row(labelPartai, '-' + money(diskon_partai)));
+    }
     if (diskon_poin && Number(diskon_poin) > 0) html += line(row('Tukar Poin (' + (poin_ditukar || 0) + 'pts):', '-' + money(diskon_poin)));
     if (diskon && Number(diskon) > 0) {
       const lbl = (diskon_persen && Number(diskon_persen) > 0)

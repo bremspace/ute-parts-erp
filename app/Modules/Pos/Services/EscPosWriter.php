@@ -297,7 +297,13 @@ class EscPosWriter
         }
 
         if (! empty($data['diskon_partai']) && (float) $data['diskon_partai'] > 0) {
-            $this->text($this->pad('Diskon Partai:', '-'.$this->money($data['diskon_partai'])));
+            $persenPartai = self::diskonPartaiPersen(
+                $data['diskon_partai_persen'] ?? null,
+                $data['diskon_partai'],
+                $data['subtotal'] ?? 0
+            );
+            $labelPartai = 'Diskon Partai:'.($persenPartai !== null ? ' '.self::formatPersen($persenPartai).'%' : '');
+            $this->text($this->pad($labelPartai, '-'.$this->money($data['diskon_partai'])));
         }
 
         if (! empty($data['diskon_poin']) && (float) $data['diskon_poin'] > 0) {
@@ -389,6 +395,41 @@ class EscPosWriter
         $this->feed(0)->cut();
 
         return $this->buf;
+    }
+
+    /**
+     * Persentase diskon partai yang dipakai.
+     * Mengutamakan nilai persen eksplisit dari PartaiPricingService; bila tidak ada
+     * (mis. struk lama), diturunkan dari diskon/subtotal yang keduanya tersimpan.
+     */
+    public static function diskonPartaiPersen(mixed $override, mixed $diskon, mixed $subtotal): ?float
+    {
+        $diskon = (float) $diskon;
+        $subtotal = (float) $subtotal;
+
+        if ($diskon <= 0) {
+            return null;
+        }
+
+        if (is_numeric($override) && (float) $override > 0) {
+            return round((float) $override, 2);
+        }
+
+        if ($subtotal <= 0) {
+            return null;
+        }
+
+        return round(($diskon / $subtotal) * 100, 2);
+    }
+
+    /** Format persentase ringkas: 3 → "3", 3.5 → "3.5", 3.25 → "3.25". */
+    public static function formatPersen(?float $persen): string
+    {
+        if ($persen === null) {
+            return '';
+        }
+
+        return rtrim(rtrim(number_format($persen, 2, '.', ''), '0'), '.');
     }
 
     /**

@@ -90,15 +90,35 @@ class EscPosWriterItemNoteTest extends TestCase
                     'subtotal' => 1060000,
                 ],
             ],
-            'subtotal' => 1264500,
+            'subtotal' => 1284000,
             'diskon_partai' => 38520,
-            'total' => 1225980,
-            'bayar' => 1225980,
+            'total' => 1245480,
+            'bayar' => 1245480,
         ]);
 
-        // Faktor partai = 1 - 38.520/1.264.500 ≈ 0,96953.
-        // Harga 106.000 × faktor ≈ 102.771.
-        $this->assertStringContainsString('Harga Partai/PCS: Rp 102.771', $output);
-        $this->assertStringContainsString('Diskon Partai:', $output);
+        // Fallback: 38.520 / 1.284.000 = 3% sesuai settingan partai.
+        // Faktor partai = 0,97 → harga 106.000 jadi 102.820.
+        $this->assertStringContainsString('Harga Partai/PCS: Rp 102.820', $output);
+        $this->assertMatchesRegularExpression('/Diskon Partai: 3% +-Rp 38\.520/', $output);
+        $this->assertStringContainsString('-Rp 38.520', $output);
+    }
+
+    public function test_persen_diskon_partai_memakai_nilai_settingan_bila_tersedia(): void
+    {
+        $writer = new EscPosWriter;
+
+        $output = $writer->receipt([
+            'no_transaksi' => 'TRX-PARTAI-002',
+            'items' => [
+                ['nama' => 'ITEM', 'qty' => 1, 'satuan' => 'PCS', 'harga' => 100000, 'subtotal' => 100000],
+            ],
+            'subtotal' => 100000,
+            'diskon_partai' => 3500,
+            'diskon_partai_persen' => 3.5,
+            'total' => 96500,
+            'bayar' => 96500,
+        ]);
+
+        $this->assertMatchesRegularExpression('/Diskon Partai: 3\.5% +-Rp 3\.500/', $output);
     }
 }
