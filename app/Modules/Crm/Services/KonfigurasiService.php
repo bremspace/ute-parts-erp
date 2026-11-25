@@ -504,7 +504,7 @@ class KonfigurasiService
 
             // QR Code Faktur Retur & Garansi
             'show_qr_retur' => true,
-            'qr_size' => 80,
+            'qr_size' => 4,
             'qr_caption' => 'Scan QR ini untuk retur & klaim garansi',
 
             // Footer & Ketentuan
@@ -514,7 +514,7 @@ class KonfigurasiService
 
             // Format Cetak
             'default_width' => '80mm',
-            'font_size' => 'normal',
+            'font_size' => 'small',
             'auto_print' => false,
 
             // Thermal Printer Hardware

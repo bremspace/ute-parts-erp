@@ -1,5 +1,6 @@
 /**
- * Thermal Receipt Preview & Print — Paper-efficient layout matching UTEParts reference.
+ * Thermal Receipt Preview & Print — paper-efficient Opsi B layout.
+ * Header alamat+telepon digabung, QR kecil di blok No. TRX, footer padat.
  * EscPos class mirrors PHP EscPosWriter byte-for-byte for 1:1 preview=print parity.
  * Supports Web Bluetooth (auto-reconnect) and CUPS raw printing via backend.
  */
@@ -46,14 +47,26 @@ class EscPos {
 
   cut() { this.buf.push(0x1d, 0x56, 0x42, 0x00); return this; } // GS V B 0
 
+  /**
+   * Ukuran QR lama disimpan dalam "px" (40/60/80/100/150).
+   * Printer memakai module size 2..8, jadi nilai lama > 8 dinormalisasi ke 4
+   * (≈48px di preview) agar tetap scan-able namun hemat kertas.
+   */
+  normalizeQrSize(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return 4;
+    if (n > 8) return 4;
+    return Math.max(2, Math.min(8, Math.round(n)));
+  }
+
   /** Model 2 QR Code — mirrors PHP EscPosWriter::qrcode() */
-  qrcode(content, size = 3) {
+  qrcode(content, size = 4) {
     const d = this.ascii(content);
     if (!d || !d.length) return this;
     const len = d.length + 3;
     const pL = len & 0xff;
     const pH = (len >> 8) & 0xff;
-    const modSize = Math.max(2, Math.min(8, size));
+    const modSize = this.normalizeQrSize(size);
 
     // 1. Model 2: GS ( k 4 0 49 65 50 0
     this.buf.push(0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
@@ -145,6 +158,17 @@ class EscPos {
       .replace(/[^\x20-\x7E]/g, '');
   }
 
+  /** Baris kontak toko: verbose bila muat, jika tidak pakai versi pendek tanpa label telepon. */
+  contactLine(alamat, telepon) {
+    const verbose = [alamat, telepon ? 'Telp/WA: ' + telepon : '']
+      .filter(Boolean)
+      .join(' - ');
+    if (verbose.length <= this.columns) return verbose;
+
+    const compact = [alamat, telepon].filter(Boolean).join(' | ');
+    return compact.length <= this.columns ? compact : verbose;
+  }
+
   wrap(text) {
     const clean = this.clean(text);
     const lines = [];
@@ -201,37 +225,29 @@ class EscPos {
     const qrShown = Boolean(show_qr_retur && no_transaksi && no_transaksi !== '-');
     const tglVisible = Boolean(show_waktu && (tanggal || waktu));
 
-    // ======== HEADER (Centered) ========
+    // ======== HEADER — ringkas: alamat + telepon jadi satu baris ========
     this.alignCenter();
     this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'BREMSPACE').sizeDoubleWidth(false).bold(false);
-    this.text(slogan || 'Pusat Sparepart & Servis Gadget');
-    if (alamat) this.text(alamat);
-    if (telepon) this.text('Telp/WA: ' + telepon);
-    if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) this.text(cabang);
+    if (slogan) this.text(slogan);
 
-    // ======== 2-COL: QR (Left) + URL/Date/Warranty (Right) ========
+    const headerContact = this.contactLine(alamat, telepon);
+    for (const contactLine of this.wrap(headerContact)) {
+      this.text(contactLine);
+    }
+    if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) this.text(cabang);
+    this.rule();
+
+    // ======== QR + TRANSAKSI — QR kecil menyatu dengan blok No. TRX ========
+    this.alignLeft();
     const qrContent = no_transaksi || '-';
     const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
     const tglStr = tanggal || waktu || '';
-    const captionStr = qr_caption || 'Scan QR ini untuk retur & klaim garansi';
+    const captionStr = qr_caption || '';
 
     if (qrShown) {
-      this.alignCenter();
-      this.qrcode(qrContent, qr_size || 3);
-      this.bold(true).text(qrContent).bold(false);
-      if (captionStr) this.text(captionStr);
-
-      this.alignLeft();
-    } else {
-      this.alignLeft();
+      this.qrcode(qrContent, this.normalizeQrSize(qr_size));
     }
-    this.text('Web: ' + qrUrlDomain);
-    if (tglVisible) this.text('Tgl: ' + tglStr);
 
-    this.rule();
-
-    // ======== TRANSACTION INFO ========
-    this.alignLeft();
     if (label_struk) {
       this.alignCenter();
       this.bold(true).text(label_struk).bold(false);
@@ -273,6 +289,13 @@ class EscPos {
         this.bold(true).text(this.pad(lbl, tier)).bold(false);
       }
     }
+
+    // Web + tanggal digabung jadi satu baris ringkas.
+    const metaLine = [
+      qrUrlDomain ? 'Web: ' + qrUrlDomain : '',
+      tglVisible ? 'Tgl: ' + tglStr : '',
+    ].filter(Boolean).join(' | ');
+    if (metaLine) this.text(metaLine);
 
     // ======== ITEMS ========
     for (const item of items) {
@@ -397,16 +420,18 @@ class EscPos {
 
     this.rule();
 
-    // ======== FOOTER (Centered) ========
+    // ======== FOOTER — digabung jadi beberapa baris padat ========
     this.alignCenter();
-    if (garansi) this.text('Garansi: ' + garansi);
     if (footer_text) this.text(footer_text);
-    if (kebijakan_retur) this.text(kebijakan_retur);
 
-    if (catatan_kaki) {
-      for (const ln of this.wrap(catatan_kaki)) {
-        this.text(ln);
-      }
+    const footerInfo = [
+      qrShown && captionStr ? captionStr : '',
+      garansi ? 'Garansi: ' + garansi : '',
+      kebijakan_retur || '',
+      catatan_kaki || '',
+    ].filter(Boolean).join(' | ');
+    for (const ln of this.wrap(footerInfo)) {
+      this.text(ln);
     }
 
     if (is_piutang) {
@@ -480,6 +505,13 @@ class EscPos {
       this.columns = saved;
       return out;
     };
+    const contact = (a, t) => {
+      const saved = this.columns;
+      this.columns = cols;
+      const out = this.contactLine(a, t);
+      this.columns = saved;
+      return out;
+    };
     const rule = '-'.repeat(cols);
     const center = (v, style = '') => '<div style="text-align:center;white-space:pre-wrap;width:100%;' + style + '">' + v + '</div>';
     const line = (v = '', style = '') => '<div style="white-space:pre-wrap;width:100%;' + style + '">' + esc(v) + '</div>';
@@ -490,10 +522,10 @@ class EscPos {
     const qrContent = no_transaksi || '-';
     const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
     const tglStr = tanggal || waktu || '';
-    const captionStr = qr_caption || 'Scan QR ini untuk retur & klaim garansi';
+    const captionStr = qr_caption || '';
     const renderedQr = qr_svg || '';
 
-    const fallbackQr = `<svg width="68" height="68" viewBox="0 0 100 100" style="border:1px solid #d1d5db;background:#fff;">
+    const fallbackQr = `<svg width="48" height="48" viewBox="0 0 100 100" style="border:1px solid #d1d5db;background:#fff;">
       <rect width="100" height="100" fill="white"/>
       <rect x="10" y="10" width="25" height="25" fill="black"/>
       <rect x="15" y="15" width="15" height="15" fill="white"/>
@@ -515,21 +547,21 @@ class EscPos {
 
     // HEADER — sama dengan buildReceipt()
     html += center('<div style="font-weight:900;letter-spacing:.04em;">' + esc(nama_toko || 'BREMSPACE') + '</div>');
-    html += center('<div>' + esc(slogan || 'Pusat Sparepart & Servis Gadget') + '</div>');
-    if (alamat) html += center('<div>' + esc(alamat) + '</div>');
-    if (telepon) html += center('<div>Telp/WA: ' + esc(telepon) + '</div>');
+    if (slogan) html += center('<div>' + esc(slogan) + '</div>');
+
+    const headerContactText = contact(alamat, telepon);
+    for (const contactLine of wrap(headerContactText)) {
+      html += center('<div>' + esc(contactLine) + '</div>');
+    }
     if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) {
       html += center('<div>' + esc(cabang) + '</div>');
     }
-
-    if (qrShown) {
-      html += center('<div style="padding:4px 0;display:flex;justify-content:center;">' + (renderedQr || fallbackQr) + '</div>');
-      html += center('<div style="font-weight:800;">' + esc(qrContent) + '</div>');
-      if (captionStr) html += center('<div>' + esc(captionStr) + '</div>');
-    }
-    html += line('Web: ' + qrUrlDomain);
-    if (tglVisible) html += line('Tgl: ' + tglStr);
     html += line(rule);
+
+    // QR + TRANSAKSI — QR kecil di awal blok identitas (sejajar area No. TRX)
+    if (qrShown) {
+      html += lineHtml('<div style="display:inline-block;line-height:0;">' + (renderedQr || fallbackQr) + '</div>');
+    }
 
     // TRANSAKSI — sama dengan buildReceipt()
     if (label_struk) html += center('<div style="font-weight:800;">' + esc(label_struk) + '</div>');
@@ -551,6 +583,12 @@ class EscPos {
         html += line(row(lbl, tier));
       }
     }
+
+    const metaLineText = [
+      qrUrlDomain ? 'Web: ' + qrUrlDomain : '',
+      tglVisible ? 'Tgl: ' + tglStr : '',
+    ].filter(Boolean).join(' | ');
+    if (metaLineText) html += line(metaLineText);
 
     // ITEMS — sama dengan buildReceipt()
     for (const item of items) {
@@ -636,12 +674,16 @@ class EscPos {
 
     html += line(rule);
 
-    // FOOTER — sama dengan buildReceipt()
-    if (garansi) html += center('<div style="font-weight:800;">Garansi: ' + esc(garansi) + '</div>');
+    // FOOTER — digabung jadi beberapa baris padat, sama dengan buildReceipt()
     if (footer_text) html += center('<div>' + esc(footer_text) + '</div>');
-    if (kebijakan_retur) html += center('<div>' + esc(kebijakan_retur) + '</div>');
-    if (catatan_kaki) {
-      for (const kakiLine of wrap(catatan_kaki)) html += center('<div>' + esc(kakiLine) + '</div>');
+    const footerInfoText = [
+      qrShown && captionStr ? captionStr : '',
+      garansi ? 'Garansi: ' + garansi : '',
+      kebijakan_retur || '',
+      catatan_kaki || '',
+    ].filter(Boolean).join(' | ');
+    for (const kakiLine of wrap(footerInfoText)) {
+      html += center('<div>' + esc(kakiLine) + '</div>');
     }
     if (is_piutang) {
       html += center('<div style="margin-top:8px;">&quot;Barang diterima &amp; berjanji melunasi sblm jatuh tempo&quot;</div>');
