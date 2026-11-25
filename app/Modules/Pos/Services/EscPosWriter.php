@@ -124,9 +124,14 @@ class EscPosWriter
             $this->text($slogan);
         }
 
-        $headerContact = $this->contactLine($data['alamat'] ?? null, $data['telepon'] ?? null);
-        foreach ($this->wrap($headerContact) as $contactLine) {
-            $this->text($contactLine);
+        // Alamat dan nomor HP各自 baris, agar tidak ada tanda '-' menggantung.
+        if (! empty($data['alamat'])) {
+            foreach ($this->wrap($data['alamat']) as $alamatLine) {
+                $this->text($alamatLine);
+            }
+        }
+        if (! empty($data['telepon'])) {
+            $this->text($data['telepon']);
         }
 
         if (! empty($data['show_cabang']) && ! empty($data['cabang'])) {
@@ -183,6 +188,7 @@ class EscPosWriter
 
         if (($data['show_pelanggan'] ?? true)) {
             $pelanggan = $data['pelanggan'] ?? 'Umum';
+            $pelanggan = preg_replace('/^Pelanggan\s+/i', '', (string) $pelanggan) ?: 'Umum';
             $this->text($this->pad('Pelanggan:', $pelanggan));
 
             if (! empty($data['tier']) && $data['tier'] !== 'Retail' && $data['tier'] !== 'Umum') {
@@ -223,8 +229,10 @@ class EscPosWriter
                 $disc = $this->money($hargaJual);
                 $potongan = $this->money(($hargaRetail - $hargaJual) * $qty);
 
-                $this->raw('Harga Retail: ');
+                $this->text('Harga Retail:');
                 $this->strikeRaster($normal);
+                // Raster tidak mengembalikan kursor ke margin kiri; paksa baris baru.
+                $this->feed(1)->alignLeft();
 
                 $this->text('Harga Box: '.$disc);
                 $this->text($qtySatuan.' x '.$disc.' = '.$rightVal);
@@ -340,7 +348,7 @@ class EscPosWriter
         // ========== FOOTER — Opsi B: cukup garansi satu baris di paling bawah ==========
         $this->alignCenter();
         if (! empty($data['garansi'])) {
-            foreach ($this->wrap('Garansi: '.$data['garansi']) as $ln) {
+            foreach ($this->wrap('Garansi: '.$this->compactGaransi($data['garansi'])) as $ln) {
                 $this->text($ln);
             }
         }
@@ -597,18 +605,16 @@ class EscPosWriter
         return $left.str_repeat(' ', $pad).$right;
     }
 
-    /** Baris kontak toko: alamat + nomor HP langsung, tanpa label "Telp/WA:". */
-    private function contactLine(?string $alamat, ?string $telepon): string
+    /** Ringkas teks garansi agar cukup satu baris di kertas 58mm. */
+    private function compactGaransi(string $garansi): string
     {
-        $verbose = implode(' - ', array_filter([$alamat, $telepon]));
+        $s = $this->ascii($garansi);
+        $s = preg_replace('/\b20\d{2}\b/', '', $s) ?? $s;
+        $s = str_replace(['(', ')'], '', $s);
+        $s = trim(preg_replace('/\s+/', ' ', $s) ?? $s);
+        $s = rtrim($s, '/ -');
 
-        if (strlen($verbose) <= $this->columns) {
-            return $verbose;
-        }
-
-        $compact = implode(' | ', array_filter([$alamat, $telepon]));
-
-        return strlen($compact) <= $this->columns ? $compact : $verbose;
+        return $s !== '' ? $s : $this->ascii($garansi);
     }
 
     private function wrap(string $text): array

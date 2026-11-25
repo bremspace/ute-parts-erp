@@ -31,6 +31,7 @@ class EscPosWriterCompactLayoutTest extends TestCase
             'nama_toko' => 'UTEParts',
             'alamat' => 'Jl. Veteran No. 12',
             'telepon' => '0812-3456',
+            'pelanggan' => 'Pelanggan Umum',
             'website_medsos' => 'www.bremspace.com',
             'tanggal' => '24-11-2026',
             'qr_caption' => 'Scan QR ini untuk retur & klaim garansi',
@@ -53,10 +54,15 @@ class EscPosWriterCompactLayoutTest extends TestCase
             'saldo_poin' => 0,
         ]);
 
-        // Header: nama toko besar (double width + height), alamat + nomor HP tanpa label.
+        // Header: nama toko besar, alamat dan nomor HP di baris terpisah tanpa '-'.
         $this->assertStringContainsString("\x1b\x45\x01\x1d\x21\x90UTEParts", $output);
-        $this->assertStringContainsString('Jl. Veteran No. 12 - 0812-3456', $output);
+        $this->assertStringContainsString("Jl. Veteran No. 12\n0812-3456", $output);
         $this->assertStringNotContainsString('Telp/WA:', $output);
+        $this->assertStringNotContainsString('No. 12 -', $output);
+
+        // Pelanggan tidak dobel kata.
+        $this->assertMatchesRegularExpression('/Pelanggan: +Umum/', $output);
+        $this->assertStringNotContainsString('Pelanggan: Pelanggan Umum', $output);
 
         // QR native ukuran penuh (modul 4), ada jarak setelah QR.
         $this->assertStringContainsString("\x1d\x28\x6b\x04\x00\x31\x41\x32\x00", $output);

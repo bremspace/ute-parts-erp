@@ -236,15 +236,14 @@ class EscPos {
       .replace(/[^\x20-\x7E]/g, '');
   }
 
-  /** Baris kontak toko: alamat + nomor HP langsung, tanpa label "Telp/WA:". */
-  contactLine(alamat, telepon) {
-    const verbose = [alamat, telepon]
-      .filter(Boolean)
-      .join(' - ');
-    if (verbose.length <= this.columns) return verbose;
-
-    const compact = [alamat, telepon].filter(Boolean).join(' | ');
-    return compact.length <= this.columns ? compact : verbose;
+  /** Ringkas garansi agar cukup satu baris di kertas 58mm. */
+  compactGaransi(garansi) {
+    let s = this.clean(garansi);
+    s = s.replace(/\b20\d{2}\b/g, '');
+    s = s.replace(/[()]/g, '');
+    s = s.replace(/\s+/g, ' ').trim();
+    s = s.replace(/[\/ -]+$/, '');
+    return s || this.clean(garansi);
   }
 
   wrap(text) {
@@ -312,10 +311,13 @@ class EscPos {
       .bold(false);
     if (slogan) this.text(slogan);
 
-    const headerContact = this.contactLine(alamat, telepon);
-    for (const contactLine of this.wrap(headerContact)) {
-      this.text(contactLine);
+    // Alamat dan nomor HP各自 baris, agar tidak ada tanda '-' menggantung.
+    if (alamat) {
+      for (const alamatLine of this.wrap(alamat)) {
+        this.text(alamatLine);
+      }
     }
+    if (telepon) this.text(telepon);
     if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) this.text(cabang);
     this.rule();
 
@@ -364,7 +366,7 @@ class EscPos {
     }
 
     if (show_pelanggan !== false && show_pelanggan !== 0 && show_pelanggan !== '0') {
-      const pel = pelanggan || 'Umum';
+      const pel = String(pelanggan || 'Umum').replace(/^Pelanggan\s+/i, '') || 'Umum';
       this.text(this.pad('Pelanggan:', pel));
 
       if (tier && tier !== 'Retail' && tier !== 'Umum') {
@@ -399,8 +401,10 @@ class EscPos {
         const disc = this.money(hargaJual);
         const potongan = this.money((hargaRetail - hargaJual) * qty);
 
-        this.raw('Harga Retail: ');
+        this.text('Harga Retail:');
         this.strikeRaster(normal);
+        // Raster tidak mengembalikan kursor ke margin kiri; paksa baris baru.
+        this.feed(1).alignLeft();
 
         this.text('Harga Box: ' + disc);
         this.text(`${qtySatuan} x ${disc} = ${rightVal}`);
@@ -505,7 +509,7 @@ class EscPos {
     // ======== FOOTER — Opsi B: cukup garansi satu baris di bawah ========
     this.alignCenter();
     if (garansi) {
-      for (const ln of this.wrap('Garansi: ' + garansi)) {
+      for (const ln of this.wrap('Garansi: ' + this.compactGaransi(garansi))) {
         this.text(ln);
       }
     }
@@ -582,13 +586,6 @@ class EscPos {
       this.columns = saved;
       return out;
     };
-    const contact = (a, t) => {
-      const saved = this.columns;
-      this.columns = cols;
-      const out = this.contactLine(a, t);
-      this.columns = saved;
-      return out;
-    };
     const rule = '-'.repeat(cols);
     const center = (v, style = '') => '<div style="text-align:center;white-space:pre-wrap;width:100%;' + style + '">' + v + '</div>';
     const line = (v = '', style = '') => '<div style="white-space:pre-wrap;width:100%;' + style + '">' + esc(v) + '</div>';
@@ -625,10 +622,12 @@ class EscPos {
     html += center('<div style="font-size:15px;font-weight:900;letter-spacing:.04em;">' + esc(nama_toko || 'BREMSPACE') + '</div>');
     if (slogan) html += center('<div>' + esc(slogan) + '</div>');
 
-    const headerContactText = contact(alamat, telepon);
-    for (const contactLine of wrap(headerContactText)) {
-      html += center('<div>' + esc(contactLine) + '</div>');
+    if (alamat) {
+      for (const alamatLine of wrap(alamat)) {
+        html += center('<div>' + esc(alamatLine) + '</div>');
+      }
     }
+    if (telepon) html += center('<div>' + esc(telepon) + '</div>');
     if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) {
       html += center('<div>' + esc(cabang) + '</div>');
     }
@@ -653,7 +652,7 @@ class EscPos {
     }
     if (show_kasir !== false && show_kasir !== 0 && show_kasir !== '0' && kasir) html += line(row('Kasir:', kasir));
     if (show_pelanggan !== false && show_pelanggan !== 0 && show_pelanggan !== '0') {
-      html += line(row('Pelanggan:', pelanggan || 'Umum'));
+      html += line(row('Pelanggan:', String(pelanggan || 'Umum').replace(/^Pelanggan\s+/i, '') || 'Umum'));
       if (tier && tier !== 'Retail' && tier !== 'Umum') {
         const lbl = ['reseller', 'agen'].includes(String(tipe_konsumen || '').toLowerCase()) ? 'Mitra:' : 'Tier:';
         html += line(row(lbl, tier));
@@ -682,7 +681,8 @@ class EscPos {
         const qty = Number(item.qty ?? 1);
         const potongan = money((hargaRetail - hargaJual) * qty);
 
-        html += lineHtml('Harga Retail: <span style="text-decoration:line-through;">' + esc(normal) + '</span>');
+        html += lineHtml('Harga Retail:');
+        html += lineHtml('<span style="text-decoration:line-through;">' + esc(normal) + '</span>');
         html += line('Harga Box: ' + disc);
         html += line(qtySatuan + ' x ' + disc + ' = ' + rightVal);
         html += line('Potongan Box: -' + potongan);
@@ -752,7 +752,7 @@ class EscPos {
 
     // FOOTER — Opsi B: cukup garansi satu baris, sama dengan buildReceipt()
     if (garansi) {
-      for (const kakiLine of wrap('Garansi: ' + garansi)) {
+      for (const kakiLine of wrap('Garansi: ' + this.compactGaransi(garansi))) {
         html += center('<div>' + esc(kakiLine) + '</div>');
       }
     }
