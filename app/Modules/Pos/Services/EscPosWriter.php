@@ -3,7 +3,8 @@
 namespace App\Modules\Pos\Services;
 
 /**
- * ESC/POS byte builder for 58mm & 80mm thermal receipts — Paper-efficient layout matching UTEParts reference.
+ * ESC/POS byte builder for 58mm & 80mm thermal receipts — paper-efficient Opsi B layout.
+ * Header alamat+telepon digabung, QR kecil di blok No. TRX, footer padat.
  * Pure PHP, no DB access, deterministic — output depends only on the input array.
  * Bytes are sent raw to the printer (CUPS `lp -o raw` or Web Bluetooth client).
  * Preview parity: JS EscPos class in thermal-print.js mirrors this byte-for-byte.
@@ -59,11 +60,11 @@ class EscPosWriter
     ];
 
     /**
-     * Build full thermal receipt bytes matching UTEParts reference layout:
-     * - Centered header (shop name, slogan, address, phone, website)
-     * - 2-col: QR code (left) + URL/Date/Warranty (right)
+     * Build full thermal receipt bytes with the paper-efficient Opsi B layout:
+     * - Centered header (shop name, slogan, alamat + telepon in one line)
+     * - Small QR code directly above the No. TRX identity block
      * - Left-right aligned: TRX info, Items, Totals
-     * - Centered footer
+     * - Compact centered footer (few lines only)
      *
      * @param  array  $data  {
      *                       items: [{nama, qty, harga, subtotal, harga_retail?, satuan?, catatan?, diskon_per_unit?, diskon_total?}],
@@ -83,14 +84,14 @@ class EscPosWriter
     public function receipt(array $data): string
     {
         $paperWidth = $data['paper_width'] ?? self::WIDTH_58MM;
-        $this->compressed = ($data['font_size'] ?? 'normal') === 'small';
+        $this->compressed = ($data['font_size'] ?? 'small') === 'small';
         $this->columns = $this->compressed
             ? (self::COLUMNS_COMPRESSED[$paperWidth] ?? 42)
             : (self::COLUMNS_NORMAL[$paperWidth] ?? 32);
 
         $this->init();
 
-        // ========== HEADER (Centered) ==========
+        // ========== HEADER — alamat + telepon digabung jadi satu baris ==========
         $this->alignCenter();
         $this->bold(true)->sizeDoubleWidth(true)->text($data['nama_toko'] ?? 'BREMSPACE')->sizeDoubleWidth(false)->bold(false);
 
@@ -99,45 +100,28 @@ class EscPosWriter
             $this->text($slogan);
         }
 
-        if (! empty($data['alamat'])) {
-            $this->text($data['alamat']);
-        }
-        if (! empty($data['telepon'])) {
-            $this->text('Telp/WA: '.$data['telepon']);
+        $headerContact = $this->contactLine($data['alamat'] ?? null, $data['telepon'] ?? null);
+        foreach ($this->wrap($headerContact) as $contactLine) {
+            $this->text($contactLine);
         }
 
         if (! empty($data['show_cabang']) && ! empty($data['cabang'])) {
             $this->text($data['cabang']);
         }
+        $this->rule();
 
-        // ========== 2-COL: QR (Left) + URL/Date/Warranty (Right) ==========
+        // ========== QR + TRANSAKSI — QR kecil menyatu dengan blok No. TRX ==========
+        $this->alignLeft();
         $noTrx = $data['no_transaksi'] ?? '-';
         $qrUrl = $data['website_medsos'] ?? $data['qr_url'] ?? 'www.bremspace.com';
-        $qrCaption = $data['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi';
+        $qrCaption = $data['qr_caption'] ?? '';
         $tglStr = $data['tanggal'] ?? $data['waktu'] ?? '';
         $qrShown = ($data['show_qr_retur'] ?? true) && ! empty($noTrx) && $noTrx !== '-';
 
         if ($qrShown) {
-            $this->alignCenter();
-            $this->qrcode($noTrx, $data['qr_size'] ?? 3);
-            $this->bold(true)->text($noTrx)->bold(false);
-            if (! empty($qrCaption)) {
-                $this->text($qrCaption);
-            }
-
-            $this->alignLeft();
-        } else {
-            $this->alignLeft();
-        }
-        $this->text('Web: '.$qrUrl);
-        if (($data['show_waktu'] ?? true) && ! empty($tglStr)) {
-            $this->text('Tgl: '.$tglStr);
+            $this->qrcode($noTrx, self::normalizeQrSize($data['qr_size'] ?? 4));
         }
 
-        $this->rule();
-
-        // ========== TRANSACTION INFO (Left-Right aligned) ==========
-        $this->alignLeft();
         if (! empty($data['label_struk'])) {
             $this->alignCenter();
             $this->bold(true)->text($data['label_struk'])->bold(false);
@@ -181,6 +165,13 @@ class EscPosWriter
                 $this->bold(true)->text($this->pad($lbl, $data['tier']))->bold(false);
             }
         }
+
+        // Web + tanggal digabung jadi satu baris ringkas.
+        $metaLine = implode(' | ', array_filter([
+            'Web: '.$qrUrl,
+            (($data['show_waktu'] ?? true) && ! empty($tglStr)) ? 'Tgl: '.$tglStr : null,
+        ]));
+        $this->text($metaLine);
 
         // ========== ITEMS ==========
         $strikethroughMode = $data['strikethrough_mode'] ?? 'esc_b';
@@ -246,6 +237,10 @@ class EscPosWriter
             $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
         } else {
             $this->text($this->pad('Subtotal:', $this->money($data['subtotal'] ?? $data['total'])));
+        }
+
+        if (! empty($data['diskon_box']) && (float) $data['diskon_box'] > 0) {
+            $this->text($this->pad('Diskon Box/Kemasan:', '-'.$this->money($data['diskon_box'])));
         }
 
         if (! empty($data['diskon_partai']) && (float) $data['diskon_partai'] > 0) {
@@ -316,22 +311,20 @@ class EscPosWriter
 
         $this->rule();
 
-        // ========== FOOTER (Centered) ==========
+        // ========== FOOTER — digabung jadi beberapa baris padat ==========
         $this->alignCenter();
-        if (! empty($data['garansi'])) {
-            $this->text('Garansi: '.$data['garansi']);
-        }
         if (! empty($data['footer_text'])) {
             $this->text($data['footer_text']);
         }
-        if (! empty($data['kebijakan_retur'])) {
-            $this->text($data['kebijakan_retur']);
-        }
 
-        if (! empty($data['catatan_kaki'])) {
-            foreach ($this->wrap($data['catatan_kaki']) as $ln) {
-                $this->text($ln);
-            }
+        $footerInfo = implode(' | ', array_filter([
+            ($qrShown && ! empty($qrCaption)) ? $qrCaption : null,
+            ! empty($data['garansi']) ? 'Garansi: '.$data['garansi'] : null,
+            $data['kebijakan_retur'] ?? null,
+            $data['catatan_kaki'] ?? null,
+        ]));
+        foreach ($this->wrap($footerInfo) as $ln) {
+            $this->text($ln);
         }
 
         if (! empty($data['is_piutang'])) {
@@ -349,6 +342,28 @@ class EscPosWriter
         return $this->buf;
     }
 
+    /**
+     * Ukuran QR lama disimpan dalam "px" (40/60/80/100/150).
+     * Printer memakai module size 2..8, jadi nilai lama > 8 dinormalisasi ke 4
+     * (≈48px di preview) agar tetap scan-able namun hemat kertas.
+     */
+    public static function normalizeQrSize(mixed $value): int
+    {
+        if (! is_numeric($value)) {
+            return 4;
+        }
+
+        $n = (int) $value;
+        if ($n <= 0) {
+            return 4;
+        }
+        if ($n > 8) {
+            return 4;
+        }
+
+        return max(2, min(8, $n));
+    }
+
     /** ESC/POS standard Model 2 QR Code. */
     public function qrcode(string $content, int $size = 4): self
     {
@@ -360,7 +375,7 @@ class EscPosWriter
         $len = strlen($d) + 3;
         $pL = chr($len & 0xFF);
         $pH = chr(($len >> 8) & 0xFF);
-        $modSize = chr(max(2, min(8, $size)));
+        $modSize = chr(self::normalizeQrSize($size));
 
         // 1. Model 2: GS ( k 4 0 49 65 50 0
         $this->buf .= "\x1d\x28\x6b\x04\x00\x31\x41\x32\x00";
@@ -473,6 +488,23 @@ class EscPosWriter
         $pad = $this->columns - $totalLen;
 
         return $left.str_repeat(' ', $pad).$right;
+    }
+
+    /** Baris kontak toko: verbose bila muat, jika tidak pakai versi pendek tanpa label telepon. */
+    private function contactLine(?string $alamat, ?string $telepon): string
+    {
+        $verbose = implode(' - ', array_filter([
+            $alamat,
+            ! empty($telepon) ? 'Telp/WA: '.$telepon : null,
+        ]));
+
+        if (strlen($verbose) <= $this->columns) {
+            return $verbose;
+        }
+
+        $compact = implode(' | ', array_filter([$alamat, $telepon]));
+
+        return strlen($compact) <= $this->columns ? $compact : $verbose;
     }
 
     private function wrap(string $text): array

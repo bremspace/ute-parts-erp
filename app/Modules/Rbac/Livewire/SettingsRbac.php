@@ -9,6 +9,7 @@ use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Notifikasi\Services\WhatsAppGatewayService;
 use App\Modules\Pos\Models\QrisCabang;
+use App\Modules\Pos\Services\EscPosWriter;
 use App\Modules\Pos\Services\QrisService;
 use App\Modules\Rbac\Livewire\Concerns\ManagesUserRbac;
 use App\Modules\Rbac\Models\Cabang;
@@ -254,13 +255,13 @@ class SettingsRbac extends Component
         'show_waktu' => true,
         'show_subtotal_breakdown' => true,
         'show_qr_retur' => true,
-        'qr_size' => 80,
+        'qr_size' => 4,
         'qr_caption' => 'Scan QR ini untuk retur & klaim garansi',
         'footer_text' => 'Terima kasih atas kunjungan Anda!',
         'kebijakan_retur' => 'Maksimal klaim retur / garansi 3 hari dengan membawa struk ber-QR ini.',
         'catatan_kaki' => 'Segel toko wajib utuh & fisik barang tidak cacat.',
         'default_width' => '80mm',
-        'font_size' => 'normal',
+        'font_size' => 'small',
         'auto_print' => false,
         'thermal_printer_name' => '',     // CUPS printer name
         'thermal_bluetooth_mac' => '',    // Bluetooth MAC for Web Bluetooth
@@ -788,6 +789,8 @@ class SettingsRbac extends Component
         $labelCfg = $config->getLabelQrConfig();
         $strukCfg = $config->getStrukConfig();
 
+        // Migrasi nilai lama (px) ke module size printer (2..8).
+        $strukCfg['qr_size'] = EscPosWriter::normalizeQrSize($strukCfg['qr_size'] ?? 4);
         $this->strukForm = array_merge($this->strukForm, $strukCfg);
         $this->wmsDocForm = array_merge($this->wmsDocForm, $config->getWmsDocConfig());
         $this->hrSlipForm = array_merge($this->hrSlipForm, $config->getSlipGajiConfig());
@@ -1042,7 +1045,7 @@ class SettingsRbac extends Component
             'strukForm.kebijakan_retur' => 'nullable|string|max:500',
             'strukForm.catatan_kaki' => 'nullable|string|max:300',
             'strukForm.default_width' => 'required|in:80mm,58mm,a4',
-            'strukForm.qr_size' => 'required|numeric|min:40|max:150',
+            'strukForm.qr_size' => 'required|numeric|min:2|max:8',
             'strukForm.thermal_printer_name' => 'nullable|string|max:100',
             'strukForm.thermal_bluetooth_mac' => 'nullable|string|max:17|regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
             'strukForm.thermal_auto_print' => 'boolean',

@@ -3,12 +3,13 @@
     @php
         $strukConfig = app(\App\Modules\Crm\Services\KonfigurasiService::class)->getStrukConfig();
         $showQrRetur = $strukConfig['show_qr_retur'] ?? true;
-        $qrSize = (int) ($strukConfig['qr_size'] ?? 4);
+        $qrSize = \App\Modules\Pos\Services\EscPosWriter::normalizeQrSize($strukConfig['qr_size'] ?? 4);
+        $qrPx = $qrSize * 12; // module 4 → 48px, sesuai mockup Opsi B
         $qrCaption = $strukConfig['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi';
         $defaultPaperSize = str_contains($strukConfig['default_width'] ?? '', '80') ? '80' : '58';
         $autoPrint = !empty($strukConfig['auto_print']) || !empty($strukConfig['thermal_auto_print']);
         $qrSvg = (!empty($receiptData['no_transaksi']) && $showQrRetur)
-            ? app(\App\Modules\Wms\Services\QrCodeService::class)->generateSvg($receiptData['no_transaksi'], 68, 0)
+            ? app(\App\Modules\Wms\Services\QrCodeService::class)->generateSvg($receiptData['no_transaksi'], $qrPx, 2)
             : '';
 
         // Preserve pelanggan's phone/address before merging so template

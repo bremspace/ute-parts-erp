@@ -1503,12 +1503,13 @@
                                             </div>
 
                                             <div>
-                                                <label class="block text-xs font-semibold text-ink-300 mb-1">Ukuran QR Code (px)</label>
+                                                <label class="block text-xs font-semibold text-ink-300 mb-1">Ukuran QR Code (modul)</label>
                                                 <select wire:model.live="strukForm.qr_size" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900">
-                                                    <option value="60">Kecil (60px) — Hemat Kertas 58mm</option>
-                                                    <option value="80">Sedang (80px) — Standar Rekomendasi</option>
-                                                    <option value="100">Besar (100px) — Sangat Jelas untuk 80mm</option>
+                                                    <option value="3">Kecil (3) — ~36px, paling hemat</option>
+                                                    <option value="4">Hemat (4) — ~48px, direkomendasikan</option>
+                                                    <option value="5">Jelas (5) — ~60px, untuk 80mm</option>
                                                 </select>
+                                                <p class="text-[11px] text-ink-300 mt-1">Ukuran modul printer. Opsi 4 ≈ 48px di preview dan tetap mudah dipindai.</p>
                                             </div>
                                         </div>
                                     @endif

@@ -1,5 +1,6 @@
 /**
- * Thermal Receipt Preview & Print — Paper-efficient layout matching UTEParts reference.
+ * Thermal Receipt Preview & Print — paper-efficient Opsi B layout.
+ * Header alamat+telepon digabung, QR kecil di blok No. TRX, footer padat.
  * EscPos class mirrors PHP EscPosWriter byte-for-byte for 1:1 preview=print parity.
  * Supports Web Bluetooth (auto-reconnect) and CUPS raw printing via backend.
  */
@@ -46,14 +47,26 @@ class EscPos {
 
   cut() { this.buf.push(0x1d, 0x56, 0x42, 0x00); return this; } // GS V B 0
 
+  /**
+   * Ukuran QR lama disimpan dalam "px" (40/60/80/100/150).
+   * Printer memakai module size 2..8, jadi nilai lama > 8 dinormalisasi ke 4
+   * (≈48px di preview) agar tetap scan-able namun hemat kertas.
+   */
+  normalizeQrSize(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return 4;
+    if (n > 8) return 4;
+    return Math.max(2, Math.min(8, Math.round(n)));
+  }
+
   /** Model 2 QR Code — mirrors PHP EscPosWriter::qrcode() */
-  qrcode(content, size = 3) {
+  qrcode(content, size = 4) {
     const d = this.ascii(content);
     if (!d || !d.length) return this;
     const len = d.length + 3;
     const pL = len & 0xff;
     const pH = (len >> 8) & 0xff;
-    const modSize = Math.max(2, Math.min(8, size));
+    const modSize = this.normalizeQrSize(size);
 
     // 1. Model 2: GS ( k 4 0 49 65 50 0
     this.buf.push(0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
@@ -145,6 +158,17 @@ class EscPos {
       .replace(/[^\x20-\x7E]/g, '');
   }
 
+  /** Baris kontak toko: verbose bila muat, jika tidak pakai versi pendek tanpa label telepon. */
+  contactLine(alamat, telepon) {
+    const verbose = [alamat, telepon ? 'Telp/WA: ' + telepon : '']
+      .filter(Boolean)
+      .join(' - ');
+    if (verbose.length <= this.columns) return verbose;
+
+    const compact = [alamat, telepon].filter(Boolean).join(' | ');
+    return compact.length <= this.columns ? compact : verbose;
+  }
+
   wrap(text) {
     const clean = this.clean(text);
     const lines = [];
@@ -201,37 +225,29 @@ class EscPos {
     const qrShown = Boolean(show_qr_retur && no_transaksi && no_transaksi !== '-');
     const tglVisible = Boolean(show_waktu && (tanggal || waktu));
 
-    // ======== HEADER (Centered) ========
+    // ======== HEADER — ringkas: alamat + telepon jadi satu baris ========
     this.alignCenter();
     this.bold(true).sizeDoubleWidth(true).text(nama_toko || 'BREMSPACE').sizeDoubleWidth(false).bold(false);
-    this.text(slogan || 'Pusat Sparepart & Servis Gadget');
-    if (alamat) this.text(alamat);
-    if (telepon) this.text('Telp/WA: ' + telepon);
-    if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) this.text(cabang);
+    if (slogan) this.text(slogan);
 
-    // ======== 2-COL: QR (Left) + URL/Date/Warranty (Right) ========
+    const headerContact = this.contactLine(alamat, telepon);
+    for (const contactLine of this.wrap(headerContact)) {
+      this.text(contactLine);
+    }
+    if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) this.text(cabang);
+    this.rule();
+
+    // ======== QR + TRANSAKSI — QR kecil menyatu dengan blok No. TRX ========
+    this.alignLeft();
     const qrContent = no_transaksi || '-';
     const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
     const tglStr = tanggal || waktu || '';
-    const captionStr = qr_caption || 'Scan QR ini untuk retur & klaim garansi';
+    const captionStr = qr_caption || '';
 
     if (qrShown) {
-      this.alignCenter();
-      this.qrcode(qrContent, qr_size || 3);
-      this.bold(true).text(qrContent).bold(false);
-      if (captionStr) this.text(captionStr);
-
-      this.alignLeft();
-    } else {
-      this.alignLeft();
+      this.qrcode(qrContent, this.normalizeQrSize(qr_size));
     }
-    this.text('Web: ' + qrUrlDomain);
-    if (tglVisible) this.text('Tgl: ' + tglStr);
 
-    this.rule();
-
-    // ======== TRANSACTION INFO ========
-    this.alignLeft();
     if (label_struk) {
       this.alignCenter();
       this.bold(true).text(label_struk).bold(false);
@@ -273,6 +289,13 @@ class EscPos {
         this.bold(true).text(this.pad(lbl, tier)).bold(false);
       }
     }
+
+    // Web + tanggal digabung jadi satu baris ringkas.
+    const metaLine = [
+      qrUrlDomain ? 'Web: ' + qrUrlDomain : '',
+      tglVisible ? 'Tgl: ' + tglStr : '',
+    ].filter(Boolean).join(' | ');
+    if (metaLine) this.text(metaLine);
 
     // ======== ITEMS ========
     for (const item of items) {
@@ -397,16 +420,18 @@ class EscPos {
 
     this.rule();
 
-    // ======== FOOTER (Centered) ========
+    // ======== FOOTER — digabung jadi beberapa baris padat ========
     this.alignCenter();
-    if (garansi) this.text('Garansi: ' + garansi);
     if (footer_text) this.text(footer_text);
-    if (kebijakan_retur) this.text(kebijakan_retur);
 
-    if (catatan_kaki) {
-      for (const ln of this.wrap(catatan_kaki)) {
-        this.text(ln);
-      }
+    const footerInfo = [
+      qrShown && captionStr ? captionStr : '',
+      garansi ? 'Garansi: ' + garansi : '',
+      kebijakan_retur || '',
+      catatan_kaki || '',
+    ].filter(Boolean).join(' | ');
+    for (const ln of this.wrap(footerInfo)) {
+      this.text(ln);
     }
 
     if (is_piutang) {
@@ -434,10 +459,13 @@ class EscPos {
   }
 
   /** Build HTML preview matching the exact paper layout */
+  /**
+   * Render HTML preview yang mengikuti buildReceipt() (ESC/POS bytes) persis.
+   * Preview dan kertas sekarang memakai urutan + format yang sama.
+   */
   buildPreviewHtml(data, paperWidthOverride = null) {
     const {
-      items = [],
-      total = 0, bayar = 0, kembali = 0,
+      items = [], total = 0, bayar = 0, kembali = 0,
       no_transaksi = '-', metode_bayar = 'TUNAI', metode = 'TUNAI', tanggal, waktu, kasir, cabang,
       pelanggan, tier, tipe_konsumen, saldo_poin, poin_ditukar,
       diskon_tier, diskon_partai, diskon_poin, diskon, diskon_persen, diskon_nominal, diskon_box,
@@ -450,314 +478,221 @@ class EscPos {
       show_cabang, show_kasir = true, show_pelanggan = true, show_waktu = true,
       show_subtotal_breakdown = true,
       show_qr_retur = true, qr_caption, qr_url, qr_svg,
-      paper_width = 58,
+      paper_width = 58, font_size = 'small', strikethrough_mode = 'esc_b',
     } = data;
-
-    const money = (v) => 'Rp ' + Number(v || 0).toLocaleString('id-ID');
-    const numberOnly = (v) => Number(v || 0).toLocaleString('id-ID');
-    const unitLabel = (satuan) => {
-      const u = String(satuan || 'PCS');
-      return u.length <= 4 ? u.toUpperCase() : u;
-    };
-    const esc = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
     const widthNum = Number(paperWidthOverride ?? paper_width) === 80 ? 80 : 58;
     const paperClass = widthNum === 80 ? 'paper-80' : 'paper-58';
+    const cols = (font_size === 'small') ? (widthNum === 80 ? 64 : 42) : (widthNum === 80 ? 48 : 32);
+
+    const money = (v) => this.money(v);
+    const numberOnly = (v) => this.numberOnly(v);
+    const unitLabel = (s) => this.unitLabel(s);
+    const clean = (v) => this.clean(v);
+    const esc = (v) => String(clean(v))
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const wrap = (v) => {
+      const saved = this.columns;
+      this.columns = cols;
+      const out = this.wrap(v);
+      this.columns = saved;
+      return out;
+    };
+    const row = (left, right) => {
+      const saved = this.columns;
+      this.columns = cols;
+      const out = this.pad(clean(left), clean(right));
+      this.columns = saved;
+      return out;
+    };
+    const contact = (a, t) => {
+      const saved = this.columns;
+      this.columns = cols;
+      const out = this.contactLine(a, t);
+      this.columns = saved;
+      return out;
+    };
+    const rule = '-'.repeat(cols);
+    const center = (v, style = '') => '<div style="text-align:center;white-space:pre-wrap;width:100%;' + style + '">' + v + '</div>';
+    const line = (v = '', style = '') => '<div style="white-space:pre-wrap;width:100%;' + style + '">' + esc(v) + '</div>';
+    const lineHtml = (v, style = '') => '<div style="white-space:pre-wrap;width:100%;' + style + '">' + v + '</div>';
+
+    const qrShown = Boolean(show_qr_retur && no_transaksi && no_transaksi !== '-');
+    const tglVisible = Boolean(show_waktu && (tanggal || waktu));
     const qrContent = no_transaksi || '-';
     const qrUrlDomain = website_medsos || qr_url || 'www.bremspace.com';
-    const tglStr = (show_waktu !== false && show_waktu !== 0 && show_waktu !== '0') ? (tanggal || waktu || '') : '';
-    const caraBayar = String(metode_bayar || metode || 'TUNAI').toUpperCase();
+    const tglStr = tanggal || waktu || '';
+    const captionStr = qr_caption || '';
+    const renderedQr = qr_svg || '';
 
-    // Generate fallback QR svg if none provided
-    const renderedQr = qr_svg || `
-      <svg width="68" height="68" viewBox="0 0 100 100" class="border border-gray-300 rounded p-0.5 bg-white">
-        <rect width="100" height="100" fill="white"/>
-        <rect x="10" y="10" width="25" height="25" fill="black"/>
-        <rect x="15" y="15" width="15" height="15" fill="white"/>
-        <rect x="19" y="19" width="7" height="7" fill="black"/>
-        <rect x="65" y="10" width="25" height="25" fill="black"/>
-        <rect x="70" y="15" width="15" height="15" fill="white"/>
-        <rect x="74" y="19" width="7" height="7" fill="black"/>
-        <rect x="10" y="65" width="25" height="25" fill="black"/>
-        <rect x="15" y="70" width="15" height="15" fill="white"/>
-        <rect x="19" y="74" width="7" height="7" fill="black"/>
-        <rect x="45" y="45" width="10" height="10" fill="black"/>
-        <rect x="40" y="20" width="6" height="15" fill="black"/>
-        <rect x="60" y="45" width="8" height="8" fill="black"/>
-        <rect x="45" y="65" width="12" height="6" fill="black"/>
-        <rect x="65" y="65" width="10" height="15" fill="black"/>
-      </svg>
-    `;
+    const fallbackQr = `<svg width="48" height="48" viewBox="0 0 100 100" style="border:1px solid #d1d5db;background:#fff;">
+      <rect width="100" height="100" fill="white"/>
+      <rect x="10" y="10" width="25" height="25" fill="black"/>
+      <rect x="15" y="15" width="15" height="15" fill="white"/>
+      <rect x="19" y="19" width="7" height="7" fill="black"/>
+      <rect x="65" y="10" width="25" height="25" fill="black"/>
+      <rect x="70" y="15" width="15" height="15" fill="white"/>
+      <rect x="74" y="19" width="7" height="7" fill="black"/>
+      <rect x="10" y="65" width="25" height="25" fill="black"/>
+      <rect x="15" y="70" width="15" height="15" fill="white"/>
+      <rect x="19" y="74" width="7" height="7" fill="black"/>
+      <rect x="45" y="45" width="10" height="10" fill="black"/>
+      <rect x="40" y="20" width="6" height="15" fill="black"/>
+      <rect x="60" y="45" width="8" height="8" fill="black"/>
+      <rect x="45" y="65" width="12" height="6" fill="black"/>
+      <rect x="65" y="65" width="10" height="15" fill="black"/>
+    </svg>`;
 
-    const lblDiskon = (diskon_persen && Number(diskon_persen) > 0)
-      ? 'Diskon (' + diskon_persen + '%)'
-      : 'Diskon Kasir';
-    const ppnLabel = ppn_persen ? 'PPN (' + ppn_persen + '%)' : 'PPN';
+    let html = '<div class="thermal-receipt-doc ' + paperClass + '" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:' + (widthNum === 80 ? '8.5px' : '8px') + ';line-height:1.2;color:#000;background:#fff;">';
 
-    return `
-<div class="thermal-receipt-doc ${paperClass}" style="width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: ${widthNum === 80 ? '11px' : '10px'}; line-height: 1.25; color: #000; background: #fff;">
-  <!-- HEADER (Centered) -->
-  <div style="text-align: center; width: 100%; padding-bottom: 2px;">
-    <div style="font-size: 14px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; text-align: center;">${esc(nama_toko || 'BREMSPACE')}</div>
-    <div style="font-size: 9px; font-weight: 600; text-transform: uppercase; margin-top: 2px; text-align: center;">${esc(slogan || 'Pusat Sparepart & Servis Gadget')}</div>
-    ${alamat ? `<div style="font-size: 8px; color: #374151; margin-top: 2px; line-height: 1.2; text-align: center;">${esc(alamat)}</div>` : ''}
-    ${telepon ? `<div style="font-size: 8.5px; color: #1f2937; text-align: center;">Telp/WA: ${esc(telepon)}</div>` : ''}
-    ${(show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) ? `<div style="font-size: 8.5px; font-weight: 600; text-align: center;">${esc(cabang)}</div>` : ''}
-  </div>
+    // HEADER — sama dengan buildReceipt()
+    html += center('<div style="font-weight:900;letter-spacing:.04em;">' + esc(nama_toko || 'BREMSPACE') + '</div>');
+    if (slogan) html += center('<div>' + esc(slogan) + '</div>');
 
-  <!-- 2-COL: QR (Left) + URL/Date/Warranty Note (Right) -->
-  <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; gap: 8px; padding: 4px 0;">
-    ${show_qr_retur && qrContent !== '-' ? `
-      <div style="width: 68px; height: 68px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-        ${renderedQr}
-      </div>
-    ` : ''}
-    <div style="flex: 1; min-width: 0; text-align: left; font-size: 8.5px; line-height: 1.25;">
-      <div style="font-weight: 600; color: #111827; word-break: break-all;">${esc(qrUrlDomain)}</div>
-      ${tglStr ? `<div style="color: #374151;">${esc(tglStr)}</div>` : ''}
-      ${show_qr_retur ? `<div style="font-size: 8px; color: #4b5563; margin-top: 2px;">${esc(qr_caption || 'Scan QR ini untuk retur & klaim garansi')}</div>` : ''}
-    </div>
-  </div>
+    const headerContactText = contact(alamat, telepon);
+    for (const contactLine of wrap(headerContactText)) {
+      html += center('<div>' + esc(contactLine) + '</div>');
+    }
+    if (show_cabang !== false && show_cabang !== 0 && show_cabang !== '0' && cabang) {
+      html += center('<div>' + esc(cabang) + '</div>');
+    }
+    html += line(rule);
 
-  <div style="border-top: 1px dashed #000; width: 100%; margin: 4px 0;"></div>
+    // QR + TRANSAKSI — QR kecil di awal blok identitas (sejajar area No. TRX)
+    if (qrShown) {
+      html += lineHtml('<div style="display:inline-block;line-height:0;">' + (renderedQr || fallbackQr) + '</div>');
+    }
 
-  <!-- TRANSACTION INFO (Left-Right) -->
-  <div style="width: 100%; font-size: 9px; line-height: 1.35;">
-    ${label_struk ? `
-      <div style="text-align: center; font-weight: 800; font-size: 9.5px; padding: 2px 0; color: #111827; text-transform: uppercase;">
-        ${esc(label_struk)}
-      </div>
-    ` : ''}
-    <div style="display: flex; justify-content: space-between; width: 100%;">
-      <span style="color: #4b5563;">No. TRX:</span>
-      <span style="font-weight: 700; color: #111827;">${esc(qrContent)}</span>
-    </div>
-    ${no_transaksi_asal && no_transaksi_asal !== '-' ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
-        <span style="color: #4b5563;">Asal TRX:</span>
-        <span style="font-weight: 600;">${esc(no_transaksi_asal)}</span>
-      </div>
-    ` : ''}
-    ${sumber && !['pos', 'offline'].includes(sumber.toLowerCase()) ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
-        <span style="color: #4b5563;">Pesanan:</span>
-        <span>${esc(sumber.toUpperCase())}</span>
-      </div>
-    ` : ''}
-    ${no_tiket ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
-        <span style="color: #4b5563;">No. Tiket:</span>
-        <span style="font-weight: 700;">${esc(no_tiket)}</span>
-      </div>
-    ` : ''}
-    ${jenis_hp ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
-        <span style="color: #4b5563;">Unit:</span>
-        <span>${esc(jenis_hp)}</span>
-      </div>
-    ` : ''}
-    ${kurir ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
-        <span style="color: #4b5563;">${is_pickup ? 'Ambil:' : 'Kurir:'}</span>
-        <span>${esc(kurir + (resi && resi !== '-' ? ' (' + resi + ')' : ''))}</span>
-      </div>
-    ` : ''}
-    ${(show_kasir !== false && show_kasir !== 0 && show_kasir !== '0' && kasir) ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
-        <span style="color: #4b5563;">Kasir:</span>
-        <span>${esc(kasir)}</span>
-      </div>
-    ` : ''}
-    ${(show_pelanggan !== false && show_pelanggan !== 0 && show_pelanggan !== '0') ? `
-      <div style="display: flex; justify-content: space-between; width: 100%;">
-        <span style="color: #4b5563;">Pelanggan:</span>
-        <span>${esc(pelanggan || 'Umum')}</span>
-      </div>
-      ${tier && tier !== 'Retail' && tier !== 'Umum' ? `
-        <div style="display: flex; justify-content: space-between; width: 100%;">
-          <span style="color: #4b5563;">${['reseller', 'agen'].includes(tipe_konsumen) ? 'Mitra:' : 'Tier:'}</span>
-          <span style="font-weight: 700;">${esc(tier)}</span>
-        </div>
-      ` : ''}
-    ` : ''}
-  </div>
+    // TRANSAKSI — sama dengan buildReceipt()
+    if (label_struk) html += center('<div style="font-weight:800;">' + esc(label_struk) + '</div>');
+    html += line(row('No. TRX:', qrContent));
+    if (no_transaksi_asal && no_transaksi_asal !== '-') html += line(row('Asal TRX:', no_transaksi_asal));
+    if (sumber && !['pos', 'offline'].includes(String(sumber).toLowerCase())) html += line(row('Pesanan:', String(sumber).toUpperCase()));
+    if (no_tiket) html += line(row('No. Tiket:', no_tiket));
+    if (jenis_hp) html += line(row('Unit:', jenis_hp));
+    if (kurir) {
+      const kurirLbl = is_pickup ? 'Ambil:' : 'Kurir:';
+      const resiTeks = (resi && resi !== '-') ? ' (' + resi + ')' : '';
+      html += line(row(kurirLbl, kurir + resiTeks));
+    }
+    if (show_kasir !== false && show_kasir !== 0 && show_kasir !== '0' && kasir) html += line(row('Kasir:', kasir));
+    if (show_pelanggan !== false && show_pelanggan !== 0 && show_pelanggan !== '0') {
+      html += line(row('Pelanggan:', pelanggan || 'Umum'));
+      if (tier && tier !== 'Retail' && tier !== 'Umum') {
+        const lbl = ['reseller', 'agen'].includes(String(tipe_konsumen || '').toLowerCase()) ? 'Mitra:' : 'Tier:';
+        html += line(row(lbl, tier));
+      }
+    }
 
-  <!-- ITEMS -->
-  <div style="width: 100%; margin: 4px 0;">
-    ${items.map(item => {
+    const metaLineText = [
+      qrUrlDomain ? 'Web: ' + qrUrlDomain : '',
+      tglVisible ? 'Tgl: ' + tglStr : '',
+    ].filter(Boolean).join(' | ');
+    if (metaLineText) html += line(metaLineText);
+
+    // ITEMS — sama dengan buildReceipt()
+    for (const item of items) {
       const nama = item.nama || 'Item';
+      for (const namaLine of wrap(nama)) html += line(namaLine, 'font-weight:800;');
+
       const qtySatuan = (item.qty || 1) + ' ' + unitLabel(item.satuan);
-      const harga = money(item.harga);
-      const subtotalItem = numberOnly(item.subtotal);
+      const rightVal = numberOnly(item.subtotal);
       const hargaRetail = Number(item.harga_retail ?? 0);
       const hargaJual = Number(item.harga ?? 0);
 
-      return `
-        <div style="width: 100%; margin-bottom: 4px;">
-          <div style="font-weight: 700; font-size: 9.5px; line-height: 1.25; word-break: break-word;">${esc(nama)}</div>
-          <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: ${widthNum === 80 ? '9.5px' : '9px'}; margin-top: 1px; gap: 4px;">
-            <span style="flex: 1; min-width: 0; word-break: break-word;">
-              ${qtySatuan} x ${hargaRetail > hargaJual ? `
-                <span style="text-decoration: line-through; opacity: 0.75; margin-right: 2px;">${money(hargaRetail)}</span>
-                <span style="font-weight: 700;">${money(hargaJual)}</span>
-              ` : `<span>${harga}</span>`}
-            </span>
-            <span style="font-weight: 700; text-align: right; white-space: nowrap; flex-shrink: 0;" class="tabular-nums">${subtotalItem}</span>
-          </div>
-          ${item.catatan ? `<div style="font-size: 8px; color: #4b5563; font-style: italic; margin-top: 1px;">* ${esc(item.catatan)}</div>` : ''}
-        </div>
-      `;
-    }).join('')}
-  </div>
+      if (hargaRetail > hargaJual && strikethrough_mode === 'esc_b') {
+        const normal = money(hargaRetail);
+        const disc = money(hargaJual);
+        const prefix = qtySatuan + ' x ';
+        const totalLineLen = prefix.length + normal.length + 1 + disc.length + rightVal.length;
+        if (totalLineLen >= cols) {
+          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:line-through;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>');
+          html += line(' '.repeat(Math.max(0, cols - rightVal.length)) + rightVal);
+        } else {
+          const gap = cols - totalLineLen;
+          html += lineHtml('<span>' + esc(prefix) + '</span><span style="text-decoration:line-through;">' + esc(normal) + '</span> <span>' + esc(disc) + '</span>' + ' '.repeat(gap) + '<span>' + esc(rightVal) + '</span>');
+        }
+      } else if (hargaRetail > hargaJual) {
+        html += line(row(qtySatuan + ' x (' + money(hargaRetail) + ') -> ' + money(hargaJual), rightVal));
+      } else {
+        html += line(row(qtySatuan + ' x ' + money(hargaJual), rightVal));
+      }
 
-  <!-- SUBTOTAL BREAKDOWN & TOTALS (Directly follows items without extra dashed line) -->
-  <div style="width: 100%; font-size: 9px; line-height: 1.35;">
-    ${(show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0') && diskon_tier && Number(diskon_tier) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">Subtotal Retail:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">${money(Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier)))}</span>
-      </div>
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">${tier && tier !== 'Retail' ? 'Pot ' + esc(tier) + ':' : 'Pot Mitra:'}</span>
-        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_tier)}</span>
-      </div>
-      ${diskon_box && Number(diskon_box) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">Diskon Box/Kemasan:</span>
-        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_box)}</span>
-      </div>` : ''}
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">Subtotal:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">${money(subtotal ?? total)}</span>
-      </div>
-    ` : `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">Subtotal:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">${money(subtotal ?? total)}</span>
-      </div>
-    `}
+      if (item.catatan) {
+        for (const catLine of wrap('  * ' + item.catatan)) html += line(catLine);
+      }
+    }
 
-    ${diskon_partai && Number(diskon_partai) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">Diskon Partai:</span>
-        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_partai)}</span>
-      </div>
-    ` : ''}
-    ${diskon_poin && Number(diskon_poin) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">Tukar Poin (${poin_ditukar || 0}pts):</span>
-        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon_poin)}</span>
-      </div>
-    ` : ''}
-    ${diskon && Number(diskon) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">${esc(lblDiskon)}:</span>
-        <span style="color: #dc2626; white-space: nowrap; flex-shrink: 0;">-${money(diskon)}</span>
-      </div>
-    ` : ''}
-    ${pajak && Number(pajak) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">${esc(ppnLabel)}:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">+${money(pajak)}</span>
-      </div>
-    ` : ''}
-    ${ongkir && Number(ongkir) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">Ongkir:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">+${money(ongkir)}</span>
-      </div>
-    ` : ''}
+    // TOTAL & RINCIAN — sama dengan buildReceipt()
+    const showBreakdown = show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0';
+    if (showBreakdown && diskon_tier && Number(diskon_tier) > 0) {
+      const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
+      html += line(row('Subtotal Retail:', money(subRetail)));
+      const tierLbl = (tier && tier !== 'Retail')
+        ? 'Pot ' + tier + ':'
+        : (['reseller', 'agen'].includes(String(tipe_konsumen || '').toLowerCase()) ? 'Pot Mitra:' : 'Pot Tier:');
+      html += line(row(tierLbl, '-' + money(diskon_tier)));
+      html += line(row('Subtotal:', money(subtotal ?? total)));
+    } else {
+      html += line(row('Subtotal:', money(subtotal ?? total)));
+    }
+    if (diskon_box && Number(diskon_box) > 0) html += line(row('Diskon Box/Kemasan:', '-' + money(diskon_box)));
+    if (diskon_partai && Number(diskon_partai) > 0) html += line(row('Diskon Partai:', '-' + money(diskon_partai)));
+    if (diskon_poin && Number(diskon_poin) > 0) html += line(row('Tukar Poin (' + (poin_ditukar || 0) + 'pts):', '-' + money(diskon_poin)));
+    if (diskon && Number(diskon) > 0) {
+      const lbl = (diskon_persen && Number(diskon_persen) > 0)
+        ? 'Diskon (' + diskon_persen + '%):'
+        : 'Diskon Kasir:';
+      html += line(row(lbl, '-' + money(diskon)));
+    }
+    if (pajak && Number(pajak) > 0) {
+      const ppnLbl = ppn_persen ? 'PPN (' + ppn_persen + '%):' : 'PPN:';
+      html += line(row(ppnLbl, '+' + money(pajak)));
+    }
+    if (ongkir && Number(ongkir) > 0) html += line(row('Ongkir:', '+' + money(ongkir)));
 
-    <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; font-size: 13px; font-weight: 900; padding: 2px 0; gap: 4px;">
-      <span>TOTAL:</span>
-      <span style="white-space: nowrap; flex-shrink: 0;">${money(total)}</span>
-    </div>
+    html += center('<div style="font-size:13px;font-weight:900;">' + esc(row('TOTAL:', money(total))) + '</div>');
 
-    ${is_piutang ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #b45309; gap: 4px;">
-        <span>Status:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">BELUM LUNAS (PIUTANG)</span>
-      </div>
-      ${jatuh_tempo ? `
-        <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-          <span style="color: #4b5563;">Jatuh Tempo:</span>
-          <span style="white-space: nowrap; flex-shrink: 0;">${esc(jatuh_tempo)}</span>
-        </div>
-      ` : ''}
-      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; gap: 4px;">
-        <span style="color: #4b5563;">Sisa Tag:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">${money(sisa_piutang ?? total)}</span>
-      </div>
-    ` : `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">BAYAR (${esc(caraBayar)}):</span>
-        <span style="font-weight: 600; white-space: nowrap; flex-shrink: 0;">${money(bayar || total)}</span>
-      </div>
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">KEMBALI:</span>
-        <span style="font-weight: 600; white-space: nowrap; flex-shrink: 0;">${money(kembali ?? 0)}</span>
-      </div>
-    `}
+    if (is_piutang) {
+      html += line(row('Status:', 'BELUM LUNAS (PIUTANG)'));
+      if (jatuh_tempo) html += line(row('Jatuh Tempo:', jatuh_tempo));
+      html += line(row('Sisa Tag:', money(sisa_piutang ?? total)));
+    } else {
+      const caraBayar = String(metode_bayar || metode || 'TUNAI').toUpperCase();
+      html += line(row('BAYAR (' + caraBayar + '):', money(bayar || total)));
+      html += line(row('KEMBALI:', money(kembali ?? 0)));
+    }
 
-    ${saldo_poin !== undefined ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; gap: 4px;">
-        <span style="color: #4b5563;">Sisa Saldo Poin:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">${Number(saldo_poin).toLocaleString('id-ID')} pts</span>
-      </div>
-    ` : ''}
-    ${hemat_total && Number(hemat_total) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; font-weight: 700; color: #059669; gap: 4px;">
-        <span>HEMAT:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">${money(hemat_total)}</span>
-      </div>
-    ` : ''}
-    ${komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0 ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; color: #2563eb; gap: 4px;">
-        <span style="color: #4b5563;">Komisi:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">+${money(komisi_mitra_nominal)} (Saldo)</span>
-      </div>
-    ` : ''}
-    ${goodwill ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669; gap: 4px;">
-        <span style="color: #4b5563;">Goodwill:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">${esc(goodwill)}</span>
-      </div>
-    ` : ''}
-    ${voucher ? `
-      <div style="display: flex; justify-content: space-between; width: 100%; color: #059669; gap: 4px;">
-        <span style="color: #4b5563;">Voucher:</span>
-        <span style="white-space: nowrap; flex-shrink: 0;">${esc(voucher)}</span>
-      </div>
-    ` : ''}
-    ${komplain ? `
-      <div style="font-size: 8px; color: #b45309; margin-top: 2px;">* ${esc(komplain)}</div>
-    ` : ''}
-  </div>
+    if (saldo_poin !== undefined) html += line(row('Sisa Saldo Poin:', numberOnly(saldo_poin) + ' pts'));
+    if (hemat_total && Number(hemat_total) > 0) html += line(row('HEMAT:', money(hemat_total)));
+    if (komisi_mitra_nominal && Number(komisi_mitra_nominal) > 0) html += line(row('Komisi:', '+' + money(komisi_mitra_nominal) + ' (Saldo)'));
+    if (goodwill) html += line(row('Goodwill:', String(goodwill)));
+    if (voucher) html += line(row('Voucher:', String(voucher)));
+    if (komplain) {
+      for (const komplainLine of wrap(String(komplain))) html += line(komplainLine);
+    }
 
-  <div style="border-top: 1px dashed #000; width: 100%; margin: 4px 0;"></div>
+    html += line(rule);
 
-  <!-- FOOTER (Centered) -->
-  <div style="text-align: center; width: 100%; font-size: 8.5px; color: #374151; line-height: 1.3; padding-top: 2px;">
-    ${garansi ? `<div style="font-weight: 700; color: #111827; text-align: center;">Garansi: ${esc(garansi)}</div>` : ''}
-    ${footer_text ? `<div style="text-align: center; font-weight: 500; color: #374151;">${esc(footer_text)}</div>` : ''}
-    ${kebijakan_retur ? `<div style="font-size: 8px; color: #4b5563; text-align: center;">${esc(kebijakan_retur)}</div>` : ''}
-    ${catatan_kaki ? `<div style="font-size: 8px; color: #6b7280; margin-top: 2px; text-align: center;">${esc(catatan_kaki)}</div>` : ''}
-    ${is_piutang ? `
-      <div style="margin-top: 8px; border-top: 1px dotted #d1d5db; padding-top: 4px;">
-        <div style="font-style: italic; font-size: 7.5px; text-align: center;">"Barang diterima & berjanji melunasi sblm jatuh tempo"</div>
-        <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 8px; padding: 0 8px;">
-          <div>Penerima,</div>
-          <div>Kasir,</div>
-        </div>
-        <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 16px; padding: 0 8px;">
-          <div>(............)</div>
-          <div>(............)</div>
-        </div>
-      </div>
-    ` : ''}
-  </div>
-</div>
-`;
+    // FOOTER — digabung jadi beberapa baris padat, sama dengan buildReceipt()
+    if (footer_text) html += center('<div>' + esc(footer_text) + '</div>');
+    const footerInfoText = [
+      qrShown && captionStr ? captionStr : '',
+      garansi ? 'Garansi: ' + garansi : '',
+      kebijakan_retur || '',
+      catatan_kaki || '',
+    ].filter(Boolean).join(' | ');
+    for (const kakiLine of wrap(footerInfoText)) {
+      html += center('<div>' + esc(kakiLine) + '</div>');
+    }
+    if (is_piutang) {
+      html += center('<div style="margin-top:8px;">&quot;Barang diterima &amp; berjanji melunasi sblm jatuh tempo&quot;</div>');
+      html += '<div style="display:flex;justify-content:space-between;width:100%;margin-top:8px;padding:0 8px;"><div>Penerima,</div><div>Kasir,</div></div>';
+      html += '<div style="display:flex;justify-content:space-between;width:100%;margin-top:16px;padding:0 8px;"><div>(............)</div><div>(............)</div></div>';
+    }
+
+    html += '</div>';
+    return html;
   }
 }
 
