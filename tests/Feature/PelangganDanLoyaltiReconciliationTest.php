@@ -51,7 +51,7 @@ class PelangganDanLoyaltiReconciliationTest extends TestCase
             'nama' => 'Test Customer +62',
             'telepon' => '+6281234567891',
         ]);
-        $this->assertEquals('081234567891', $p1->telepon);
+        $this->assertEquals('6281234567891', $p1->telepon);
         $this->assertEquals('pending', $p1->status);
 
         // Verify approval request was generated
@@ -66,7 +66,7 @@ class PelangganDanLoyaltiReconciliationTest extends TestCase
             'nama' => 'Test Customer 62',
             'telepon' => '6281234567892',
         ]);
-        $this->assertEquals('081234567892', $p2->telepon);
+        $this->assertEquals('6281234567892', $p2->telepon);
     }
 
     public function test_pelanggan_auto_active_when_no_member_approval_rule_exists(): void
@@ -108,7 +108,7 @@ class PelangganDanLoyaltiReconciliationTest extends TestCase
             ->set('pelangganBaruForm.telepon', '+6287712345678')
             ->call('simpanPelangganBaru');
 
-        $pelanggan = Pelanggan::where('telepon', '087712345678')->first();
+        $pelanggan = Pelanggan::where('telepon', '6287712345678')->first();
         $this->assertNotNull($pelanggan);
         $this->assertEquals('pending', $pelanggan->status);
 

@@ -578,7 +578,7 @@ class MasterProdukUiDanBatchTest extends TestCase
 
         $supplier = Supplier::where('nama', 'PT Sinar Jaya Abadi Sparepart')->first();
         $this->assertNotNull($supplier);
-        $this->assertEquals('081299998888', $supplier->telepon);
+        $this->assertEquals('6281299998888', $supplier->telepon);
 
         // 2. Tambah Master Produk dengan Supplier Terpilih
         Livewire::test(ProdukTab::class)

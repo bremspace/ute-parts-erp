@@ -71,7 +71,7 @@ class ResellerFase5Test extends TestCase
             ],
         ])->assertSuccessful();
 
-        $reseller = Pelanggan::where('telepon', '081555')->firstOrFail();
+        $reseller = Pelanggan::where('telepon', '6281555')->firstOrFail();
         $this->assertTrue($reseller->is_reseller);
         $this->assertDatabaseHas('skema_komisi_reseller', ['pelanggan_id' => $reseller->id, 'kategori' => 'LCD', 'nilai' => 10]);
 

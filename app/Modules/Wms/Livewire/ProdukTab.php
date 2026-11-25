@@ -26,6 +26,7 @@ use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\ProductImageService;
 use App\Modules\Wms\Services\ProdukService;
 use App\Modules\Wms\Services\ScanResolverService;
+use App\Support\NomorTeleponIndonesia;
 use App\Support\WhatsAppHelper;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\Cache;
@@ -2482,13 +2483,7 @@ class ProdukTab extends Component
             case 'supplier':
                 $teleponSupplier = ! empty($this->quickAddForm['telepon']) ? trim($this->quickAddForm['telepon']) : null;
                 if ($teleponSupplier) {
-                    $clean = preg_replace('/[^0-9+]/', '', (string) $teleponSupplier);
-                    if (str_starts_with($clean, '+62')) {
-                        $clean = '0'.substr($clean, 3);
-                    } elseif (str_starts_with($clean, '62')) {
-                        $clean = '0'.substr($clean, 2);
-                    }
-                    $teleponSupplier = $clean;
+                    $teleponSupplier = NomorTeleponIndonesia::standar($teleponSupplier);
                 }
                 $supplier = Supplier::firstOrCreate(
                     ['nama' => $nama],

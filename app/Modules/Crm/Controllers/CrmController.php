@@ -16,6 +16,7 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Support\NomorTeleponIndonesia;
 use App\Traits\ApiResponse;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Http\Request;
@@ -482,13 +483,9 @@ class CrmController extends Controller
     public function storeLead(Request $request)
     {
         if ($request->filled('telepon')) {
-            $clean = preg_replace('/[^0-9+]/', '', (string) $request->telepon);
-            if (str_starts_with($clean, '+62')) {
-                $clean = '0'.substr($clean, 3);
-            } elseif (str_starts_with($clean, '62')) {
-                $clean = '0'.substr($clean, 2);
-            }
-            $request->merge(['telepon' => $clean]);
+            $request->merge([
+                'telepon' => NomorTeleponIndonesia::standar($request->telepon),
+            ]);
         }
 
         $request->validate([
@@ -516,13 +513,9 @@ class CrmController extends Controller
         $lead = Lead::forCabang()->findOrFail($id);
 
         if ($request->filled('telepon')) {
-            $clean = preg_replace('/[^0-9+]/', '', (string) $request->telepon);
-            if (str_starts_with($clean, '+62')) {
-                $clean = '0'.substr($clean, 3);
-            } elseif (str_starts_with($clean, '62')) {
-                $clean = '0'.substr($clean, 2);
-            }
-            $request->merge(['telepon' => $clean]);
+            $request->merge([
+                'telepon' => NomorTeleponIndonesia::standar($request->telepon),
+            ]);
         }
 
         $request->validate([

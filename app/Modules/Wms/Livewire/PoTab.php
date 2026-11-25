@@ -15,6 +15,7 @@ use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\PurchaseOrderService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
+use App\Support\NomorTeleponIndonesia;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -935,13 +936,7 @@ class PoTab extends Component
 
         $data = $this->supplierForm;
         if (! empty($data['telepon'])) {
-            $clean = preg_replace('/[^0-9+]/', '', (string) $data['telepon']);
-            if (str_starts_with($clean, '+62')) {
-                $clean = '0'.substr($clean, 3);
-            } elseif (str_starts_with($clean, '62')) {
-                $clean = '0'.substr($clean, 2);
-            }
-            $data['telepon'] = $clean;
+            $data['telepon'] = NomorTeleponIndonesia::standar($data['telepon']);
         }
 
         $supplier = Supplier::create($data);

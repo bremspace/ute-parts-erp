@@ -17,6 +17,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Services\ImportProdukService;
+use App\Support\NomorTeleponIndonesia;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -722,14 +723,14 @@ class SetupWizard extends Component
                         'kode' => $this->kodeCabang ?: 'CBG-01',
                         'nama' => $this->namaCabang,
                         'alamat' => $this->alamatToko,
-                        'telepon' => $this->teleponToko,
+                        'telepon' => NomorTeleponIndonesia::standar($this->teleponToko),
                         'is_active' => true,
                     ]);
                 } else {
                     $cabang->update([
                         'nama' => $this->namaCabang,
                         'alamat' => $this->alamatToko,
-                        'telepon' => $this->teleponToko,
+                        'telepon' => NomorTeleponIndonesia::standar($this->teleponToko),
                         'is_active' => true,
                     ]);
                 }
@@ -779,7 +780,7 @@ class SetupWizard extends Component
                                 ['setting_key' => 'wa_number'],
                                 [
                                     'group_key' => 'kontak',
-                                    'setting_value' => $this->teleponToko,
+                                    'setting_value' => NomorTeleponIndonesia::standar($this->teleponToko),
                                     'value_type' => 'string',
                                     'deskripsi' => 'Nomor WhatsApp resmi toko',
                                 ]
@@ -833,7 +834,7 @@ class SetupWizard extends Component
                     'nama_toko' => $this->namaToko,
                     'slogan' => $this->strukSlogan,
                     'alamat' => $this->alamatToko,
-                    'telepon' => $this->teleponToko,
+                    'telepon' => NomorTeleponIndonesia::standar($this->teleponToko),
                     'header_title' => $this->strukHeader,
                     'header_subtitle' => $this->strukSlogan,
                     'footer_text' => $this->strukFooter,

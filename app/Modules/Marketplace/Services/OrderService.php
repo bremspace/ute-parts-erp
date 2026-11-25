@@ -16,6 +16,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Services\StockReservationService;
+use App\Support\NomorTeleponIndonesia;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -326,7 +327,9 @@ class OrderService
                     'asal_cabang' => $cabang?->nama ?? 'Cabang Pusat',
                     'nama_penerima' => $shippingData['nama_penerima'] ?? $pelanggan->nama,
                     'alamat_tujuan' => $shippingData['alamat_tujuan'] ?? $pelanggan->alamat ?? '-',
-                    'telepon_tujuan' => $shippingData['telepon_tujuan'] ?? $pelanggan->telepon ?? '-',
+                    'telepon_tujuan' => NomorTeleponIndonesia::standar(
+                        $shippingData['telepon_tujuan'] ?? $pelanggan->telepon ?? ''
+                    ) ?: '-',
                     'status' => 'pending',
                 ]);
             }

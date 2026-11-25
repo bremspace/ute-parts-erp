@@ -211,7 +211,7 @@ class MemberActivationTest extends TestCase
             ->assertHasNoErrors();
 
         $pelanggan->refresh();
-        $this->assertSame('081999888777', $pelanggan->telepon);
+        $this->assertSame('6281999888777', $pelanggan->telepon);
 
         $login = $this->post('/login-pelanggan', [
             'telepon' => '081999888777',
@@ -416,7 +416,7 @@ class MemberActivationTest extends TestCase
         ]);
 
         $this->assertSame(1, Pelanggan::count());
-        $this->assertSame('081234567890', Pelanggan::first()->telepon);
+        $this->assertSame('6281234567890', Pelanggan::first()->telepon);
         $this->assertSame(2, TiketServis::count());
     }
 }

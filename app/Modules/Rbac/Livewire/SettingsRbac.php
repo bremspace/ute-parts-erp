@@ -29,6 +29,7 @@ use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportAtributService;
+use App\Support\NomorTeleponIndonesia;
 use App\Traits\ParsesNominal;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Facades\Cache;
@@ -247,7 +248,7 @@ class SettingsRbac extends Component
         'nama_toko' => 'BREMSPACE',
         'slogan' => 'Pusat Sparepart & Servis HP',
         'alamat' => 'Jl. Veteran No. 12',
-        'telepon' => '0812-3456-7890',
+        'telepon' => '6281234567890',
         'website_medsos' => 'www.bremspace.com',
         'show_cabang' => true,
         'show_kasir' => true,
@@ -1050,6 +1051,10 @@ class SettingsRbac extends Component
             'strukForm.thermal_bluetooth_mac' => 'nullable|string|max:17|regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
             'strukForm.thermal_auto_print' => 'boolean',
         ]);
+
+        if (! empty($this->strukForm['telepon'])) {
+            $this->strukForm['telepon'] = NomorTeleponIndonesia::standar($this->strukForm['telepon']);
+        }
 
         $config = app(KonfigurasiService::class);
         $config->set('struk_config', $this->strukForm, 'Pengaturan kustomisasi template struk transaksi kasir');
@@ -2368,6 +2373,10 @@ class SettingsRbac extends Component
             'cabangForm.nama' => 'required|string|max:255',
             'cabangForm.kode' => 'required|string|max:20|unique:cabang,kode,'.($this->cabangForm['id'] ?? 'NULL'),
         ]);
+
+        if (! empty($this->cabangForm['telepon'])) {
+            $this->cabangForm['telepon'] = NomorTeleponIndonesia::standar($this->cabangForm['telepon']);
+        }
 
         if ($this->cabangForm['id']) {
             Cabang::findOrFail($this->cabangForm['id'])->update($this->cabangForm);

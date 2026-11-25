@@ -32,6 +32,7 @@ use App\Modules\Wms\Services\PurchaseOrderService;
 use App\Modules\Wms\Services\TransferStokJournalService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
+use App\Support\NomorTeleponIndonesia;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -570,13 +571,7 @@ class WmsController extends Controller
 
         $data = $request->only(['nama', 'kontak', 'telepon', 'alamat', 'is_active']);
         if (! empty($data['telepon'])) {
-            $clean = preg_replace('/[^0-9+]/', '', (string) $data['telepon']);
-            if (str_starts_with($clean, '+62')) {
-                $clean = '0'.substr($clean, 3);
-            } elseif (str_starts_with($clean, '62')) {
-                $clean = '0'.substr($clean, 2);
-            }
-            $data['telepon'] = $clean;
+            $data['telepon'] = NomorTeleponIndonesia::standar($data['telepon']);
         }
         $data['termin_hari'] = (int) ($request->termin_hari ?? $request->termin_hutang_hari ?? 30);
 
@@ -602,13 +597,7 @@ class WmsController extends Controller
 
         $data = $request->only(['nama', 'kontak', 'telepon', 'alamat', 'is_active']);
         if (! empty($data['telepon'])) {
-            $clean = preg_replace('/[^0-9+]/', '', (string) $data['telepon']);
-            if (str_starts_with($clean, '+62')) {
-                $clean = '0'.substr($clean, 3);
-            } elseif (str_starts_with($clean, '62')) {
-                $clean = '0'.substr($clean, 2);
-            }
-            $data['telepon'] = $clean;
+            $data['telepon'] = NomorTeleponIndonesia::standar($data['telepon']);
         }
         if ($request->has('termin_hari') || $request->has('termin_hutang_hari')) {
             $data['termin_hari'] = (int) ($request->termin_hari ?? $request->termin_hutang_hari);
