@@ -279,13 +279,23 @@ class OmnichannelController extends Controller
         }
 
         $adapter = $this->syncService->adapterFor($channel->platform);
-        if ($adapter) {
-            $valid = $adapter->verifyWebhookSignature($request->fullUrl(), $request->getContent(), $signature, $partnerKey);
-            if (! $valid) {
-                Log::warning("Signature webhook {$channel->platform} tidak valid untuk channel #{$channel->id}");
 
-                return response()->json(['success' => false, 'message' => 'Signature tidak valid'], 401);
-            }
+        // Fail-closed: platform tanpa adapter tidak punya cara verifikasi signature.
+        // Dulu blok ini di-skip dan webhook tetap diproses = bypass autentikasi.
+        if (! $adapter) {
+            Log::warning("Webhook channel #{$channel->id} ditolak: platform {$channel->platform} tidak punya adapter verifikasi.");
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Platform channel belum mendukung verifikasi webhook.',
+            ], 403);
+        }
+
+        $valid = $adapter->verifyWebhookSignature($request->fullUrl(), $request->getContent(), $signature, $partnerKey);
+        if (! $valid) {
+            Log::warning("Signature webhook {$channel->platform} tidak valid untuk channel #{$channel->id}");
+
+            return response()->json(['success' => false, 'message' => 'Signature tidak valid'], 401);
         }
 
         $payload = $request->all();

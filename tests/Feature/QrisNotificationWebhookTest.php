@@ -13,6 +13,18 @@ class QrisNotificationWebhookTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const SECRET = 'test-qris-secret-123';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Webhook QRIS fail-closed: tanpa secret terkonfigurasi endpoint menolak semua
+        // request (503). Forwarder Android wajib mengirim header X-QRIS-Secret.
+        app(KonfigurasiService::class)->set('qris_webhook_secret', self::SECRET);
+        $this->withHeader('X-QRIS-Secret', self::SECRET);
+    }
+
     protected function tearDown(): void
     {
         Cache::forget('qris_payment_50000');
@@ -78,6 +90,7 @@ class QrisNotificationWebhookTest extends TestCase
     {
         $configService = app(KonfigurasiService::class);
         $configService->set('qris_webhook_secret', 'my-super-secret-123');
+        $this->withHeaders(['X-QRIS-Secret' => '']);
 
         // Request without secret -> 401
         $badResp = $this->postJson('/api/webhook/qris-notif', [
@@ -172,12 +185,44 @@ class QrisNotificationWebhookTest extends TestCase
             [],
             [],
             [],
-            ['CONTENT_TYPE' => 'text/plain'],
+            ['CONTENT_TYPE' => 'text/plain', 'HTTP_X_QRIS_SECRET' => self::SECRET],
             '01/10 14:22:10 TRSF E-BANKING CR 250.000,00 DARI QRIS'
         );
 
         $response->assertStatus(200);
         $this->assertSame(250000, $response->json('data.nominal'));
         $this->assertNotNull(Cache::get('qris_payment_250000'));
+    }
+
+    /**
+     * Regresi: secret kosong dulu berarti "siapa pun boleh". Sekarang harus 503,
+     * karena webhook ini bisa melunasi order marketplace tanpa uang masuk.
+     */
+    public function test_webhook_fails_closed_when_secret_not_configured(): void
+    {
+        app(KonfigurasiService::class)->set('qris_webhook_secret', '');
+
+        $response = $this->withHeaders(['X-QRIS-Secret' => ''])->postJson('/api/webhook/qris-notif', [
+            'nominal' => 111000,
+            'text' => 'QRIS 111000',
+        ]);
+
+        $response->assertStatus(503);
+        $this->assertNull(Cache::get('qris_payment_111000'));
+    }
+
+    public function test_webhook_rejects_wrong_secret(): void
+    {
+        $response = $this->withHeaders(['X-QRIS-Secret' => 'bukan-secret-nya'])->postJson('/api/webhook/qris-notif', [
+            'nominal' => 222000,
+            'text' => 'QRIS 222000',
+        ]);
+
+        $response->assertStatus(401);
+        $this->assertNull(Cache::get('qris_payment_222000'));
+
+        // Secret asli tidak boleh bocor ke riwayat log yang tampil di UI admin.
+        $history = Cache::get('qris_webhook_log_history', []);
+        $this->assertStringNotContainsString(self::SECRET, json_encode($history));
     }
 }

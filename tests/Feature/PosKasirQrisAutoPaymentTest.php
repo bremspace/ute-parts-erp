@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\KasSesiState;
@@ -37,6 +38,9 @@ class PosKasirQrisAutoPaymentTest extends TestCase
         $this->seed(CabangSeeder::class);
         $this->seed(AkunCoaSeeder::class);
         $this->seed(RolesAndPermissionsSeeder::class);
+
+        // Webhook QRIS fail-closed bila secret belum diset di Pengaturan.
+        app(KonfigurasiService::class)->set('qris_webhook_secret', 'uteparts');
 
         $this->cabang = Cabang::first();
 

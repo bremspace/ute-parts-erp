@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -238,22 +239,26 @@ class PelangganService
 
         $validated = Validator::make($data, $this->rules(), $this->messages())->validate();
 
+        // Registrasi mandiri (publik) tidak boleh menentukan tier harga maupun status
+        // reseller/agen sendiri. Dulu nilai ini diambil dari request apa adanya.
+        $isMandiri = ! empty($data['is_registrasi_mandiri']);
+
         $tierTerendah = TierMembership::where('is_active', true)
             ->orderBy('min_belanja_12bulan')
             ->first();
 
-        $tierMembershipId = array_key_exists('tier_membership_id', $validated)
-            ? $validated['tier_membership_id']
-            : (! empty($data['is_registrasi_mandiri']) ? null : $tierTerendah?->id);
+        $tierMembershipId = $isMandiri
+            ? null
+            : (array_key_exists('tier_membership_id', $validated) ? $validated['tier_membership_id'] : $tierTerendah?->id);
 
-        $isReseller = (bool) ($validated['is_reseller'] ?? false);
-        $tipeKonsumen = $validated['tipe_konsumen'] ?? ($isReseller ? 'reseller' : 'retail');
-        if ($tipeKonsumen === 'agen' || $tipeKonsumen === 'reseller') {
+        $isReseller = $isMandiri ? false : (bool) ($validated['is_reseller'] ?? false);
+        $tipeKonsumen = $isMandiri ? 'retail' : ($validated['tipe_konsumen'] ?? ($isReseller ? 'reseller' : 'retail'));
+        if (! $isMandiri && ($tipeKonsumen === 'agen' || $tipeKonsumen === 'reseller')) {
             $isReseller = true;
         }
 
-        $kodeAgen = ! empty($validated['kode_agen']) ? strtoupper(trim($validated['kode_agen'])) : null;
-        if ($tipeKonsumen === 'agen' && empty($kodeAgen)) {
+        $kodeAgen = (! $isMandiri && ! empty($validated['kode_agen'])) ? strtoupper(trim($validated['kode_agen'])) : null;
+        if (! $isMandiri && $tipeKonsumen === 'agen' && empty($kodeAgen)) {
             $kodeAgen = $this->generateUniqueKodeAgen();
         }
 
@@ -280,11 +285,17 @@ class PelangganService
         $approvalService = app(ApprovalService::class);
         $pemohon = $requestedBy ?? auth()->id() ?? ApprovalService::pemohon();
         if (! $pemohon) {
-            $systemUser = User::first() ?? User::factory()->create([
-                'email' => 'system@bremspace.id',
-                'name' => 'System Automated',
+            $pemohon = User::query()->orderBy('id')->value('id');
+        }
+
+        if (! $pemohon) {
+            // Jangan bikin user hantu lewat factory di jalur runtime publik:
+            // dulu pendaftaran anonim menulis akun baru ke tabel users.
+            Log::warning('Pendaftaran pelanggan tanpa user pemohon; approval request dilewati.', [
+                'pelanggan_id' => $pelanggan->id,
             ]);
-            $pemohon = $systemUser->id;
+
+            return $pelanggan->load('tierMembership');
         }
 
         $effectiveCabang = $cabangId ?? session('cabang_id');

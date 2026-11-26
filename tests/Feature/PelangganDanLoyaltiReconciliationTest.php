@@ -29,6 +29,10 @@ class PelangganDanLoyaltiReconciliationTest extends TestCase
         Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'owner', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'kasir', 'guard_name' => 'web']);
+
+        // Jalur pendaftaran publik butuh "pemohon" nyata (FK requested_by).
+        // Dulu service membuat user hantu lewat User::factory() saat tabel users kosong.
+        User::factory()->create(['email' => 'owner@uteparts.test']);
     }
 
     public function test_phone_normalization_and_approval_routing_in_pelanggan_service(): void
@@ -209,5 +213,42 @@ class PelangganDanLoyaltiReconciliationTest extends TestCase
         $this->assertEquals(150, (int) $config->get('poin_redeem_rupiah'));
         $this->assertEquals(4.5, (float) $config->get('diskon_silver'));
         $this->assertEquals(8.0, (float) $config->get('diskon_gold'));
+    }
+
+    /**
+     * Regresi: /daftar-pelanggan dulu meneruskan $request->all() ke service,
+     * sehingga pendaftar anonim bisa mengangkat dirinya jadi agen + tier Platinum.
+     */
+    public function test_registrasi_publik_mengabaikan_tier_dan_status_agen_dari_request(): void
+    {
+        ApprovalRule::firstOrCreate(
+            ['entity_type' => 'member', 'level' => 1],
+            [
+                'cabang_id' => null,
+                'min_amount' => 0,
+                'max_amount' => null,
+                'approver_role' => 'owner',
+                'is_aktif' => true,
+            ]
+        );
+
+        $this->post('/daftar-pelanggan', [
+            'nama' => 'Penyusup Tier',
+            'telepon' => '081377788899',
+            'password' => 'rahasia123',
+            'tipe_konsumen' => 'agen',
+            'is_reseller' => 1,
+            'tier_membership_id' => 3,
+            'kode_agen' => 'HACK-001',
+            'status' => 'aktif',
+        ])->assertRedirect();
+
+        $p = Pelanggan::where('nama', 'Penyusup Tier')->firstOrFail();
+
+        $this->assertSame('retail', $p->tipe_konsumen);
+        $this->assertFalse((bool) $p->is_reseller);
+        $this->assertNull($p->tier_membership_id);
+        $this->assertNotSame('HACK-001', $p->kode_agen);
+        $this->assertSame('pending', $p->status);
     }
 }

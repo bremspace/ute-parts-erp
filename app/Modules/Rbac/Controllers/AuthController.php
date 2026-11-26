@@ -35,6 +35,15 @@ class AuthController extends Controller
             return $this->error('Akun tidak aktif', 403);
         }
 
+        // Jangan izinkan login API melewati 2FA. Route ini stateless-secara-desain,
+        // tapi dengan statefulApi() (Sanctum) Laravel memasang session + cookie,
+        // sehingga Auth::attempt() di sini = session penuh tanpa challenge TOTP.
+        if ($user->hasEnabledTwoFactor()) {
+            Auth::logout();
+
+            return $this->error('Akun ini memerlukan verifikasi 2FA. Login melalui /app/login.', 403);
+        }
+
         $permissions = $user->getAllPermissions()->pluck('name');
         $cabangs = $user->daftarCabangAkses();
 

@@ -461,7 +461,13 @@ Route::post('/login-pelanggan', function (Request $request) {
 Route::get('/daftar-pelanggan', fn () => view('auth.customer-register'))->name('customer.register');
 Route::post('/daftar-pelanggan', function (Request $request) {
     try {
-        $data = $request->all();
+        // Whitelist: pendaftaran publik hanya boleh mengisi profil dasar.
+        // Sebelumnya $request->all() meneruskan tier_membership_id / is_reseller /
+        // tipe_konsumen=agen / status, sehingga siapa pun bisa mendaftar langsung
+        // sebagai Platinum atau agen (harga & komisi reseller) tanpa persetujuan.
+        $data = $request->only([
+            'nama', 'telepon', 'email', 'password', 'alamat', 'tanggal_lahir', 'referral_kode',
+        ]);
         $data['is_registrasi_mandiri'] = true;
         $pelanggan = app(PelangganService::class)->create($data);
 
