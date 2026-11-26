@@ -140,14 +140,9 @@ class LeadService
             $pelanggan = null;
             $leadPhone = $lead->telepon;
             if ($leadPhone) {
-                $clean = preg_replace('/[^0-9+]/', '', (string) $leadPhone);
-                if (str_starts_with($clean, '+62')) {
-                    $clean = '0'.substr($clean, 3);
-                } elseif (str_starts_with($clean, '62')) {
-                    $clean = '0'.substr($clean, 2);
-                }
-                $leadPhone = $clean;
-                $pelanggan = Pelanggan::where('telepon', $leadPhone)->first();
+                // Cocokkan semua varian format (62/08/8), bukan hanya 08:
+                // pelanggan kini tersimpan kanonik "62…" (NomorTeleponIndonesia).
+                $pelanggan = $this->pelangganService->cariByTelepon($leadPhone);
             }
             if (! $pelanggan && $lead->email) {
                 $pelanggan = Pelanggan::where('email', $lead->email)->first();

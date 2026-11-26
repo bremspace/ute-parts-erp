@@ -50,7 +50,7 @@ class MemberApprovalWorkflowTest extends TestCase
         $response->assertRedirect('/login-pelanggan');
         $response->assertSessionHas('info');
 
-        $pelanggan = Pelanggan::where('telepon', '081234567890')->first();
+        $pelanggan = Pelanggan::where('telepon', '6281234567890')->first();
         $this->assertNotNull($pelanggan);
         $this->assertEquals('pending', $pelanggan->status);
 
@@ -111,7 +111,7 @@ class MemberApprovalWorkflowTest extends TestCase
             'password' => 'secret123',
         ]);
 
-        $response->assertRedirect('/shop');
+        $response->assertRedirect('/account');
         $this->assertAuthenticatedAs($pelanggan, 'customer');
     }
 
@@ -286,7 +286,7 @@ class MemberApprovalWorkflowTest extends TestCase
             'password' => 'secret123',
         ]);
 
-        $pelanggan = Pelanggan::where('telepon', '089912345678')->first();
+        $pelanggan = Pelanggan::where('telepon', '6289912345678')->first();
         $this->assertNotNull($pelanggan);
         $this->assertEquals('pending', $pelanggan->status);
         $this->assertNull($pelanggan->tier_membership_id, 'Member pending registrasi tidak boleh default ke Silver.');
@@ -311,7 +311,7 @@ class MemberApprovalWorkflowTest extends TestCase
             'telepon' => '089987654321',
             'password' => 'secret123',
         ]);
-        $pelanggan2 = Pelanggan::where('telepon', '089987654321')->first();
+        $pelanggan2 = Pelanggan::where('telepon', '6289987654321')->first();
         $req2 = ApprovalRequest::where('entity_type', 'member')->where('entity_id', $pelanggan2->id)->first();
 
         Livewire::actingAs($owner)

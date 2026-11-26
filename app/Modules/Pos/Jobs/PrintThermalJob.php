@@ -61,6 +61,7 @@ class PrintThermalJob implements ShouldQueue
             $hargaSatuan = (float) $item->harga_satuan;
             $qty = (int) $item->jumlah;
             $diskonPerUnit = max(0, $hargaDasar - $hargaSatuan);
+            $catatan = trim((string) ($item->catatan ?? '').' '.(string) ($item->catatanPicking() ?? ''));
 
             $items[] = [
                 'nama' => $this->itemName($item),
@@ -68,8 +69,8 @@ class PrintThermalJob implements ShouldQueue
                 'harga' => $hargaSatuan,
                 'subtotal' => (float) $item->subtotal,
                 'harga_retail' => $hargaDasar,
-                'satuan' => $item->produk?->satuan ?? 'pcs',
-                'catatan' => $item->catatan,
+                'satuan' => $item->satuan ?: 'pcs',
+                'catatan' => $catatan ?: null,
                 'diskon_per_unit' => $diskonPerUnit,
                 'diskon_total' => $diskonPerUnit * $qty,
             ];
@@ -114,7 +115,7 @@ class PrintThermalJob implements ShouldQueue
             'nama_toko' => $strukConfig['nama_toko'] ?? config('app.name', 'BREMSPACE'),
             'slogan' => $strukConfig['slogan'] ?? 'Pusat Sparepart & Servis Gadget',
             'alamat' => $strukConfig['alamat'] ?? 'Jl. Veteran No. 12',
-            'telepon' => $strukConfig['telepon'] ?? '0812-3456-7890',
+            'telepon' => $strukConfig['telepon'] ?? '6281234567890',
             'website_medsos' => $strukConfig['website_medsos'] ?? 'www.bremspace.com',
 
             // Display options

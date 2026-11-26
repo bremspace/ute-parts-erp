@@ -38,9 +38,11 @@ use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
+use App\Modules\Wms\Services\LokasiBarangService;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Wms\Services\StockReservationService;
+use App\Support\NomorTeleponIndonesia;
 use App\Traits\ParsesNominal;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -2246,10 +2248,7 @@ class PosKasir extends Component
                 $this->customer?->nama ?? 'Pelanggan'
             );
 
-            $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->qrisCustomerPhone);
-            if (str_starts_with($cleanPhone, '0')) {
-                $cleanPhone = '62'.substr($cleanPhone, 1);
-            }
+            $cleanPhone = NomorTeleponIndonesia::standar($this->qrisCustomerPhone);
 
             $this->waQrisUrl = filled($cleanPhone)
                 ? 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($msg)
@@ -2285,10 +2284,7 @@ class PosKasir extends Component
             $this->customer?->nama ?? 'Pelanggan'
         );
 
-        $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->qrisCustomerPhone);
-        if (str_starts_with($cleanPhone, '0')) {
-            $cleanPhone = '62'.substr($cleanPhone, 1);
-        }
+        $cleanPhone = NomorTeleponIndonesia::standar($this->qrisCustomerPhone);
 
         $this->waQrisUrl = filled($cleanPhone)
             ? 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($msg)
@@ -2439,10 +2435,7 @@ class PosKasir extends Component
             $this->customer?->nama ?? 'Pelanggan'
         );
 
-        $cleanPhone = preg_replace('/[^0-9]/', '', (string) $custPhone);
-        if (str_starts_with($cleanPhone, '0')) {
-            $cleanPhone = '62'.substr($cleanPhone, 1);
-        }
+        $cleanPhone = NomorTeleponIndonesia::standar($custPhone);
 
         if (filled($cleanPhone)) {
             try {
@@ -2839,6 +2832,7 @@ class PosKasir extends Component
             $hargaSatuan = (float) $item->harga_satuan;
             $qty = (int) $item->jumlah;
             $diskonPerUnit = max(0, $retailPerUnit - $hargaSatuan);
+            $catatanCetak = trim((string) ($item->catatan ?? '').' '.(string) ($item->catatanPicking() ?? ''));
 
             return [
                 'nama' => $item->produk?->nama ?? 'Produk',
@@ -2853,7 +2847,7 @@ class PosKasir extends Component
                 'diskon_total' => $diskonPerUnit * $qty,
                 'subtotal_retail' => $retailPerUnit * $qty,
                 'subtotal' => (float) $item->subtotal,
-                'catatan' => $item->catatan,
+                'catatan' => $catatanCetak ?: null,
             ];
         })->toArray();
 
@@ -3530,6 +3524,11 @@ class PosKasir extends Component
             return null;
         }
 
+        $lokasi = app(LokasiBarangService::class)->peta(
+            $trx->items->pluck('produk_id'),
+            $trx->gudang_id ?: $this->selectedGudangId
+        );
+
         return [
             'id' => $trx->id,
             'no_transaksi' => $trx->no_transaksi,
@@ -3537,11 +3536,17 @@ class PosKasir extends Component
             'pelanggan_telepon' => $trx->pelanggan?->telepon ?? '-',
             'waktu' => $trx->created_at?->format('d/m/Y H:i'),
             'total' => (float) $trx->total_akhir,
-            'jumlah_item' => (int) $trx->items->sum('jumlah'),
+            'jumlah_item' => (int) $trx->items->sum(fn ($it) => $it->qtyDasar()),
             'items' => $trx->items->map(fn ($it) => [
                 'nama' => $it->produk?->nama ?? 'Produk',
                 'jumlah' => (int) $it->jumlah,
+                'satuan' => (string) ($it->satuan ?: 'pcs'),
+                'konversi' => (float) ($it->konversi ?? 1),
+                'qty_dasar' => $it->qtyDasar(),
+                'qty_label' => $it->qtyLabel(),
                 'subtotal' => (float) $it->subtotal,
+                'lokasi' => $lokasi[$it->produk_id] ?? [],
+                'sku' => $it->produk?->sku ?? '-',
             ])->values()->all(),
             // [T-SERAH] Sudah lunas online → mode serah terima (bukan bayar)
             'sudah_lunas' => $trx->status === 'lunas',

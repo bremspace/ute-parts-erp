@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Marketplace\Services\DuitkuService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -315,5 +316,34 @@ class DuitkuServiceTest extends TestCase
 
         $this->assertFalse($svc->verifyCallbackSignature(100000, 'ORD-1', 'invalid-signature'));
         $this->assertFalse($svc->verifyCallbackSignature(100000, 'ORD-1', ''));
+    }
+
+    public function test_is_configured_berhasil_bila_hanya_salah_satu_key_terisi_dan_fallback_403_signature(): void
+    {
+        app(KonfigurasiService::class)->set('duitku_gateway_config', [
+            'mode' => 'sandbox',
+            'merchant_code' => 'DS36712',
+            'api_key' => 'kunci_lama_salah',
+            'merchant_key' => 'kunci_valid_123',
+            'expiry_period' => 720,
+        ]);
+
+        $svc = app(DuitkuService::class);
+        $this->assertTrue($svc->isConfigured());
+
+        Http::fake([
+            self::BASE.'/paymentmethod/getpaymentmethod' => Http::sequence()
+                ->push(['Message' => 'Invalid Signature.'], 403)
+                ->push([
+                    'responseCode' => '00',
+                    'paymentFee' => [
+                        ['paymentMethod' => 'BC', 'paymentName' => 'BCA VA', 'totalFee' => 4000],
+                    ],
+                ], 200),
+        ]);
+
+        $methods = $svc->getPaymentMethods(100000);
+        $this->assertCount(1, $methods);
+        $this->assertSame('BC', $methods[0]['kode']);
     }
 }

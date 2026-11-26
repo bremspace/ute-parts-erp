@@ -55,6 +55,13 @@ class CartCheckout extends Component
 
     public string $cartSearch = '';
 
+    /** Daftar produk cepat: 5 per muat, bisa di-scroll terus (infinite). */
+    public int $quickLimit = 5;
+
+    public array $quickProducts = [];
+
+    public bool $quickHasMore = true;
+
     public function mount()
     {
         // Parameter route bukan penting — deteksi dari URL
@@ -69,6 +76,8 @@ class CartCheckout extends Component
             $this->teleponPenerima = $customer->telepon ?? '';
             $this->alamatPengiriman = $customer->alamat ?? '';
         }
+
+        $this->loadMoreQuickProducts();
     }
 
     public function getCartProperty(): array
@@ -138,6 +147,46 @@ class CartCheckout extends Component
             fn (array $row) => ! $row['is_kemasan'] ? $row['potongan_total'] : 0.0,
             $this->hargaTampilan
         ));
+    }
+
+    /**
+     * Muat 5 produk cepat berikutnya. Dipanggi wire:init & IntersectionObserver.
+     */
+    public function loadMoreQuickProducts(): void
+    {
+        if (! $this->quickHasMore) {
+            return;
+        }
+
+        $semua = Produk::query()
+            ->where('produk.is_active', true)
+            ->with(['kategoriRelasi', 'kualitas', 'brand', 'tipeHps'])
+            ->withSum('stokItems', 'jumlah')
+            ->orderBy('produk.nama')
+            ->get()
+            ->filter(fn (Produk $p) => (float) ($p->stok_items_sum_jumlah ?? 0) > 0)
+            ->values();
+
+        $batch = $semua->slice(count($this->quickProducts), $this->quickLimit);
+
+        foreach ($batch as $p) {
+            $this->quickProducts[] = [
+                'id' => (int) $p->id,
+                'nama' => (string) $p->nama,
+                'sku' => (string) ($p->sku ?? ''),
+                'gambar' => $p->thumbnail_url ?: $p->gambar,
+                'harga' => (float) ($p->harga_jual_retail ?? 0),
+                'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
+                'kategori' => $p->kategori ?: ($p->kategoriRelasi?->nama ?? null),
+                'kualitas' => $p->kualitas?->nama ?? null,
+                'brand' => $p->brand?->nama ?? ($p->brand_kompatibel ?? null),
+                'kompatibel' => $p->tipeHps->isNotEmpty()
+                    ? $p->tipeHps->take(2)->map(fn ($t) => trim((string) $t->merk.' '.(string) $t->model))->implode(', ')
+                    : null,
+            ];
+        }
+
+        $this->quickHasMore = count($this->quickProducts) < $semua->count();
     }
 
     /**
@@ -401,6 +450,8 @@ class CartCheckout extends Component
             'pajakPreview' => $this->pajakPreview,
             'jumlahItem' => $this->jumlahItem,
             'rekomendasi' => $this->rekomendasi,
+            'quickProducts' => $this->quickProducts,
+            'quickHasMore' => $this->quickHasMore,
             'cartSearchSuggestions' => $this->cartSearchSuggestions,
             'hargaTampilan' => $this->hargaTampilan,
             'potonganKemasan' => $this->potonganKemasan,

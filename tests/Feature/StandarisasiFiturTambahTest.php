@@ -124,7 +124,7 @@ class StandarisasiFiturTambahTest extends TestCase
             ->call('simpanPelangganBaruServis')
             ->assertHasNoErrors();
 
-        $pelanggan = Pelanggan::where('telepon', '081299998888')->first();
+        $pelanggan = Pelanggan::where('telepon', '6281299998888')->first();
         $this->assertNotNull($pelanggan);
         $this->assertEquals('Pelanggan Servis Baru', $pelanggan->nama);
         $this->assertEquals('agen', $pelanggan->tipe_konsumen);
@@ -415,7 +415,7 @@ class StandarisasiFiturTambahTest extends TestCase
 
         $pelanggan = $leadService->convertToPelanggan($lead);
         $this->assertNotNull($pelanggan);
-        $this->assertEquals('087711223344', $pelanggan->telepon);
+        $this->assertEquals('6287711223344', $pelanggan->telepon);
         $this->assertEquals('Lead Calon Agen', $pelanggan->nama);
         $this->assertEquals($pelanggan->id, $lead->fresh()->pelanggan_id);
     }
@@ -438,7 +438,7 @@ class StandarisasiFiturTambahTest extends TestCase
         ], $this->adminUser);
 
         $this->assertEquals('Joko Toko', $tiket->nama_pelanggan);
-        $this->assertEquals('085566778899', $tiket->telepon_pelanggan);
+        $this->assertEquals('6285566778899', $tiket->telepon_pelanggan);
     }
 
     public function test_aset_register_simpan_alert_contains_nama_aset(): void

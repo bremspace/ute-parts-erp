@@ -8,6 +8,7 @@ use App\Modules\Hr\Models\KaryawanRiwayat;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Services\SessionManagementService;
+use App\Support\NomorTeleponIndonesia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -92,7 +93,7 @@ class UserHrSyncService
                     'nama' => $user->name,
                     'nik' => $finalNik,
                     'email' => $user->email,
-                    'telepon' => $user->phone ?? $karyawan?->telepon,
+                    'telepon' => NomorTeleponIndonesia::standar($user->phone ?? $karyawan?->telepon),
                     'jabatan' => $finalJabatan,
                     'cabang_id' => $defaultCabangId,
                     'tgl_masuk' => $karyawan?->tgl_masuk ?? now()->toDateString(),
@@ -167,7 +168,7 @@ class UserHrSyncService
             $karyawan->update([
                 'user_id' => $user->id,
                 'email' => $karyawan->email ?: $user->email,
-                'telepon' => $karyawan->telepon ?: $user->phone,
+                'telepon' => NomorTeleponIndonesia::standar($karyawan->telepon ?: $user->phone),
             ]);
 
             app(AuditService::class)->catat('Karyawan', 'update', $karyawan->id, "Karyawan {$karyawan->nama} ditautkan ke akun user {$user->name} ({$user->email})");

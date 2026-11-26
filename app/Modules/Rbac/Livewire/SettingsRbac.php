@@ -7,6 +7,8 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Marketplace\Services\DuitkuService;
+use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Notifikasi\Services\WhatsAppGatewayService;
 use App\Modules\Pos\Models\QrisCabang;
 use App\Modules\Pos\Services\EscPosWriter;
@@ -29,6 +31,7 @@ use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportAtributService;
+use App\Support\NomorTeleponIndonesia;
 use App\Traits\ParsesNominal;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Facades\Cache;
@@ -111,6 +114,11 @@ class SettingsRbac extends Component
     ];
 
     public $qrisImageFile = null;
+
+    /** Logo opsional yang tampil di halaman pembayaran online konsumen. */
+    public $duitkuLogoFile = null;
+
+    public bool $hapusDuitkuLogo = false;
 
     public ?string $qrisPreviewSvg = null;
 
@@ -247,7 +255,7 @@ class SettingsRbac extends Component
         'nama_toko' => 'BREMSPACE',
         'slogan' => 'Pusat Sparepart & Servis HP',
         'alamat' => 'Jl. Veteran No. 12',
-        'telepon' => '0812-3456-7890',
+        'telepon' => '6281234567890',
         'website_medsos' => 'www.bremspace.com',
         'show_cabang' => true,
         'show_kasir' => true,
@@ -286,6 +294,7 @@ class SettingsRbac extends Component
         'duitku_api_key' => '',
         'duitku_merchant_key' => '',
         'duitku_expiry_period' => 1440,
+        'duitku_logo' => '',
 
         // Biteship Logistics Gateway
         'biteship_api_key' => '',
@@ -305,6 +314,10 @@ class SettingsRbac extends Component
     ];
 
     public ?string $waTestStatus = null;
+
+    public ?string $duitkuTestStatus = null;
+
+    public string $duitkuTestMessage = '';
 
     public ?string $syncTestStatus = null;
 
@@ -1051,6 +1064,10 @@ class SettingsRbac extends Component
             'strukForm.thermal_auto_print' => 'boolean',
         ]);
 
+        if (! empty($this->strukForm['telepon'])) {
+            $this->strukForm['telepon'] = NomorTeleponIndonesia::standar($this->strukForm['telepon']);
+        }
+
         $config = app(KonfigurasiService::class);
         $config->set('struk_config', $this->strukForm, 'Pengaturan kustomisasi template struk transaksi kasir');
 
@@ -1209,6 +1226,7 @@ class SettingsRbac extends Component
             $this->integrasiForm['duitku_api_key'] = $savedDuitku['api_key'] ?? '';
             $this->integrasiForm['duitku_merchant_key'] = $savedDuitku['merchant_key'] ?? '';
             $this->integrasiForm['duitku_expiry_period'] = (int) ($savedDuitku['expiry_period'] ?? 1440);
+            $this->integrasiForm['duitku_logo'] = (string) ($savedDuitku['logo'] ?? '');
         } else {
             $this->integrasiForm['duitku_mode'] = config('duitku.sandbox') ? 'sandbox' : 'production';
             $this->integrasiForm['duitku_merchant_code'] = (string) config('duitku.merchant_code', '');
@@ -1225,9 +1243,16 @@ class SettingsRbac extends Component
             $this->integrasiForm['biteship_api_key'] = (string) env('BITESHIP_API_KEY', '');
         }
 
-        // Metode Pembayaran MP Toko
-        $this->integrasiForm['payment_mp_duitku_enabled'] = (bool) $config->get('payment_mp_duitku_enabled', true);
-        $this->integrasiForm['payment_mp_qris_toko_enabled'] = (bool) $config->get('payment_mp_qris_toko_enabled', true);
+        // Metode Pembayaran MP Toko (prioritaskan KonfigurasiService, fallback WebKonsumenService)
+        $webKonsumen = app(WebKonsumenService::class);
+        $crmDuitku = $config->get('payment_mp_duitku_enabled');
+        $crmQrisToko = $config->get('payment_mp_qris_toko_enabled');
+        $this->integrasiForm['payment_mp_duitku_enabled'] = $crmDuitku !== null
+            ? (bool) $crmDuitku
+            : (bool) $webKonsumen->get('payment_mp_duitku_enabled', true);
+        $this->integrasiForm['payment_mp_qris_toko_enabled'] = $crmQrisToko !== null
+            ? (bool) $crmQrisToko
+            : (bool) $webKonsumen->get('payment_mp_qris_toko_enabled', true);
 
         // Asymmetric Hybrid Sync
         $savedSync = $config->get('hybrid_sync_config');
@@ -1446,6 +1471,8 @@ class SettingsRbac extends Component
             'integrasiForm.duitku_api_key' => 'nullable|string|max:255',
             'integrasiForm.duitku_merchant_key' => 'nullable|string|max:255',
             'integrasiForm.duitku_expiry_period' => 'required|integer|min:15|max:10080',
+            'integrasiForm.duitku_logo' => 'nullable|string|max:255',
+            'duitkuLogoFile' => 'nullable|mimes:jpg,jpeg,png,svg,webp|max:2048',
             'integrasiForm.biteship_api_key' => 'nullable|string|max:255',
 
             // Asymmetric Hybrid Sync — nilai ini jadi sumber runtime (lihat
@@ -1477,12 +1504,27 @@ class SettingsRbac extends Component
         ], 'Konfigurasi WhatsApp Gateway');
 
         // 2. Duitku Config
+        $logoPath = (string) ($this->integrasiForm['duitku_logo'] ?? '');
+
+        if ($this->duitkuLogoFile) {
+            $logoPath = $this->duitkuLogoFile->store('duitku-logo', 'public');
+            $this->duitkuLogoFile = null;
+        }
+
+        if ($this->hapusDuitkuLogo) {
+            $logoPath = '';
+            $this->hapusDuitkuLogo = false;
+        }
+
+        $this->integrasiForm['duitku_logo'] = $logoPath;
+
         $config->set('duitku_gateway_config', [
             'mode' => $this->integrasiForm['duitku_mode'],
             'merchant_code' => $this->integrasiForm['duitku_merchant_code'],
             'api_key' => $this->integrasiForm['duitku_api_key'],
             'merchant_key' => $this->integrasiForm['duitku_merchant_key'],
             'expiry_period' => (int) $this->integrasiForm['duitku_expiry_period'],
+            'logo' => $logoPath,
         ], 'Konfigurasi Payment Gateway Duitku');
 
         // 3. Biteship Config
@@ -1491,9 +1533,15 @@ class SettingsRbac extends Component
             'origin_type' => $this->integrasiForm['biteship_origin_type'],
         ], 'Konfigurasi Ekspedisi Biteship');
 
-        // 4. Pembayaran MP Toko
-        $config->set('payment_mp_duitku_enabled', (bool) ($this->integrasiForm['payment_mp_duitku_enabled'] ?? true), 'Aktivasi Gateway Duitku MP');
-        $config->set('payment_mp_qris_toko_enabled', (bool) ($this->integrasiForm['payment_mp_qris_toko_enabled'] ?? true), 'Aktivasi QRIS Dinamis Toko MP');
+        // 4. Pembayaran MP Toko (sinkron ke KonfigurasiService + WebKonsumenService)
+        $duitkuEnabled = (bool) ($this->integrasiForm['payment_mp_duitku_enabled'] ?? true);
+        $qrisTokoEnabled = (bool) ($this->integrasiForm['payment_mp_qris_toko_enabled'] ?? true);
+        $config->set('payment_mp_duitku_enabled', $duitkuEnabled, 'Aktivasi Gateway Duitku MP');
+        $config->set('payment_mp_qris_toko_enabled', $qrisTokoEnabled, 'Aktivasi QRIS Dinamis Toko MP');
+        app(WebKonsumenService::class)->saveSettings([
+            'payment_mp_duitku_enabled' => $duitkuEnabled,
+            'payment_mp_qris_toko_enabled' => $qrisTokoEnabled,
+        ], auth()->id());
 
         // 5. Asymmetric Hybrid Sync
         $syncEnabled = (bool) ($this->integrasiForm['sync_enabled'] ?? false);
@@ -1537,6 +1585,62 @@ class SettingsRbac extends Component
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => 'Konfigurasi integrasi gateway (WhatsApp, Duitku, Biteship) berhasil disimpan.',
+        ]);
+    }
+
+    public function updatedIntegrasiForm(mixed $value, string $key): void
+    {
+        if (! in_array($key, ['payment_mp_duitku_enabled', 'payment_mp_qris_toko_enabled'], true)) {
+            return;
+        }
+
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah saluran pembayaran marketplace.')) {
+            $this->loadIntegrasiConfig();
+
+            return;
+        }
+
+        $duitkuEnabled = (bool) ($this->integrasiForm['payment_mp_duitku_enabled'] ?? false);
+        $qrisTokoEnabled = (bool) ($this->integrasiForm['payment_mp_qris_toko_enabled'] ?? false);
+
+        $config = app(KonfigurasiService::class);
+        $config->set('payment_mp_duitku_enabled', $duitkuEnabled, 'Aktivasi Gateway Duitku MP');
+        $config->set('payment_mp_qris_toko_enabled', $qrisTokoEnabled, 'Aktivasi QRIS Dinamis Toko MP');
+
+        app(WebKonsumenService::class)->saveSettings([
+            'payment_mp_duitku_enabled' => $duitkuEnabled,
+            'payment_mp_qris_toko_enabled' => $qrisTokoEnabled,
+        ], auth()->id());
+
+        $label = $key === 'payment_mp_duitku_enabled'
+            ? ('Gateway Duitku '.($duitkuEnabled ? 'diaktifkan' : 'dinonaktifkan'))
+            : ('QRIS Dinamis Toko '.($qrisTokoEnabled ? 'diaktifkan' : 'dinonaktifkan'));
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => $label.' dan disinkronkan ke Web Konsumen.',
+        ]);
+    }
+
+    public function testKoneksiDuitku(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin menguji koneksi gateway Duitku.')) {
+            return;
+        }
+
+        $hasil = app(DuitkuService::class)->testConnection(
+            (string) ($this->integrasiForm['duitku_mode'] ?? 'sandbox'),
+            (string) ($this->integrasiForm['duitku_merchant_code'] ?? ''),
+            (string) ($this->integrasiForm['duitku_api_key'] ?? ''),
+            (string) ($this->integrasiForm['duitku_merchant_key'] ?? '')
+        );
+
+        $this->duitkuTestStatus = $hasil['ok'] ? 'success' : 'error';
+        $this->duitkuTestMessage = $hasil['message'];
+
+        $this->dispatch('alert', [
+            'type' => $hasil['ok'] ? 'success' : 'error',
+            'message' => $hasil['message'],
         ]);
     }
 
@@ -2368,6 +2472,10 @@ class SettingsRbac extends Component
             'cabangForm.nama' => 'required|string|max:255',
             'cabangForm.kode' => 'required|string|max:20|unique:cabang,kode,'.($this->cabangForm['id'] ?? 'NULL'),
         ]);
+
+        if (! empty($this->cabangForm['telepon'])) {
+            $this->cabangForm['telepon'] = NomorTeleponIndonesia::standar($this->cabangForm['telepon']);
+        }
 
         if ($this->cabangForm['id']) {
             Cabang::findOrFail($this->cabangForm['id'])->update($this->cabangForm);

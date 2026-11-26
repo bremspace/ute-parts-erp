@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Console\Commands\SyncFlushCommand;
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\TransaksiSequenceService;
@@ -963,6 +964,42 @@ class HybridSyncTest extends TestCase
         $this->assertDatabaseHas('jurnal_header', [
             'sumber' => 'pos',
             'cabang_id' => $this->cabang->id,
+        ]);
+    }
+
+    /**
+     * Regresi: matcher closure pada resolveForeignId() dulu diabaikan karena
+     * dianggap array. Akibatnya query tanpa WHERE -> pelanggan pertama terpilih.
+     */
+    public function test_servis_update_memilih_pelanggan_berdasarkan_telepon_bukan_yang_pertama(): void
+    {
+        Pelanggan::create(['nama' => 'Pelanggan Pertama', 'telepon' => '6281100000001']);
+        $target = Pelanggan::create(['nama' => 'Pelanggan Tujuan', 'telepon' => '6281100000002']);
+
+        $processor = app(HybridSyncProcessorService::class);
+        $result = $processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'servis.update',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => [
+                'no_tiket' => 'SRV-SYNC-TEL-01',
+                'cabang_id' => $this->cabang->id,
+                'nama_pelanggan' => 'Pelanggan Tujuan',
+                // Kunci yang dipakai TiketServisSyncObserver + format lokal,
+                // harus tetap ketemu lewat kandidat normalisasi.
+                'pelanggan_telepon' => '081100000002',
+                'telepon_pelanggan' => '081100000002',
+                'jenis_hp' => 'iPhone 13',
+                'keluhan' => 'Tes resolusi pelanggan',
+                'status' => 'diterima',
+                'token_approval' => 'token-sync-tel-01',
+            ],
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertDatabaseHas('tiket_servis', [
+            'no_tiket' => 'SRV-SYNC-TEL-01',
+            'pelanggan_id' => $target->id,
         ]);
     }
 }

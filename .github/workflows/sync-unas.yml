@@ -16,6 +16,7 @@ on:
 permissions:
   contents: write
   issues: write
+  actions: write
 
 concurrency:
   group: sync-unas-${{ github.ref }}
@@ -31,6 +32,7 @@ jobs:
           fetch-depth: 0
 
       - name: Merge brem into Unas
+        id: merge
         env:
           GIT_AUTHOR_NAME: bremspace-bot
           GIT_AUTHOR_EMAIL: bot@bremspace.id
@@ -46,11 +48,20 @@ jobs:
           if git merge origin/brem --no-edit; then
             git push origin Unas
             echo "SYNC_OK: brem -> Unas"
+            # Commit bot (GITHUB_TOKEN) tidak memicu workflow lain, jadi CI
+            # harus dipicu eksplisit agar sha hasil sync punya run sendiri.
+            echo "synced=true" >> "$GITHUB_OUTPUT"
           else
             echo "SYNC_CONFLICT: merge brem -> Unas bentrok, perlu resolusi manual oleh Unas"
             git merge --abort
             exit 1
           fi
+
+      - name: Picu CI untuk commit hasil sync
+        if: steps.merge.outputs.synced == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run ci.yml --ref Unas
 
       - name: Deteksi simpangan & laporkan
         env:

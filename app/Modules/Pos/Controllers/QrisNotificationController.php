@@ -65,29 +65,44 @@ class QrisNotificationController extends Controller
 
         $candidates = array_unique(array_filter($candidates, fn ($c) => filled($c)));
 
-        // 2. Validasi secret token jika dikonfigurasi di sistem
+        // 2. Validasi secret token — FAIL-CLOSED.
+        //    Secret kosong BUKAN berarti "bebas akses": endpoint ini bisa melunasi order
+        //    marketplace, jadi tanpa secret harus mati total (503), bukan terbuka.
         $secretExpected = trim((string) $configService->get('qris_webhook_secret'), " \t\n\r\0\x0B\"'");
-        if (filled($secretExpected)) {
-            // Lolos jika salah satu kandidat secret token yang dikirim cocok dengan yang diharapkan
-            $isAuthorized = in_array($secretExpected, $candidates, true);
 
-            if (! $isAuthorized) {
-                $providedList = ! empty($candidates) ? implode(', ', $candidates) : '(kosong)';
-                $this->catatLogHistory([
-                    'status' => 'unauthorized',
-                    'pesan' => 'Secret token tidak cocok (diterima: '.$providedList.', diharapkan: '.$secretExpected.')',
-                    'nominal' => null,
-                    'title' => (string) ($request->input('title') ?? $request->query('title') ?? 'QRIS Notification'),
-                    'raw' => filled($rawContent) ? $rawContent : json_encode($request->all()),
-                    'waktu' => now()->format('Y-m-d H:i:s'),
-                    'ip' => $request->ip(),
-                ]);
+        if ($secretExpected === '') {
+            Log::warning('Webhook QRIS ditolak: qris_webhook_secret belum dikonfigurasi.');
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized: secret token tidak valid.',
-                ], 401);
+            return response()->json([
+                'success' => false,
+                'message' => 'Webhook QRIS belum dikonfigurasi. Set secret token di Pengaturan > QRIS.',
+            ], 503);
+        }
+
+        $isAuthorized = false;
+        foreach ($candidates as $candidate) {
+            // hash_equals: bandingkan waktu-konstan, jangan bocorkan panjang/prefix secret.
+            if (hash_equals($secretExpected, (string) $candidate)) {
+                $isAuthorized = true;
+                break;
             }
+        }
+
+        if (! $isAuthorized) {
+            $this->catatLogHistory([
+                'status' => 'unauthorized',
+                'pesan' => 'Secret token tidak cocok (jumlah kandidat diterima: '.count($candidates).').',
+                'nominal' => null,
+                'title' => (string) ($request->input('title') ?? $request->query('title') ?? 'QRIS Notification'),
+                'raw' => filled($rawContent) ? $rawContent : json_encode($request->all()),
+                'waktu' => now()->format('Y-m-d H:i:s'),
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: secret token tidak valid.',
+            ], 401);
         }
 
         // 3. Ekstrak pesan teks dan judul dari berbagai variasi field MacroDroid / PayHook / forwarder Android
@@ -315,6 +330,15 @@ class QrisNotificationController extends Controller
      */
     private function catatLogHistory(array $entry): void
     {
+        // Jangan pernah menyimpan secret/token apa adanya — riwayat ini tampil di UI admin.
+        if (isset($entry['raw'])) {
+            $entry['raw'] = (string) preg_replace(
+                '/((?:secret|token)\b\s*[:=]\s*["\']?)[^"\'&\s]+/i',
+                '$1***',
+                (string) $entry['raw']
+            );
+        }
+
         try {
             $history = Cache::get('qris_webhook_log_history', []);
             if (! is_array($history)) {

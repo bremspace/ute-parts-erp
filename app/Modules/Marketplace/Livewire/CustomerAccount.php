@@ -6,11 +6,13 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Marketplace\Models\PelangganDeviceSession;
+use App\Modules\Marketplace\Services\PaymentBrandService;
 use App\Modules\Marketplace\Support\HargaTampilan;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Services\SessionManagementService;
 use App\Modules\Servis\Models\TiketServis;
+use App\Support\NomorTeleponIndonesia;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -386,8 +388,15 @@ class CustomerAccount extends Component
             ? app(PelangganService::class)->normalizePhone($this->telepon)
             : $customer->telepon;
 
+        // Simpan dalam format kanonik sebelum validasi unik, dan anggap nomor
+        // lama 08… dengan input 62… sebagai nomor yang sama (bukan perubahan identitas).
+        if (! empty($this->telepon) && $teleponBaru !== '') {
+            $this->telepon = $teleponBaru;
+        }
+        $teleponLamaStandar = NomorTeleponIndonesia::standar($customer->telepon);
+
         $identitasBerubah =
-            $teleponBaru !== (string) ($customer->telepon ?? '')
+            ($teleponBaru !== '' && $teleponBaru !== $teleponLamaStandar)
             || trim((string) $this->email) !== (string) ($customer->email ?? '');
 
         $this->validate([
@@ -531,6 +540,7 @@ class CustomerAccount extends Component
             'downlines' => $this->downlines,
             'perangkat' => $this->activeTab === 'sesi' ? $this->perangkat : collect(),
             'membershipInfo' => $this->activeTab === 'membership' ? $this->membershipInfo : [],
+            'paymentBrand' => app(PaymentBrandService::class)->info(),
         ])->layout('layouts.marketplace', ['title' => 'Akun Saya']);
     }
 }

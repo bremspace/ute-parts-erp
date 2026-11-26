@@ -1108,6 +1108,9 @@
     <div class="space-y-6">
         @php
             $activeQris = app(\App\Modules\Pos\Services\QrisService::class)->getActiveQris();
+            $duitkuService = app(\App\Modules\Marketplace\Services\DuitkuService::class);
+            $duitkuConfigured = $duitkuService->isConfigured();
+            $duitkuSandbox = $duitkuService->isSandbox();
             $duitkuActive = (bool) ($paymentForm['payment_mp_duitku_enabled'] ?? false);
             $qrisTokoActive = (bool) ($paymentForm['payment_mp_qris_toko_enabled'] ?? false);
         @endphp
@@ -1182,6 +1185,16 @@
                         </span>
                     </div>
                     <div class="flex items-center justify-between">
+                        <span>Kredensial &amp; Mode:</span>
+                        @if($duitkuConfigured)
+                            <span class="font-bold {{ $duitkuSandbox ? 'text-up-amber' : 'text-up-mint' }}">
+                                {{ $duitkuSandbox ? '🧪 Sandbox' : '🚀 Production' }} ({{ $duitkuService->getMerchantCode() }})
+                            </span>
+                        @else
+                            <span class="font-bold text-up-red">Belum Dikonfigurasi</span>
+                        @endif
+                    </div>
+                    <div class="flex items-center justify-between">
                         <span>Cakupan Bank:</span>
                         <span class="text-white font-mono text-[11px]">BCA, Mandiri, BRI, BNI, Permata, dll</span>
                     </div>
@@ -1237,6 +1250,14 @@
                     </div>
                 </div>
             </x-prism.glass-card>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/10">
+            <p class="text-xs text-ink-400">Perubahan toggle langsung tersimpan &amp; disinkronkan ke Pusat Pengaturan.</p>
+            <button type="button" wire:click="savePaymentChannels" wire:loading.attr="disabled"
+                    class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white text-xs font-semibold cursor-pointer disabled:opacity-50 shrink-0">
+                Simpan Pengaturan Pembayaran
+            </button>
         </div>
     </div>
     @endif

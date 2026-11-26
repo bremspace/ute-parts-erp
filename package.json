@@ -2,6 +2,11 @@
     "$schema": "https://www.schemastore.org/package.json",
     "private": true,
     "type": "module",
+    "overrides": {
+        "fast-uri": "3.1.9",
+        "serialize-javascript": "7.1.4",
+        "glob": "14.0.6"
+    },
     "scripts": {
         "build": "vite build",
         "dev": "vite"

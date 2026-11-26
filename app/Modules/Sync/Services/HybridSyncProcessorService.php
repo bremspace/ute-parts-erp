@@ -32,6 +32,7 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\StokDeductionService;
+use App\Support\NomorTeleponIndonesia;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -309,7 +310,7 @@ class HybridSyncProcessorService
      *
      * @param  class-string<TModel>  $modelClass
      * @param  array<string, mixed>  $payload
-     * @param  array<int, array<string, mixed>>  $naturalMatchers
+     * @param  array<int, array<string, mixed>|callable>  $naturalMatchers
      */
     protected function resolveForeignId(
         string $modelClass,
@@ -332,25 +333,35 @@ class HybridSyncProcessorService
         }
 
         foreach ($naturalMatchers as $matcher) {
-            if ($matcher === []) {
-                continue;
-            }
-
             $query = $baseQuery();
-            $valid = true;
-            foreach ($matcher as $col => $val) {
-                if ($val === null || $val === '') {
-                    $valid = false;
-                    break;
+
+            if (is_callable($matcher)) {
+                // Matcher closure menyusun WHERE sendiri; nilai false = tidak cocok.
+                if (! $matcher($query)) {
+                    continue;
                 }
-                $query->where($col, $val);
+            } else {
+                if ($matcher === []) {
+                    continue;
+                }
+
+                $valid = true;
+                foreach ($matcher as $col => $val) {
+                    if ($val === null || $val === '') {
+                        $valid = false;
+                        break;
+                    }
+                    $query->where($col, $val);
+                }
+
+                if (! $valid) {
+                    continue;
+                }
             }
 
-            if ($valid) {
-                $id = $query->value('id');
-                if ($id) {
-                    return (int) $id;
-                }
+            $id = $query->value('id');
+            if ($id) {
+                return (int) $id;
             }
         }
 
@@ -421,7 +432,15 @@ class HybridSyncProcessorService
             'pelanggan_id',
             'pelanggan_sync_uuid',
             [
-                ['telepon' => $payload['pelanggan_telepon'] ?? null],
+                function ($query) use ($payload) {
+                    $kandidat = NomorTeleponIndonesia::kandidat($payload['pelanggan_telepon'] ?? null);
+                    if ($kandidat === []) {
+                        return false;
+                    }
+                    $query->whereIn('telepon', $kandidat);
+
+                    return true;
+                },
             ]
         );
     }
@@ -603,7 +622,15 @@ class HybridSyncProcessorService
             Pelanggan::class,
             $payload,
             [
-                ['telepon' => $payload['telepon'] ?? null],
+                function ($query) use ($payload) {
+                    $kandidat = NomorTeleponIndonesia::kandidat($payload['telepon'] ?? null);
+                    if ($kandidat === []) {
+                        return false;
+                    }
+                    $query->whereIn('telepon', $kandidat);
+
+                    return true;
+                },
                 ['username' => $payload['username'] ?? null],
                 ['email' => $payload['email'] ?? null],
                 ['kode_agen' => $payload['kode_agen'] ?? null],
@@ -632,7 +659,9 @@ class HybridSyncProcessorService
         $pelanggan->fill([
             'nama' => $payload['nama'] ?? $pelanggan->nama ?? 'Pelanggan',
             'username' => $payload['username'] ?? $pelanggan->username,
-            'telepon' => $payload['telepon'] ?? $pelanggan->telepon,
+            'telepon' => ! empty($payload['telepon'])
+                ? NomorTeleponIndonesia::standar($payload['telepon'])
+                : $pelanggan->telepon,
             'email' => $payload['email'] ?? $pelanggan->email,
             'avatar' => $payload['avatar'] ?? $pelanggan->avatar,
             'alamat' => $payload['alamat'] ?? $pelanggan->alamat,

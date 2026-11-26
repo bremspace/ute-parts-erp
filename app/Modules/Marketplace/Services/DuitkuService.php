@@ -3,6 +3,8 @@
 namespace App\Modules\Marketplace\Services;
 
 use App\Modules\Crm\Services\KonfigurasiService;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -43,19 +45,30 @@ class DuitkuService
     /** hmac | md5 | dual — default dual selama masa transisi. */
     private string $signatureMode;
 
+    private int $expiryPeriod;
+
     public function __construct()
     {
         $cfg = app(KonfigurasiService::class)->get('duitku_gateway_config');
         if (is_array($cfg) && filled($cfg['merchant_code'] ?? null)) {
-            $this->merchantCode = (string) ($cfg['merchant_code'] ?? '');
-            $this->apiKey = (string) ($cfg['api_key'] ?? '');
-            $this->merchantKey = (string) ($cfg['merchant_key'] ?? '');
+            $this->merchantCode = trim((string) ($cfg['merchant_code'] ?? ''));
+            $this->apiKey = trim((string) ($cfg['api_key'] ?? ''));
+            $this->merchantKey = trim((string) ($cfg['merchant_key'] ?? ''));
             $this->sandbox = ($cfg['mode'] ?? 'sandbox') === 'sandbox';
+            $this->expiryPeriod = max(15, (int) ($cfg['expiry_period'] ?? config('duitku.expiry_period', 1440)));
         } else {
-            $this->merchantCode = (string) config('duitku.merchant_code');
-            $this->apiKey = (string) config('duitku.api_key');
-            $this->merchantKey = (string) config('duitku.merchant_key');
+            $this->merchantCode = trim((string) config('duitku.merchant_code'));
+            $this->apiKey = trim((string) config('duitku.api_key'));
+            $this->merchantKey = trim((string) config('duitku.merchant_key'));
             $this->sandbox = (bool) config('duitku.sandbox');
+            $this->expiryPeriod = max(15, (int) config('duitku.expiry_period', 1440));
+        }
+
+        // Di portal Duitku hanya ada 1 project API key; bila admin hanya mengisi salah satu field, fallback otomatis.
+        if ($this->apiKey === '' && $this->merchantKey !== '') {
+            $this->apiKey = $this->merchantKey;
+        } elseif ($this->merchantKey === '' && $this->apiKey !== '') {
+            $this->merchantKey = $this->apiKey;
         }
 
         $this->baseUrl = $this->sandbox
@@ -68,7 +81,7 @@ class DuitkuService
 
     public function isConfigured(): bool
     {
-        return $this->merchantCode !== '' && $this->apiKey !== '' && $this->merchantKey !== '';
+        return $this->merchantCode !== '' && ($this->apiKey !== '' || $this->merchantKey !== '');
     }
 
     public function getMerchantCode(): string
@@ -118,7 +131,7 @@ class DuitkuService
             $targetCallbackUrl = ($parsedCb['scheme'] ?? 'http').'://'.$parsedCb['host'].($parsedCb['path'] ?? '/webhook/duitku');
         }
 
-        $payload = array_filter([
+        $basePayload = array_filter([
             'merchantCode' => $this->merchantCode,
             'paymentAmount' => $paymentAmount,
             'paymentMethod' => $paymentMethod ?: 'VA',
@@ -132,12 +145,14 @@ class DuitkuService
             // Setelah bayar di halaman Duitku, kembali ke Akun Saya (daftar
             // pesanan + status live) — bukan checkout kosong.
             'returnUrl' => $returnUrl ?: url('/account'),
-            'expiryPeriod' => (int) config('duitku.expiry_period'),
-            'signature' => $this->sign($this->merchantCode.$merchantOrderId.$paymentAmount),
+            'expiryPeriod' => $this->expiryPeriod,
         ], fn ($v) => $v !== null);
 
-        // retry(2,…) = 2 percobaan (1 retry) — aman karena merchantOrderId idempotent
-        $response = Http::timeout(20)->retry(2, 1000)->post($this->baseUrl.'/v2/inquiry', $payload);
+        $response = $this->postWithSignatureFallback(
+            '/v2/inquiry',
+            $basePayload,
+            $this->merchantCode.$merchantOrderId.$paymentAmount
+        );
 
         $data = $response->json() ?? [];
 
@@ -217,17 +232,20 @@ class DuitkuService
         $paymentAmount = (int) round($amount);
         $datetime = date('Y-m-d H:i:s');
 
-        $payload = [
+        $basePayload = [
             'merchantCode' => $this->merchantCode,
             // Uji live sandbox (2026-10-17): field bernama 'amount' — docs
             // menulis 'paymentAmount' tapi server hanya membaca 'amount'
             // (signature cocok hanya saat field ini ada).
             'amount' => $paymentAmount,
             'datetime' => $datetime,
-            'signature' => $this->sign($this->merchantCode.$paymentAmount.$datetime),
         ];
 
-        $response = Http::timeout(20)->retry(2, 1000)->post($this->baseUrl.'/paymentmethod/getpaymentmethod', $payload);
+        $response = $this->postWithSignatureFallback(
+            '/paymentmethod/getpaymentmethod',
+            $basePayload,
+            $this->merchantCode.$paymentAmount.$datetime
+        );
 
         $data = $response->json() ?? [];
 
@@ -481,13 +499,121 @@ class DuitkuService
      * Tanda tangan outbound sesuai signature_mode.
      * hmac/dual → HMAC-SHA256 (docs resmi); md5 → md5(stringToSign + apiKey) (legacy).
      */
-    private function sign(string $stringToSign): string
+    private function sign(string $stringToSign, ?string $keyOverride = null): string
     {
+        $key = $keyOverride ?? $this->apiKey;
+
         if ($this->signatureMode === 'md5') {
-            return md5($stringToSign.$this->apiKey);
+            return md5($stringToSign.$key);
         }
 
-        return hash_hmac('sha256', $stringToSign, $this->apiKey);
+        return hash_hmac('sha256', $stringToSign, $key);
+    }
+
+    /**
+     * Kirim POST ke endpoint Duitku dengan fallback otomatis ke merchantKey bila
+     * apiKey dan merchantKey berbeda serta respon mengembalikan 403 Invalid Signature.
+     */
+    private function postWithSignatureFallback(string $path, array $basePayload, string $stringToSign): Response
+    {
+        $url = $this->baseUrl.$path;
+        $payload = array_merge($basePayload, ['signature' => $this->sign($stringToSign, $this->apiKey)]);
+        $shouldRetry = fn (\Throwable $e): bool => ! ($e instanceof RequestException && $e->response->status() === 403);
+
+        try {
+            return Http::timeout(20)->retry(2, 1000, $shouldRetry)->post($url, $payload);
+        } catch (RequestException $e) {
+            $resp = $e->response;
+            if (
+                $resp->status() === 403
+                && str_contains(strtolower($resp->body()), 'signature')
+                && $this->merchantKey !== ''
+                && $this->merchantKey !== $this->apiKey
+            ) {
+                Log::warning('[Duitku] Signature api_key ditolak (403), mencoba fallback merchant_key', ['path' => $path]);
+                $fallbackPayload = array_merge($basePayload, ['signature' => $this->sign($stringToSign, $this->merchantKey)]);
+
+                return Http::timeout(20)->retry(2, 1000, $shouldRetry)->post($url, $fallbackPayload);
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Uji koneksi & kredensial spesifik tanpa menyimpan ke DB terlebih dahulu.
+     *
+     * @return array{ok: bool, methods_count: int, message: string, used_fallback_key: bool}
+     */
+    public function testConnection(string $mode, string $merchantCode, string $apiKey, string $merchantKey = ''): array
+    {
+        $mc = trim($merchantCode);
+        $ak = trim($apiKey) !== '' ? trim($apiKey) : trim($merchantKey);
+        $mk = trim($merchantKey) !== '' ? trim($merchantKey) : $ak;
+
+        if ($mc === '' || $ak === '') {
+            return [
+                'ok' => false,
+                'methods_count' => 0,
+                'message' => 'Merchant Code dan API Key wajib diisi sebelum uji koneksi.',
+                'used_fallback_key' => false,
+            ];
+        }
+
+        $baseUrl = $mode === 'production'
+            ? config('duitku.production_url')
+            : config('duitku.sandbox_url');
+        $datetime = date('Y-m-d H:i:s');
+        $amount = 10000;
+        $stringToSign = $mc.$amount.$datetime;
+        $payload = [
+            'merchantCode' => $mc,
+            'amount' => $amount,
+            'datetime' => $datetime,
+            'signature' => $this->sign($stringToSign, $ak),
+        ];
+
+        $usedFallback = false;
+        try {
+            $response = Http::timeout(15)->post($baseUrl.'/paymentmethod/getpaymentmethod', $payload);
+            if ($response->status() === 403 && str_contains(strtolower($response->body()), 'signature') && $mk !== '' && $mk !== $ak) {
+                $payload['signature'] = $this->sign($stringToSign, $mk);
+                $response = Http::timeout(15)->post($baseUrl.'/paymentmethod/getpaymentmethod', $payload);
+                $usedFallback = $response->ok();
+            }
+
+            $data = $response->json() ?? [];
+            if (! $response->ok() || ! $this->isSuccessResponse($data)) {
+                $err = $this->pickField($data, 'message')
+                    ?: $this->pickField($data, 'Message')
+                    ?: ('HTTP '.$response->status());
+
+                return [
+                    'ok' => false,
+                    'methods_count' => 0,
+                    'message' => 'Gagal terhubung ke Duitku ('.strtoupper($mode).'): '.$err,
+                    'used_fallback_key' => false,
+                ];
+            }
+
+            $count = count($this->pickField($data, 'paymentFee') ?? []);
+
+            return [
+                'ok' => true,
+                'methods_count' => $count,
+                'message' => $usedFallback
+                    ? 'Terhubung ke Duitku ('.strtoupper($mode)."), {$count} metode tersedia — catatan: Merchant Key valid, perbarui field API Key agar sama."
+                    : 'Terhubung ke Duitku ('.strtoupper($mode)."), {$count} metode pembayaran aktif tersedia.",
+                'used_fallback_key' => $usedFallback,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'ok' => false,
+                'methods_count' => 0,
+                'message' => 'Tidak dapat menjangkau server Duitku: '.$e->getMessage(),
+                'used_fallback_key' => false,
+            ];
+        }
     }
 
     /**

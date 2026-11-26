@@ -491,7 +491,7 @@ class KonfigurasiService
             'nama_toko' => 'BREMSPACE',
             'slogan' => 'Pusat Sparepart & Servis Gadget',
             'alamat' => 'Jl. Veteran No. 12',
-            'telepon' => '0812-3456-7890',
+            'telepon' => '6281234567890',
             'website_medsos' => 'www.bremspace.com',
             'logo_url' => $this->get('app_logo'),
 
@@ -565,7 +565,7 @@ class KonfigurasiService
             'nama_toko' => $struk['nama_toko'] ?? 'BREMSPACE',
             'slogan' => $struk['slogan'] ?? 'Pusat Sparepart & Servis Gadget',
             'alamat' => $struk['alamat'] ?? 'Jl. Veteran No. 12',
-            'telepon' => $struk['telepon'] ?? '0812-3456-7890',
+            'telepon' => $struk['telepon'] ?? '6281234567890',
             'website_medsos' => $struk['website_medsos'] ?? 'www.bremspace.com',
         ];
     }

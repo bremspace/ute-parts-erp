@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Models;
 
 use App\Modules\Rbac\Traits\CatatAktivitas;
+use App\Support\NomorTeleponIndonesia;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -83,10 +84,7 @@ class PurchaseOrder extends Model
             return null;
         }
 
-        $phone = preg_replace('/[^0-9]/', '', (string) $supplier->telepon);
-        if (str_starts_with($phone, '0')) {
-            $phone = '62'.substr($phone, 1);
-        }
+        $phone = NomorTeleponIndonesia::standar($supplier->telepon);
 
         $cabangNama = $this->gudangTujuan?->cabang?->nama ?? config('app.name', 'Bremspace');
         $gudangNama = $this->gudangTujuan?->nama ?? '-';
@@ -127,10 +125,7 @@ class PurchaseOrder extends Model
             return null;
         }
 
-        $phone = preg_replace('/[^0-9]/', '', (string) $supplier->telepon);
-        if (str_starts_with($phone, '0')) {
-            $phone = '62'.substr($phone, 1);
-        }
+        $phone = NomorTeleponIndonesia::standar($supplier->telepon);
 
         $cabangNama = $this->gudangTujuan?->cabang?->nama ?? config('app.name', 'Bremspace');
         $gudangNama = $this->gudangTujuan?->nama ?? '-';

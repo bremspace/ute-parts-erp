@@ -8,6 +8,7 @@ use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Reseller\Models\SkemaKomisiReseller;
 use App\Modules\Reseller\Services\KomisiService;
+use App\Support\NomorTeleponIndonesia;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -23,6 +24,10 @@ class ResellerController extends Controller
     // [API: RESELLER-05][T-21] Daftarkan reseller baru + skema komisi custom per kategori
     public function daftarReseller(Request $request)
     {
+        if ($request->filled('telepon')) {
+            $request->merge(['telepon' => NomorTeleponIndonesia::standar($request->telepon)]);
+        }
+
         $request->validate([
             'nama' => 'required|string|max:255',
             'telepon' => 'required|string|max:20|unique:pelanggan,telepon',

@@ -19,7 +19,7 @@ class CustomerLoginTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_customer_can_login_with_phone_normalization_and_redirects_to_shop_when_cart_empty(): void
+    public function test_customer_can_login_with_phone_normalization_and_redirects_to_account(): void
     {
         Pelanggan::create([
             'nama' => 'Budi Santoso',
@@ -33,11 +33,14 @@ class CustomerLoginTest extends TestCase
             'password' => 'secret123',
         ]);
 
-        $response->assertRedirect('/shop');
+        $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
+
+        // Tujuan redirect benar-benar bisa dibuka (tidak redirect balik / error).
+        $this->get('/account')->assertSuccessful();
     }
 
-    public function test_customer_login_redirects_to_checkout_when_cart_is_not_empty(): void
+    public function test_customer_login_redirects_to_account_even_when_cart_is_not_empty(): void
     {
         Pelanggan::create([
             'nama' => 'Budi Santoso',
@@ -57,7 +60,7 @@ class CustomerLoginTest extends TestCase
             'password' => 'secret123',
         ]);
 
-        $response->assertRedirect('/checkout');
+        $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 
@@ -95,7 +98,7 @@ class CustomerLoginTest extends TestCase
             'password' => 'secret123',
         ]);
 
-        $response->assertRedirect('/shop');
+        $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 
@@ -133,7 +136,7 @@ class CustomerLoginTest extends TestCase
             'password' => 'secret123',
         ]);
 
-        $response->assertRedirect('/shop');
+        $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 
@@ -222,7 +225,7 @@ class CustomerLoginTest extends TestCase
             'password' => 'passwordBaru2026',
         ]);
 
-        $response->assertRedirect('/shop');
+        $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 
@@ -265,7 +268,7 @@ class CustomerLoginTest extends TestCase
             'telepon' => '081555555555',
             'password' => 'passwordBaruPending',
         ]);
-        $response->assertRedirect('/shop');
+        $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 
@@ -302,7 +305,7 @@ class CustomerLoginTest extends TestCase
             'telepon' => '081444444444',
             'password' => 'passwordLangsung123',
         ]);
-        $response->assertRedirect('/shop');
+        $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 
@@ -346,7 +349,7 @@ class CustomerLoginTest extends TestCase
             'telepon' => '081333333333',
             'password' => 'passwordWalkIn123',
         ]);
-        $response->assertRedirect('/shop');
+        $response->assertRedirect('/account');
         $this->assertAuthenticated('customer');
     }
 }

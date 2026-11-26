@@ -170,7 +170,7 @@ class SetupWizardTest extends TestCase
         // Cabang terupdate
         $cabang->refresh();
         $this->assertEquals('Cabang Sentral', $cabang->nama);
-        $this->assertEquals('081299998888', $cabang->telepon);
+        $this->assertEquals('6281299998888', $cabang->telepon);
 
         // User terupdate
         $admin->refresh();
@@ -468,6 +468,6 @@ class SetupWizardTest extends TestCase
 
         $waSetting = WebKonsumenSetting::where('setting_key', 'wa_number')->first();
         $this->assertNotNull($waSetting);
-        $this->assertEquals('081299998888', $waSetting->setting_value);
+        $this->assertEquals('6281299998888', $waSetting->setting_value);
     }
 }

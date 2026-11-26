@@ -177,7 +177,7 @@ class LeadConversionTest extends TestCase
         }
         $resp->assertJsonPath('success', true);
 
-        $pelanggan = Pelanggan::where('telepon', '089876543210')->first();
+        $pelanggan = Pelanggan::where('telepon', '6289876543210')->first();
         $this->assertNotNull($pelanggan, 'Pelanggan harus dibuat dari lead won');
         $this->assertEquals('Pelanggan Konversi', $pelanggan->nama);
         $this->assertEquals($pelanggan->id, $resp->json('data.id'));
