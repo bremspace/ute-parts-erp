@@ -8,6 +8,7 @@ use App\Modules\Marketplace\Support\HargaTampilan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Produk;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
@@ -179,7 +180,7 @@ class CartCheckout extends Component
                 'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
                 'kategori' => $p->kategori ?: ($p->kategoriRelasi?->nama ?? null),
                 'kualitas' => $p->kualitas?->nama ?? null,
-                'brand' => ($p->brand instanceof \App\Modules\Wms\Models\Brand ? $p->brand->nama : null) ?? ($p->brand_kompatibel ?? null),
+                'brand' => ($p->brand instanceof Brand ? $p->brand->nama : null) ?? ($p->brand_kompatibel ?? null),
                 'kompatibel' => $p->tipeHps->isNotEmpty()
                     ? $p->tipeHps->take(2)->map(fn ($t) => trim((string) $t->merk.' '.(string) $t->model))->implode(', ')
                     : null,
