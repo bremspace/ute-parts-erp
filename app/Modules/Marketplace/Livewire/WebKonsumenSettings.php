@@ -282,10 +282,53 @@ class WebKonsumenSettings extends Component
         $this->contactForm['popup_banner_id'] = (string) ($settings['popup_banner_id'] ?? '');
         $this->contactForm['popup_frequency'] = $settings['popup_frequency'] ?? 'once_per_day';
 
-        // Populate Payment Options
+        // Populate Payment Options (KonfigurasiService adalah runtime source of truth)
         $crmConfig = app(KonfigurasiService::class);
-        $this->paymentForm['payment_mp_duitku_enabled'] = (bool) ($settings['payment_mp_duitku_enabled'] ?? $crmConfig->get('payment_mp_duitku_enabled', true));
-        $this->paymentForm['payment_mp_qris_toko_enabled'] = (bool) ($settings['payment_mp_qris_toko_enabled'] ?? $crmConfig->get('payment_mp_qris_toko_enabled', true));
+        $crmDuitku = $crmConfig->get('payment_mp_duitku_enabled');
+        $crmQrisToko = $crmConfig->get('payment_mp_qris_toko_enabled');
+        $this->paymentForm['payment_mp_duitku_enabled'] = $crmDuitku !== null
+            ? (bool) $crmDuitku
+            : (bool) ($settings['payment_mp_duitku_enabled'] ?? true);
+        $this->paymentForm['payment_mp_qris_toko_enabled'] = $crmQrisToko !== null
+            ? (bool) $crmQrisToko
+            : (bool) ($settings['payment_mp_qris_toko_enabled'] ?? true);
+    }
+
+    public function updatedPaymentForm(mixed $value, string $key): void
+    {
+        if (! in_array($key, ['payment_mp_duitku_enabled', 'payment_mp_qris_toko_enabled'], true)) {
+            return;
+        }
+
+        $this->persistPaymentChannels(app(WebKonsumenService::class));
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Status saluran pembayaran marketplace langsung diperbarui.',
+        ]);
+    }
+
+    public function savePaymentChannels(WebKonsumenService $service): void
+    {
+        $this->persistPaymentChannels($service);
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Pengaturan saluran pembayaran marketplace berhasil disimpan.',
+        ]);
+    }
+
+    private function persistPaymentChannels(WebKonsumenService $service): void
+    {
+        $duitkuEnabled = (bool) ($this->paymentForm['payment_mp_duitku_enabled'] ?? false);
+        $qrisTokoEnabled = (bool) ($this->paymentForm['payment_mp_qris_toko_enabled'] ?? false);
+
+        $service->saveSettings([
+            'payment_mp_duitku_enabled' => $duitkuEnabled,
+            'payment_mp_qris_toko_enabled' => $qrisTokoEnabled,
+        ], Auth::id());
+
+        $crmConfig = app(KonfigurasiService::class);
+        $crmConfig->set('payment_mp_duitku_enabled', $duitkuEnabled, 'Aktivasi Gateway Duitku MP');
+        $crmConfig->set('payment_mp_qris_toko_enabled', $qrisTokoEnabled, 'Aktivasi QRIS Dinamis Toko MP');
     }
 
     public function setTab(string $tab): void

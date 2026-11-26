@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Marketplace\Livewire\WebKonsumenSettings;
+use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Rbac\Livewire\SessionManagementPage;
 use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
@@ -242,5 +244,34 @@ class PengaturanSistemIntegrationTest extends TestCase
         $biteship = $config->get('biteship_gateway_config');
         $this->assertIsArray($biteship);
         $this->assertEquals('biteship-api-key-test', $biteship['api_key']);
+    }
+
+    public function test_toggle_duitku_di_settings_rbac_tersinkron_ke_web_konsumen_settings(): void
+    {
+        $this->actingAs($this->superAdmin);
+        session(['cabang_id' => $this->cabang->id]);
+
+        Livewire::withQueryParams(['tab' => 'integrasi'])
+            ->test(SettingsRbac::class)
+            ->set('integrasiForm.payment_mp_duitku_enabled', false)
+            ->assertDispatched('alert')
+            ->set('integrasiForm.payment_mp_duitku_enabled', true)
+            ->assertDispatched('alert');
+
+        $config = app(KonfigurasiService::class);
+        $webKonsumen = app(WebKonsumenService::class);
+
+        $this->assertTrue((bool) $config->get('payment_mp_duitku_enabled'));
+        $this->assertTrue((bool) $webKonsumen->get('payment_mp_duitku_enabled'));
+
+        // Pastikan toggle di WebKonsumenSettings ikut menyinkronkan ke KonfigurasiService
+        Livewire::actingAs($this->superAdmin)
+            ->test(WebKonsumenSettings::class, ['tab' => 'pembayaran'])
+            ->assertSet('paymentForm.payment_mp_duitku_enabled', true)
+            ->set('paymentForm.payment_mp_duitku_enabled', false)
+            ->assertDispatched('alert');
+
+        $this->assertFalse((bool) $config->get('payment_mp_duitku_enabled'));
+        $this->assertFalse((bool) $webKonsumen->get('payment_mp_duitku_enabled'));
     }
 }

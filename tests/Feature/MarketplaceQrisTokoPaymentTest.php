@@ -146,6 +146,7 @@ class MarketplaceQrisTokoPaymentTest extends TestCase
 
         // Mock Duitku Service agar return VA dan QRIS
         $this->mock(DuitkuService::class, function ($mock) {
+            $mock->shouldReceive('isConfigured')->andReturn(true);
             $mock->shouldReceive('getPaymentMethods')->once()->andReturn([
                 [
                     'kode' => 'SP',
@@ -270,5 +271,39 @@ class MarketplaceQrisTokoPaymentTest extends TestCase
         $transaksi->refresh();
         $this->assertEquals('lunas', $transaksi->status);
         $this->assertEquals('qris', $transaksi->metode_bayar);
+    }
+
+    public function test_create_payment_menolak_duitku_saat_dinonaktifkan(): void
+    {
+        $config = app(KonfigurasiService::class);
+        $config->set('payment_mp_duitku_enabled', false);
+
+        $transaksi = $this->createPendingTransaksi(100000);
+
+        $response = $this->actingAs($this->pelanggan, 'customer')
+            ->postJson('/api/payment/create', [
+                'no_transaksi' => $transaksi->no_transaksi,
+                'payment_method' => 'BC',
+            ]);
+
+        $response->assertStatus(503);
+        $response->assertJsonPath('success', false);
+    }
+
+    public function test_payment_methods_mengembalikan_503_bila_duitku_belum_dikonfigurasi_dan_qris_nonaktif(): void
+    {
+        $config = app(KonfigurasiService::class);
+        $config->set('payment_mp_duitku_enabled', true);
+        $config->set('payment_mp_qris_toko_enabled', false);
+        config([
+            'duitku.merchant_code' => '',
+            'duitku.api_key' => '',
+            'duitku.merchant_key' => '',
+        ]);
+
+        $response = $this->getJson('/api/payment/methods?amount=100000');
+
+        $response->assertStatus(503);
+        $response->assertJsonPath('success', false);
     }
 }

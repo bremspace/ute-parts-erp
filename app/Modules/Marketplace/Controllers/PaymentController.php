@@ -42,8 +42,14 @@ class PaymentController extends Controller
             return $this->error('Transaksi tidak dalam status menunggu pembayaran', 422);
         }
 
+        $config = app(KonfigurasiService::class);
+
         // Jalur Pembayaran QRIS Toko (Langsung tanpa gateway)
         if ($request->payment_method === 'QRIS_TOKO') {
+            if (! (bool) $config->get('payment_mp_qris_toko_enabled', true)) {
+                return $this->error('Pembayaran QRIS Toko sedang dinonaktifkan oleh toko.', 503);
+            }
+
             $qrisService = app(QrisService::class);
             $qris = $qrisService->getActiveQris($transaksi->cabang_id);
 
@@ -86,9 +92,13 @@ class PaymentController extends Controller
             }
         }
 
+        if (! (bool) $config->get('payment_mp_duitku_enabled', true)) {
+            return $this->error('Gateway pembayaran online (Duitku) sedang dinonaktifkan oleh toko.', 503);
+        }
+
         if (! $this->duitku->isConfigured()) {
             return $this->error(
-                'Duitku belum dikonfigurasi — set DUITKU_MERCHANT_CODE, DUITKU_API_KEY, DUITKU_MERCHANT_KEY di .env (sandbox=true untuk testing)',
+                'Duitku belum dikonfigurasi — lengkapi Merchant Code dan API Key di Pengaturan Integrasi.',
                 503
             );
         }
@@ -275,12 +285,17 @@ class PaymentController extends Controller
     public function paymentMethods(Request $request)
     {
         $amount = (float) ($request->query('amount', 0));
+        $noTransaksi = trim((string) $request->query('no_transaksi', ''));
+        $cabangId = $noTransaksi !== ''
+            ? Transaksi::where('no_transaksi', $noTransaksi)->value('cabang_id')
+            : null;
+
         $config = app(KonfigurasiService::class);
         $duitkuEnabled = (bool) $config->get('payment_mp_duitku_enabled', true);
         $qrisTokoEnabled = (bool) $config->get('payment_mp_qris_toko_enabled', true);
 
         $qrisService = app(QrisService::class);
-        $qrisToko = $qrisService->getActiveQris();
+        $qrisToko = $qrisService->getActiveQris($cabangId ? (int) $cabangId : null);
         $qrisTokoAvailable = $qrisTokoEnabled && ($qrisToko !== null && filled($qrisToko->payload_static));
 
         $qrisTokoItem = [
@@ -292,16 +307,21 @@ class PaymentController extends Controller
             'deskripsi' => 'BCA, Mandiri, BRI, BNI, DANA, GoPay, OVO, ShopeePay — Bebas Biaya',
         ];
 
-        // 1. Jika Duitku dinonaktifkan
-        if (! $duitkuEnabled) {
+        // 1. Jika Duitku dinonaktifkan atau kredensial Duitku belum diisi
+        if (! $duitkuEnabled || ! $this->duitku->isConfigured()) {
             if ($qrisTokoAvailable) {
                 return $this->success([$qrisTokoItem], 'Daftar metode pembayaran berhasil dimuat');
             }
 
-            return $this->error('Layanan pembayaran online sedang tidak aktif', 503);
+            return $this->error(
+                $duitkuEnabled
+                    ? 'Gateway pembayaran online belum dikonfigurasi.'
+                    : 'Layanan pembayaran online sedang tidak aktif',
+                503
+            );
         }
 
-        // 2. Jika Duitku diaktifkan
+        // 2. Jika Duitku diaktifkan & terkonfigurasi
         try {
             $methods = $this->duitku->getPaymentMethods($amount);
 
@@ -323,6 +343,10 @@ class PaymentController extends Controller
                 $methods = $filtered;
             }
 
+            if ($methods === []) {
+                return $this->error('Tidak ada metode pembayaran online yang aktif saat ini.', 503);
+            }
+
             return $this->success($methods, 'Daftar metode pembayaran berhasil dimuat');
         } catch (\Exception $e) {
             // Jika Duitku bermasalah/offline namun QRIS Toko tersedia, fallback ke QRIS Toko
@@ -330,7 +354,9 @@ class PaymentController extends Controller
                 return $this->success([$qrisTokoItem], 'Daftar metode pembayaran berhasil dimuat');
             }
 
-            return $this->error('Duitku: '.$e->getMessage(), 502);
+            Log::warning('[Duitku] Gagal memuat metode pembayaran', ['error' => $e->getMessage()]);
+
+            return $this->error('Layanan gateway pembayaran sedang bermasalah: '.$e->getMessage(), 502);
         }
     }
 

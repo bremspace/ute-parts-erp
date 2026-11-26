@@ -88,7 +88,7 @@
                     this.loadingMetode = true;
 
                     try {
-                        const res = await fetch('/api/payment/methods?amount=' + Math.round(total), {
+                        const res = await fetch('/api/payment/methods?amount=' + Math.round(total) + '&no_transaksi=' + encodeURIComponent(no || ''), {
                             headers: { 'Accept': 'application/json' },
                             credentials: 'include',
                         });
@@ -660,6 +660,28 @@
                             </button>
                         </div>
 
+                        {{-- ===== Gangguan memuat daftar metode (502 / jaringan) ===== --}}
+                        <div x-show="!loadingMetode && !infoBayar && errorBayar && errorBayar !== 'PAYMENT_UNAVAILABLE' && metodeList.length === 0" class="p-4 rounded-2xl bg-up-red/5 border border-up-red/20 text-center space-y-3">
+                            <p class="text-sm font-bold text-up-red">Gagal Memuat Metode Pembayaran</p>
+                            <p class="text-xs text-ink-600 dark:text-ink-300 leading-relaxed" x-text="errorBayar"></p>
+                            <div class="flex items-center justify-center gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    x-on:click="orderBayar && bukaBayar(orderBayar.id, orderBayar.no, orderBayar.total)"
+                                    class="px-4 py-2.5 rounded-2xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-colors cursor-pointer min-h-[44px]"
+                                >
+                                    Coba Lagi
+                                </button>
+                                <button
+                                    type="button"
+                                    x-on:click="tutupBayar()"
+                                    class="px-4 py-2.5 rounded-2xl bg-white dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs hover:bg-ink-50 transition-colors cursor-pointer min-h-[44px]"
+                                >
+                                    Tutup
+                                </button>
+                            </div>
+                        </div>
+
                         {{-- ===== Layar instruksi bayar (VA / QRIS / E-Wallet / URL) ===== --}}
                         <div x-show="infoBayar && errorBayar !== 'PAYMENT_UNAVAILABLE'" class="space-y-4">
                             <div class="p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-xs text-ink-700 dark:text-emerald-200">
@@ -821,7 +843,7 @@
                         </div>
 
                         {{-- ===== Pilih metode: Segmented Tabs & Compact Grid ===== --}}
-                        <div x-show="!infoBayar && errorBayar !== 'PAYMENT_UNAVAILABLE'" class="space-y-4">
+                        <div x-show="!infoBayar && errorBayar !== 'PAYMENT_UNAVAILABLE' && (loadingMetode || metodeList.length > 0)" class="space-y-4">
                             <!-- Loading daftar metode -->
                             <div x-show="loadingMetode" class="space-y-2.5">
                                 <p class="text-[11px] text-ink-400 animate-pulse">Memuat metode pembayaran…</p>

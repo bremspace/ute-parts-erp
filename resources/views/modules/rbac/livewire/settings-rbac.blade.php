@@ -4261,6 +4261,29 @@
                     <!-- Duitku Payment Gateway Card -->
                     <x-prism.glass-card title="Payment Gateway Duitku" subtitle="Integrasi pembayaran online (QRIS, VA Bank, E-Wallet, Kartu Kredit)">
                         <div class="space-y-4">
+                            @php
+                                $duitkuAktif = (bool) ($integrasiForm['payment_mp_duitku_enabled'] ?? false);
+                            @endphp
+                            <!-- Toggle Aktivasi Langsung + Status Lingkungan -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border transition-colors {{ $duitkuAktif ? 'bg-up-primary/10 border-up-primary/30' : 'bg-white/[0.02] border-white/10' }}">
+                                <div class="space-y-0.5">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs font-bold text-white">Aktifkan Pembayaran Online Duitku</span>
+                                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full {{ $duitkuAktif ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-white/10 text-ink-400 border border-white/10' }}">
+                                            {{ $duitkuAktif ? '● Aktif' : '○ Nonaktif' }}
+                                        </span>
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ ($integrasiForm['duitku_mode'] ?? 'sandbox') === 'production' ? 'bg-up-accent/20 text-up-accent' : 'bg-up-amber/20 text-up-amber' }}">
+                                            {{ ($integrasiForm['duitku_mode'] ?? 'sandbox') === 'production' ? 'Production' : 'Sandbox' }}
+                                        </span>
+                                    </div>
+                                    <p class="text-[11px] text-ink-400">Menentukan apakah metode pembayaran Duitku tampil di laman bayar konsumen.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                    <input type="checkbox" wire:model.live="integrasiForm.payment_mp_duitku_enabled" class="sr-only peer" aria-label="Aktifkan Gateway Duitku">
+                                    <div class="w-11 h-6 bg-white/15 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-primary"></div>
+                                </label>
+                            </div>
+
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-xs font-semibold text-ink-300 mb-1.5">Mode Lingkungan (Environment) *</label>
@@ -4287,18 +4310,39 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-semibold text-ink-300 mb-1.5">Merchant Key (Passport)</label>
-                                    <input type="password" wire:model="integrasiForm.duitku_merchant_key" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Merchant Key" />
+                                    <input type="password" wire:model="integrasiForm.duitku_merchant_key" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Samakan dengan API Key" />
                                 </div>
                             </div>
 
-                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                                <div class="min-w-0">
                                     <span class="text-xs font-semibold text-white">Callback URL Webhook Duitku</span>
                                     <p class="text-[11px] text-ink-400 mt-0.5">Pasang URL ini di dashboard Merchant Duitku → Proyek → Callback URL:</p>
                                 </div>
                                 <code class="px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-up-mint font-mono text-[11px] select-all truncate">
                                     {{ url('/webhook/duitku') }}
                                 </code>
+                            </div>
+
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                                <div class="min-w-0 flex-1">
+                                    @if($duitkuTestMessage !== '')
+                                        <p class="text-xs font-semibold {{ $duitkuTestStatus === 'success' ? 'text-up-mint' : 'text-up-red' }}">
+                                            {{ $duitkuTestMessage }}
+                                        </p>
+                                    @else
+                                        <p class="text-[11px] text-ink-400">Uji kredensial &amp; signature langsung ke server Duitku ({{ ($integrasiForm['duitku_mode'] ?? 'sandbox') === 'production' ? 'Production' : 'Sandbox' }}).</p>
+                                    @endif
+                                </div>
+                                <button
+                                    type="button"
+                                    wire:click="testKoneksiDuitku"
+                                    wire:loading.attr="disabled"
+                                    class="px-4 py-2 rounded-xl bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 font-bold text-xs transition disabled:opacity-50 cursor-pointer shrink-0"
+                                >
+                                    <span wire:loading.remove wire:target="testKoneksiDuitku">🔌 Uji Koneksi Duitku</span>
+                                    <span wire:loading wire:target="testKoneksiDuitku">Menguji koneksi...</span>
+                                </button>
                             </div>
                         </div>
                     </x-prism.glass-card>
@@ -4307,35 +4351,46 @@
                     <x-prism.glass-card title="Saluran Pembayaran Marketplace (Web Konsumen)" subtitle="Aktivasi gateway Duitku dan QRIS Dinamis Toko untuk pesanan storefront">
                         <div class="space-y-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <label class="p-4 rounded-xl bg-white/[0.02] border border-white/10 flex items-start gap-3 cursor-pointer hover:bg-white/[0.04] transition-colors">
-                                    <input type="checkbox" wire:model="integrasiForm.payment_mp_duitku_enabled" class="accent-up-primary w-4 h-4 rounded mt-0.5">
-                                    <div class="space-y-0.5">
-                                        <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <div class="p-4 rounded-xl bg-white/[0.02] border border-white/10 flex items-start justify-between gap-3">
+                                    <div class="space-y-0.5 min-w-0">
+                                        <div class="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
                                             <span>💳 Gateway Duitku</span>
                                             @if($integrasiForm['payment_mp_duitku_enabled'] ?? false)
-                                                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-up-primary/20 text-up-primary">AKTIF</span>
+                                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-up-primary/20 text-up-primary">AKTIF</span>
+                                            @else
+                                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-ink-400">NONAKTIF</span>
                                             @endif
                                         </div>
                                         <p class="text-[11px] text-ink-400 leading-relaxed">Aktifkan channel VA Bank, E-Wallet, dan Retail di checkout konsumen.</p>
                                     </div>
-                                </label>
+                                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                        <input type="checkbox" wire:model.live="integrasiForm.payment_mp_duitku_enabled" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-primary"></div>
+                                    </label>
+                                </div>
 
-                                <label class="p-4 rounded-xl bg-white/[0.02] border border-white/10 flex items-start gap-3 cursor-pointer hover:bg-white/[0.04] transition-colors">
-                                    <input type="checkbox" wire:model="integrasiForm.payment_mp_qris_toko_enabled" class="accent-up-mint w-4 h-4 rounded mt-0.5">
-                                    <div class="space-y-0.5">
-                                        <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <div class="p-4 rounded-xl bg-white/[0.02] border border-white/10 flex items-start justify-between gap-3">
+                                    <div class="space-y-0.5 min-w-0">
+                                        <div class="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
                                             <span>⚡ QRIS Dinamis Toko</span>
                                             @if($integrasiForm['payment_mp_qris_toko_enabled'] ?? false)
-                                                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-up-mint/20 text-up-mint">AKTIF</span>
+                                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-up-mint/20 text-up-mint">AKTIF</span>
+                                            @else
+                                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-ink-400">NONAKTIF</span>
                                             @endif
                                         </div>
                                         <p class="text-[11px] text-ink-400 leading-relaxed">Bebas fee gateway (0%). Gantikan QRIS Duitku otomatis jika keduanya aktif.</p>
                                     </div>
-                                </label>
+                                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                        <input type="checkbox" wire:model.live="integrasiForm.payment_mp_qris_toko_enabled" class="sr-only peer">
+                                        <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-mint"></div>
+                                    </label>
+                                </div>
                             </div>
 
-                            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-ink-400">
-                                💡 Aturan Hibrida: Jika Duitku dan QRIS Toko sama-sama aktif, opsi QRIS dari Duitku akan disembunyikan dan digantikan QRIS Toko.
+                            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-ink-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <span>💡 Aturan Hibrida: Jika Duitku dan QRIS Toko sama-sama aktif, opsi QRIS dari Duitku digantikan QRIS Toko.</span>
+                                <a href="/app/pengaturan/web-konsumen/pembayaran" class="text-up-primary hover:underline font-semibold shrink-0">Kelola di CMS Pembayaran ↗</a>
                             </div>
                         </div>
                     </x-prism.glass-card>
