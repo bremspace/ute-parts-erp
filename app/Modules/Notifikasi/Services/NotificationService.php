@@ -32,6 +32,39 @@ class NotificationService
         $kategori = $payload['kategori'] ?? $this->deteksiKategori($judul, $konten, $payload);
         $cabangId = $payload['cabang_id'] ?? (session()->has('cabang_id') ? session('cabang_id') : null);
 
+        // Template WA terpusat. Payload `wa_template` + `wa_vars` dipakai semua
+        // call site baru. Jika template nonaktif, log tetap dibuat dengan status
+        // `terlewat` (audit jelas) tetapi TIDAK masuk queue / tidak dikirim.
+        $waTemplateKey = $tipe === 'wa' && is_string($payload['wa_template'] ?? null)
+            ? (string) $payload['wa_template']
+            : null;
+        $waSkipped = false;
+        $waError = null;
+
+        if ($waTemplateKey !== null) {
+            /** @var WaTemplateService $waTemplate */
+            $waTemplate = app(WaTemplateService::class);
+            $waVars = is_array($payload['wa_vars'] ?? null) ? $payload['wa_vars'] : [];
+            $waEnabled = $waTemplate->isEnabled($waTemplateKey);
+
+            // Render paksa agar isi yang "terlewat" tetap bisa dilihat di log.
+            $konten = $waTemplate->render($waTemplateKey, $waVars, true);
+            $judul = (string) ($payload['wa_judul'] ?? $judul);
+            $missing = $waTemplate->missingVars($waTemplateKey, $waVars);
+
+            $payload['wa_template'] = $waTemplateKey;
+            $payload['wa_group'] = $waTemplate->event($waTemplateKey)['group'] ?? null;
+            $payload['wa_render_source'] = $waTemplate->isCustomized($waTemplateKey) ? 'kustom' : 'referensi';
+            if ($missing !== []) {
+                $payload['wa_missing_vars'] = $missing;
+            }
+
+            if (! $waEnabled) {
+                $waSkipped = true;
+                $waError = 'DINONAKTIFKAN: template WA "'.$waTemplateKey.'" sedang dimatikan (master/grup/event).';
+            }
+        }
+
         $payloadUrl = $payload['action_url'] ?? $payload['url'] ?? null;
         $payloadUrlIsString = is_string($payloadUrl) && $payloadUrl !== '';
 
@@ -64,7 +97,8 @@ class NotificationService
             'judul' => $judul,
             'konten' => $konten,
             'payload' => $payload,
-            'status' => 'pending',
+            'status' => $waSkipped ? 'terlewat' : 'pending',
+            'error' => $waError,
             'kampanye_broadcast_id' => $kampanyeBroadcastId,
             'user_id' => $userId,
             'pelanggan_id' => $pelangganId,
@@ -74,7 +108,10 @@ class NotificationService
         ]);
 
         // Dispatch via queue — database driver + Supervisor (PRD §4.9 §7)
-        Queue::later(0, new KirimNotifikasiJob($log->id));
+        // Template nonaktif sengaja tidak dikirim, tetapi tetap tercatat.
+        if (! $waSkipped) {
+            Queue::later(0, new KirimNotifikasiJob($log->id));
+        }
 
         return $log;
     }

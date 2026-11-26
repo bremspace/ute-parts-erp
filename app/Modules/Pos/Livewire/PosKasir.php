@@ -2450,6 +2450,14 @@ class PosKasir extends Component
                         'kategori' => 'transaksi',
                         'pelanggan_id' => $this->selectedCustomerId,
                         'invoice' => $inv,
+                        'wa_template' => 'tagihan_qris',
+                        'wa_judul' => 'Tagihan Pembayaran QRIS Toko',
+                        'wa_vars' => [
+                            'nama' => $this->customer?->nama ?? 'Pelanggan',
+                            'invoice' => $inv,
+                            'total' => number_format((float) $nominal, 0, ',', '.'),
+                            'qr_url' => '',
+                        ],
                     ]
                 );
             } catch (\Throwable $e) {

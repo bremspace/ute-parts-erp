@@ -34,7 +34,8 @@ class KirimNotifikasiJob implements ShouldQueue
     {
         $log = NotifikasiKeluar::find($this->notifikasiId);
 
-        if (! $log || $log->status === 'terkirim') {
+        // `terlewat` = sengaja dimatikan lewat template WA; tidak perlu dikirim.
+        if (! $log || in_array($log->status, ['terkirim', 'terlewat'], true)) {
             return;
         }
 

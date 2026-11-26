@@ -372,12 +372,21 @@ class OrderService
                 $this->notifService->kirim(
                     'wa',
                     $pelanggan->telepon,
-                    'Invoice Pesanan '.config('app.name', 'Bremspace'),
-                    "Halo {$pelanggan->nama}, pesanan {$noTransaksi} telah kami terima dengan total Rp ".number_format($transaksi->total_akhir, 0, ',', '.').'. Silakan selesaikan pembayaran untuk diproses toko.',
+                    'Invoice Pesanan',
+                    '', // Diisi WaTemplateService dari template referensi/kustom
                     [
                         'transaksi_id' => $transaksi->id,
                         'pelanggan_id' => $pelanggan->id,
                         'audience' => 'pelanggan',
+                        'kategori' => 'transaksi',
+                        'wa_template' => 'order_menunggu_pembayaran',
+                        'wa_judul' => 'Invoice Pesanan',
+                        'wa_vars' => [
+                            'nama' => $pelanggan->nama,
+                            'no_transaksi' => $noTransaksi,
+                            'total' => number_format($transaksi->total_akhir, 0, ',', '.'),
+                            'url_pesanan' => url('/account'),
+                        ],
                     ]
                 );
             }

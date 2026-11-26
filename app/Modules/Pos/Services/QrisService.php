@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Pos\Services;
 
+use App\Modules\Notifikasi\Services\WaTemplateService;
 use App\Modules\Pos\Models\QrisCabang;
 use App\Modules\Wms\Services\QrCodeService;
 use InvalidArgumentException;
@@ -239,21 +240,20 @@ class QrisService
         string $customerName,
         ?string $qrUrl = null
     ): string {
-        $formattedNominal = number_format($total, 0, ',', '.');
-
-        $msg = "*Tagihan Pembayaran QRIS - {$storeName}*\n";
-        $msg .= "Halo *{$customerName}*,\n\n";
-        $msg .= "Berikut adalah rincian tagihan belanja Anda:\n";
-        $msg .= "• No. Transaksi: *{$invoice}*\n";
-        $msg .= "• Total Tagihan: *Rp {$formattedNominal}*\n\n";
-        $msg .= "Silakan scan kode QRIS yang tampil di layar kasir atau buka tautan berikut untuk scan:\n";
-        if ($qrUrl) {
-            $msg .= "{$qrUrl}\n\n";
-        }
-        $msg .= "Pastikan nominal pembayaran sesuai (*Rp {$formattedNominal}*). Simpan bukti transaksi setelah berhasil.\n\n";
-        $msg .= "Terima kasih telah berbelanja di *{$storeName}*!";
-
-        return $msg;
+        // Template referensi/kustom dipakai BOTH untuk link wa.me dan notifikasi
+        // gateway. `force = true` agar menonaktifkan auto-notif tidak menghilangkan
+        // tombol kirim manual dari kasir.
+        return app(WaTemplateService::class)->render(
+            'tagihan_qris',
+            [
+                'nama' => $customerName,
+                'invoice' => $invoice,
+                'total' => number_format($total, 0, ',', '.'),
+                'qr_url' => (string) ($qrUrl ?? ''),
+                'nama_toko' => $storeName,
+            ],
+            true
+        );
     }
 
     /**
