@@ -523,6 +523,11 @@
                                     <div class="min-w-0">
                                         <p class="font-bold text-ink-900 dark:text-white truncate">{{ $it->produk?->nama }}</p>
                                         <p class="text-[10px] text-ink-400 font-mono">SKU: {{ $it->produk?->sku ?? '-' }}</p>
+                                        @if(!empty($lokasiSelectedOrder[$it->produk_id]))
+                                            <p class="text-[10px] font-bold text-violet-600 dark:text-violet-400">📍 {{ implode(' · ', $lokasiSelectedOrder[$it->produk_id]) }}</p>
+                                        @else
+                                            <p class="text-[10px] italic text-ink-400">📍 Belum ada rak</p>
+                                        @endif
                                     </div>
                                     <div class="text-right flex-shrink-0">
                                         <p class="font-bold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($it->subtotal, 0, ',', '.') }}</p>
@@ -600,8 +605,15 @@
                     <div class="max-h-36 overflow-y-auto space-y-1 border border-ink-200 dark:border-white/10 rounded-xl p-2 bg-ink-50/50 dark:bg-white/[0.02]">
                         @foreach($pickupOrder->items as $it)
                             <div class="flex justify-between items-center text-[11px] py-1 border-b border-ink-100 dark:border-white/5 last:border-0">
-                                <span class="font-medium text-ink-900 dark:text-white truncate">✓ {{ $it->produk?->nama }}</span>
-                                <span class="font-mono font-bold text-up-primary">×{{ $it->jumlah }}</span>
+                                <span class="min-w-0">
+                                    <span class="block font-medium text-ink-900 dark:text-white truncate">✓ {{ $it->produk?->nama }}</span>
+                                    @if(!empty($lokasiPickupOrder[$it->produk_id]))
+                                        <span class="block text-[10px] font-bold text-violet-600 dark:text-violet-400">📍 {{ implode(' · ', $lokasiPickupOrder[$it->produk_id]) }}</span>
+                                    @else
+                                        <span class="block text-[10px] italic text-ink-400">📍 Belum ada rak</span>
+                                    @endif
+                                </span>
+                                <span class="font-mono font-bold text-up-primary flex-shrink-0">×{{ $it->jumlah }}</span>
                             </div>
                         @endforeach
                     </div>

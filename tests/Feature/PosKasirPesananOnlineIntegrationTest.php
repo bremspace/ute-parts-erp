@@ -13,6 +13,7 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\StokItem;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\CabangSeeder;
@@ -81,9 +82,17 @@ class PosKasirPesananOnlineIntegrationTest extends TestCase
             'harga_jual_retail' => 150000,
             'stok_minimum' => 5,
         ]);
+        $rak = Rak::create([
+            'gudang_id' => $this->gudang->id,
+            'kode' => 'A1',
+            'nama' => 'Rak A1',
+            'zona' => 'Depan',
+            'is_active' => true,
+        ]);
         StokItem::create([
             'gudang_id' => $this->gudang->id,
             'produk_id' => $this->produk->id,
+            'rak_id' => $rak->id,
             'jumlah' => 20,
         ]);
 
@@ -104,6 +113,7 @@ class PosKasirPesananOnlineIntegrationTest extends TestCase
         $transaksi = Transaksi::create([
             'no_transaksi' => 'MP-KSR-'.uniqid(),
             'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
             'pelanggan_id' => $this->pelanggan->id,
             'sumber' => 'marketplace',
             'subtotal' => $subtotal,
@@ -139,6 +149,21 @@ class PosKasirPesananOnlineIntegrationTest extends TestCase
     private function stokProduk(): int
     {
         return (int) StokItem::where('produk_id', $this->produk->id)->first()->jumlah;
+    }
+
+    public function test_detail_pesanan_online_menampilkan_lokasi_rak_barang(): void
+    {
+        $transaksi = $this->buatOrderPickup('menunggu_pembayaran', 2);
+
+        $component = Livewire::test(PosKasir::class)
+            ->call('bukaPesananOnlineModal')
+            ->set('pesananOnlineTerpilih', $transaksi->id)
+            ->assertSee('Lokasi Barang');
+
+        $detail = $component->get('pesananOnlineDetail');
+
+        $this->assertNotEmpty($detail['items'][0]['lokasi']);
+        $this->assertContains('Gudang Utama · A1 · Zona Depan', $detail['items'][0]['lokasi']);
     }
 
     public function test_bayar_online_pickup_tunai_dari_layar_kasir(): void
