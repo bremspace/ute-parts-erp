@@ -167,6 +167,74 @@ class WaTemplateTest extends TestCase
         $this->assertSame('Promo Halo {nama}!', $hasil);
     }
 
+    public function test_struk_kasir_memakai_template_yang_sama_dengan_tombol_manual(): void
+    {
+        $struk = app(WaTemplateService::class)->renderStrukKasir([
+            'no_transaksi' => 'TRX-2026-0100',
+            'waktu' => '26/11/2026 13:45',
+            'kasir' => 'Dewi',
+            'pelanggan' => 'Budi',
+            'items' => [
+                ['nama' => '[Jasa] Ganti LCD', 'qty' => 1, 'satuan' => 'pcs', 'harga' => 250000, 'subtotal' => 250000],
+            ],
+            'subtotal' => 250000,
+            'diskon' => 10000,
+            'total' => 240000,
+            'metode' => 'TUNAI',
+            'cabang' => 'Cabang Pusat',
+        ]);
+
+        $this->assertStringContainsString('Halo kak *Budi*,', $struk);
+        $this->assertStringContainsString('TRX-2026-0100', $struk);
+        $this->assertStringContainsString('Ganti LCD', $struk);
+        $this->assertStringContainsString('Diskon Kasir: -Rp 10.000', $struk);
+        $this->assertStringContainsString('Rp 240.000', $struk);
+        $this->assertStringContainsString('Cabang Pusat', $struk);
+    }
+
+    public function test_event_member_dan_internal_terdaftar_dengan_default_aktif(): void
+    {
+        $service = app(WaTemplateService::class);
+        $cfg = $service->config();
+
+        foreach ([
+            'transaksi_kasir_selesai',
+            'member_registrasi_pending',
+            'member_registrasi_disetujui',
+            'member_registrasi_ditolak',
+            'member_kode_aktivasi',
+            'member_aktivasi_berhasil',
+            'member_reset_password_berhasil',
+            'member_status_nonaktif',
+            'approval_baru',
+            'approval_pengingat',
+            'stok_reorder',
+            'backup_gagal',
+            'depresiasi_gagal',
+            'database_crash',
+        ] as $event) {
+            $this->assertNotNull($service->event($event), "Event {$event} harus terdaftar");
+            $this->assertTrue($cfg['events'][$event]['enabled'], "Event {$event} default aktif");
+        }
+
+        $this->assertArrayHasKey('member', $service->groups());
+        $this->assertArrayHasKey('approval_internal', $service->groups());
+    }
+
+    public function test_template_kode_aktivasi_tidak_mengandung_kata_sandi(): void
+    {
+        $hasil = app(WaTemplateService::class)->render('member_kode_aktivasi', [
+            'nama' => 'Budi',
+            'kode_aktivasi' => '123456',
+            'berlaku_sampai' => '27 Nov 2026 13:45',
+            'url_aktivasi' => 'https://contoh.test/aktivasi-akun',
+        ]);
+
+        $this->assertStringContainsString('123456', $hasil);
+        $this->assertStringContainsString('27 Nov 2026 13:45', $hasil);
+        $this->assertStringNotContainsString('password', strtolower($hasil));
+    }
+
     private function simpanDanCek(WaTemplateService $service, array $cfg, string $event): bool
     {
         $this->assertTrue($service->save($cfg)['ok']);

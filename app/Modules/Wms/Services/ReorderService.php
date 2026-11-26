@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Services;
 
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Notifikasi\Services\WaTemplateService;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\StokItem;
@@ -186,6 +187,18 @@ class ReorderService
                 'type' => 'warning',
                 'po_ids' => $pos->pluck('id')->all(),
             ]
+        );
+
+        app(WaTemplateService::class)->kirimKePeran(
+            ['owner', 'super-admin', 'staff-gudang'],
+            'stok_reorder',
+            'Usulan Reorder Otomatis',
+            [
+                'jumlah' => $pos->count(),
+                'daftar' => $daftar,
+                'url' => url('/app/wms'),
+            ],
+            'stok'
         );
     }
 }

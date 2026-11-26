@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Modules\Notifikasi\Services\WaTemplateService;
+
 class WhatsAppHelper
 {
     /**
@@ -38,93 +40,9 @@ class WhatsAppHelper
      */
     public static function draftStrukPos(array $receiptData): string
     {
-        $tokoRaw = $receiptData['cabang'] ?? config('app.name', 'Bremspace');
-        $toko = strip_tags(html_entity_decode((string) $tokoRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-
-        $noTrx = trim((string) ($receiptData['no_transaksi'] ?? '-'));
-        $waktu = $receiptData['waktu'] ?? now()->format('d/m/Y H:i');
-
-        $pelangganRaw = $receiptData['pelanggan'] ?? 'Pelanggan';
-        $pelanggan = trim(strip_tags(html_entity_decode((string) $pelangganRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
-
-        $isUmum = in_array(strtolower($pelanggan), ['pelanggan umum', 'umum', 'guest', 'retail', 'pelanggan', '-']) || blank($pelanggan);
-        $salam = $isUmum
-            ? "Halo kak,\nTerima kasih telah berbelanja di *{$toko}*! 🙏"
-            : "Halo kak *{$pelanggan}*,\nTerima kasih telah berbelanja di *{$toko}*! 🙏";
-
-        $total = number_format((float) ($receiptData['total'] ?? 0), 0, ',', '.');
-        $metode = strtoupper(trim((string) ($receiptData['metode'] ?? 'TUNAI')));
-
-        $items = '';
-        foreach (($receiptData['items'] ?? []) as $it) {
-            $namaRaw = $it['nama'] ?? $it['nama_produk'] ?? 'Item';
-            $nama = strip_tags(html_entity_decode((string) $namaRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-            // Bersihkan prefix teknis seperti [Jasa] atau [Part] jika ada
-            $nama = preg_replace('/^\[(Jasa|Part)\]\s*/i', '', $nama);
-            $nama = trim(preg_replace('/\s+/', ' ', (string) $nama));
-
-            $qty = (int) ($it['qty'] ?? 1);
-            $harga = number_format((float) ($it['harga'] ?? 0), 0, ',', '.');
-            $subtotal = number_format((float) ($it['subtotal'] ?? 0), 0, ',', '.');
-
-            $items .= "- {$nama}\n  {$qty}x Rp {$harga} = Rp {$subtotal}\n";
-        }
-
-        $garansiText = ! empty($receiptData['garansi']) ? "Garansi: {$receiptData['garansi']}\n" : '';
-
-        $rincianBiaya = '';
-        if (isset($receiptData['subtotal']) && (float) $receiptData['subtotal'] > 0 && ((float) $receiptData['subtotal'] !== (float) ($receiptData['total'] ?? 0))) {
-            $subtotalFmt = number_format((float) $receiptData['subtotal'], 0, ',', '.');
-            $rincianBiaya .= "Subtotal: Rp {$subtotalFmt}\n";
-        }
-        if (! empty($receiptData['diskon_tier']) && (float) $receiptData['diskon_tier'] > 0) {
-            $tierFmt = number_format((float) $receiptData['diskon_tier'], 0, ',', '.');
-            $rincianBiaya .= "Potongan Tier: -Rp {$tierFmt}\n";
-        }
-        if (! empty($receiptData['diskon_partai']) && (float) $receiptData['diskon_partai'] > 0) {
-            $partaiFmt = number_format((float) $receiptData['diskon_partai'], 0, ',', '.');
-            $rincianBiaya .= "Diskon Partai: -Rp {$partaiFmt}\n";
-        }
-        if (! empty($receiptData['diskon_poin']) && (float) $receiptData['diskon_poin'] > 0) {
-            $poinFmt = number_format((float) $receiptData['diskon_poin'], 0, ',', '.');
-            $rincianBiaya .= "Tukar Poin: -Rp {$poinFmt}\n";
-        }
-        if (! empty($receiptData['diskon']) && (float) $receiptData['diskon'] > 0) {
-            $diskonFmt = number_format((float) $receiptData['diskon'], 0, ',', '.');
-            $lbl = ! empty($receiptData['diskon_persen']) && (float) $receiptData['diskon_persen'] > 0 ? "Diskon Kasir ({$receiptData['diskon_persen']}%)" : 'Diskon Kasir';
-            $rincianBiaya .= "{$lbl}: -Rp {$diskonFmt}\n";
-        }
-        if (! empty($receiptData['pajak']) && (float) $receiptData['pajak'] > 0) {
-            $pajakFmt = number_format((float) $receiptData['pajak'], 0, ',', '.');
-            $ppnLbl = ! empty($receiptData['ppn_persen']) ? "PPN ({$receiptData['ppn_persen']}%)" : 'PPN';
-            $rincianBiaya .= "{$ppnLbl}: +Rp {$pajakFmt}\n";
-        }
-        if (! empty($receiptData['ongkir']) && (float) $receiptData['ongkir'] > 0) {
-            $ongkirFmt = number_format((float) $receiptData['ongkir'], 0, ',', '.');
-            $rincianBiaya .= "Ongkir: +Rp {$ongkirFmt}\n";
-        }
-
-        $pembayaranText = "{$rincianBiaya}*Total: Rp {$total}*\nMetode: {$metode}";
-        if (isset($receiptData['bayar']) && (float) $receiptData['bayar'] > 0 && (float) $receiptData['bayar'] !== (float) ($receiptData['total'] ?? 0)) {
-            $bayarFmt = number_format((float) $receiptData['bayar'], 0, ',', '.');
-            $pembayaranText .= "\nBayar: Rp {$bayarFmt}";
-        }
-        if (isset($receiptData['kembali']) && (float) $receiptData['kembali'] > 0) {
-            $kembaliFmt = number_format((float) $receiptData['kembali'], 0, ',', '.');
-            $pembayaranText .= "\nKembali: Rp {$kembaliFmt}";
-        }
-
-        return "{$salam}\n\n"
-            ."*STRUK PEMBELIAN*\n"
-            ."No. Transaksi: {$noTrx}\n"
-            ."Waktu: {$waktu}\n"
-            ."-------------------------\n"
-            ."{$items}"
-            ."-------------------------\n"
-            ."{$pembayaranText}\n"
-            .($garansiText ? "{$garansiText}" : '')
-            ."\nSimpan pesan ini sebagai bukti transaksi resmi Anda.\n"
-            .'Semoga harimu menyenangkan! ✨';
+        // Satu sumber dengan struk otomatis (NotificationService) agar pesan
+        // manual via wa.me dan pengiriman gateway tidak pernah berbeda.
+        return app(WaTemplateService::class)->renderStrukKasir($receiptData);
     }
 
     /**

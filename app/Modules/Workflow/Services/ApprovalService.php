@@ -7,6 +7,7 @@ use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Notifikasi\Services\WaTemplateService;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\ReturnPenjualanService;
@@ -74,7 +75,7 @@ class ApprovalService
             return $existing;
         }
 
-        return DB::transaction(function () use ($rule, $entityType, $entityId, $cabangId, $payload, $requestedBy) {
+        return DB::transaction(function () use ($rule, $entityType, $entityId, $cabangId, $payload, $requestedBy, $amount) {
             $request = ApprovalRequest::create([
                 'approval_rule_id' => $rule->id,
                 'entity_type' => $entityType,
@@ -92,7 +93,13 @@ class ApprovalService
                 "Permintaan approval {$entityType} #{$entityId}",
                 'Amount Rp '.number_format((float) ($payload['amount'] ?? 0), 0, ',', '.')
                     ." menunggu persetujuan Anda (level {$rule->level}).",
-                ['approval_request_id' => $request->id, 'entity_type' => $entityType, 'entity_id' => $entityId]
+                [
+                    'approval_request_id' => $request->id,
+                    'entity_type' => $entityType,
+                    'entity_id' => $entityId,
+                    'amount' => $amount,
+                    'requested_by' => $requestedBy,
+                ]
             );
 
             return $request;
@@ -217,6 +224,29 @@ class ApprovalService
         }
 
         $pelanggan->update($update);
+
+        // Jangan pernah mengirim kata sandi baru lewat WA — hanya informasikan.
+        if (! empty($pelanggan->telepon)) {
+            app(NotificationService::class)->kirim(
+                'wa',
+                $pelanggan->telepon,
+                'Kata Sandi Akun Diperbarui',
+                '',
+                [
+                    'pelanggan_id' => $pelanggan->id,
+                    'audience' => 'pelanggan',
+                    'kategori' => 'membership',
+                    'wa_template' => 'member_reset_password_berhasil',
+                    'wa_judul' => 'Kata Sandi Akun Diperbarui',
+                    'wa_vars' => [
+                        'nama' => $pelanggan->nama,
+                        'alasan' => $catatan ? ' Catatan: '.$catatan : '',
+                        'nama_approver' => User::find($actionedBy)?->name ?? 'CS/toko',
+                        'url_login' => url('/login-pelanggan'),
+                    ],
+                ]
+            );
+        }
     }
 
     /**
@@ -360,6 +390,32 @@ class ApprovalService
                             'cabang_id' => $request->cabang_id,
                         ]
                     );
+
+                    if (! empty($pelanggan->telepon)) {
+                        app(NotificationService::class)->kirim(
+                            'wa',
+                            $pelanggan->telepon,
+                            'Pendaftaran Akun Member Disetujui',
+                            '',
+                            [
+                                'pelanggan_id' => $pelanggan->id,
+                                'audience' => 'pelanggan',
+                                'kategori' => 'membership',
+                                'cabang_id' => $request->cabang_id,
+                                'wa_template' => 'member_registrasi_disetujui',
+                                'wa_judul' => 'Pendaftaran Akun Member Disetujui',
+                                'wa_vars' => [
+                                    'nama' => $pelanggan->nama,
+                                    'label' => $label,
+                                    'instruksi' => empty($pelanggan->password)
+                                        ? 'Akun Anda belum memiliki kata sandi. Ambil kode aktivasi di CS toko lalu buat kata sandi di halaman aktivasi akun.'
+                                        : 'Silakan masuk dengan nomor HP dan kata sandi Anda.',
+                                    'url_aktivasi' => url('/aktivasi-akun'),
+                                    'url_login' => url('/login-pelanggan'),
+                                ],
+                            ]
+                        );
+                    }
                 } else {
                     $pelanggan->update([
                         'status' => 'ditolak',
@@ -380,6 +436,28 @@ class ApprovalService
                             'cabang_id' => $request->cabang_id,
                         ]
                     );
+
+                    if (! empty($pelanggan->telepon)) {
+                        app(NotificationService::class)->kirim(
+                            'wa',
+                            $pelanggan->telepon,
+                            'Pendaftaran Akun Member Ditolak',
+                            '',
+                            [
+                                'pelanggan_id' => $pelanggan->id,
+                                'audience' => 'pelanggan',
+                                'kategori' => 'membership',
+                                'cabang_id' => $request->cabang_id,
+                                'wa_template' => 'member_registrasi_ditolak',
+                                'wa_judul' => 'Pendaftaran Akun Member Ditolak',
+                                'wa_vars' => [
+                                    'nama' => $pelanggan->nama,
+                                    'alasan' => $catatan ? ' Alasan: '.$catatan : '',
+                                    'url' => url('/daftar-pelanggan'),
+                                ],
+                            ]
+                        );
+                    }
                 }
             }
 
@@ -496,7 +574,13 @@ class ApprovalService
             "Permintaan approval {$selesai->entity_type} #{$selesai->entity_id}",
             'Amount Rp '.number_format((float) ($selesai->payload_json['amount'] ?? 0), 0, ',', '.')
                 ." menunggu persetujuan Anda (level {$next->level}).",
-            ['approval_request_id' => $nextRequest->id, 'entity_type' => $selesai->entity_type, 'entity_id' => $selesai->entity_id]
+            [
+                'approval_request_id' => $nextRequest->id,
+                'entity_type' => $selesai->entity_type,
+                'entity_id' => $selesai->entity_id,
+                'amount' => (float) ($selesai->payload_json['amount'] ?? 0),
+                'requested_by' => (int) $selesai->requested_by,
+            ]
         );
 
         return true;
@@ -553,6 +637,33 @@ class ApprovalService
 
         foreach (User::role($role)->get() as $user) {
             $this->kirimInapp($user, $judul, $konten, $payload);
+        }
+
+        // Approver butuh aksi cepat — kirim WA bila punya nomor. Dedupe nomor
+        // done by nomorPenerimaPeran(); satu approval_request = satu WA per nomor.
+        if (! empty($payload['approval_request_id'])) {
+            $request = ApprovalRequest::find($payload['approval_request_id']);
+            $pembuat = User::find((int) ($payload['requested_by'] ?? 0))?->name
+                ?? $request?->requestedBy?->name
+                ?? '-';
+            $nominal = isset($payload['amount'])
+                ? 'Rp '.number_format((float) $payload['amount'], 0, ',', '.')
+                : '-';
+
+            app(WaTemplateService::class)->kirimKePeran(
+                [$role],
+                'approval_baru',
+                'Permintaan Approval Baru',
+                [
+                    'judul' => $judul,
+                    'jenis' => (string) ($payload['entity_type'] ?? '-'),
+                    'pembuat' => $pembuat,
+                    'nominal' => $nominal,
+                    'url' => url('/app/approvals'),
+                    'deadline' => optional($request?->created_at)->addHours(12)->format('d M Y H:i') ?: '-',
+                ],
+                'approval'
+            );
         }
     }
 
