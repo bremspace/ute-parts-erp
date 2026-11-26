@@ -61,6 +61,7 @@ class PrintThermalJob implements ShouldQueue
             $hargaSatuan = (float) $item->harga_satuan;
             $qty = (int) $item->jumlah;
             $diskonPerUnit = max(0, $hargaDasar - $hargaSatuan);
+            $catatan = trim((string) ($item->catatan ?? '').' '.(string) ($item->catatanPicking() ?? ''));
 
             $items[] = [
                 'nama' => $this->itemName($item),
@@ -68,8 +69,8 @@ class PrintThermalJob implements ShouldQueue
                 'harga' => $hargaSatuan,
                 'subtotal' => (float) $item->subtotal,
                 'harga_retail' => $hargaDasar,
-                'satuan' => $item->produk?->satuan ?? 'pcs',
-                'catatan' => $item->catatan,
+                'satuan' => $item->satuan ?: 'pcs',
+                'catatan' => $catatan ?: null,
                 'diskon_per_unit' => $diskonPerUnit,
                 'diskon_total' => $diskonPerUnit * $qty,
             ];

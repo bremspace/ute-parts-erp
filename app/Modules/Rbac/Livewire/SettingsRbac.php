@@ -115,6 +115,11 @@ class SettingsRbac extends Component
 
     public $qrisImageFile = null;
 
+    /** Logo opsional yang tampil di halaman pembayaran online konsumen. */
+    public $duitkuLogoFile = null;
+
+    public bool $hapusDuitkuLogo = false;
+
     public ?string $qrisPreviewSvg = null;
 
     public ?string $qrisScanError = null;
@@ -289,6 +294,7 @@ class SettingsRbac extends Component
         'duitku_api_key' => '',
         'duitku_merchant_key' => '',
         'duitku_expiry_period' => 1440,
+        'duitku_logo' => '',
 
         // Biteship Logistics Gateway
         'biteship_api_key' => '',
@@ -1220,6 +1226,7 @@ class SettingsRbac extends Component
             $this->integrasiForm['duitku_api_key'] = $savedDuitku['api_key'] ?? '';
             $this->integrasiForm['duitku_merchant_key'] = $savedDuitku['merchant_key'] ?? '';
             $this->integrasiForm['duitku_expiry_period'] = (int) ($savedDuitku['expiry_period'] ?? 1440);
+            $this->integrasiForm['duitku_logo'] = (string) ($savedDuitku['logo'] ?? '');
         } else {
             $this->integrasiForm['duitku_mode'] = config('duitku.sandbox') ? 'sandbox' : 'production';
             $this->integrasiForm['duitku_merchant_code'] = (string) config('duitku.merchant_code', '');
@@ -1464,6 +1471,8 @@ class SettingsRbac extends Component
             'integrasiForm.duitku_api_key' => 'nullable|string|max:255',
             'integrasiForm.duitku_merchant_key' => 'nullable|string|max:255',
             'integrasiForm.duitku_expiry_period' => 'required|integer|min:15|max:10080',
+            'integrasiForm.duitku_logo' => 'nullable|string|max:255',
+            'duitkuLogoFile' => 'nullable|mimes:jpg,jpeg,png,svg,webp|max:2048',
             'integrasiForm.biteship_api_key' => 'nullable|string|max:255',
 
             // Asymmetric Hybrid Sync — nilai ini jadi sumber runtime (lihat
@@ -1495,12 +1504,27 @@ class SettingsRbac extends Component
         ], 'Konfigurasi WhatsApp Gateway');
 
         // 2. Duitku Config
+        $logoPath = (string) ($this->integrasiForm['duitku_logo'] ?? '');
+
+        if ($this->duitkuLogoFile) {
+            $logoPath = $this->duitkuLogoFile->store('duitku-logo', 'public');
+            $this->duitkuLogoFile = null;
+        }
+
+        if ($this->hapusDuitkuLogo) {
+            $logoPath = '';
+            $this->hapusDuitkuLogo = false;
+        }
+
+        $this->integrasiForm['duitku_logo'] = $logoPath;
+
         $config->set('duitku_gateway_config', [
             'mode' => $this->integrasiForm['duitku_mode'],
             'merchant_code' => $this->integrasiForm['duitku_merchant_code'],
             'api_key' => $this->integrasiForm['duitku_api_key'],
             'merchant_key' => $this->integrasiForm['duitku_merchant_key'],
             'expiry_period' => (int) $this->integrasiForm['duitku_expiry_period'],
+            'logo' => $logoPath,
         ], 'Konfigurasi Payment Gateway Duitku');
 
         // 3. Biteship Config

@@ -8,6 +8,7 @@ use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Marketplace\Services\DuitkuPaymentProcessor;
 use App\Modules\Marketplace\Services\OrderService;
+use App\Modules\Pos\Livewire\PesananOnlineIndex;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\PembayaranPesananOnlineService;
 use App\Modules\Pos\Services\ReturnPenjualanService;
@@ -18,6 +19,7 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\ProdukSatuanKonversi;
 use App\Modules\Wms\Models\StokItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -150,6 +152,29 @@ class MarketplaceOrderSatuanKonversiTest extends TestCase
         $this->assertEquals(3240000.0, (float) $transaksi->subtotal);
         // Stok belum dipotong saat order dibuat (menunggu pembayaran).
         $this->assertEquals(100, $this->stok());
+    }
+
+    public function test_label_picking_order_box_di_kasir_menampilkan_jumlah_pcs(): void
+    {
+        $transaksi = app(OrderService::class)->buatOrder(
+            $this->pelanggan,
+            [['produk_id' => $this->produk->id, 'jumlah' => 24, 'satuan' => 'box']],
+            $this->cabang->id,
+            'ambil_ke_toko'
+        );
+
+        $item = $transaksi->items->first();
+
+        $this->assertSame(24, $item->qtyDasar());
+        $this->assertSame('2 BOX (24 pcs)', $item->qtyLabel());
+        $this->assertSame('×2 BOX (24 pcs)', $item->qtyRingkas());
+        $this->assertSame('Isi 2 BOX = 24 pcs', $item->catatanPicking());
+
+        $this->actingAs($this->staff, 'web');
+
+        Livewire::test(PesananOnlineIndex::class)
+            ->call('lihatDetail', $transaksi->id)
+            ->assertSee('2 BOX (24 pcs)');
     }
 
     public function test_order_box_murni_lunas_duitku_potong_stok_dan_hpp_qty_dasar(): void

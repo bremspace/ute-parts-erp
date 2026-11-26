@@ -6,6 +6,7 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Marketplace\Models\PelangganDeviceSession;
+use App\Modules\Marketplace\Services\PaymentBrandService;
 use App\Modules\Marketplace\Support\HargaTampilan;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
@@ -539,6 +540,7 @@ class CustomerAccount extends Component
             'downlines' => $this->downlines,
             'perangkat' => $this->activeTab === 'sesi' ? $this->perangkat : collect(),
             'membershipInfo' => $this->activeTab === 'membership' ? $this->membershipInfo : [],
+            'paymentBrand' => app(PaymentBrandService::class)->info(),
         ])->layout('layouts.marketplace', ['title' => 'Akun Saya']);
     }
 }
