@@ -4291,6 +4291,39 @@
                                 </div>
                             </div>
 
+                            {{-- Logo custom yang tampil di halaman pembayaran konsumen --}}
+                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <span class="text-xs font-semibold text-white">Logo di Halaman Pembayaran</span>
+                                        <p class="text-[10px] text-ink-400 mt-0.5">Opsional. Tampil di panel bayar konsumen agar sesuai identitas toko Anda.</p>
+                                    </div>
+                                    <div class="w-12 h-12 flex-shrink-0 rounded-xl bg-ink-950/70 border border-white/10 flex items-center justify-center overflow-hidden">
+                                        @if(!empty($integrasiForm['duitku_logo']))
+                                            <img src="{{ asset('storage/'.$integrasiForm['duitku_logo']) }}" alt="Logo pembayaran" class="w-full h-full object-contain" />
+                                        @else
+                                            <span class="text-lg">🏬</span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <label class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-[11px] text-ink-200 font-bold cursor-pointer hover:bg-white/10 transition">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                        Pilih Logo
+                                        <input type="file" wire:model="duitkuLogoFile" accept=".jpg,.jpeg,.png,.svg,.webp" class="hidden" />
+                                    </label>
+                                    <label class="inline-flex items-center gap-1.5 text-[11px] text-ink-300 cursor-pointer">
+                                        <input type="checkbox" wire:model="hapusDuitkuLogo" class="accent-up-red w-3.5 h-3.5 rounded" />
+                                        Hapus logo
+                                    </label>
+                                    @if($duitkuLogoFile)
+                                        <span class="text-[10px] text-up-mint font-semibold">{{ $duitkuLogoFile->getClientOriginalName() }}</span>
+                                    @endif
+                                </div>
+                                @error('duitkuLogoFile') <p class="text-[10px] text-up-red">{{ $message }}</p> @enderror
+                                <p class="text-[10px] text-ink-400">Format JPG, PNG, SVG, atau WebP. Maksimal 2 MB. Kosongkan untuk memakai logo toko bawaan.</p>
+                            </div>
+
                             <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
                                     <span class="text-xs font-semibold text-white">Callback URL Webhook Duitku</span>

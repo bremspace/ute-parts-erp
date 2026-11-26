@@ -5,6 +5,7 @@ namespace App\Modules\Marketplace\Controllers;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Marketplace\Services\DuitkuPaymentProcessor;
 use App\Modules\Marketplace\Services\DuitkuService;
+use App\Modules\Marketplace\Services\PaymentBrandService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\QrisService;
 use App\Traits\ApiResponse;
@@ -20,7 +21,8 @@ class PaymentController extends Controller
 
     public function __construct(
         protected DuitkuService $duitku,
-        protected DuitkuPaymentProcessor $processor
+        protected DuitkuPaymentProcessor $processor,
+        protected PaymentBrandService $brand
     ) {}
 
     /**
@@ -88,8 +90,9 @@ class PaymentController extends Controller
 
         if (! $this->duitku->isConfigured()) {
             return $this->error(
-                'Duitku belum dikonfigurasi — set DUITKU_MERCHANT_CODE, DUITKU_API_KEY, DUITKU_MERCHANT_KEY di .env (sandbox=true untuk testing)',
-                503
+                'Pembayaran online belum dikonfigurasi. Silakan hubungi admin toko.',
+                503,
+                ['code' => 'DUITKU_UNCONFIGURED', 'brand' => $this->brand->info()]
             );
         }
 
@@ -118,7 +121,15 @@ class PaymentController extends Controller
                 'sandbox' => $this->duitku->isSandbox(),
             ], 'Transaksi Duitku berhasil dibuat');
         } catch (\Exception $e) {
-            return $this->error('Duitku: '.$e->getMessage(), 502);
+            Log::warning('[Duitku] Gagal membuat transaksi', [
+                'message' => $e->getMessage(),
+                'order' => $request->no_transaksi,
+            ]);
+
+            return $this->error('Pembayaran online sedang bermasalah. Silakan coba lagi atau hubungi CS toko.', 502, [
+                'code' => 'DUITKU_ERROR',
+                'brand' => $this->brand->info(),
+            ]);
         }
     }
 
@@ -269,6 +280,16 @@ class PaymentController extends Controller
         return response()->json(['success' => true, 'message' => 'Recorded as failed']);
     }
 
+    private function paymentMethodsResponse(array $methods, string $message = 'Daftar metode pembayaran berhasil dimuat'): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $methods,
+            'message' => $message,
+            'brand' => $this->brand->info(),
+        ]);
+    }
+
     /**
      * Daftar metode pembayaran Duitku & QRIS Toko (dinamis berdasarkan konfigurasi owner).
      */
@@ -295,13 +316,29 @@ class PaymentController extends Controller
         // 1. Jika Duitku dinonaktifkan
         if (! $duitkuEnabled) {
             if ($qrisTokoAvailable) {
-                return $this->success([$qrisTokoItem], 'Daftar metode pembayaran berhasil dimuat');
+                return $this->paymentMethodsResponse([$qrisTokoItem]);
             }
 
-            return $this->error('Layanan pembayaran online sedang tidak aktif', 503);
+            return $this->error('Layanan pembayaran online sedang tidak aktif', 503, [
+                'code' => 'PAYMENT_UNAVAILABLE',
+                'brand' => $this->brand->info(),
+            ]);
         }
 
-        // 2. Jika Duitku diaktifkan
+        // 2. Kredensial Duitku belum diisi → jangan panggil API dengan data kosong.
+        if (! $this->duitku->isConfigured()) {
+            if ($qrisTokoAvailable) {
+                return $this->paymentMethodsResponse([$qrisTokoItem]);
+            }
+
+            return $this->error(
+                'Pembayaran online belum dikonfigurasi. Silakan hubungi admin toko.',
+                503,
+                ['code' => 'DUITKU_UNCONFIGURED', 'brand' => $this->brand->info()]
+            );
+        }
+
+        // 3. Jika Duitku diaktifkan dan terkonfigurasi
         try {
             $methods = $this->duitku->getPaymentMethods($amount);
 
@@ -323,14 +360,22 @@ class PaymentController extends Controller
                 $methods = $filtered;
             }
 
-            return $this->success($methods, 'Daftar metode pembayaran berhasil dimuat');
+            return $this->paymentMethodsResponse($methods);
         } catch (\Exception $e) {
+            Log::warning('[Duitku] Gagal memuat metode pembayaran', [
+                'message' => $e->getMessage(),
+                'amount' => $amount,
+            ]);
+
             // Jika Duitku bermasalah/offline namun QRIS Toko tersedia, fallback ke QRIS Toko
             if ($qrisTokoAvailable) {
-                return $this->success([$qrisTokoItem], 'Daftar metode pembayaran berhasil dimuat');
+                return $this->paymentMethodsResponse([$qrisTokoItem]);
             }
 
-            return $this->error('Duitku: '.$e->getMessage(), 502);
+            return $this->error('Pembayaran online sedang bermasalah. Silakan coba lagi atau hubungi CS toko.', 502, [
+                'code' => 'DUITKU_ERROR',
+                'brand' => $this->brand->info(),
+            ]);
         }
     }
 

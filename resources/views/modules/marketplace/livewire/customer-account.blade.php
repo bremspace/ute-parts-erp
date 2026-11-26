@@ -16,6 +16,7 @@
                 qrisPollInterval: null,
                 errorBayar: '',        // pesan bebas; 'PAYMENT_UNAVAILABLE' = gateway belum dikonfigurasi (503)
                 infoBayar: null,       // { payment_url, va_number, qr_string, qr_image, merchant_name, is_qris_toko, expiry, sandbox, kode, namaMetode, badge, kategori }
+                brand: @json($paymentBrand ?? []), // identitas toko dari pengaturan Duitku / Web Konsumen
 
                 init() {
                     const params = new URLSearchParams(window.location.search);
@@ -93,6 +94,7 @@
                             credentials: 'include',
                         });
                         const body = await res.json().catch(() => null);
+                        if (body && body.brand) this.brand = body.brand;
 
                         if (res.status === 503) {
                             this.errorBayar = 'PAYMENT_UNAVAILABLE';
@@ -141,6 +143,7 @@
                             }),
                         });
                         const body = await res.json().catch(() => null);
+                        if (body && body.brand) this.brand = body.brand;
 
                         if (res.status === 503) {
                             this.errorBayar = 'PAYMENT_UNAVAILABLE';
@@ -626,49 +629,87 @@
                         x-transition:leave-end="translate-y-8 opacity-0 sm:translate-y-0 sm:scale-[0.97]"
                         class="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto bg-white dark:bg-ink-900 border border-ink-100 dark:border-white/10 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl"
                     >
-                        <!-- Header -->
-                        <div class="flex items-start justify-between gap-3 mb-4">
-                            <div class="min-w-0">
-                                <p class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Pembayaran Pesanan</p>
-                                <p class="font-mono text-up-primary font-bold text-sm truncate" x-text="orderBayar ? orderBayar.no : ''"></p>
-                                <p class="text-lg font-black text-ink-900 dark:text-white tabular-nums mt-0.5" x-text="orderBayar ? rupiah(orderBayar.total) : ''"></p>
+                        <!-- Header bermerek -->
+                        <div class="flex items-start justify-between gap-3 mb-4 pb-4 border-b border-ink-100 dark:border-white/10">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-11 h-11 flex-shrink-0 rounded-2xl bg-white dark:bg-ink-950 border border-ink-100 dark:border-white/10 shadow-sm flex items-center justify-center overflow-hidden p-1.5">
+                                    <template x-if="brand && brand.logo">
+                                        <img :src="brand.logo" :alt="brand.nama || 'Logo toko'" class="w-full h-full object-contain" />
+                                    </template>
+                                    <template x-if="!(brand && brand.logo)">
+                                        <span class="text-lg">🏬</span>
+                                    </template>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Pembayaran Pesanan</p>
+                                    <p class="text-sm font-black text-ink-900 dark:text-white truncate" x-text="brand && brand.nama ? brand.nama : 'UTEParts'"></p>
+                                    <p class="font-mono text-[11px] text-up-primary truncate" x-text="orderBayar ? orderBayar.no : ''"></p>
+                                </div>
                             </div>
-                            <button
-                                type="button"
-                                x-on:click="tutupBayar()"
-                                class="w-9 h-9 flex-shrink-0 rounded-xl bg-ink-50 dark:bg-white/5 text-ink-400 hover:text-up-red flex items-center justify-center transition-colors cursor-pointer"
-                                aria-label="Tutup"
-                            >
-                                ✕
-                            </button>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <div class="text-right">
+                                    <p class="text-lg font-black text-ink-900 dark:text-white tabular-nums leading-tight" x-text="orderBayar ? rupiah(orderBayar.total) : ''"></p>
+                                    <span x-show="brand && brand.sandbox" class="inline-block mt-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-up-amber/15 text-up-amber">SANDBOX</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    x-on:click="tutupBayar()"
+                                    class="w-9 h-9 rounded-xl bg-ink-50 dark:bg-white/5 text-ink-400 hover:text-up-red flex items-center justify-center transition-colors cursor-pointer"
+                                    aria-label="Tutup"
+                                >
+                                    ✕
+                                </button>
+                            </div>
                         </div>
 
                         {{-- ===== Gateway belum dikonfigurasi (503) / daftar kosong ===== --}}
-                        <div x-show="errorBayar === 'PAYMENT_UNAVAILABLE'" class="p-4 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-center space-y-2">
-                            <p class="text-base">🛍️</p>
-                            <p class="text-sm font-bold text-ink-900 dark:text-white">Pembayaran Online Belum Tersedia</p>
+                        <div x-show="errorBayar === 'PAYMENT_UNAVAILABLE'" class="p-5 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-center space-y-2.5">
+                            <div class="w-12 h-12 mx-auto rounded-2xl bg-white dark:bg-ink-950 border border-ink-100 dark:border-white/10 flex items-center justify-center text-xl shadow-sm">🧾</div>
+                            <p class="text-sm font-black text-ink-900 dark:text-white">Pembayaran Online Belum Tersedia</p>
                             <p class="text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
-                                Layanan pembayaran online sedang tidak aktif. Pesanan Anda tetap tersimpan —
-                                selesaikan pembayaran saat ambil barang atau lewat instruksi resmi WhatsApp toko.
+                                Gateway pembayaran <span x-text="brand && brand.nama ? brand.nama : 'toko'"></span> sedang tidak aktif atau belum dikonfigurasi.
+                                Pesanan Anda tetap tersimpan. Silakan selesaikan pembayaran saat ambil barang atau hubungi CS kami.
                             </p>
-                            <button
-                                type="button"
-                                x-on:click="tutupBayar()"
-                                class="mt-2 px-5 py-2.5 rounded-2xl bg-white dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs hover:bg-ink-50 transition-colors cursor-pointer min-h-[44px]"
-                            >
-                                Mengerti
-                            </button>
+                            <div class="flex flex-col sm:flex-row gap-2 justify-center pt-1">
+                                <a
+                                    x-show="brand && brand.whatsapp"
+                                    :href="brand && brand.whatsapp ? brand.whatsapp : '#'"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-up-mint text-white font-bold text-xs hover:brightness-95 transition min-h-[44px]"
+                                >
+                                    <span>💬</span><span>Hubungi via WhatsApp</span>
+                                </a>
+                                <button
+                                    type="button"
+                                    x-on:click="tutupBayar()"
+                                    class="px-5 py-2.5 rounded-2xl bg-white dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs hover:bg-ink-50 transition-colors cursor-pointer min-h-[44px]"
+                                >
+                                    Mengerti
+                                </button>
+                            </div>
                         </div>
 
                         {{-- ===== Layar instruksi bayar (VA / QRIS / E-Wallet / URL) ===== --}}
                         <div x-show="infoBayar && errorBayar !== 'PAYMENT_UNAVAILABLE'" class="space-y-4">
-                            <div class="p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-xs text-ink-700 dark:text-emerald-200">
-                                <p class="font-bold text-up-mint flex items-center gap-1.5">
-                                    <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
-                                    <span x-text="'Tagihan ' + (infoBayar ? (infoBayar.namaMetode || 'Pembayaran') : 'Pembayaran') + ' Dibuat'"></span>
-                                    <span x-show="infoBayar && infoBayar.sandbox" class="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/20 text-up-amber">Mode Sandbox</span>
-                                </p>
-                                <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-1">
+                            <div class="p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-xs text-ink-700 dark:text-emerald-200 space-y-2">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 flex-shrink-0 rounded-xl bg-white dark:bg-ink-950 border border-ink-100 dark:border-white/10 flex items-center justify-center overflow-hidden p-1">
+                                        <template x-if="brand && brand.logo">
+                                            <img :src="brand.logo" :alt="brand.nama || 'Logo toko'" class="w-full h-full object-contain" />
+                                        </template>
+                                        <template x-if="!(brand && brand.logo)"><span class="text-sm">🏬</span></template>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-bold text-up-mint flex items-center gap-1.5">
+                                            <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
+                                            <span x-text="'Tagihan ' + (infoBayar ? (infoBayar.namaMetode || 'Pembayaran') : 'Pembayaran') + ' Dibuat'"></span>
+                                        </p>
+                                        <p class="text-[10px] text-ink-500 dark:text-ink-400 truncate" x-text="brand && brand.nama ? brand.nama : 'UTEParts'"></p>
+                                    </div>
+                                    <span x-show="infoBayar && infoBayar.sandbox" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/20 text-up-amber">Mode Sandbox</span>
+                                </div>
+                                <p class="text-[11px] text-ink-500 dark:text-ink-400">
                                     Selesaikan pembayaran sebelum batas waktu agar pesanan Anda segera diproses gudang.
                                 </p>
                             </div>
@@ -822,6 +863,14 @@
 
                         {{-- ===== Pilih metode: Segmented Tabs & Compact Grid ===== --}}
                         <div x-show="!infoBayar && errorBayar !== 'PAYMENT_UNAVAILABLE'" class="space-y-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-xs font-black uppercase tracking-wider text-ink-900 dark:text-white">Pilih Metode Pembayaran</p>
+                                    <p class="text-[11px] text-ink-400 mt-0.5">Pembayaran diproses otomatis dan status pesanan diperbarui setelah lunas.</p>
+                                </div>
+                                <span class="flex-shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold bg-up-mint/10 text-up-mint border border-up-mint/20">Aman & Otomatis</span>
+                            </div>
+
                             <!-- Loading daftar metode -->
                             <div x-show="loadingMetode" class="space-y-2.5">
                                 <p class="text-[11px] text-ink-400 animate-pulse">Memuat metode pembayaran…</p>
@@ -914,7 +963,7 @@
                             </button>
 
                             <p class="text-[10px] text-ink-400 text-center leading-relaxed">
-                                Pembayaran diproses dengan aman melalui gateway resmi. Status pesanan diperbarui otomatis setelah lunas.
+                                Pembayaran untuk <span x-text="brand && brand.nama ? brand.nama : 'toko kami'"></span> diproses aman melalui gateway resmi. Status pesanan diperbarui otomatis setelah lunas.
                             </p>
                         </div>
                     </div>
