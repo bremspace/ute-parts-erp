@@ -242,8 +242,18 @@ class PembayaranPesananOnlineService
                     'wa',
                     $transaksi->pelanggan->telepon,
                     'Pembayaran Diterima',
-                    "Halo {$transaksi->pelanggan->nama}, pembayaran pesanan {$transaksi->no_transaksi} sebesar Rp ".number_format($total, 0, ',', '.').' telah diverifikasi.',
-                    $payload
+                    '',
+                    array_merge($payload, [
+                        'cabang_id' => $transaksi->cabang_id,
+                        'wa_template' => 'pembayaran_kasir_diterima',
+                        'wa_judul' => 'Pembayaran Diterima',
+                        'wa_vars' => [
+                            'nama' => $transaksi->pelanggan->nama,
+                            'no_transaksi' => $transaksi->no_transaksi,
+                            'total' => number_format($total, 0, ',', '.'),
+                            'metode' => (string) ($metode ?? ''),
+                        ],
+                    ])
                 );
             }
 
@@ -340,11 +350,20 @@ class PembayaranPesananOnlineService
                 'wa',
                 $transaksi->pelanggan->telepon,
                 'Pesanan Selesai Diambil',
-                "Halo {$transaksi->pelanggan->nama}, pesanan {$transaksi->no_transaksi} telah selesai diambil di toko. Terima kasih telah mempercayai kami!",
+                '',
                 [
                     'transaksi_id' => $transaksi->id,
                     'pelanggan_id' => $transaksi->pelanggan_id,
                     'audience' => 'pelanggan',
+                    'kategori' => 'transaksi',
+                    'cabang_id' => $transaksi->cabang_id,
+                    'wa_template' => 'pesanan_selesai_diambil',
+                    'wa_judul' => 'Pesanan Selesai Diambil',
+                    'wa_vars' => [
+                        'nama' => $transaksi->pelanggan->nama,
+                        'no_transaksi' => $transaksi->no_transaksi,
+                        'nama_cabang' => $transaksi->cabang?->nama ?? 'Cabang',
+                    ],
                 ]
             );
         }

@@ -133,16 +133,30 @@ class BroadcastService
                         default => null,
                     };
 
+                    $payload = [
+                        'pelanggan_id' => $pelanggan->id,
+                        'kampanye_id' => $kampanye->id,
+                        'audience' => 'pelanggan',
+                    ];
+
+                    // Broadcast WA tetap memakai pesan kampanye, tetapi dapat
+                    // dimatikan/dibungkus lewat template global `broadcast`.
+                    if ($kampanye->channel === 'wa') {
+                        $payload['wa_template'] = 'broadcast';
+                        $payload['wa_judul'] = $kampanye->judul;
+                        $payload['wa_vars'] = [
+                            'nama' => $pelanggan->nama,
+                            'tier' => $pelanggan->tierMembership?->nama ?? 'Member',
+                            'pesan' => $konten,
+                        ];
+                    }
+
                     $this->notifService->kirim(
                         $kampanye->channel,
                         $tujuan,
                         $kampanye->judul,
                         $konten,
-                        [
-                            'pelanggan_id' => $pelanggan->id,
-                            'kampanye_id' => $kampanye->id,
-                            'audience' => 'pelanggan',
-                        ],
+                        $payload,
                         $kampanye->id
                     );
                     $terkirim++;

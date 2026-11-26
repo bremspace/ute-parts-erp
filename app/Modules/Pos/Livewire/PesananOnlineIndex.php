@@ -286,11 +286,21 @@ class PesananOnlineIndex extends Component
                     'wa',
                     $transaksi->pelanggan->telepon,
                     'Pembayaran Diterima',
-                    "Halo {$transaksi->pelanggan->nama}, pembayaran pesanan {$transaksi->no_transaksi} sebesar Rp ".number_format($totalAkhir, 0, ',', '.').' telah diverifikasi.',
+                    '',
                     [
                         'transaksi_id' => $transaksi->id,
                         'pelanggan_id' => $transaksi->pelanggan_id,
                         'audience' => 'pelanggan',
+                        'kategori' => 'transaksi',
+                        'cabang_id' => $transaksi->cabang_id,
+                        'wa_template' => 'pembayaran_kasir_diterima',
+                        'wa_judul' => 'Pembayaran Diterima',
+                        'wa_vars' => [
+                            'nama' => $transaksi->pelanggan->nama,
+                            'no_transaksi' => $transaksi->no_transaksi,
+                            'total' => number_format($totalAkhir, 0, ',', '.'),
+                            'metode' => 'kasir',
+                        ],
                     ]
                 );
             }
@@ -486,11 +496,22 @@ class PesananOnlineIndex extends Component
                     'wa',
                     $transaksi->pelanggan->telepon,
                     $judul,
-                    "Halo {$transaksi->pelanggan->nama}, {$pesan} Terima kasih telah berbelanja di toko kami!",
+                    '',
                     [
                         'transaksi_id' => $transaksi->id,
                         'pelanggan_id' => $transaksi->pelanggan_id,
                         'audience' => 'pelanggan',
+                        'kategori' => 'transaksi',
+                        'cabang_id' => $transaksi->cabang_id,
+                        'wa_template' => $isPickup ? 'pesanan_siap_diambil' : 'pesanan_dikirim',
+                        'wa_judul' => $judul,
+                        'wa_vars' => [
+                            'nama' => $transaksi->pelanggan->nama,
+                            'no_transaksi' => $transaksi->no_transaksi,
+                            'nama_cabang' => $transaksi->cabang?->nama ?? 'Cabang',
+                            'kurir' => $this->kurirPilihan,
+                            'no_resi' => $this->nomorResi,
+                        ],
                     ]
                 );
             }

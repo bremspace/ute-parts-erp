@@ -214,11 +214,22 @@ class ServisService
                 'wa',
                 $telepon,
                 'Unit Servis Diterima',
-                "Unit {$tiket->jenis_hp} ({$tiket->no_tiket}) telah kami terima. Pantau perbaikan Anda di: ".url("/tracking/{$tiket->token_approval}"),
+                '',
                 [
                     'tiket_id' => $tiket->id,
                     'pelanggan_id' => $tiket->pelanggan_id,
                     'audience' => 'pelanggan',
+                    'kategori' => 'servis',
+                    'cabang_id' => $tiket->cabang_id,
+                    'wa_template' => 'servis_unit_diterima',
+                    'wa_judul' => 'Unit Servis Diterima',
+                    'wa_vars' => [
+                        'nama' => $namaPelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                        'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                        'url_tracking' => url("/tracking/{$tiket->token_approval}"),
+                    ],
                 ]
             );
         } else {
@@ -580,12 +591,25 @@ class ServisService
                 'wa',
                 $telepon,
                 'Status Servis Diperbarui',
-                $pesanNotif,
+                '',
                 [
                     'tiket_id' => $tiket->id,
                     'status' => $statusBaru,
                     'pelanggan_id' => $tiket->pelanggan_id,
                     'audience' => 'pelanggan',
+                    'kategori' => 'servis',
+                    'cabang_id' => $tiket->cabang_id,
+                    'wa_template' => 'servis_status',
+                    'wa_judul' => 'Status Servis Diperbarui',
+                    'wa_vars' => [
+                        'nama' => $tiket->nama_pelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                        'status' => $labelStatus,
+                        'status_key' => $statusBaru,
+                        'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                        'url_tracking' => $trackingUrl,
+                    ],
                 ]
             );
         } else {
@@ -747,12 +771,24 @@ class ServisService
                 'wa',
                 $telepon,
                 'Estimasi Servis Perlu Approval',
-                $pesanEstimasi,
+                '',
                 [
                     'tiket_id' => $tiket->id,
                     'token' => $token,
                     'pelanggan_id' => $tiket->pelanggan_id,
                     'audience' => 'pelanggan',
+                    'kategori' => 'servis',
+                    'cabang_id' => $tiket->cabang_id,
+                    'wa_template' => 'servis_estimasi_approval',
+                    'wa_judul' => 'Estimasi Servis Perlu Approval',
+                    'wa_vars' => [
+                        'nama' => $tiket->nama_pelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                        'biaya' => 'Rp '.number_format((float) $biaya, 0, ',', '.'),
+                        'link_approve' => $linkApprove,
+                        'batas_waktu' => $tiket->batas_waktu_menit ? 'Batas waktu persetujuan: '.$tiket->batas_waktu_menit.' menit.' : '',
+                    ],
                 ]
             );
         } else {
@@ -1197,12 +1233,22 @@ class ServisService
                 'wa',
                 $telepon,
                 'Perubahan Lingkup Servis',
-                "Ada perubahan lingkup pada servis {$tiket->no_tiket} di luar estimasi yang Anda setujui. Tinjau & setujui di: {$link}",
+                '',
                 [
                     'tiket_id' => $tiket->id,
                     'token' => $tiket->token_approval,
                     'pelanggan_id' => $tiket->pelanggan_id,
                     'audience' => 'pelanggan',
+                    'kategori' => 'servis',
+                    'cabang_id' => $tiket->cabang_id,
+                    'wa_template' => 'servis_perubahan_lingkup',
+                    'wa_judul' => 'Perubahan Lingkup Servis',
+                    'wa_vars' => [
+                        'nama' => $tiket->nama_pelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                        'link' => $link,
+                    ],
                 ]
             );
         }
@@ -1260,12 +1306,21 @@ class ServisService
             'wa',
             $telepon,
             'Persetujuan Perubahan Lingkup Servis',
-            "Pembaruan: servis {$tiket->no_tiket} memerlukan persetujuan Anda. Tinjau & setujui di: {$link}",
+            '',
             [
                 'tiket_id' => $tiket->id,
                 'token' => $tiket->token_approval,
                 'pelanggan_id' => $tiket->pelanggan_id,
                 'audience' => 'pelanggan',
+                'kategori' => 'servis',
+                'cabang_id' => $tiket->cabang_id,
+                'wa_template' => 'servis_persetujuan_diulang',
+                'wa_judul' => 'Persetujuan Perubahan Lingkup Servis',
+                'wa_vars' => [
+                    'nama' => $tiket->nama_pelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
+                    'no_tiket' => $tiket->no_tiket,
+                    'link' => $link,
+                ],
             ]
         );
 
@@ -1636,8 +1691,23 @@ class ServisService
             $telepon = $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon;
             if ($tampilkanKeKonsumen && filled($telepon) && $tiket->token_approval) {
                 $trackingUrl = url("/tracking/{$tiket->token_approval}");
-                $pesan = "Progress Pengerjaan Servis {$tiket->no_tiket} ({$tiket->jenis_hp}): {$persentase}% - {$judul}. Pantau selengkapnya di {$trackingUrl}";
-                $this->notifService->kirim('wa', $telepon, 'Pembaruan Pengerjaan Servis', $pesan);
+                $this->notifService->kirim('wa', $telepon, 'Pembaruan Pengerjaan Servis', '', [
+                    'tiket_id' => $tiket->id,
+                    'pelanggan_id' => $tiket->pelanggan_id,
+                    'audience' => 'pelanggan',
+                    'kategori' => 'servis',
+                    'cabang_id' => $tiket->cabang_id,
+                    'wa_template' => 'servis_progres',
+                    'wa_judul' => 'Pembaruan Pengerjaan Servis',
+                    'wa_vars' => [
+                        'nama' => $tiket->nama_pelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                        'persentase' => $persentase,
+                        'judul' => $judul,
+                        'url_tracking' => $trackingUrl,
+                    ],
+                ]);
             }
 
             return $progress;
@@ -1747,12 +1817,23 @@ class ServisService
                 'wa',
                 $telepon,
                 'Komplain Pasca-Servis Diterima',
-                "Komplain untuk {$tiket->no_tiket} ({$tiket->jenis_hp}) telah kami terima. {$status}. Pantau tindak lanjut di: {$link}",
+                '',
                 [
                     'tiket_id' => $tiket->id,
                     'token' => $tiket->token_approval,
                     'pelanggan_id' => $tiket->pelanggan_id,
                     'audience' => 'pelanggan',
+                    'kategori' => 'servis',
+                    'cabang_id' => $tiket->cabang_id,
+                    'wa_template' => 'servis_komplain_diterima',
+                    'wa_judul' => 'Komplain Pasca-Servis Diterima',
+                    'wa_vars' => [
+                        'nama' => $tiket->nama_pelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                        'status_garansi' => $status,
+                        'link' => $link,
+                    ],
                 ]
             );
         }
@@ -1763,11 +1844,21 @@ class ServisService
                 'wa',
                 $teleponToko,
                 'Komplain Pasca-Servis Masuk',
-                "Komplain masuk {$tiket->no_tiket} ({$tiket->jenis_hp}) dari tiket {$tiketLama->no_tiket}".($garansiBerlaku ? ' — GARANSI berlaku' : '').'.',
+                '',
                 [
                     'tiket_id' => $tiket->id,
                     'cabang_id' => $tiket->cabang_id,
                     'audience' => 'staf',
+                    'kategori' => 'servis',
+                    'wa_template' => 'servis_komplain_masuk',
+                    'wa_judul' => 'Komplain Pasca-Servis Masuk',
+                    'wa_vars' => [
+                        'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                        'no_tiket_lama' => $tiketLama->no_tiket,
+                        'status_garansi' => $garansiBerlaku ? ' — GARANSI berlaku.' : '.',
+                    ],
                 ]
             );
         }
@@ -2131,9 +2222,23 @@ class ServisService
 
         // Notifikasi ke teknisi jika ditugaskan
         if ($tiket->teknisi_id && $tiket->teknisi) {
-            $pesanTeknisi = "Halo {$tiket->teknisi->name}, Anda mulai mengerjakan servis {$tiket->no_tiket} ({$tiket->jenis_hp}). Batas waktu pengerjaan: {$batasMenit} menit (Deadline: {$deadline->format('H:i')}). Pantau progres dan unggah pembaruan secara berkala.";
             if ($tiket->teknisi->phone ?? false) {
-                $this->notifService->kirim('wa', $tiket->teknisi->phone, 'Tugas Pengerjaan Servis Dimulai', $pesanTeknisi);
+                $this->notifService->kirim('wa', $tiket->teknisi->phone, 'Tugas Pengerjaan Servis Dimulai', '', [
+                    'tiket_id' => $tiket->id,
+                    'user_id' => $tiket->teknisi_id,
+                    'audience' => 'staf',
+                    'kategori' => 'servis',
+                    'cabang_id' => $tiket->cabang_id,
+                    'wa_template' => 'servis_tugas_mulai',
+                    'wa_judul' => 'Tugas Pengerjaan Servis Dimulai',
+                    'wa_vars' => [
+                        'nama_teknisi' => $tiket->teknisi->name,
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                        'batas_menit' => $batasMenit,
+                        'deadline' => $deadline,
+                    ],
+                ]);
             }
         }
     }

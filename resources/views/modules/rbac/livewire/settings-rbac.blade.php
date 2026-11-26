@@ -4244,17 +4244,196 @@
                                 @endif
                             </div>
 
-                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
-                                <h4 class="text-xs font-bold text-white mb-1.5">Pemicu Otomatis (Automation Triggers)</h4>
-                                <label class="flex items-center gap-2.5 text-xs text-ink-300 cursor-pointer">
-                                    <input type="checkbox" wire:model="integrasiForm.wa_auto_notif_transaksi" class="accent-up-mint w-4 h-4 rounded" />
-                                    <span>Kirim struk / notifikasi otomatis via WA saat transaksi kasir POS selesai</span>
-                                </label>
-                                <label class="flex items-center gap-2.5 text-xs text-ink-300 cursor-pointer">
-                                    <input type="checkbox" wire:model="integrasiForm.wa_auto_notif_servis" class="accent-up-mint w-4 h-4 rounded" />
-                                    <span>Kirim update progres servis otomatis saat status tiket servis berubah</span>
-                                </label>
+                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
+                                <h4 class="text-xs font-bold text-white">Pemicu Otomatis (Automation Triggers)</h4>
+                                <p class="text-[11px] text-ink-400 leading-relaxed">
+                                    Atur pemicu per event, including transaksi & servis, lewat kartu <span class="text-up-primary font-semibold">Template WA</span> di bawah.
+                                    Master, grup, dan event dapat di-on/off tanpa mengubah kredensial gateway.
+                                </p>
                             </div>
+                        </div>
+                    </x-prism.glass-card>
+
+                    @php
+                        $waTpl = app(\App\Modules\Notifikasi\Services\WaTemplateService::class);
+                        $waSummary = $waTpl->summary();
+                        $waSelected = $waTemplatePreviewEvent ? $waTpl->event($waTemplatePreviewEvent) : null;
+                    @endphp
+
+                    <!-- Template WA Card -->
+                    <x-prism.glass-card title="Template WA" subtitle="Template referensi dapat disesuaikan toko. Berlaku global untuk seluruh cabang.">
+                        <div class="space-y-4">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="px-2 py-1 rounded-lg text-[10px] font-bold bg-white/5 border border-white/10 text-ink-300">
+                                    {{ $waSummary['total'] }} event
+                                </span>
+                                <span class="px-2 py-1 rounded-lg text-[10px] font-bold bg-up-mint/15 border border-up-mint/25 text-up-mint">
+                                    {{ $waSummary['aktif'] }} aktif
+                                </span>
+                                <span class="px-2 py-1 rounded-lg text-[10px] font-bold bg-up-amber/15 border border-up-amber/25 text-up-amber">
+                                    {{ $waSummary['nonaktif'] }} nonaktif
+                                </span>
+                                <span class="px-2 py-1 rounded-lg text-[10px] font-bold bg-up-primary/15 border border-up-primary/25 text-up-primary">
+                                    {{ $waSummary['kustom'] }} disesuaikan
+                                </span>
+                            </div>
+
+                            <label class="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 cursor-pointer">
+                                <span>
+                                    <span class="block text-xs font-bold text-white">Aktifkan seluruh notifikasi WA</span>
+                                    <span class="block text-[10px] text-ink-400 mt-0.5">Master switch. Mematikan ini menonaktifkan semua event tanpa menghapus template.</span>
+                                </span>
+                                <input type="checkbox" wire:model.live="waTemplateForm.master_enabled" class="accent-up-mint w-4 h-4 rounded shrink-0" />
+                            </label>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                @foreach($waTpl->groups() as $groupKey => $group)
+                                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                                        <label class="flex items-center justify-between gap-2 cursor-pointer">
+                                            <span>
+                                                <span class="block text-xs font-bold text-white">{{ $group['label'] }}</span>
+                                                <span class="block text-[10px] text-ink-400 leading-snug">{{ $group['deskripsi'] }}</span>
+                                            </span>
+                                            <input type="checkbox" wire:model.live="waTemplateForm.groups.{{ $groupKey }}.enabled" class="accent-up-mint w-4 h-4 rounded shrink-0" />
+                                        </label>
+                                        <div class="space-y-1 pt-1 border-t border-white/5">
+                                            @foreach($waTpl->events() as $eventKey => $event)
+                                                @continue($event['group'] !== $groupKey)
+                                                @php
+                                                    $eventAktif = $waTpl->isEnabled($eventKey);
+                                                    $eventKustom = $waTpl->isCustomized($eventKey);
+                                                @endphp
+                                                <button
+                                                    type="button"
+                                                    wire:click="previewWaTemplate('{{ $eventKey }}')"
+                                                    class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-colors {{ $waTemplatePreviewEvent === $eventKey ? 'bg-up-primary/15 border border-up-primary/30' : 'hover:bg-white/5 border border-transparent' }}"
+                                                >
+                                                    <span class="flex items-center gap-2 min-w-0">
+                                                        <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $eventAktif ? 'bg-up-mint' : 'bg-up-red/70' }}"></span>
+                                                        <span class="text-[11px] text-ink-200 truncate">{{ $event['label'] }}</span>
+                                                    </span>
+                                                    <span class="flex items-center gap-1 shrink-0">
+                                                        @if($eventKustom)
+                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-up-primary/15 text-up-primary">KUSTOM</span>
+                                                        @endif
+                                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded {{ $eventAktif ? 'bg-up-mint/15 text-up-mint' : 'bg-up-red/15 text-up-red' }}">
+                                                            {{ $eventAktif ? 'AKTIF' : 'MATI' }}
+                                                        </span>
+                                                    </span>
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            @if($waSelected)
+                                @php $selectedKey = (string) $waTemplatePreviewEvent; @endphp
+                                <div class="pt-4 border-t border-white/10 space-y-3">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <p class="text-xs font-bold text-white">{{ $waSelected['label'] }}</p>
+                                            <p class="text-[10px] text-ink-400">Penerima: {{ $waSelected['audience'] }} · Grup: {{ $waTpl->groups()[$waSelected['group']]['label'] }}</p>
+                                        </div>
+                                        <label class="flex items-center gap-2 text-[11px] text-ink-300 cursor-pointer">
+                                            <input type="checkbox" wire:model.live="waTemplateForm.events.{{ $selectedKey }}.enabled" class="accent-up-mint w-4 h-4 rounded" />
+                                            Aktifkan event ini
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-ink-300 mb-1">Isi pesan</label>
+                                        <textarea
+                                            wire:model.defer="waTemplateForm.events.{{ $selectedKey }}.template"
+                                            rows="7"
+                                            class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono leading-relaxed"
+                                            placeholder="Tulis template WhatsApp…"
+                                        ></textarea>
+                                        @error('waTemplateForm.events.'.$selectedKey.'.template') <p class="text-up-red text-[10px] mt-1">{{ $message }}</p> @enderror
+                                        @if(! empty($waTemplateErrors[$selectedKey]))
+                                            <p class="text-up-red text-[10px] mt-1">⚠ {{ $waTemplateErrors[$selectedKey] }}</p>
+                                        @endif
+                                        <p class="text-[10px] text-ink-400 mt-1">Maks. 2000 karakter. Placeholder ditulis seperti <span class="font-mono text-up-primary">&#123;nama&#125;</span>.</p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-[10px] font-semibold text-ink-300 mb-1.5">Placeholder tersedia (klik untuk menyalin manual):</p>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @foreach($waTpl->placeholderTokens($selectedKey) as $token)
+                                                <span class="px-2 py-1 rounded-lg bg-white/5 border border-white/10 font-mono text-[10px] text-ink-300">&#123;{{ $token }}&#125;</span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    @if($selectedKey === 'servis_status')
+                                        <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <p class="text-[11px] font-bold text-white">Override per status servis</p>
+                                                <p class="text-[10px] text-ink-400">Kosongkan = pakai template umum di atas.</p>
+                                            </div>
+                                            @foreach($waTemplateErrors as $errKey => $errMessage)
+                                                @if(str_starts_with((string) $errKey, 'servis_status.'))
+                                                    <p class="text-[10px] text-up-red">⚠ {{ $errMessage }}</p>
+                                                @endif
+                                            @endforeach
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                @foreach($waTpl->statusServis() as $statusKey => $statusLabel)
+                                                    <div class="p-2 rounded-lg bg-ink-950/30 border border-white/5 space-y-1.5">
+                                                        <div class="flex items-center justify-between gap-2">
+                                                            <span class="text-[10px] font-bold text-ink-200">{{ $statusLabel }}</span>
+                                                            <button
+                                                                type="button"
+                                                                wire:click="resetWaStatusOverride('{{ $statusKey }}')"
+                                                                class="text-[9px] font-bold text-up-primary hover:underline cursor-pointer"
+                                                            >
+                                                                Reset
+                                                            </button>
+                                                        </div>
+                                                        <textarea
+                                                            wire:model.defer="waTemplateForm.events.servis_status.overrides.{{ $statusKey }}"
+                                                            rows="2"
+                                                            class="w-full px-2 py-1.5 rounded-lg glass-input text-[10px] font-mono leading-snug"
+                                                            placeholder="Pakai template umum…"
+                                                        ></textarea>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    <div class="p-3 rounded-xl bg-ink-950/40 border border-white/5">
+                                        <p class="text-[10px] font-bold text-ink-300 mb-2">PRATINJAU DENGAN DATA CONTOH</p>
+                                        <pre class="whitespace-pre-wrap font-sans text-[11px] text-ink-200 leading-relaxed">{{ $waTemplatePreview }}</pre>
+                                    </div>
+
+                                    <div class="flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            wire:click="simpanWaTemplate"
+                                            wire:loading.attr="disabled"
+                                            class="px-4 py-2 rounded-xl bg-up-primary hover:opacity-95 text-white font-bold text-xs transition-opacity disabled:opacity-50 cursor-pointer"
+                                        >
+                                            Simpan Template WA
+                                        </button>
+                                        <button
+                                            type="button"
+                                            wire:click="resetWaTemplate('{{ $selectedKey }}')"
+                                            wire:loading.attr="disabled"
+                                            class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-200 font-bold text-xs border border-white/10 transition-colors disabled:opacity-50 cursor-pointer"
+                                        >
+                                            Reset ke Referensi
+                                        </button>
+                                        <button
+                                            type="button"
+                                            wire:click="testKirimWaTemplate('{{ $selectedKey }}')"
+                                            wire:loading.attr="disabled"
+                                            class="px-4 py-2 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint font-bold text-xs border border-up-mint/25 transition-colors disabled:opacity-50 cursor-pointer"
+                                        >
+                                            Kirim Uji Template Ini
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     </x-prism.glass-card>
 
@@ -4576,6 +4755,41 @@
 
                 <!-- Sidebar Test & Status (Col Span 1) -->
                 <div class="space-y-6">
+                    <x-prism.glass-card title="Status Pengiriman WA" subtitle="8 aktivitas terbaru, termasuk yang sengaja dimatikan">
+                        <div class="space-y-2">
+                            @forelse($waRecentLogs as $log)
+                                @php
+                                    $statusInfo = match($log['status']) {
+                                        'terkirim' => ['Terkirim', 'bg-up-mint/15 text-up-mint border-up-mint/25'],
+                                        'gagal' => ['Gagal', 'bg-up-red/15 text-up-red border-up-red/25'],
+                                        'pending' => ['Antrean', 'bg-up-amber/15 text-up-amber border-up-amber/25'],
+                                        'terlewat' => ['Dimatikan', 'bg-white/5 text-ink-400 border-white/10'],
+                                        default => [$log['status'], 'bg-white/5 text-ink-400 border-white/10'],
+                                    };
+                                @endphp
+                                <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <p class="text-[11px] font-semibold text-ink-200 leading-snug">{{ $log['label'] }}</p>
+                                        <span class="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded border {{ $statusInfo[1] }}">{{ $statusInfo[0] }}</span>
+                                    </div>
+                                    <p class="text-[10px] text-ink-400">{{ $log['waktu'] }} · {{ $log['tujuan'] }}</p>
+                                    @if($log['error'] !== '')
+                                        <p class="text-[10px] text-up-red leading-snug break-words">{{ $log['error'] }}</p>
+                                    @endif
+                                </div>
+                            @empty
+                                <p class="text-[11px] text-ink-400">Belum ada aktivitas WhatsApp.</p>
+                            @endforelse
+                            <button
+                                type="button"
+                                wire:click="refreshWaRecentLogs"
+                                class="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[11px] font-bold text-ink-200 border border-white/10 transition-colors cursor-pointer"
+                            >
+                                Refresh Status
+                            </button>
+                        </div>
+                    </x-prism.glass-card>
+
                     <x-prism.glass-card title="Uji Coba WhatsApp" subtitle="Pastikan pesan gateway dapat terkirim">
                         <div class="space-y-3.5">
                             <div>

@@ -9,6 +9,8 @@ use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Marketplace\Services\DuitkuService;
 use App\Modules\Marketplace\Services\WebKonsumenService;
+use App\Modules\Notifikasi\Models\NotifikasiKeluar;
+use App\Modules\Notifikasi\Services\WaTemplateService;
 use App\Modules\Notifikasi\Services\WhatsAppGatewayService;
 use App\Modules\Pos\Models\QrisCabang;
 use App\Modules\Pos\Services\EscPosWriter;
@@ -314,6 +316,19 @@ class SettingsRbac extends Component
     ];
 
     public ?string $waTestStatus = null;
+
+    /** @var array<string, mixed> Konfigurasi template WA (master, grup, event). */
+    public array $waTemplateForm = [];
+
+    public ?string $waTemplatePreviewEvent = null;
+
+    public string $waTemplatePreview = '';
+
+    /** @var array<string, string> Error validasi per event template. */
+    public array $waTemplateErrors = [];
+
+    /** @var array<int, array<string, mixed>> Riwayat WA terbaru untuk panel status. */
+    public array $waRecentLogs = [];
 
     public ?string $duitkuTestStatus = null;
 
@@ -1272,6 +1287,23 @@ class SettingsRbac extends Component
             $this->integrasiForm['sync_pull_interval_seconds'] = (int) config('sync.pull_interval_seconds', 30);
         }
 
+        // Template WA (global) + status pengiriman terbaru.
+        $waTemplate = app(WaTemplateService::class);
+        $this->waTemplateForm = $waTemplate->config();
+
+        // Migrasi sekali dari toggle lama bila template belum pernah disimpan.
+        if (! is_array($config->get(WaTemplateService::CONFIG_KEY))) {
+            $legacy = is_array($savedWa) ? $savedWa : [];
+            $this->waTemplateForm['groups']['transaksi']['enabled'] = (bool) ($legacy['auto_notif_transaksi'] ?? true);
+            $this->waTemplateForm['groups']['servis_pelanggan']['enabled'] = (bool) ($legacy['auto_notif_servis'] ?? true);
+            $this->waTemplateForm['groups']['servis_internal']['enabled'] = (bool) ($legacy['auto_notif_servis'] ?? true);
+        }
+
+        $this->waTemplateErrors = [];
+        $this->waTemplatePreviewEvent = $this->waTemplatePreviewEvent ?: array_key_first($waTemplate->events());
+        $this->previewWaTemplate($this->waTemplatePreviewEvent);
+        $this->refreshWaRecentLogs();
+
         $this->refreshSyncStatus();
     }
 
@@ -1454,6 +1486,204 @@ class SettingsRbac extends Component
         }
     }
 
+    /** Muat 8 log WA terbaru untuk panel status/error di halaman integrasi. */
+    public function refreshWaRecentLogs(): void
+    {
+        $this->waRecentLogs = NotifikasiKeluar::query()
+            ->where('tipe', 'wa')
+            ->latest()
+            ->limit(8)
+            ->get()
+            ->map(function (NotifikasiKeluar $log): array {
+                $event = (string) ($log->payload['wa_template'] ?? '');
+                $label = app(WaTemplateService::class)->event($event)['label'] ?? ($log->judul ?: 'WA');
+
+                return [
+                    'id' => $log->id,
+                    'label' => $label,
+                    'status' => (string) $log->status,
+                    'tujuan' => $this->maskNomor((string) ($log->tujuan ?? '')),
+                    'error' => (string) ($log->error ?? ''),
+                    'waktu' => optional($log->created_at)->format('d M Y H:i:s'),
+                ];
+            })
+            ->all();
+    }
+
+    public function previewWaTemplate(?string $event = null): void
+    {
+        $key = (string) ($event ?? $this->waTemplatePreviewEvent ?? '');
+        $service = app(WaTemplateService::class);
+
+        if ($service->event($key) === null) {
+            $this->waTemplatePreview = '';
+
+            return;
+        }
+
+        $this->waTemplatePreviewEvent = $key;
+        $template = (string) ($this->waTemplateForm['events'][$key]['template'] ?? $service->templateFor($key));
+        $this->waTemplatePreview = $service->preview($key, $template);
+    }
+
+    public function simpanWaTemplate(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah template WhatsApp.')) {
+            return;
+        }
+
+        $hasil = app(WaTemplateService::class)->save($this->waTemplateForm);
+        $this->waTemplateErrors = $hasil['errors'];
+        $this->waTemplateForm = $hasil['config'];
+
+        if (! $hasil['ok']) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Template WA belum disimpan. Periksa placeholder/karakter pada event yang ditandai.',
+            ]);
+
+            return;
+        }
+
+        $this->previewWaTemplate($this->waTemplatePreviewEvent);
+        $this->refreshWaRecentLogs();
+        app(AuditService::class)->catat('Konfigurasi', 'update', null, 'Template notifikasi WhatsApp diperbarui');
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Template WA berhasil disimpan dan langsung berlaku untuk seluruh toko.',
+        ]);
+    }
+
+    public function resetWaTemplate(string $event): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah template WhatsApp.')) {
+            return;
+        }
+
+        $service = app(WaTemplateService::class);
+        if ($service->event($event) === null) {
+            return;
+        }
+
+        $cfg = $service->config();
+        unset($cfg['events'][$event]['template']);
+        if ($event === 'servis_status') {
+            unset($cfg['events'][$event]['overrides']);
+        }
+
+        $hasil = $service->save($cfg);
+        $this->waTemplateForm = $hasil['config'];
+        $this->waTemplateErrors = $hasil['errors'];
+        $this->previewWaTemplate($event);
+
+        $this->dispatch('alert', [
+            'type' => $hasil['ok'] ? 'success' : 'error',
+            'message' => $hasil['ok']
+                ? 'Template "'.$service->event($event)['label'].'" dikembalikan ke template referensi.'
+                : 'Gagal mereset template: '.implode(' ', $hasil['errors']),
+        ]);
+    }
+
+    public function resetWaStatusOverride(string $status): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah template WhatsApp.')) {
+            return;
+        }
+
+        $service = app(WaTemplateService::class);
+        $cfg = $service->config();
+        $cfg['events']['servis_status']['overrides'][$status] = '';
+
+        $hasil = $service->save($cfg);
+        $this->waTemplateForm = $hasil['config'];
+        $this->waTemplateErrors = $hasil['errors'];
+        $this->previewWaTemplate('servis_status');
+
+        $this->dispatch('alert', [
+            'type' => $hasil['ok'] ? 'success' : 'error',
+            'message' => $hasil['ok']
+                ? 'Override status "'.($service->statusServis()[$status] ?? $status).'" dikembalikan ke template referensi.'
+                : 'Gagal mereset override status: '.implode(' ', $hasil['errors']),
+        ]);
+    }
+
+    public function testKirimWaTemplate(string $event): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin menguji template WhatsApp.')) {
+            return;
+        }
+
+        $this->validate([
+            'integrasiForm.wa_token' => 'required|string',
+            'integrasiForm.wa_url' => 'required|url',
+            'integrasiForm.wa_test_number' => 'required|string|min:9|max:20',
+        ], [
+            'integrasiForm.wa_test_number.required' => 'Nomor WhatsApp tujuan tes wajib diisi.',
+            'integrasiForm.wa_token.required' => 'Token / API Key WhatsApp wajib diisi sebelum melakukan tes.',
+        ]);
+
+        $service = app(WaTemplateService::class);
+        if ($service->event($event) === null) {
+            return;
+        }
+
+        $template = (string) ($this->waTemplateForm['events'][$event]['template'] ?? $service->templateFor($event));
+        $pesan = $service->preview($event, $template);
+        $tujuan = WhatsAppGatewayService::nomorInternasional($this->integrasiForm['wa_test_number'] ?? null);
+
+        if ($tujuan === null) {
+            $this->waTestStatus = 'error';
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Nomor WhatsApp tujuan tes tidak valid.',
+            ]);
+
+            return;
+        }
+
+        $hasil = app(WhatsAppGatewayService::class)->kirimDenganConfig([
+            'provider' => $this->integrasiForm['wa_provider'] ?? 'custom',
+            'url' => $this->integrasiForm['wa_url'],
+            'token' => $this->integrasiForm['wa_token'],
+            'session' => $this->integrasiForm['wa_session'] ?? '',
+            'timeout' => (int) config('services.openwa.timeout', 20),
+        ], $tujuan, "🧪 TEST TEMPLATE ({$service->event($event)['label']})\n\n".$pesan);
+
+        NotifikasiKeluar::create([
+            'tipe' => 'wa',
+            'kategori' => 'sistem',
+            'tujuan' => $tujuan,
+            'judul' => 'Uji Template: '.$service->event($event)['label'],
+            'konten' => $pesan,
+            'payload' => [
+                'wa_template' => $event,
+                'wa_test' => true,
+                'wa_render_source' => $service->isCustomized($event) ? 'kustom' : 'referensi',
+            ],
+            'status' => $hasil['ok'] ? 'terkirim' : 'gagal',
+            'error' => $hasil['ok'] ? null : $hasil['error'],
+            'user_id' => auth()->id(),
+        ]);
+
+        $this->waTestStatus = $hasil['ok'] ? 'success' : 'error';
+        $this->refreshWaRecentLogs();
+        $this->dispatch('alert', [
+            'type' => $hasil['ok'] ? 'success' : 'error',
+            'message' => $hasil['ok']
+                ? 'Template "'.$service->event($event)['label'].'" berhasil dikirim ke '.$this->maskNomor($tujuan).'.'
+                : 'Gagal kirim template WA: '.$hasil['error'],
+        ]);
+    }
+
+    protected function maskNomor(string $nomor): string
+    {
+        $digits = preg_replace('/\D/', '', $nomor) ?: '';
+
+        return strlen($digits) > 6
+            ? substr($digits, 0, 4).'••••'.substr($digits, -4)
+            : ($digits !== '' ? '••••'.$digits : '-');
+    }
+
     public function simpanIntegrasi(): void
     {
         if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi integrasi gateway.')) {
@@ -1492,15 +1722,36 @@ class SettingsRbac extends Component
 
         $config = app(KonfigurasiService::class);
 
-        // 1. WhatsApp Config
+        // 1. Template WA divalidasi & disimpan lebih dulu agar flag legacy
+        //    `auto_notif_*` disinkronkan dari grup template yang efektif.
+        $hasilTemplate = app(WaTemplateService::class)->save($this->waTemplateForm);
+        $this->waTemplateErrors = $hasilTemplate['errors'];
+        $this->waTemplateForm = $hasilTemplate['config'];
+        if (! $hasilTemplate['ok']) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Template WA belum valid. Periksa panel Template WA sebelum menyimpan.',
+            ]);
+
+            return;
+        }
+        $this->previewWaTemplate($this->waTemplatePreviewEvent);
+
+        // 1b. WhatsApp Config — toggle lama mengikuti grup template baru.
+        $grupTransaksiAktif = (bool) ($this->waTemplateForm['groups']['transaksi']['enabled'] ?? true);
+        $grupServisAktif = (bool) ($this->waTemplateForm['groups']['servis_pelanggan']['enabled'] ?? true)
+            || (bool) ($this->waTemplateForm['groups']['servis_internal']['enabled'] ?? true);
+        $this->integrasiForm['wa_auto_notif_transaksi'] = $grupTransaksiAktif;
+        $this->integrasiForm['wa_auto_notif_servis'] = $grupServisAktif;
+
         $config->set('wa_gateway_config', [
             'provider' => $this->integrasiForm['wa_provider'],
             'url' => $this->integrasiForm['wa_url'],
             'token' => $this->integrasiForm['wa_token'],
             'device_id' => $this->integrasiForm['wa_device_id'],
             'session' => $this->integrasiForm['wa_session'],
-            'auto_notif_transaksi' => (bool) $this->integrasiForm['wa_auto_notif_transaksi'],
-            'auto_notif_servis' => (bool) $this->integrasiForm['wa_auto_notif_servis'],
+            'auto_notif_transaksi' => $grupTransaksiAktif,
+            'auto_notif_servis' => $grupServisAktif,
         ], 'Konfigurasi WhatsApp Gateway');
 
         // 2. Duitku Config

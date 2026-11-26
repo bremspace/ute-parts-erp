@@ -37,14 +37,22 @@ class CekBatasWaktuServisCommand extends Command
             if ($now->greaterThanOrEqualTo($waktuWarning) && $now->lessThan($deadline)) {
                 if (! $tiket->warning_overdue_sent_at) {
                     $sisaMenit = max(1, (int) $now->diffInMinutes($deadline, false));
-                    $pesanTeknisi = "PERINGATAN BATAS WAKTU: Servis {$tiket->no_tiket} ({$tiket->jenis_hp}) sisa waktu pengerjaan {$sisaMenit} menit lagi! Segera selesaikan atau update progres pengerjaan.";
 
                     if ($tiket->teknisi?->phone) {
-                        $notifService->kirim('wa', $tiket->teknisi->phone, 'Peringatan Batas Waktu Servis', $pesanTeknisi, [
+                        $notifService->kirim('wa', $tiket->teknisi->phone, 'Peringatan Batas Waktu Servis', '', [
                             'audience' => 'staf',
                             'user_id' => $tiket->teknisi_id,
                             'cabang_id' => $tiket->cabang_id,
                             'tiket_id' => $tiket->id,
+                            'kategori' => 'servis',
+                            'wa_template' => 'servis_sla_warning',
+                            'wa_judul' => 'Peringatan Batas Waktu Servis',
+                            'wa_vars' => [
+                                'nama_teknisi' => $tiket->teknisi->name,
+                                'no_tiket' => $tiket->no_tiket,
+                                'jenis_hp' => $tiket->jenis_hp,
+                                'sisa_menit' => $sisaMenit,
+                            ],
                         ]);
                     }
 
@@ -79,13 +87,22 @@ class CekBatasWaktuServisCommand extends Command
                         // Berikan informasi transparan kepada konsumen
                         $teleponKonsumen = $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon;
                         if (filled($teleponKonsumen)) {
-                            $pesanKonsumen = "Halo {$tiket->nama_pelanggan}, kami mohon maaf atas ketidaknyamanannya. Pengerjaan servis unit {$tiket->jenis_hp} ({$tiket->no_tiket}) melewati batas waktu estimasi kami dan dibatalkan otomatis demi menjaga standar kualitas dan kepastian unit Anda. Unit siap diambil kembali di cabang, atau silakan hubungi tim kami untuk opsi penjadwalan ulang.";
-                            $notifService->kirim('wa', $teleponKonsumen, 'Informasi Pembatalan Servis', $pesanKonsumen, [
+                            $notifService->kirim('wa', $teleponKonsumen, 'Informasi Pembatalan Servis', '', [
                                 'audience' => 'pelanggan',
                                 'pelanggan_id' => $tiket->pelanggan_id,
                                 'cabang_id' => $tiket->cabang_id,
                                 'tiket_id' => $tiket->id,
+                                'kategori' => 'servis',
                                 'status' => 'ditolak',
+                                'wa_template' => 'servis_batal_otomatis',
+                                'wa_judul' => 'Informasi Pembatalan Servis',
+                                'wa_vars' => [
+                                    'nama' => $tiket->nama_pelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
+                                    'no_tiket' => $tiket->no_tiket,
+                                    'jenis_hp' => $tiket->jenis_hp,
+                                    'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                                    'alasan' => 'melewati batas waktu pengerjaan',
+                                ],
                             ]);
                         }
 
@@ -97,13 +114,20 @@ class CekBatasWaktuServisCommand extends Command
                 } else {
                     // Opsi Manual: Berikan peringatan overdue ke teknisi & cabang bahwa waktu sudah habis
                     if (! $tiket->warning_overdue_sent_at || $tiket->warning_overdue_sent_at->diffInHours($now) >= 1) {
-                        $pesanOverdue = "BATAS WAKTU HABIS: Servis {$tiket->no_tiket} ({$tiket->jenis_hp}) telah melewati batas waktu SLA. Mohon segera selesaikan servis atau lakukan koordinasi/penjadwalan ulang dengan konsumen.";
                         if ($tiket->teknisi?->phone) {
-                            $notifService->kirim('wa', $tiket->teknisi->phone, 'Batas Waktu Servis Habis', $pesanOverdue, [
+                            $notifService->kirim('wa', $tiket->teknisi->phone, 'Batas Waktu Servis Habis', '', [
                                 'audience' => 'staf',
                                 'user_id' => $tiket->teknisi_id,
                                 'cabang_id' => $tiket->cabang_id,
                                 'tiket_id' => $tiket->id,
+                                'kategori' => 'servis',
+                                'wa_template' => 'servis_sla_habis',
+                                'wa_judul' => 'Batas Waktu Servis Habis',
+                                'wa_vars' => [
+                                    'nama_teknisi' => $tiket->teknisi->name,
+                                    'no_tiket' => $tiket->no_tiket,
+                                    'jenis_hp' => $tiket->jenis_hp,
+                                ],
                             ]);
                         }
                         $tiket->update(['warning_overdue_sent_at' => $now]);
@@ -129,22 +153,36 @@ class CekBatasWaktuServisCommand extends Command
         foreach ($komplainOverdue as $tiket) {
             $tiket->update(['komplain_eskalasi_at' => $now]);
 
-            $pesan = "ESKALASI KOMPLAIN: {$tiket->no_tiket} ({$tiket->jenis_hp}) melewati SLA komplain. Segera tindak lanjuti & koordinasikan dengan konsumen.";
-
             if ($tiket->teknisi?->phone) {
-                $notifService->kirim('wa', $tiket->teknisi->phone, 'Eskalasi Komplain Servis', $pesan, [
+                $notifService->kirim('wa', $tiket->teknisi->phone, 'Eskalasi Komplain Servis', '', [
                     'audience' => 'staf',
                     'user_id' => $tiket->teknisi_id,
                     'cabang_id' => $tiket->cabang_id,
                     'tiket_id' => $tiket->id,
+                    'kategori' => 'servis',
+                    'wa_template' => 'servis_komplain_eskalasi_teknisi',
+                    'wa_judul' => 'Eskalasi Komplain Servis',
+                    'wa_vars' => [
+                        'nama_teknisi' => $tiket->teknisi->name,
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                    ],
                 ]);
             }
 
             if ($tiket->cabang?->telepon) {
-                $notifService->kirim('wa', $tiket->cabang->telepon, 'Eskalasi Komplain Servis', $pesan, [
+                $notifService->kirim('wa', $tiket->cabang->telepon, 'Eskalasi Komplain Servis', '', [
                     'audience' => 'staf',
                     'cabang_id' => $tiket->cabang_id,
                     'tiket_id' => $tiket->id,
+                    'kategori' => 'servis',
+                    'wa_template' => 'servis_komplain_eskalasi_cabang',
+                    'wa_judul' => 'Eskalasi Komplain Servis',
+                    'wa_vars' => [
+                        'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                        'no_tiket' => $tiket->no_tiket,
+                        'jenis_hp' => $tiket->jenis_hp,
+                    ],
                 ]);
             }
 

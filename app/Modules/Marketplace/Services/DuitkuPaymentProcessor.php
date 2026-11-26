@@ -231,11 +231,21 @@ class DuitkuPaymentProcessor
                         'wa',
                         $transaksi->pelanggan->telepon,
                         'Pembayaran Pesanan Lunas',
-                        "Terima kasih {$transaksi->pelanggan->nama}! Pembayaran pesanan {$merchantOrderId} sebesar Rp ".number_format($totalAkhir, 0, ',', '.').' telah kami terima. Pesanan Anda segera dikemas & dikirim.',
+                        '',
                         [
                             'transaksi_id' => $transaksi->id,
                             'pelanggan_id' => $transaksi->pelanggan_id,
                             'audience' => 'pelanggan',
+                            'kategori' => 'transaksi',
+                            'cabang_id' => $cabangId,
+                            'wa_template' => 'pembayaran_duitku_lunas',
+                            'wa_judul' => 'Pembayaran Pesanan Lunas',
+                            'wa_vars' => [
+                                'nama' => $transaksi->pelanggan->nama,
+                                'no_transaksi' => $merchantOrderId,
+                                'total' => number_format($totalAkhir, 0, ',', '.'),
+                                'metode' => (string) ($metodeBayar ?? ''),
+                            ],
                         ]
                     );
                 }
@@ -279,7 +289,7 @@ class DuitkuPaymentProcessor
     public function prosesGagal(string $merchantOrderId, string $resultCode): array
     {
         try {
-            return DB::transaction(function () use ($merchantOrderId) {
+            return DB::transaction(function () use ($merchantOrderId, $resultCode) {
                 $transaksi = Transaksi::where('no_transaksi', $merchantOrderId)
                     ->lockForUpdate()
                     ->first();
@@ -310,6 +320,30 @@ class DuitkuPaymentProcessor
                             'audience' => 'pelanggan',
                         ]
                     );
+
+                    if ($transaksi->pelanggan?->telepon) {
+                        $this->notifService->kirim(
+                            'wa',
+                            $transaksi->pelanggan->telepon,
+                            'Pembayaran Gagal',
+                            '',
+                            [
+                                'transaksi_id' => $transaksi->id,
+                                'pelanggan_id' => $transaksi->pelanggan_id,
+                                'audience' => 'pelanggan',
+                                'kategori' => 'transaksi',
+                                'cabang_id' => $transaksi->cabang_id,
+                                'wa_template' => 'pembayaran_gagal',
+                                'wa_judul' => 'Pembayaran Gagal',
+                                'wa_vars' => [
+                                    'nama' => $transaksi->pelanggan->nama,
+                                    'no_transaksi' => $merchantOrderId,
+                                    'alasan' => $resultCode !== '' ? ' (kode: '.$resultCode.')' : '',
+                                    'url_pesanan' => url('/account'),
+                                ],
+                            ]
+                        );
+                    }
                 }
 
                 $this->notifService->sinkronkanStatusTransaksi($transaksi, 'gagal');
@@ -367,6 +401,29 @@ class DuitkuPaymentProcessor
                             'audience' => 'pelanggan',
                         ]
                     );
+
+                    if ($transaksi->pelanggan?->telepon) {
+                        $this->notifService->kirim(
+                            'wa',
+                            $transaksi->pelanggan->telepon,
+                            'Pembayaran Kadaluarsa',
+                            '',
+                            [
+                                'transaksi_id' => $transaksi->id,
+                                'pelanggan_id' => $transaksi->pelanggan_id,
+                                'audience' => 'pelanggan',
+                                'kategori' => 'transaksi',
+                                'cabang_id' => $transaksi->cabang_id,
+                                'wa_template' => 'pembayaran_kadaluarsa',
+                                'wa_judul' => 'Pembayaran Kadaluarsa',
+                                'wa_vars' => [
+                                    'nama' => $transaksi->pelanggan->nama,
+                                    'no_transaksi' => $merchantOrderId,
+                                    'url_pesanan' => url('/account'),
+                                ],
+                            ]
+                        );
+                    }
                 }
 
                 $this->notifService->sinkronkanStatusTransaksi($transaksi, 'kadaluarsa');
