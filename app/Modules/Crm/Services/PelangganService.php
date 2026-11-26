@@ -131,7 +131,6 @@ class PelangganService
                     'pelanggan_id' => $pelanggan->id,
                     'audience' => 'pelanggan',
                     'kategori' => 'membership',
-                    'cabang_id' => $pelanggan->cabang_id,
                     'wa_template' => 'member_kode_aktivasi',
                     'wa_judul' => 'Kode Aktivasi Akun Member',
                     'wa_vars' => [

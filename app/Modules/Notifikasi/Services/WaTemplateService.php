@@ -445,7 +445,7 @@ class WaTemplateService
         foreach ($this->events() as $eventKey => $event) {
             $savedEvent = is_array($cfg['events'][$eventKey] ?? null) ? $cfg['events'][$eventKey] : [];
             $normalized['events'][$eventKey] = [
-                'enabled' => (bool) ($savedEvent['enabled'] ?? $event['aktif'] ?? true),
+                'enabled' => (bool) ($savedEvent['enabled'] ?? $event['aktif']),
                 'template' => (string) ($savedEvent['template'] ?? $event['default']),
             ];
 
@@ -729,7 +729,7 @@ class WaTemplateService
         $known[] = 'waktu';
         $known[] = 'tanggal';
 
-        return array_values(array_unique(array_diff($matches[1] ?? [], $known)));
+        return array_values(array_unique(array_diff($matches[1], $known)));
     }
 
     public function validateTemplate(string $key, string $template): ?string

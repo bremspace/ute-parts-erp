@@ -41,6 +41,9 @@ class MemberApprovalWorkflowTest extends TestCase
 
     public function test_registrasi_member_menjadi_pending_dan_antre_ke_approval_owner(): void
     {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
         $response = $this->post('/daftar-pelanggan', [
             'nama' => 'Budi Konsumen',
             'telepon' => '081234567890',

@@ -69,21 +69,25 @@ class ApprovalRequest extends Model
         });
     }
 
+    /** @return BelongsTo<ApprovalRule, $this> */
     public function rule(): BelongsTo
     {
         return $this->belongsTo(ApprovalRule::class, 'approval_rule_id');
     }
 
+    /** @return BelongsTo<Cabang, $this> */
     public function cabang(): BelongsTo
     {
         return $this->belongsTo(Cabang::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function requestedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function actionedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'actioned_by');

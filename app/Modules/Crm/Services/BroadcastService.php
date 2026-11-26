@@ -36,6 +36,8 @@ class BroadcastService
     /**
      * Bangun query target di SQL; caller dapat memproses hasilnya per chunk.
      * Eager load tier untuk menghindari N+1 saat mempersonalisasi pesan.
+     *
+     * @return Builder<Pelanggan>
      */
     public function resolveTarget(KampanyeBroadcast $kampanye): Builder
     {
