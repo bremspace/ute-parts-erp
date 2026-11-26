@@ -675,6 +675,7 @@ class PesananOnlineIndex extends Component
             'tipe_konsumen' => $tipeKonsumen,
             'items' => $transaksi->items->map(function ($it) {
                 $retail = (float) ($it->produk?->harga_jual_retail ?? ($it->harga_satuan + $it->diskon_nominal));
+                $catatan = trim((string) ($it->catatan ?? '').' '.(string) ($it->catatanPicking() ?? ''));
 
                 return [
                     'nama' => $it->produk?->nama ?? 'Produk',
@@ -684,7 +685,7 @@ class PesananOnlineIndex extends Component
                     'harga' => (float) $it->harga_satuan,
                     'harga_retail' => $retail,
                     'subtotal' => (float) $it->subtotal,
-                    'catatan' => $it->catatan,
+                    'catatan' => $catatan ?: null,
                 ];
             })->toArray(),
             'subtotal_retail' => $subtotalRetail,

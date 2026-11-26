@@ -251,7 +251,7 @@
                                 <div class="space-y-1">
                                     @foreach($o->items->take(2) as $it)
                                         <div class="text-[11px] text-ink-800 dark:text-ink-200 truncate max-w-xs">
-                                            {{ $it->produk?->nama }} <span class="font-mono text-ink-400">×{{ $it->jumlah }}</span>
+                                            {{ $it->produk?->nama }} <span class="font-mono text-ink-400">{{ $it->qtyRingkas() }}</span>
                                         </div>
                                     @endforeach
                                     @if($o->items->count() > 2)
@@ -531,7 +531,7 @@
                                     </div>
                                     <div class="text-right flex-shrink-0">
                                         <p class="font-bold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($it->subtotal, 0, ',', '.') }}</p>
-                                        <p class="text-[10px] text-ink-400">{{ $it->jumlah }}{{ ($it->satuan && $it->satuan !== 'pcs') ? ' '.$it->satuan : '' }} × Rp {{ number_format($it->harga_satuan, 0, ',', '.') }}@if(($it->satuan ?? 'pcs') !== 'pcs' && (float)($it->konversi ?? 1) > 1) ({{ (int) ($it->jumlah * ($it->konversi ?? 1)) }} pcs)@endif</p>
+                                        <p class="text-[10px] text-ink-400">{{ $it->qtyLabel() }} × Rp {{ number_format($it->harga_satuan, 0, ',', '.') }}</p>
                                     </div>
                                 </div>
                             @endforeach
@@ -613,7 +613,7 @@
                                         <span class="block text-[10px] italic text-ink-400">📍 Belum ada rak</span>
                                     @endif
                                 </span>
-                                <span class="font-mono font-bold text-up-primary flex-shrink-0">×{{ $it->jumlah }}</span>
+                                <span class="text-right font-mono font-bold text-up-primary flex-shrink-0">{{ $it->qtyLabel() }}</span>
                             </div>
                         @endforeach
                     </div>
