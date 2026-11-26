@@ -282,6 +282,12 @@ class CartService
             'catatan' => $cleanCatatan,
             'name' => $produk->nama,
             'sku' => $produk->sku,
+            'kategori' => $produk->kategori ?: ($produk->kategoriRelasi?->nama ?? null),
+            'kualitas' => $produk->kualitas?->nama ?? null,
+            'brand' => $produk->brand?->nama ?? ($produk->brand_kompatibel ?? null),
+            'kompatibel' => $produk->tipeHps->isNotEmpty()
+                ? $produk->tipeHps->take(2)->map(fn ($t) => trim((string) $t->merk.' '.(string) $t->model))->implode(', ')
+                : null,
             'gambar' => $produk->thumbnail_url ?: $produk->gambar,
             'gambar_preview' => $gambarPreview,
             'variant_name' => $variant?->nama_varian,

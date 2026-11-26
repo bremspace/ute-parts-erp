@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Marketplace\Livewire\CartCheckout;
 use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Marketplace\Services\OrderService;
 use App\Modules\Rbac\Models\Cabang;
@@ -12,6 +13,7 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class MarketplaceCartTest extends TestCase
@@ -63,6 +65,33 @@ class MarketplaceCartTest extends TestCase
         ]);
 
         return $p;
+    }
+
+    public function test_produk_cepat_kartu_awal_lima_dan_bisa_dimuat_lagi(): void
+    {
+        for ($i = 1; $i <= 7; $i++) {
+            $this->buatProduk('Produk Cepat '.$i, 10000 + $i, 5);
+        }
+
+        $component = Livewire::test(CartCheckout::class);
+
+        $this->assertCount(5, $component->get('quickProducts'));
+        $this->assertTrue($component->get('quickHasMore'));
+        $this->assertSame('Sparepart', $component->get('quickProducts')[0]['kategori']);
+
+        $component->call('loadMoreQuickProducts');
+
+        $this->assertCount(7, $component->get('quickProducts'));
+        $this->assertFalse($component->get('quickHasMore'));
+
+        $p = $this->buatProduk('Produk Di Keranjang', 25000, 3);
+        app(CartService::class)->isi($p->id, null, 1);
+        $item = app(CartService::class)->all()['p'.$p->id];
+
+        $this->assertSame('Sparepart', $item['kategori']);
+        $this->assertArrayHasKey('kualitas', $item);
+        $this->assertArrayHasKey('brand', $item);
+        $this->assertArrayHasKey('kompatibel', $item);
     }
 
     public function test_memasukkan_produk_berbeda_tidak_menduplikasi_qty_dan_tidak_menghilangkan_item(): void

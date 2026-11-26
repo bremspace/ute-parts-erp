@@ -367,32 +367,7 @@
                         @include('modules.marketplace.livewire.partials.cart-quick-search')
                     @endif
 
-                    @if(!empty($rekomendasi))
-                        <div class="mt-8 border-t border-ink-100/80 dark:border-white/10 pt-5">
-                            <h3 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white mb-3">Pilihan populer untuk Anda</h3>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                                @foreach($rekomendasi as $rec)
-                                    <button type="button"
-                                            wire:click="tambahRekomendasi({{ $rec['id'] }})"
-                                            wire:loading.attr="disabled"
-                                            class="text-left rounded-2xl border border-ink-200/80 dark:border-white/10 bg-white dark:bg-ink-900 p-2 hover:border-up-primary/50 transition-colors cursor-pointer active:scale-[0.98] flex flex-col gap-2 disabled:opacity-50">
-                                        <span class="w-full aspect-square rounded-xl bg-ink-50 dark:bg-ink-950 overflow-hidden flex items-center justify-center">
-                                            @if($rec['gambar'])
-                                                <img src="{{ $rec['gambar'] }}" alt="" class="w-full h-full object-contain" loading="lazy">
-                                            @else
-                                                <svg class="w-6 h-6 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                                            @endif
-                                        </span>
-                                        <span class="min-w-0">
-                                            <span class="block text-[11px] font-bold text-ink-900 dark:text-white leading-snug line-clamp-2 break-words">{{ $rec['nama'] }}</span>
-                                            <span class="block text-[10px] text-ink-400 font-mono truncate">{{ $rec['sku'] ?: '-' }}</span>
-                                            <span class="block text-[11px] font-black text-up-primary tabular-nums mt-0.5">Rp {{ number_format($rec['harga'], 0, ',', '.') }}</span>
-                                        </span>
-                                    </button>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
+                    @include('modules.marketplace.livewire.partials.cart-quick-products')
                 </div>
             @else
                 <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-3 sm:p-4 lg:p-7 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-2">
@@ -413,6 +388,18 @@
                                                 <span class="font-mono text-ink-400">{{ $item['sku'] }}</span>
                                             @endif
                                             <span class="font-bold px-1.5 py-0.5 rounded bg-ink-100 dark:bg-white/5 text-ink-500 dark:text-ink-300">PCS</span>
+                                            @if(!empty($item['kategori']))
+                                                <span class="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 font-bold">{{ $item['kategori'] }}</span>
+                                            @endif
+                                            @if(!empty($item['kualitas']))
+                                                <span class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-bold">{{ $item['kualitas'] }}</span>
+                                            @endif
+                                            @if(!empty($item['brand']))
+                                                <span class="px-1.5 py-0.5 rounded bg-ink-100 dark:bg-white/5 text-ink-500 dark:text-ink-300 font-bold">{{ $item['brand'] }}</span>
+                                            @endif
+                                            @if(!empty($item['kompatibel']))
+                                                <span class="px-1.5 py-0.5 rounded bg-up-mint/10 text-up-mint font-bold truncate max-w-full" title="{{ $item['kompatibel'] }}">{{ $item['kompatibel'] }}</span>
+                                            @endif
                                             @if(!empty($item['breakdown']))
                                                 <span class="px-1.5 py-0.5 rounded bg-up-mint/10 text-up-mint font-bold" title="Box penuh pakai harga box, sisa pcs pakai harga retail">
                                                     {{ $item['breakdown'] }}
@@ -529,6 +516,7 @@
 
                     @if($mode === 'cart')
                         @include('modules.marketplace.livewire.partials.cart-quick-search')
+                        @include('modules.marketplace.livewire.partials.cart-quick-products')
                     @endif
 
                     <div class="pt-4 sm:pt-5 lg:pt-6 border-t border-ink-100/80 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">

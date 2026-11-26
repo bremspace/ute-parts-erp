@@ -627,7 +627,7 @@
                         x-transition:leave="transition duration-150 ease-out"
                         x-transition:leave-start="translate-y-0 opacity-100 sm:scale-100"
                         x-transition:leave-end="translate-y-8 opacity-0 sm:translate-y-0 sm:scale-[0.97]"
-                        class="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto bg-white dark:bg-ink-900 border border-ink-100 dark:border-white/10 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl"
+                        class="relative w-full sm:max-w-md lg:max-w-3xl max-h-[92vh] lg:max-h-[86vh] overflow-y-auto bg-white dark:bg-ink-900 border border-ink-100 dark:border-white/10 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 lg:p-7 shadow-2xl"
                     >
                         <!-- Header bermerek -->
                         <div class="flex items-start justify-between gap-3 mb-4 pb-4 border-b border-ink-100 dark:border-white/10">
@@ -659,6 +659,22 @@
                                 >
                                     ✕
                                 </button>
+                            </div>
+                        </div>
+
+                        {{-- Ringkasan kepercayaan — desktop only --}}
+                        <div class="hidden lg:grid lg:grid-cols-3 gap-3 mb-4">
+                            <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/10">
+                                <p class="text-[10px] font-black text-ink-900 dark:text-white">🔒 Pembayaran Aman</p>
+                                <p class="text-[10px] text-ink-400 mt-0.5">Diproses melalui gateway resmi & terenkripsi.</p>
+                            </div>
+                            <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/10">
+                                <p class="text-[10px] font-black text-ink-900 dark:text-white">⚡ Status Otomatis</p>
+                                <p class="text-[10px] text-ink-400 mt-0.5">Pesanan diperbarui saat pembayaran terdeteksi.</p>
+                            </div>
+                            <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/10">
+                                <p class="text-[10px] font-black text-ink-900 dark:text-white">🧾 Bukti Transaksi</p>
+                                <p class="text-[10px] text-ink-400 mt-0.5">Struk & riwayat tersimpan di akun Anda.</p>
                             </div>
                         </div>
 
@@ -769,7 +785,7 @@
                                     </div>
                                     <div class="flex justify-center p-3 bg-white rounded-2xl border border-ink-100 max-w-[240px] mx-auto shadow-inner">
                                         <template x-if="infoBayar && infoBayar.qr_image">
-                                            <img :src="infoBayar.qr_image" alt="QRIS Toko" class="w-52 h-52 object-contain" />
+                                            <img :src="infoBayar.qr_image" alt="QRIS Toko" class="w-52 h-52 lg:w-64 lg:h-64 object-contain" />
                                         </template>
                                     </div>
                                     <div>
@@ -909,7 +925,7 @@
                                         <button
                                             type="button"
                                             x-on:click="pilihKategori(cat.key)"
-                                            class="shrink-0 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all duration-140 cursor-pointer flex items-center gap-1.5 min-h-[36px]"
+                                            class="shrink-0 px-3 py-1.5 lg:px-4 lg:py-2 lg:text-sm rounded-xl font-bold whitespace-nowrap transition-all duration-140 cursor-pointer flex items-center gap-1.5 min-h-[36px]"
                                             :class="kategoriDipilih === cat.key
                                                 ? 'bg-up-primary text-white shadow-sm shadow-up-primary/20'
                                                 : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/5'"
@@ -925,12 +941,12 @@
                                 </div>
 
                                 <!-- Compact Grid Metode -->
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1" role="radiogroup" aria-label="Pilihan metode">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-3 max-h-[300px] lg:max-h-[420px] overflow-y-auto pr-1" role="radiogroup" aria-label="Pilihan metode">
                                     <template x-for="m in filteredMetode" :key="m.kode">
                                         <button
                                             type="button"
                                             x-on:click="metodeDipilih = m.kode"
-                                            class="p-3 rounded-2xl border-2 text-left flex items-start justify-between gap-2.5 transition-[border-color,background-color] duration-140 cursor-pointer active:scale-[0.99]"
+                                            class="p-3 lg:p-4 rounded-2xl border-2 text-left flex items-start justify-between gap-2.5 transition-[border-color,background-color] duration-140 cursor-pointer active:scale-[0.99]"
                                             :class="metodeDipilih === m.kode
                                                 ? 'border-up-primary bg-up-primary/5 dark:bg-up-primary/10 shadow-sm'
                                                 : 'border-ink-200/80 dark:border-white/10 hover:border-ink-300 dark:hover:border-white/20'"
@@ -944,7 +960,7 @@
                                                         :class="metodeDipilih === m.kode ? 'bg-up-primary text-white' : 'bg-ink-100 dark:bg-white/10 text-ink-700 dark:text-ink-300'"
                                                         x-text="m.badge || m.kode"
                                                     ></span>
-                                                    <span class="text-xs font-bold text-ink-900 dark:text-white truncate" x-text="m.nama"></span>
+                                                    <span class="text-xs lg:text-sm font-bold text-ink-900 dark:text-white truncate" x-text="m.nama"></span>
                                                 </div>
                                                 <p x-show="m.deskripsi" class="text-[10px] text-ink-400 dark:text-ink-500 line-clamp-1" x-text="m.deskripsi"></p>
                                                 <div class="mt-1 flex items-center gap-2">
