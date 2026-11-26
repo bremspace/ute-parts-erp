@@ -2,6 +2,7 @@
 
 namespace App\Modules\Notifikasi\Services;
 
+use App\Models\User;
 use App\Modules\Crm\Services\KonfigurasiService;
 use Illuminate\Support\Facades\Log;
 
@@ -40,6 +41,14 @@ class WaTemplateService
             'crm' => [
                 'label' => 'CRM & Broadcast',
                 'deskripsi' => 'Kampanye broadcast WA. Pesan kampanye tetap diisi dari halaman CRM.',
+            ],
+            'member' => [
+                'label' => 'Akun Member',
+                'deskripsi' => 'Registrasi, persetujuan, kode aktivasi, aktivasi, reset sandi, dan penonaktifan akun.',
+            ],
+            'approval_internal' => [
+                'label' => 'Approval & Sistem Internal',
+                'deskripsi' => 'Approval masuk/pengingat, reorder stok, dan kegagalan kritis (backup/depresiasi/database).',
             ],
         ];
     }
@@ -253,6 +262,124 @@ class WaTemplateService
                 'aktif' => true,
                 'variabel' => ['nama', 'tier', 'pesan', 'nama_toko'],
                 'default' => '{pesan}',
+            ],
+            'transaksi_kasir_selesai' => [
+                'label' => 'Struk transaksi kasir selesai',
+                'group' => 'transaksi',
+                'audience' => 'Pelanggan',
+                'aktif' => true,
+                'variabel' => ['nama', 'salam', 'no_transaksi', 'waktu', 'kasir', 'items', 'rincian', 'total', 'metode', 'nama_cabang', 'nama_toko'],
+                'opsional' => ['kasir', 'nama_cabang', 'items', 'rincian'],
+                'default' => "{salam}\nTerima kasih telah berbelanja di *{nama_toko}*! 🙏\n\n*STRUK PEMBELIAN*\nNo. Transaksi: {no_transaksi}\nWaktu: {waktu}\nKasir: {kasir}\nCabang: {nama_cabang}\n-------------------------\n{items}\n-------------------------\n{rincian}\n*Total: Rp {total}*\nMetode: {metode}\n\nSimpan pesan ini sebagai bukti transaksi resmi Anda.\n\nSemoga harimu menyenangkan!",
+            ],
+            'member_registrasi_pending' => [
+                'label' => 'Registrasi member menunggu approval',
+                'group' => 'member',
+                'audience' => 'Pelanggan',
+                'aktif' => true,
+                'variabel' => ['nama', 'telepon', 'tipe_konsumen', 'url', 'nama_toko'],
+                'default' => "Halo {nama},\n\nPendaftaran akun member Anda di {nama_toko} telah kami terima dan sedang menunggu persetujuan owner.\n\nSetelah disetujui, kami akan mengabari Anda kembali. Terima kasih!",
+            ],
+            'member_registrasi_disetujui' => [
+                'label' => 'Registrasi member disetujui',
+                'group' => 'member',
+                'audience' => 'Pelanggan',
+                'aktif' => true,
+                'variabel' => ['nama', 'label', 'instruksi', 'url_aktivasi', 'url_login', 'nama_cabang', 'nama_toko'],
+                'opsional' => ['nama_cabang', 'url_aktivasi'],
+                'default' => "Halo {nama},\n\nPendaftaran akun member Anda di {nama_toko} telah DISETUJUI sebagai {label}.\n\n{instruksi}\n\nMasuk ke akun: {url_login}\n\nTerima kasih!",
+            ],
+            'member_registrasi_ditolak' => [
+                'label' => 'Registrasi member ditolak',
+                'group' => 'member',
+                'audience' => 'Pelanggan',
+                'aktif' => true,
+                'variabel' => ['nama', 'alasan', 'url', 'nama_cabang', 'nama_toko'],
+                'opsional' => ['alasan', 'nama_cabang'],
+                'default' => "Halo {nama},\n\nMohon maaf, pendaftaran akun member Anda di {nama_toko} belum dapat kami setujui.{alasan}\n\nSilakan hubungi toko/CS untuk informasi lebih lanjut.\n\nTerima kasih.",
+            ],
+            'member_kode_aktivasi' => [
+                'label' => 'Kode aktivasi akun member',
+                'group' => 'member',
+                'audience' => 'Pelanggan',
+                'aktif' => true,
+                'variabel' => ['nama', 'kode_aktivasi', 'berlaku_sampai', 'url_aktivasi', 'nama_toko'],
+                'default' => "Halo {nama},\n\nKode aktivasi akun {nama_toko} Anda: *{kode_aktivasi}*\n\nBerlaku sampai: {berlaku_sampai}\nBuat kata sandi Anda di: {url_aktivasi}\n\nJangan bagikan kode ini kepada siapa pun. Bila akun masih menunggu persetujuan, tunggu konfirmasi dari toko.",
+            ],
+            'member_aktivasi_berhasil' => [
+                'label' => 'Akun member berhasil diaktifkan',
+                'group' => 'member',
+                'audience' => 'Pelanggan',
+                'aktif' => true,
+                'variabel' => ['nama', 'url_login', 'nama_toko'],
+                'default' => "Halo {nama},\n\nAkun Anda di {nama_toko} telah berhasil diaktifkan dan kata sandi sudah tersetel.\n\nSilakan masuk: {url_login}\n\nSelamat berbelanja!",
+            ],
+            'member_reset_password_berhasil' => [
+                'label' => 'Reset kata sandi member berhasil',
+                'group' => 'member',
+                'audience' => 'Pelanggan',
+                'aktif' => true,
+                'variabel' => ['nama', 'alasan', 'nama_approver', 'url_login', 'nama_toko'],
+                'opsional' => ['alasan', 'nama_approver'],
+                'default' => "Halo {nama},\n\nKata sandi akun {nama_toko} Anda telah diperbarui oleh CS/toko.{alasan}\n\nSilakan masuk dengan kata sandi terbaru: {url_login}\n\nDemikian keamanan akun Anda tetap terjaga. Jangan bagikan kata sandi kepada siapa pun.",
+            ],
+            'member_status_nonaktif' => [
+                'label' => 'Akun member dinonaktifkan',
+                'group' => 'member',
+                'audience' => 'Pelanggan',
+                'aktif' => true,
+                'variabel' => ['nama', 'alasan', 'url', 'nama_toko'],
+                'opsional' => ['alasan'],
+                'default' => "Halo {nama},\n\nAkun Anda di {nama_toko} sedang dinonaktifkan sementara.{alasan}\n\nSilakan hubungi CS/toko untuk mengaktifkan kembali. Terima kasih.",
+            ],
+            'approval_baru' => [
+                'label' => 'Permintaan approval baru (approver)',
+                'group' => 'approval_internal',
+                'audience' => 'Staf / Owner',
+                'aktif' => true,
+                'variabel' => ['judul', 'jenis', 'pembuat', 'nominal', 'url', 'deadline', 'nama_toko'],
+                'opsional' => ['nominal', 'pembuat'],
+                'default' => "PENGAJUAN APPROVAL BARU\n\n{judul}\n\nJenis: {jenis}\nPemohon: {pembuat}\nNominal: {nominal}\nBatas tindak lanjut: {deadline}\n\nSegera proses di: {url}\n\n{nama_toko}",
+            ],
+            'approval_pengingat' => [
+                'label' => 'Pengingat approval member tertunda',
+                'group' => 'approval_internal',
+                'audience' => 'Staf / Owner',
+                'aktif' => true,
+                'variabel' => ['jumlah', 'url', 'deadline', 'nama_toko'],
+                'default' => "PENGINGAT APPROVAL MEMBER\n\nAda {jumlah} pendaftaran member yang masih menunggu persetujuan dan belum bisa login.\n\nSegera proses di: {url}\n\n{nama_toko}",
+            ],
+            'stok_reorder' => [
+                'label' => 'Usulan reorder stok otomatis',
+                'group' => 'approval_internal',
+                'audience' => 'Staf / Owner',
+                'aktif' => true,
+                'variabel' => ['jumlah', 'daftar', 'url', 'nama_toko'],
+                'default' => "USULAN REORDER STOK\n\n{jumlah} usulan PO dibuat dari stok di bawah minimum:\n{daftar}\n\nBuka WMS → PO & Supplier untuk mengonfirmasi:\n{url}\n\n{nama_toko}",
+            ],
+            'backup_gagal' => [
+                'label' => 'Backup database gagal',
+                'group' => 'approval_internal',
+                'audience' => 'Owner / Admin',
+                'aktif' => true,
+                'variabel' => ['alasan', 'waktu', 'url', 'nama_toko'],
+                'default' => "BACKUP DATABASE GAGAL\n\nWaktu: {waktu}\nAlasan: {alasan}\n\nSegera periksa menu Pengaturan → Database:\n{url}\n\n{nama_toko}",
+            ],
+            'depresiasi_gagal' => [
+                'label' => 'Jurnal depresiasi aset gagal',
+                'group' => 'approval_internal',
+                'audience' => 'Owner / Finance',
+                'aktif' => true,
+                'variabel' => ['periode', 'alasan', 'url', 'nama_toko'],
+                'default' => "DEPRESIASI ASET GAGAL\n\nPeriode: {periode}\nAlasan: {alasan}\n\nJurnal belum diposting dan perlu diperiksa manual:\n{url}\n\n{nama_toko}",
+            ],
+            'database_crash' => [
+                'label' => 'Database crash / gagal dipulihkan',
+                'group' => 'approval_internal',
+                'audience' => 'Owner / Admin',
+                'aktif' => true,
+                'variabel' => ['alasan', 'waktu', 'url', 'nama_toko'],
+                'default' => "DATABASE CRASH — AUTO RESTORE GAGAL\n\nWaktu: {waktu}\nAlasan: {alasan}\n\nTransaksi dapat terganggu. Segera periksa:\n{url}\n\n{nama_toko}",
             ],
         ];
     }
@@ -654,6 +781,136 @@ class WaTemplateService
             'grup_aktif' => $grupAktif,
             'kustom' => $kustom,
         ];
+    }
+
+    /** @return array<int, string> Nomor WhatsApp unik dari user yang memegang salah satu role. */
+    public function nomorPenerimaPeran(array $roles): array
+    {
+        if ($roles === []) {
+            return [];
+        }
+
+        return User::query()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
+            ->whereNotNull('phone')
+            ->get()
+            ->map(fn (User $user) => WhatsAppGatewayService::nomorInternasional($user->phone))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** Kirim template WA ke semua user dengan role tertentu. */
+    public function kirimKePeran(array $roles, string $template, string $judul, array $vars, string $kategori = 'sistem', array $payload = []): int
+    {
+        $terkirim = 0;
+        foreach ($this->nomorPenerimaPeran($roles) as $nomor) {
+            app(NotificationService::class)->kirim('wa', $nomor, $judul, '', array_merge($payload, [
+                'audience' => 'staf',
+                'kategori' => $kategori,
+                'wa_template' => $template,
+                'wa_judul' => $judul,
+                'wa_vars' => $vars,
+            ]));
+            $terkirim++;
+        }
+
+        return $terkirim;
+    }
+
+    /** Petakan receiptData kasir ke variabel template struk. */
+    public function varsStrukKasir(array $receiptData): array
+    {
+        $pelanggan = $this->bersihkanTeks($receiptData['pelanggan'] ?? '');
+        $umum = $pelanggan === '' || in_array(strtolower($pelanggan), ['umum', 'pelanggan umum', 'guest', 'retail', 'pelanggan', '-'], true);
+
+        return [
+            'nama' => $umum ? 'Pelanggan' : $pelanggan,
+            'salam' => $umum
+                ? 'Halo kak,'
+                : 'Halo kak *'.$pelanggan.'*,',
+            'no_transaksi' => (string) ($receiptData['no_transaksi'] ?? '-'),
+            'waktu' => (string) ($receiptData['waktu'] ?? now()->format('d/m/Y H:i')),
+            'kasir' => (string) ($receiptData['kasir'] ?? '-'),
+            'items' => $this->formatItemsStruk($receiptData['items'] ?? []),
+            'rincian' => $this->formatRincianStruk($receiptData),
+            'total' => number_format((float) ($receiptData['total'] ?? 0), 0, ',', '.'),
+            'metode' => strtoupper((string) ($receiptData['metode'] ?? 'TUNAI')),
+            'nama_cabang' => $this->bersihkanTeks($receiptData['cabang'] ?? ''),
+        ];
+    }
+
+    /** Render struk kasir dari receiptData (dipakai auto & tombol manual). */
+    public function renderStrukKasir(array $receiptData): string
+    {
+        return $this->render('transaksi_kasir_selesai', $this->varsStrukKasir($receiptData), true);
+    }
+
+    protected function bersihkanTeks(mixed $value): string
+    {
+        $decoded = html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return trim(preg_replace('/\s+/', ' ', strip_tags($decoded)) ?: '');
+    }
+
+    protected function formatItemsStruk(mixed $items): string
+    {
+        if (! is_array($items)) {
+            return '';
+        }
+
+        $baris = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $nama = $this->bersihkanTeks($item['nama'] ?? $item['nama_produk'] ?? 'Item');
+            $nama = preg_replace('/^\[(Jasa|Part)\]\s*/i', '', $nama);
+            $qty = (int) ($item['qty'] ?? 1);
+            $satuan = strtolower((string) ($item['satuan'] ?? 'pcs'));
+            $harga = number_format((float) ($item['harga'] ?? 0), 0, ',', '.');
+            $subtotal = number_format((float) ($item['subtotal'] ?? 0), 0, ',', '.');
+            $baris[] = "- {$nama}\n  {$qty} {$satuan} x Rp {$harga} = Rp {$subtotal}";
+        }
+
+        return implode("\n", $baris);
+    }
+
+    protected function formatRincianStruk(array $data): string
+    {
+        $baris = [];
+        $subtotal = (float) ($data['subtotal'] ?? 0);
+        $total = (float) ($data['total'] ?? 0);
+        if ($subtotal > 0 && abs($subtotal - $total) > 0.01) {
+            $baris[] = 'Subtotal: Rp '.number_format($subtotal, 0, ',', '.');
+        }
+        foreach ([
+            'diskon_partai' => 'Diskon Partai',
+            'diskon_tier' => 'Potongan Tier',
+            'diskon_box' => 'Diskon Kemasan',
+            'diskon_poin' => 'Tukar Poin',
+            'diskon' => 'Diskon Kasir',
+        ] as $key => $label) {
+            if ((float) ($data[$key] ?? 0) > 0) {
+                $baris[] = $label.': -Rp '.number_format((float) $data[$key], 0, ',', '.');
+            }
+        }
+        if ((float) ($data['pajak'] ?? 0) > 0) {
+            $label = ! empty($data['ppn_persen']) ? 'PPN ('.$data['ppn_persen'].'%)' : 'PPN';
+            $baris[] = $label.': +Rp '.number_format((float) $data['pajak'], 0, ',', '.');
+        }
+        if ((float) ($data['bayar'] ?? 0) > 0 && (float) $data['bayar'] !== $total) {
+            $baris[] = 'Bayar: Rp '.number_format((float) $data['bayar'], 0, ',', '.');
+        }
+        if ((float) ($data['kembali'] ?? 0) > 0) {
+            $baris[] = 'Kembali: Rp '.number_format((float) $data['kembali'], 0, ',', '.');
+        }
+        if (! empty($data['garansi'])) {
+            $baris[] = 'Garansi: '.$data['garansi'];
+        }
+
+        return implode("\n", $baris);
     }
 
     protected function namaToko(): string

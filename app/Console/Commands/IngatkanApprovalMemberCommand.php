@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Notifikasi\Services\WhatsAppGatewayService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use Illuminate\Console\Command;
 
@@ -52,6 +53,31 @@ class IngatkanApprovalMemberCommand extends Command
                     'cabang_id' => null,
                 ]
             );
+
+            $nomorSaya = WhatsAppGatewayService::nomorInternasional($user->phone);
+            $terlama = $pending->sortBy('created_at')->first();
+            $deadline = $terlama?->created_at?->copy()->addHours(12)->format('d M Y H:i') ?: '-';
+
+            if ($nomorSaya !== null) {
+                app(NotificationService::class)->kirim(
+                    'wa',
+                    $nomorSaya,
+                    'Pengingat Approval Member',
+                    '',
+                    [
+                        'user_id' => $user->id,
+                        'audience' => 'staf',
+                        'kategori' => 'approval',
+                        'wa_template' => 'approval_pengingat',
+                        'wa_judul' => 'Pengingat Approval Member',
+                        'wa_vars' => [
+                            'jumlah' => $pending->count(),
+                            'url' => url('/app/approvals'),
+                            'deadline' => $deadline,
+                        ],
+                    ]
+                );
+            }
         }
 
         $this->line("Pengingat terkirim ke {$penerima->count()} penerima untuk {$pending->count()} pendaftaran pending.");

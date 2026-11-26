@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Notifikasi\Services\WaTemplateService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -298,6 +299,18 @@ class UteBackupCommand extends Command
                 'Backup Database Gagal',
                 $pesan,
                 ['error' => $pesan],
+            );
+
+            app(WaTemplateService::class)->kirimKePeran(
+                ['owner', 'super-admin'],
+                'backup_gagal',
+                'Backup Database Gagal',
+                [
+                    'alasan' => $pesan,
+                    'waktu' => now()->format('d M Y H:i:s'),
+                    'url' => url('/app/pengaturan'),
+                ],
+                'sistem'
             );
         } catch (Throwable $e) {
             report($e);

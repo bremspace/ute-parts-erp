@@ -4,6 +4,7 @@ namespace App\Modules\Akunting\Jobs;
 
 use App\Modules\Akunting\Services\DepresiasiService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Notifikasi\Services\WaTemplateService;
 use App\Services\BranchContextManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -83,16 +84,30 @@ class DepresiasiAsetJob implements ShouldQueue
 
         report($e);
 
+        $alasan = $e?->getMessage() ?: 'penyebab tidak diketahui';
+
         app(NotificationService::class)->kirim(
             'inapp',
             null,
             'Depresiasi Aset Bulanan Gagal',
-            "Depresiasi aset periode {$periode} gagal: ".($e?->getMessage() ?: 'penyebab tidak diketahui').
-            '. Jurnal depresiasi belum diposting — perlu diperiksa manual.',
+            "Depresiasi aset periode {$periode} gagal: {$alasan}.".
+            ' Jurnal depresiasi belum diposting — perlu diperiksa manual.',
             [
                 'type' => 'error',
                 'periode' => $periode,
             ]
+        );
+
+        app(WaTemplateService::class)->kirimKePeran(
+            ['owner', 'super-admin', 'finance'],
+            'depresiasi_gagal',
+            'Depresiasi Aset Bulanan Gagal',
+            [
+                'periode' => $periode,
+                'alasan' => $alasan,
+                'url' => url('/app/akunting'),
+            ],
+            'keuangan'
         );
     }
 }

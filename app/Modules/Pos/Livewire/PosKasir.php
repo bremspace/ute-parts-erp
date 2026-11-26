@@ -12,6 +12,7 @@ use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PartaiPricingService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Notifikasi\Services\WaTemplateService;
 use App\Modules\Pos\Jobs\PrintThermalJob;
 use App\Modules\Pos\Livewire\Concerns\ManagesHoldTransactions;
 use App\Modules\Pos\Livewire\Concerns\ManagesKasLaci;
@@ -2750,6 +2751,7 @@ class PosKasir extends Component
                     'waktu' => now()->format('d/m/Y H:i'),
                     'kasir' => auth()->user()?->name ?? 'Kasir',
                     'pelanggan' => $pelangganSaatTransaksi?->nama ?? 'Umum',
+                    'pelanggan_id' => $pelangganSaatTransaksi?->id,
                     'telepon' => $pelangganSaatTransaksi?->telepon ?? null,
                     'tier' => $namaTierTransaksi ?? ($tipeKonsumenTransaksi === 'reseller' ? 'Reseller' : ($tipeKonsumenTransaksi === 'agen' ? 'Agen' : 'Retail')),
                     'tipe_konsumen' => $tipeKonsumenTransaksi,
@@ -2795,6 +2797,30 @@ class PosKasir extends Component
                     PrintThermalJob::dispatch($transaksi->id);
                 }
             });
+
+            // Struk otomatis via WA gateway — SETELAH commit, tidak memperlambat
+            // transaksi. Guest tanpa nomor telepon sengaja dilewati.
+            if (! empty($this->receiptData['telepon'])) {
+                try {
+                    app(NotificationService::class)->kirim(
+                        'wa',
+                        $this->receiptData['telepon'],
+                        'Struk Pembelian',
+                        '',
+                        [
+                            'pelanggan_id' => $this->receiptData['pelanggan_id'] ?? null,
+                            'audience' => 'pelanggan',
+                            'kategori' => 'transaksi',
+                            'cabang_id' => session('cabang_id'),
+                            'wa_template' => 'transaksi_kasir_selesai',
+                            'wa_judul' => 'Struk Pembelian',
+                            'wa_vars' => app(WaTemplateService::class)->varsStrukKasir($this->receiptData),
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('Gagal mengantrekan struk WA kasir: '.$e->getMessage());
+                }
+            }
 
             $this->showPaymentModal = false;
             $this->showReceiptModal = true;

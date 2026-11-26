@@ -7,6 +7,7 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\PelangganKodeAktivasi;
 use App\Modules\Crm\Models\PelangganPoinLog;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Reseller\Models\Komisi;
@@ -113,12 +114,35 @@ class PelangganService
             $kode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         } while (PelangganKodeAktivasi::where('kode', $kode)->exists());
 
-        PelangganKodeAktivasi::create([
+        $record = PelangganKodeAktivasi::create([
             'pelanggan_id' => $pelanggan->id,
             'kode' => $kode,
             'kedaluwarsa_at' => now()->addDay(),
             'dibuat_oleh' => auth()->id(),
         ]);
+
+        if (! empty($pelanggan->telepon)) {
+            app(NotificationService::class)->kirim(
+                'wa',
+                $pelanggan->telepon,
+                'Kode Aktivasi Akun Member',
+                '',
+                [
+                    'pelanggan_id' => $pelanggan->id,
+                    'audience' => 'pelanggan',
+                    'kategori' => 'membership',
+                    'cabang_id' => $pelanggan->cabang_id,
+                    'wa_template' => 'member_kode_aktivasi',
+                    'wa_judul' => 'Kode Aktivasi Akun Member',
+                    'wa_vars' => [
+                        'nama' => $pelanggan->nama,
+                        'kode_aktivasi' => $kode,
+                        'berlaku_sampai' => optional($record->kedaluwarsa_at)->format('d M Y H:i') ?: '-',
+                        'url_aktivasi' => url('/aktivasi-akun'),
+                    ],
+                ]
+            );
+        }
 
         return $kode;
     }
@@ -159,6 +183,26 @@ class PelangganService
 
         $pelanggan->update(['password' => Hash::make($password)]);
         $record->update(['dipakai_at' => now()]);
+
+        if (! empty($pelanggan->telepon)) {
+            app(NotificationService::class)->kirim(
+                'wa',
+                $pelanggan->telepon,
+                'Akun Berhasil Diaktifkan',
+                '',
+                [
+                    'pelanggan_id' => $pelanggan->id,
+                    'audience' => 'pelanggan',
+                    'kategori' => 'membership',
+                    'wa_template' => 'member_aktivasi_berhasil',
+                    'wa_judul' => 'Akun Berhasil Diaktifkan',
+                    'wa_vars' => [
+                        'nama' => $pelanggan->nama,
+                        'url_login' => url('/login-pelanggan'),
+                    ],
+                ]
+            );
+        }
 
         return $pelanggan;
     }
@@ -323,6 +367,44 @@ class PelangganService
             ]);
         }
 
+        // Kabari member via WA (bukan hanya flash/alert staf).
+        if (! empty($pelanggan->telepon)) {
+            $pending = $approvalRequest && $approvalRequest->status === 'pending';
+            $label = match ($pelanggan->tipe_konsumen) {
+                'agen' => 'Agen / Mitra B2B',
+                'reseller' => 'Reseller',
+                default => 'Member Retail',
+            };
+            $instruksi = empty($pelanggan->password)
+                ? 'Akun Anda belum memiliki kata sandi. Ambil kode aktivasi di CS toko lalu buat kata sandi di halaman aktivasi akun.'
+                : 'Silakan masuk dengan nomor HP dan kata sandi Anda.';
+
+            app(NotificationService::class)->kirim(
+                'wa',
+                $pelanggan->telepon,
+                $pending ? 'Pendaftaran Member Diterima' : 'Pendaftaran Member Disetujui',
+                '',
+                [
+                    'pelanggan_id' => $pelanggan->id,
+                    'audience' => 'pelanggan',
+                    'kategori' => 'membership',
+                    'cabang_id' => $effectiveCabang,
+                    'wa_template' => $pending ? 'member_registrasi_pending' : 'member_registrasi_disetujui',
+                    'wa_judul' => $pending ? 'Pendaftaran Member Diterima' : 'Pendaftaran Member Disetujui',
+                    'wa_vars' => [
+                        'nama' => $pelanggan->nama,
+                        'telepon' => $pelanggan->telepon,
+                        'tipe_konsumen' => $pelanggan->tipe_konsumen,
+                        'label' => $label,
+                        'instruksi' => $instruksi,
+                        'url' => url('/login-pelanggan'),
+                        'url_aktivasi' => url('/aktivasi-akun'),
+                        'url_login' => url('/login-pelanggan'),
+                    ],
+                ]
+            );
+        }
+
         return $pelanggan->load('tierMembership');
     }
 
@@ -416,7 +498,29 @@ class PelangganService
             }
         }
 
+        $statusLama = (string) $pelanggan->status;
         $pelanggan->update($updateData);
+
+        if ($statusLama === 'aktif' && ($updateData['status'] ?? null) === 'nonaktif' && ! empty($pelanggan->telepon)) {
+            app(NotificationService::class)->kirim(
+                'wa',
+                $pelanggan->telepon,
+                'Akun Member Dinonaktifkan',
+                '',
+                [
+                    'pelanggan_id' => $pelanggan->id,
+                    'audience' => 'pelanggan',
+                    'kategori' => 'membership',
+                    'wa_template' => 'member_status_nonaktif',
+                    'wa_judul' => 'Akun Member Dinonaktifkan',
+                    'wa_vars' => [
+                        'nama' => $pelanggan->nama,
+                        'alasan' => ' Hubungi CS/toko untuk informasi lebih lanjut.',
+                        'url' => url('/login-pelanggan'),
+                    ],
+                ]
+            );
+        }
 
         return $pelanggan->fresh('tierMembership');
     }
