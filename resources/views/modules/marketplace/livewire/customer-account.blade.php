@@ -627,10 +627,10 @@
                         x-transition:leave="transition duration-150 ease-out"
                         x-transition:leave-start="translate-y-0 opacity-100 sm:scale-100"
                         x-transition:leave-end="translate-y-8 opacity-0 sm:translate-y-0 sm:scale-[0.97]"
-                        class="relative w-full sm:max-w-md lg:max-w-3xl max-h-[92vh] lg:max-h-[86vh] overflow-y-auto bg-white dark:bg-ink-900 border border-ink-100 dark:border-white/10 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 lg:p-7 shadow-2xl"
+                        class="relative flex w-full flex-col overflow-hidden sm:max-w-md lg:max-w-3xl max-h-[92dvh] lg:max-h-[88vh] bg-white dark:bg-ink-900 border border-ink-100 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl"
                     >
                         <!-- Header bermerek -->
-                        <div class="flex items-start justify-between gap-3 mb-4 pb-4 border-b border-ink-100 dark:border-white/10">
+                        <div class="flex flex-shrink-0 items-start justify-between gap-3 border-b border-ink-100 dark:border-white/10 px-5 sm:px-6 lg:px-7 pt-5 pb-4">
                             <div class="flex items-center gap-3 min-w-0">
                                 <div class="w-11 h-11 flex-shrink-0 rounded-2xl bg-white dark:bg-ink-950 border border-ink-100 dark:border-white/10 shadow-sm flex items-center justify-center overflow-hidden p-1.5">
                                     <template x-if="brand && brand.logo">
@@ -662,21 +662,14 @@
                             </div>
                         </div>
 
-                        {{-- Ringkasan kepercayaan — desktop only --}}
-                        <div class="hidden lg:grid lg:grid-cols-3 gap-3 mb-4">
-                            <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/10">
-                                <p class="text-[10px] font-black text-ink-900 dark:text-white">🔒 Pembayaran Aman</p>
-                                <p class="text-[10px] text-ink-400 mt-0.5">Diproses melalui gateway resmi & terenkripsi.</p>
+                        {{-- Konten bisa.di-scroll; header & aksi tetap terlihat --}}
+                        <div class="flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6 lg:px-7 py-4">
+                            {{-- Ringkasan kepercayaan ringkas — desktop only --}}
+                            <div class="hidden lg:flex flex-wrap items-center gap-2 mb-4">
+                                <span class="px-2 py-1 rounded-lg bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-[10px] font-bold text-ink-600 dark:text-ink-300">🔒 Pembayaran Aman</span>
+                                <span class="px-2 py-1 rounded-lg bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-[10px] font-bold text-ink-600 dark:text-ink-300">⚡ Status Otomatis</span>
+                                <span class="px-2 py-1 rounded-lg bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-[10px] font-bold text-ink-600 dark:text-ink-300">🧾 Bukti Transaksi</span>
                             </div>
-                            <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/10">
-                                <p class="text-[10px] font-black text-ink-900 dark:text-white">⚡ Status Otomatis</p>
-                                <p class="text-[10px] text-ink-400 mt-0.5">Pesanan diperbarui saat pembayaran terdeteksi.</p>
-                            </div>
-                            <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/10">
-                                <p class="text-[10px] font-black text-ink-900 dark:text-white">🧾 Bukti Transaksi</p>
-                                <p class="text-[10px] text-ink-400 mt-0.5">Struk & riwayat tersimpan di akun Anda.</p>
-                            </div>
-                        </div>
 
                         {{-- ===== Gateway belum dikonfigurasi (503) / daftar kosong ===== --}}
                         <div x-show="errorBayar === 'PAYMENT_UNAVAILABLE'" class="p-5 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-center space-y-2.5">
@@ -941,7 +934,7 @@
                                 </div>
 
                                 <!-- Compact Grid Metode -->
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-3 max-h-[300px] lg:max-h-[420px] overflow-y-auto pr-1" role="radiogroup" aria-label="Pilihan metode">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-3 max-h-[320px] lg:max-h-[360px] overflow-y-auto pr-1" role="radiogroup" aria-label="Pilihan metode">
                                     <template x-for="m in filteredMetode" :key="m.kode">
                                         <button
                                             type="button"
@@ -956,13 +949,13 @@
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex items-center gap-1.5 mb-0.5">
                                                     <span
-                                                        class="px-1.5 py-0.5 rounded text-[10px] font-extrabold tracking-wider"
+                                                        class="shrink-0 whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wider"
                                                         :class="metodeDipilih === m.kode ? 'bg-up-primary text-white' : 'bg-ink-100 dark:bg-white/10 text-ink-700 dark:text-ink-300'"
                                                         x-text="m.badge || m.kode"
                                                     ></span>
-                                                    <span class="text-xs lg:text-sm font-bold text-ink-900 dark:text-white truncate" x-text="m.nama"></span>
+                                                    <span class="text-xs lg:text-sm font-bold text-ink-900 dark:text-white line-clamp-2" x-text="m.nama"></span>
                                                 </div>
-                                                <p x-show="m.deskripsi" class="text-[10px] text-ink-400 dark:text-ink-500 line-clamp-1" x-text="m.deskripsi"></p>
+                                                <p x-show="m.deskripsi" class="text-[10px] text-ink-400 dark:text-ink-500 line-clamp-2" x-text="m.deskripsi"></p>
                                                 <div class="mt-1 flex items-center gap-2">
                                                     <span x-show="Number(m.fee) > 0" class="text-[10px] text-up-amber font-semibold tabular-nums" x-text="'Fee +' + rupiah(m.fee)"></span>
                                                     <span x-show="!Number(m.fee)" class="text-[10px] text-up-mint font-semibold">Bebas Biaya</span>
@@ -984,24 +977,27 @@
                                 <span x-text="errorBayar"></span>
                             </div>
 
-                            <!-- Tombol konfirmasi -->
-                            <button
-                                type="button"
-                                x-on:click="konfirmasiBayar()"
-                                x-bind:disabled="loadingCreate || !metodeDipilih || loadingMetode"
-                                x-bind:class="(!metodeDipilih || loadingCreate || loadingMetode) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-up-primary-dark shadow-sm shadow-up-primary/25 cursor-pointer'"
-                                class="w-full py-3.5 rounded-2xl bg-up-primary text-white font-bold text-sm transition-[opacity,background-color,transform] duration-140 active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2"
-                            >
-                                <svg x-show="loadingCreate" class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                </svg>
-                                <span x-text="loadingCreate ? 'Menghubungi penyedia pembayaran…' : 'Lanjut ke Pembayaran'"></span>
-                            </button>
+                            <!-- Tombol konfirmasi selalu terlihat saat menggulir -->
+                            <div class="sticky bottom-0 z-10 -mx-5 sm:-mx-6 lg:-mx-7 mt-2 px-5 sm:px-6 lg:px-7 pt-3 pb-1 bg-white/95 dark:bg-ink-900/95 backdrop-blur border-t border-ink-100/80 dark:border-white/10">
+                                <button
+                                    type="button"
+                                    x-on:click="konfirmasiBayar()"
+                                    x-bind:disabled="loadingCreate || !metodeDipilih || loadingMetode"
+                                    x-bind:class="(!metodeDipilih || loadingCreate || loadingMetode) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-up-primary-dark shadow-sm shadow-up-primary/25 cursor-pointer'"
+                                    class="w-full py-3.5 rounded-2xl bg-up-primary text-white font-bold text-sm transition-[opacity,background-color,transform] duration-140 active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2"
+                                >
+                                    <svg x-show="loadingCreate" class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                    <span x-text="loadingCreate ? 'Menghubungi penyedia pembayaran…' : 'Lanjut ke Pembayaran'"></span>
+                                </button>
 
-                            <p class="text-[10px] text-ink-400 text-center leading-relaxed">
-                                Pembayaran untuk <span x-text="brand && brand.nama ? brand.nama : 'toko kami'"></span> diproses aman melalui gateway resmi. Status pesanan diperbarui otomatis setelah lunas.
-                            </p>
+                                <p class="text-[10px] text-ink-400 text-center leading-relaxed mt-2">
+                                    Pembayaran untuk <span x-text="brand && brand.nama ? brand.nama : 'toko kami'"></span> diproses aman melalui gateway resmi. Status pesanan diperbarui otomatis setelah lunas.
+                                </p>
+                            </div>
+                        </div>
                         </div>
                     </div>
                 </div>
