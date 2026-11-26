@@ -135,6 +135,7 @@
                                     <thead>
                                         <tr class="border-b border-ink-200/80 dark:border-white/10 text-ink-500 text-[10px] bg-ink-50 dark:bg-white/[0.02] uppercase font-bold">
                                             <th class="py-2.5 px-3.5">Item</th>
+                                            <th class="py-2.5 px-3.5">Lokasi Barang</th>
                                             <th class="py-2.5 px-3.5 text-center">Qty</th>
                                             <th class="py-2.5 px-3.5 text-right">Subtotal</th>
                                         </tr>
@@ -142,7 +143,21 @@
                                     <tbody class="divide-y divide-ink-200/60 dark:divide-white/5">
                                         @foreach($pesananOnlineDetail['items'] as $it)
                                             <tr>
-                                                <td class="py-2.5 px-3.5 text-ink-900 dark:text-white font-medium">{{ $it['nama'] }}</td>
+                                                <td class="py-2.5 px-3.5 text-ink-900 dark:text-white font-medium">
+                                                    <div>{{ $it['nama'] }}</div>
+                                                    <div class="text-[10px] text-ink-400 font-mono">{{ $it['sku'] ?? '-' }}</div>
+                                                </td>
+                                                <td class="py-2.5 px-3.5">
+                                                    @if(!empty($it['lokasi']))
+                                                        <div class="flex flex-wrap gap-1">
+                                                            @foreach($it['lokasi'] as $lokasi)
+                                                                <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">{{ $lokasi }}</span>
+                                                            @endforeach
+                                                        </div>
+                                                    @else
+                                                        <span class="text-[10px] text-ink-400 italic">Belum ada rak</span>
+                                                    @endif
+                                                </td>
                                                 <td class="py-2.5 px-3.5 text-center text-ink-700 dark:text-white tabular-nums">{{ $it['jumlah'] }}</td>
                                                 <td class="py-2.5 px-3.5 text-right text-ink-900 dark:text-white font-bold tabular-nums">Rp {{ number_format($it['subtotal'], 0, ',', '.') }}</td>
                                             </tr>

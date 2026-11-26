@@ -13,6 +13,7 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Services\LokasiBarangService;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\DB;
@@ -710,6 +711,41 @@ class PesananOnlineIndex extends Component
         $this->showReceiptModal = true;
     }
 
+    private function gudangIdPesanan(?Transaksi $trx): ?int
+    {
+        if (! $trx) {
+            return null;
+        }
+
+        return (int) ($trx->gudang_id ?: Gudang::getDefault($trx->cabang_id)->id);
+    }
+
+    /** Peta lokasi rak item pada modal detail pesanan online. */
+    public function getLokasiSelectedOrderProperty(): array
+    {
+        if (! $this->selectedOrder) {
+            return [];
+        }
+
+        return app(LokasiBarangService::class)->peta(
+            $this->selectedOrder->items->pluck('produk_id'),
+            $this->gudangIdPesanan($this->selectedOrder)
+        );
+    }
+
+    /** Peta lokasi rak item pada modal pickup kasir. */
+    public function getLokasiPickupOrderProperty(): array
+    {
+        if (! $this->pickupOrder) {
+            return [];
+        }
+
+        return app(LokasiBarangService::class)->peta(
+            $this->pickupOrder->items->pluck('produk_id'),
+            $this->gudangIdPesanan($this->pickupOrder)
+        );
+    }
+
     public function render()
     {
         $cabangId = $this->selectedCabangId;
@@ -773,6 +809,8 @@ class PesananOnlineIndex extends Component
             'orders' => $orders,
             'counts' => $this->counts,
             'cabangs' => Cabang::where('is_active', true)->get(),
+            'lokasiSelectedOrder' => $this->lokasiSelectedOrder,
+            'lokasiPickupOrder' => $this->lokasiPickupOrder,
         ])->layout('layouts.backoffice', ['header' => 'Pesanan Online']);
     }
 }

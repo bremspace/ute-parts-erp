@@ -38,6 +38,7 @@ use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
+use App\Modules\Wms\Services\LokasiBarangService;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Wms\Services\StockReservationService;
@@ -3522,6 +3523,11 @@ class PosKasir extends Component
             return null;
         }
 
+        $lokasi = app(LokasiBarangService::class)->peta(
+            $trx->items->pluck('produk_id'),
+            $trx->gudang_id ?: $this->selectedGudangId
+        );
+
         return [
             'id' => $trx->id,
             'no_transaksi' => $trx->no_transaksi,
@@ -3534,6 +3540,8 @@ class PosKasir extends Component
                 'nama' => $it->produk?->nama ?? 'Produk',
                 'jumlah' => (int) $it->jumlah,
                 'subtotal' => (float) $it->subtotal,
+                'lokasi' => $lokasi[$it->produk_id] ?? [],
+                'sku' => $it->produk?->sku ?? '-',
             ])->values()->all(),
             // [T-SERAH] Sudah lunas online → mode serah terima (bukan bayar)
             'sudah_lunas' => $trx->status === 'lunas',
