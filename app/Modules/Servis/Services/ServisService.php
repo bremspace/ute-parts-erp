@@ -227,7 +227,7 @@ class ServisService
                         'nama' => $namaPelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
                         'no_tiket' => $tiket->no_tiket,
                         'jenis_hp' => $tiket->jenis_hp,
-                        'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                        'nama_cabang' => $tiket->cabang?->nama ?: 'Cabang',
                         'url_tracking' => url("/tracking/{$tiket->token_approval}"),
                     ],
                 ]
@@ -607,7 +607,7 @@ class ServisService
                         'jenis_hp' => $tiket->jenis_hp,
                         'status' => $labelStatus,
                         'status_key' => $statusBaru,
-                        'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                        'nama_cabang' => $tiket->cabang?->nama ?: 'Cabang',
                         'url_tracking' => $trackingUrl,
                     ],
                 ]
@@ -1853,7 +1853,7 @@ class ServisService
                     'wa_template' => 'servis_komplain_masuk',
                     'wa_judul' => 'Komplain Pasca-Servis Masuk',
                     'wa_vars' => [
-                        'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                        'nama_cabang' => $tiket->cabang?->nama ?: 'Cabang',
                         'no_tiket' => $tiket->no_tiket,
                         'jenis_hp' => $tiket->jenis_hp,
                         'no_tiket_lama' => $tiketLama->no_tiket,

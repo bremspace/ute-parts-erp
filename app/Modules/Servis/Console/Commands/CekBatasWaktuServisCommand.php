@@ -100,7 +100,7 @@ class CekBatasWaktuServisCommand extends Command
                                     'nama' => $tiket->nama_pelanggan ?: ($tiket->pelanggan?->nama ?? 'Pelanggan'),
                                     'no_tiket' => $tiket->no_tiket,
                                     'jenis_hp' => $tiket->jenis_hp,
-                                    'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                                    'nama_cabang' => $tiket->cabang?->nama ?: 'Cabang',
                                     'alasan' => 'melewati batas waktu pengerjaan',
                                 ],
                             ]);
@@ -179,7 +179,7 @@ class CekBatasWaktuServisCommand extends Command
                     'wa_template' => 'servis_komplain_eskalasi_cabang',
                     'wa_judul' => 'Eskalasi Komplain Servis',
                     'wa_vars' => [
-                        'nama_cabang' => $tiket->cabang?->nama ?? 'Cabang',
+                        'nama_cabang' => $tiket->cabang?->nama ?: 'Cabang',
                         'no_tiket' => $tiket->no_tiket,
                         'jenis_hp' => $tiket->jenis_hp,
                     ],

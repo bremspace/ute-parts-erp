@@ -251,7 +251,7 @@ class PembayaranPesananOnlineService
                             'nama' => $transaksi->pelanggan->nama,
                             'no_transaksi' => $transaksi->no_transaksi,
                             'total' => number_format($total, 0, ',', '.'),
-                            'metode' => (string) ($metode ?? ''),
+                            'metode' => $metode,
                         ],
                     ])
                 );

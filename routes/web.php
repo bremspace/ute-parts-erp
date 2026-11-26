@@ -682,6 +682,11 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
+// Alias URL lama: /pengaturan/... -> /app/pengaturan/...
+Route::get('/pengaturan/{tab?}', function (?string $tab = null) {
+    return redirect('/app/pengaturan'.($tab ? '/'.$tab : ''));
+})->where('tab', '.*');
+
 Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])->group(function () {
     Route::get('/', fn () => redirect('/app/dashboard'));
 

@@ -5,6 +5,7 @@ namespace App\Modules\Marketplace\Services;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PartaiPricingService;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
@@ -284,7 +285,7 @@ class CartService
             'sku' => $produk->sku,
             'kategori' => $produk->kategori ?: ($produk->kategoriRelasi?->nama ?? null),
             'kualitas' => $produk->kualitas?->nama ?? null,
-            'brand' => $produk->brand?->nama ?? ($produk->brand_kompatibel ?? null),
+            'brand' => ($produk->brand instanceof Brand ? $produk->brand->nama : null) ?? ($produk->brand_kompatibel ?? null),
             'kompatibel' => $produk->tipeHps->isNotEmpty()
                 ? $produk->tipeHps->take(2)->map(fn ($t) => trim((string) $t->merk.' '.(string) $t->model))->implode(', ')
                 : null,
