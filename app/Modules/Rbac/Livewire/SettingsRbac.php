@@ -116,7 +116,7 @@ class SettingsRbac extends Component
     public $qrisImageFile = null;
 
     /** Logo opsional yang tampil di halaman pembayaran online konsumen. */
-    public $duitkuLogoFile = null;
+    public mixed $duitkuLogoFile = null;
 
     public bool $hapusDuitkuLogo = false;
 

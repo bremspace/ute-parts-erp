@@ -20,6 +20,10 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
+/**
+ * @property-read array $lokasiSelectedOrder
+ * @property-read array $lokasiPickupOrder
+ */
 class PesananOnlineIndex extends Component
 {
     use ParsesNominal;

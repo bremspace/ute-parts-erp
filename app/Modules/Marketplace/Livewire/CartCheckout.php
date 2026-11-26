@@ -179,7 +179,7 @@ class CartCheckout extends Component
                 'stok' => (int) ($p->stok_items_sum_jumlah ?? 0),
                 'kategori' => $p->kategori ?: ($p->kategoriRelasi?->nama ?? null),
                 'kualitas' => $p->kualitas?->nama ?? null,
-                'brand' => $p->brand?->nama ?? ($p->brand_kompatibel ?? null),
+                'brand' => ($p->brand instanceof \App\Modules\Wms\Models\Brand ? $p->brand->nama : null) ?? ($p->brand_kompatibel ?? null),
                 'kompatibel' => $p->tipeHps->isNotEmpty()
                     ? $p->tipeHps->take(2)->map(fn ($t) => trim((string) $t->merk.' '.(string) $t->model))->implode(', ')
                     : null,

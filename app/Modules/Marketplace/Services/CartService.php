@@ -284,7 +284,7 @@ class CartService
             'sku' => $produk->sku,
             'kategori' => $produk->kategori ?: ($produk->kategoriRelasi?->nama ?? null),
             'kualitas' => $produk->kualitas?->nama ?? null,
-            'brand' => $produk->brand?->nama ?? ($produk->brand_kompatibel ?? null),
+            'brand' => ($produk->brand instanceof \App\Modules\Wms\Models\Brand ? $produk->brand->nama : null) ?? ($produk->brand_kompatibel ?? null),
             'kompatibel' => $produk->tipeHps->isNotEmpty()
                 ? $produk->tipeHps->take(2)->map(fn ($t) => trim((string) $t->merk.' '.(string) $t->model))->implode(', ')
                 : null,
