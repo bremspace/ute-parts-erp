@@ -48,6 +48,57 @@ class TransaksiItem extends Model
         return $this->belongsTo(Transaksi::class);
     }
 
+    /** Jumlah dalam satuan dasar (pcs) = jumlah satuan jual × faktor konversi. */
+    public function qtyDasar(): int
+    {
+        $faktor = max(1.0, (float) ($this->konversi ?? 1));
+
+        return (int) round((int) $this->jumlah * $faktor);
+    }
+
+    public function isSatuanKonversi(): bool
+    {
+        $satuan = strtolower(trim((string) ($this->satuan ?: 'pcs')));
+
+        return $this->qtyDasar() > (int) $this->jumlah && $satuan !== '' && $satuan !== 'pcs';
+    }
+
+    /** Label lengkap untuk picking: "1 BOX (10 pcs)". */
+    public function qtyLabel(): string
+    {
+        $satuan = strtoupper(trim((string) ($this->satuan ?: 'pcs'))) ?: 'PCS';
+        $label = (int) $this->jumlah.' '.$satuan;
+
+        if ($this->isSatuanKonversi()) {
+            $label .= ' ('.$this->qtyDasar().' pcs)';
+        }
+
+        return $label;
+    }
+
+    /** Label ringkas untuk kartu daftar order: "×1 BOX (10 pcs)". */
+    public function qtyRingkas(): string
+    {
+        $label = '×'.(int) $this->jumlah;
+        if ($this->isSatuanKonversi()) {
+            $label .= ' '.strtoupper(trim((string) ($this->satuan ?: 'box')))
+                .' ('.$this->qtyDasar().' pcs)';
+        }
+
+        return $label;
+    }
+
+    /** Catatan picking untuk struk/label, bila item dibeli dalam satuan konversi. */
+    public function catatanPicking(): ?string
+    {
+        if (! $this->isSatuanKonversi()) {
+            return null;
+        }
+
+        return 'Isi '.(int) $this->jumlah.' '.strtoupper(trim((string) $this->satuan))
+            .' = '.$this->qtyDasar().' pcs';
+    }
+
     /**
      * @return BelongsTo<Produk, $this>
      */

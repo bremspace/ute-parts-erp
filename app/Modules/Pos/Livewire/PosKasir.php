@@ -2832,6 +2832,7 @@ class PosKasir extends Component
             $hargaSatuan = (float) $item->harga_satuan;
             $qty = (int) $item->jumlah;
             $diskonPerUnit = max(0, $retailPerUnit - $hargaSatuan);
+            $catatanCetak = trim((string) ($item->catatan ?? '').' '.(string) ($item->catatanPicking() ?? ''));
 
             return [
                 'nama' => $item->produk?->nama ?? 'Produk',
@@ -2846,7 +2847,7 @@ class PosKasir extends Component
                 'diskon_total' => $diskonPerUnit * $qty,
                 'subtotal_retail' => $retailPerUnit * $qty,
                 'subtotal' => (float) $item->subtotal,
-                'catatan' => $item->catatan,
+                'catatan' => $catatanCetak ?: null,
             ];
         })->toArray();
 
@@ -3535,10 +3536,14 @@ class PosKasir extends Component
             'pelanggan_telepon' => $trx->pelanggan?->telepon ?? '-',
             'waktu' => $trx->created_at?->format('d/m/Y H:i'),
             'total' => (float) $trx->total_akhir,
-            'jumlah_item' => (int) $trx->items->sum('jumlah'),
+            'jumlah_item' => (int) $trx->items->sum(fn ($it) => $it->qtyDasar()),
             'items' => $trx->items->map(fn ($it) => [
                 'nama' => $it->produk?->nama ?? 'Produk',
                 'jumlah' => (int) $it->jumlah,
+                'satuan' => (string) ($it->satuan ?: 'pcs'),
+                'konversi' => (float) ($it->konversi ?? 1),
+                'qty_dasar' => $it->qtyDasar(),
+                'qty_label' => $it->qtyLabel(),
                 'subtotal' => (float) $it->subtotal,
                 'lokasi' => $lokasi[$it->produk_id] ?? [],
                 'sku' => $it->produk?->sku ?? '-',

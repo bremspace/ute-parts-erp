@@ -158,7 +158,12 @@
                                                         <span class="text-[10px] text-ink-400 italic">Belum ada rak</span>
                                                     @endif
                                                 </td>
-                                                <td class="py-2.5 px-3.5 text-center text-ink-700 dark:text-white tabular-nums">{{ $it['jumlah'] }}</td>
+                                                <td class="py-2.5 px-3.5 text-center text-ink-700 dark:text-white tabular-nums">
+                                                    <span class="block font-bold">{{ $it['qty_label'] ?? $it['jumlah'] }}</span>
+                                                    @if(!empty($it['qty_dasar']) && $it['qty_dasar'] !== $it['jumlah'])
+                                                        <span class="block text-[10px] text-ink-400">= {{ $it['qty_dasar'] }} pcs</span>
+                                                    @endif
+                                                </td>
                                                 <td class="py-2.5 px-3.5 text-right text-ink-900 dark:text-white font-bold tabular-nums">Rp {{ number_format($it['subtotal'], 0, ',', '.') }}</td>
                                             </tr>
                                         @endforeach
