@@ -92,7 +92,24 @@ Lalu di ERP isi:
 
 ---
 
-## 4. Setelah installer selesai (OpenWA)
+## 4. Akses IP & domain
+
+Installer otomatis mendeteksi IP publik VPS dan membuat server block Nginx untuk:
+
+| Akses | URL | Keterangan |
+|---|---|---|
+| Domain ERP | `https://DOMAIN` | HTTPS, redirect otomatis dari HTTP |
+| IP ERP (HTTP) | `http://IP_VPS` | langsung ke aplikasi, tanpa redirect |
+| IP ERP (HTTPS) | `https://IP_VPS` | sertifikat self-signed, NAT harus forward 443 |
+| Domain OpenWA | `https://wa.DOMAIN` | reverse proxy + WebSocket |
+| IP OpenWA | `http://IP_VPS` / `https://IP_VPS` | saat memakai `install-openwa-only.sh` |
+
+Catatan NAT MikroTik:
+- `external_port → VPS:80` untuk akses HTTP lewat IP.
+- `external_port → VPS:443` kalau ingin akses HTTPS lewat IP.
+- Satu port external tidak bisa sekaligus dipakai HTTP dan HTTPS; pakai dua port berbeda kalau keduanya dibutuhkan.
+
+## 5. Setelah installer selesai (OpenWA)
 
 Buka dashboard WA:
 
@@ -118,7 +135,7 @@ Catatan lanjutan juga ditulis di:
 
 ---
 
-## 5. Perintah harian
+## 6. Perintah harian
 
 ```bash
 ute-healthcheck     # cek service, DB, Redis, HTTP, HTTPS
@@ -134,7 +151,7 @@ Cron otomatis:
 
 ---
 
-## 6. Backup & restore
+## 7. Backup & restore
 
 Backup tersimpan di:
 
@@ -162,7 +179,7 @@ Kalau pakai rclone, set `RCLONE_REMOTE` di `/etc/environment` atau cron, lalu ba
 
 ---
 
-## 7. Struktur folder
+## 8. Struktur folder
 
 ```text
 installer vps new/
@@ -173,6 +190,7 @@ installer vps new/
 │   ├── env-production.env
 │   ├── nginx-ute.conf.tpl
 │   ├── nginx-openwa.conf.tpl
+│   ├── nginx-openwa-ip.conf.tpl
 │   ├── php-fpm-www.conf.tpl
 │   ├── php-opcache.ini
 │   ├── mariadb-tuning.cnf.tpl
@@ -190,7 +208,7 @@ installer vps new/
 
 ---
 
-## 8. Catatan penting
+## 9. Catatan penting
 
 - Installer **tidak** menghapus database yang sudah ada; ia hanya membuat database/user jika belum ada.
 - `.env` lama akan ditimpa, tetapi installer menyimpan kredensial baru di `/root/ute-install-credentials.txt`.
@@ -200,7 +218,7 @@ installer vps new/
 
 ---
 
-## 9. Troubleshooting cepat
+## 10. Troubleshooting cepat
 
 | Gejala | Cek |
 |---|---|

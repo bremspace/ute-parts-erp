@@ -20,6 +20,13 @@ ask WA_DOMAIN "Domain/subdomain panel OpenWA (mis. wa.tokobaru.com)"
 ask EMAIL "Email untuk Let's Encrypt"
 [[ "$EMAIL" == *"@"* ]] || fail "Email tidak valid."
 ask TIMEZONE "Timezone" "Asia/Jakarta"
+
+PUBLIC_IP="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
+[[ -n "$PUBLIC_IP" ]] || PUBLIC_IP="$(curl -fsS --max-time 5 https://ifconfig.me/ip 2>/dev/null || true)"
+PRIVATE_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+ask SERVER_IP "IP publik VPS yang dipakai untuk akses (deteksi: ${PUBLIC_IP:-tidak terdeteksi})" "$PUBLIC_IP"
+[[ -n "$SERVER_IP" ]] || fail "IP publik wajib diisi."
+
 API_MASTER_KEY="$(genpass)"
 
 apt-get update -qq
@@ -56,6 +63,12 @@ if ! certbot certonly --webroot -w /var/www/certbot \
     WA_CERT_OK=no
     warn "Gagal sertifikat Let's Encrypt untuk ${WA_DOMAIN}. Lanjut dengan self-signed."
 fi
+
+IP_SAN_LIST=("$SERVER_IP")
+[[ -n "${PRIVATE_IP:-}" && "$PRIVATE_IP" != "$SERVER_IP" ]] && IP_SAN_LIST+=("$PRIVATE_IP")
+make_selfsigned "openwa-ip" "${IP_SAN_LIST[@]}"
+IP_SSL_CERT="$SSL_CERT"
+IP_SSL_KEY="$SSL_KEY"
 
 if [[ "$WA_CERT_OK" == "yes" ]]; then
     SSL_CERT="/etc/letsencrypt/live/${WA_DOMAIN}/fullchain.pem"
@@ -103,10 +116,13 @@ if [[ -z "$SESSION_ID" ]]; then
 fi
 
 rm -f /etc/nginx/sites-enabled/openwa-bootstrap
-render "${CFG_DIR}/nginx-openwa.conf.tpl" /etc/nginx/sites-available/openwa \
+render "${CFG_DIR}/nginx-openwa-ip.conf.tpl" /etc/nginx/sites-available/openwa \
     WA_DOMAIN "$WA_DOMAIN" \
+    SERVER_IP "$SERVER_IP" \
     SSL_CERT "$SSL_CERT" \
-    SSL_KEY "$SSL_KEY"
+    SSL_KEY "$SSL_KEY" \
+    IP_SSL_CERT "$IP_SSL_CERT" \
+    IP_SSL_KEY "$IP_SSL_KEY"
 ln -sf /etc/nginx/sites-available/openwa /etc/nginx/sites-enabled/openwa
 nginx -t
 service_restart nginx
@@ -119,7 +135,8 @@ ufw --force enable >/dev/null || true
 CRED=/root/openwa-credentials.txt
 cat > "$CRED" <<EOF
 OpenWA standalone - $(date '+%F %T')
-URL       : https://${WA_DOMAIN}
+URL domain: https://${WA_DOMAIN}
+URL IP    : http://${SERVER_IP} / https://${SERVER_IP} (self-signed)
 API key   : ${OPENWA_KEY}
 Session ID: ${SESSION_ID:-<lihat dashboard>}
 Data      : /opt/openwa/data
@@ -128,7 +145,7 @@ chmod 0600 "$CRED"
 
 ok "OPENWA STANDALONE SELESAI"
 printf '\n'
-printf 'Dashboard : https://%s\n' "$WA_DOMAIN"
+printf 'Dashboard : https://%s  |  IP: http://%s\n' "$WA_DOMAIN" "$SERVER_IP"
 printf 'Kredensial: %s\n' "$CRED"
 printf '\nDi ERP isi Provider=OpenWA, URL=https://%s/api, Token=API key, ID Sesi=UUID.\n' "$WA_DOMAIN"
 printf 'Jangan lupa scan QR di menu Sesi sampai status READY.\n'
