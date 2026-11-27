@@ -4219,21 +4219,45 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-semibold text-ink-300 mb-1.5">API Endpoint URL *</label>
-                                    <input type="url" wire:model="integrasiForm.wa_url" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="https://api.fonnte.com/send" />
+                                    <input
+                                        type="url"
+                                        wire:model="integrasiForm.wa_url"
+                                        class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono"
+                                        placeholder="{{ ($integrasiForm['wa_provider'] ?? '') === 'openwa' ? 'http://127.0.0.1:2785/api' : 'https://api.fonnte.com/send' }}"
+                                    />
+                                    @error('integrasiForm.wa_url') <p class="text-up-red text-[10px] mt-1">{{ $message }}</p> @enderror
                                 </div>
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Token / API Key *</label>
-                                    <input type="password" wire:model="integrasiForm.wa_token" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Masukkan token API gateway WA" />
-                                    <p class="text-[10px] text-ink-400 mt-1">Dapatkan dari dashboard penyedia WA gateway Anda.</p>
+                                    <div class="flex items-center justify-between gap-2 mb-1.5">
+                                        <label class="block text-xs font-semibold text-ink-300">
+                                            {{ ($integrasiForm['wa_provider'] ?? '') === 'openwa' ? 'Operator API Key *' : 'Token / API Key *' }}
+                                        </label>
+                                        @if($waTokenConfigured)
+                                            <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-up-mint/15 text-up-mint border border-up-mint/25">
+                                                ● Tersimpan Terenkripsi
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <input
+                                        type="password"
+                                        wire:model="integrasiForm.wa_token"
+                                        class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono"
+                                        placeholder="{{ $waTokenConfigured ? 'Kosongkan jika tidak ingin mengganti token tersimpan' : 'Masukkan token / API key gateway WA' }}"
+                                    />
+                                    <p class="text-[10px] text-ink-400 mt-1">
+                                        {{ ($integrasiForm['wa_provider'] ?? '') === 'openwa'
+                                            ? 'Gunakan key role operator (atau biarkan Setup Otomatis di bawah membuatnya).'
+                                            : 'Dapatkan dari dashboard penyedia WA gateway Anda.' }}
+                                    </p>
                                 </div>
                                 @if(($integrasiForm['wa_provider'] ?? '') === 'openwa')
                                     <div>
-                                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">ID Sesi OpenWA *</label>
-                                        <input type="text" wire:model="integrasiForm.wa_session" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="default" />
-                                        <p class="text-[10px] text-ink-400 mt-1">Nama sesi dari dasbor OpenWA. Biasanya <span class="font-mono">default</span>. API key sebaiknya role <span class="font-mono">operator</span> yang di-scope ke sesi ini.</p>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">ID Sesi OpenWA (UUID) *</label>
+                                        <input type="text" wire:model="integrasiForm.wa_session" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="UUID sesi dari OpenWA (gunakan Setup Otomatis)" />
+                                        <p class="text-[10px] text-ink-400 mt-1">OpenWA memakai <span class="font-mono">UUID</span> sesi, bukan nama tampilan. Gunakan panel OpenWA di bawah untuk membuat/memilih sesi otomatis.</p>
                                         @error('integrasiForm.wa_session') <p class="text-up-red text-[10px] mt-1">{{ $message }}</p> @enderror
                                     </div>
                                 @else
@@ -4243,6 +4267,156 @@
                                     </div>
                                 @endif
                             </div>
+
+                            @if(($integrasiForm['wa_provider'] ?? '') === 'openwa')
+                                @php
+                                    $sessionStatusRaw = strtolower((string) ($openwaSessionStatus['status'] ?? ''));
+                                    $sessionIsReady = \App\Modules\Notifikasi\Services\OpenWaManagerService::isReadyStatus($sessionStatusRaw);
+                                    $sessionNeedPoll = ! $sessionIsReady && ($openwaQrData !== '' || in_array($sessionStatusRaw, ['created', 'initializing', 'qr_ready', 'authenticating'], true));
+                                    $statusLabel = match ($sessionStatusRaw) {
+                                        'ready', 'connected', 'working' => ['Terhubung & Siap', 'bg-up-mint/15 text-up-mint border-up-mint/30'],
+                                        'qr_ready' => ['Menunggu Scan QR', 'bg-up-amber/15 text-up-amber border-up-amber/30'],
+                                        'initializing', 'authenticating' => ['Menyambungkan Engine...', 'bg-up-primary/15 text-up-primary border-up-primary/30'],
+                                        'created', 'disconnected', 'stopped' => ['Belum Aktif ('.$sessionStatusRaw.')', 'bg-white/10 text-ink-300 border-white/15'],
+                                        default => $sessionStatusRaw !== '' ? [$sessionStatusRaw, 'bg-white/10 text-ink-300 border-white/15'] : null,
+                                    };
+                                @endphp
+                                <div class="p-4 rounded-2xl bg-up-primary/[0.06] border border-up-primary/25 space-y-4" @if($sessionNeedPoll) wire:poll.4s="refreshOpenWaSessionStatus" @endif>
+                                    <!-- Bar Kesehatan & Status Sesi -->
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="text-xs font-bold text-white">Manajemen Gateway OpenWA</span>
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border {{ $openwaHealth === 'online' ? 'bg-up-mint/15 text-up-mint border-up-mint/30' : ($openwaHealth === 'offline' ? 'bg-up-red/15 text-up-red border-up-red/30' : 'bg-white/5 text-ink-400 border-white/10') }}">
+                                                {{ $openwaHealth === 'online' ? '● Service Online' : ($openwaHealth === 'offline' ? '○ Offline / Tak Terjangkau' : '○ Belum Dicek') }}
+                                            </span>
+                                            @if($statusLabel)
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border {{ $statusLabel[1] }}">
+                                                    {{ $statusLabel[0] }}
+                                                </span>
+                                            @endif
+                                            @if(!empty($openwaSessionStatus['phone']))
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/5 text-ink-200 border border-white/10">
+                                                    +{{ $openwaSessionStatus['phone'] }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <button type="button" wire:click="cekHealthOpenWa" wire:loading.attr="disabled" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold text-ink-200 cursor-pointer disabled:opacity-50">
+                                                <span wire:loading.remove wire:target="cekHealthOpenWa">Cek Health</span>
+                                                <span wire:loading wire:target="cekHealthOpenWa">Mengecek...</span>
+                                            </button>
+                                            @if(filled($integrasiForm['wa_session'] ?? ''))
+                                                <button type="button" wire:click="refreshOpenWaSessionStatus" wire:loading.attr="disabled" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold text-ink-200 cursor-pointer disabled:opacity-50">
+                                                    Refresh Status
+                                                </button>
+                                                @if(! $sessionIsReady)
+                                                    <button type="button" wire:click="startSesiOpenWa" wire:loading.attr="disabled" class="px-2.5 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 border border-up-primary/30 text-[11px] font-semibold text-up-primary cursor-pointer disabled:opacity-50">
+                                                        Start Sesi
+                                                    </button>
+                                                @endif
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    <!-- Setup Wizard 1-Klik -->
+                                    <div class="p-3.5 rounded-xl bg-black/25 border border-white/10 space-y-3">
+                                        <div>
+                                            <p class="text-[11px] font-bold text-white">Setup Otomatis 1-Klik (Admin Key Dipakai Sekali)</p>
+                                            <p class="text-[10px] text-ink-400 mt-0.5">
+                                                Tempel Master Admin Key dari container VPS (<span class="font-mono text-ink-300">cat /app/data/.api-key</span>). ERP akan otomatis membuat sesi, menyalakan engine, mencetak Operator API Key scoped, lalu langsung menghapus Admin Key dari form.
+                                            </p>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-[10px] font-semibold text-ink-300 mb-1">Nama Label Sesi</label>
+                                                <input type="text" wire:model="openwaSessionName" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" placeholder="bremspace-erp" />
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-semibold text-ink-300 mb-1">Master Admin Key OpenWA</label>
+                                                <input type="password" wire:model="openwaAdminKey" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" placeholder="owa_k1_... (opsional setelah setup)" />
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button type="button" wire:click="setupOpenWaOtomatis" wire:loading.attr="disabled" class="px-3.5 py-2 rounded-xl bg-up-primary hover:opacity-95 text-white text-xs font-bold cursor-pointer disabled:opacity-50">
+                                                <span wire:loading.remove wire:target="setupOpenWaOtomatis">⚡ Hubungkan &amp; Buat Sesi Otomatis</span>
+                                                <span wire:loading wire:target="setupOpenWaOtomatis">Menyiapkan OpenWA...</span>
+                                            </button>
+                                            <button type="button" wire:click="muatSesiOpenWa" wire:loading.attr="disabled" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 text-xs font-semibold cursor-pointer disabled:opacity-50">
+                                                📋 Muat Daftar Sesi
+                                            </button>
+                                        </div>
+
+                                        @if(!empty($openwaSessions))
+                                            <div class="pt-2 border-t border-white/10 space-y-1.5">
+                                                <p class="text-[10px] font-semibold text-ink-300">Pilih Sesi Tersedia:</p>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    @foreach($openwaSessions as $sess)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="pilihSesiOpenWa('{{ $sess['id'] }}')"
+                                                            class="px-2.5 py-1.5 rounded-lg text-[10px] font-mono border cursor-pointer transition {{ ($integrasiForm['wa_session'] ?? '') === ($sess['id'] ?? '') ? 'bg-up-primary/20 border-up-primary text-white' : 'bg-white/5 border-white/10 text-ink-300 hover:bg-white/10' }}"
+                                                        >
+                                                            {{ $sess['name'] }} ({{ $sess['status'] }})
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    <!-- QR Code & Pairing Code -->
+                                    @if(filled($integrasiForm['wa_session'] ?? '') && ! $sessionIsReady)
+                                        <div class="p-3.5 rounded-xl bg-black/25 border border-white/10 space-y-3">
+                                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                                <div>
+                                                    <p class="text-[11px] font-bold text-white">Tautkan Nomor WhatsApp Khusus</p>
+                                                    <p class="text-[10px] text-ink-400">Scan QR lewat WhatsApp HP → Perangkat Tertaut, atau gunakan Kode Pairing nomor HP.</p>
+                                                </div>
+                                                <button type="button" wire:click="getQrOpenWa" wire:loading.attr="disabled" class="px-3 py-1.5 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 border border-up-mint/30 text-up-mint text-xs font-bold cursor-pointer disabled:opacity-50">
+                                                    <span wire:loading.remove wire:target="getQrOpenWa">📷 Tampilkan / Muat QR</span>
+                                                    <span wire:loading wire:target="getQrOpenWa">Memuat QR...</span>
+                                                </button>
+                                            </div>
+
+                                            @if($openwaQrData !== '' && str_starts_with($openwaQrData, 'data:image/'))
+                                                <div class="flex flex-col sm:flex-row items-center gap-4 p-3 rounded-xl bg-white/[0.03] border border-white/10">
+                                                    <div class="p-2.5 rounded-xl bg-white shrink-0 shadow">
+                                                        <img src="{{ $openwaQrData }}" alt="QR Code Tautkan WhatsApp OpenWA" class="w-44 h-44 object-contain" />
+                                                    </div>
+                                                    <div class="text-[11px] text-ink-300 space-y-1.5">
+                                                        <p class="font-bold text-white">Cara Scan:</p>
+                                                        <ol class="list-decimal list-inside space-y-1 text-ink-400">
+                                                            <li>Buka WhatsApp pada nomor khusus toko/gateway.</li>
+                                                            <li>Ketuk menu <span class="text-ink-200">Perangkat Tertaut → Tautkan Perangkat</span>.</li>
+                                                            <li>Arahkan kamera ke QR ini; status akan otomatis berubah ke <span class="text-up-mint font-semibold">Terhubung &amp; Siap</span>.</li>
+                                                        </ol>
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            <div class="pt-2 border-t border-white/10 space-y-2">
+                                                <p class="text-[10px] font-semibold text-ink-300">Alternatif Tanpa Kamera (Kode Pairing 8 Karakter):</p>
+                                                <div class="flex flex-col sm:flex-row gap-2">
+                                                    <input type="text" wire:model="openwaPairingPhone" class="flex-1 px-3 py-2 rounded-xl glass-input text-xs font-mono" placeholder="Nomor WA gateway, mis. 081234567890" />
+                                                    <button type="button" wire:click="getPairingCodeOpenWa" wire:loading.attr="disabled" class="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-bold cursor-pointer disabled:opacity-50 shrink-0">
+                                                        🔑 Minta Kode Pairing
+                                                    </button>
+                                                </div>
+                                                @if($openwaPairingCode !== '')
+                                                    <div class="p-2.5 rounded-xl bg-up-mint/10 border border-up-mint/30 flex items-center justify-between gap-2">
+                                                        <span class="text-[11px] text-ink-200">Masukkan kode ini di WhatsApp HP:</span>
+                                                        <span class="px-3 py-1 rounded-lg bg-black/40 font-mono text-sm font-bold tracking-widest text-up-mint select-all">{{ $openwaPairingCode }}</span>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    <p class="text-[10px] text-up-amber/90 leading-relaxed">
+                                        ⚠️ OpenWA bukan API resmi Meta. Gunakan nomor WA khusus operasional toko (hangatkan bertahap), jangan logout sesi yang sudah berjalan lancar, dan pastikan kontainer <span class="font-mono">openwa-api</span> aktif di loopback VPS.
+                                    </p>
+                                </div>
+                            @endif
 
                             <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
                                 <h4 class="text-xs font-bold text-white">Pemicu Otomatis (Automation Triggers)</h4>

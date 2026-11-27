@@ -3,6 +3,18 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-27 — OpenWA Gateway: Audit Perbaikan, Enkripsi Kredensial & Manajemen UI 1-Klik
+
+- **Perbaikan Celah & Keandalan Gateway**:
+  - `WhatsAppGatewayService`: Normalisasi URL OpenWA (`normalizeOpenWaUrl()` menjamin akhiran `/api`), fallback otomatis ke `config('services.openwa')` saat konfigurasi DB kosong, pemetaan error HTTP `409`/`503`, dekripsi token dari DB (tetap kompatibel dengan nilai plaintext lama), dan metadata `retryable` untuk klasifikasi retry.
+  - `KirimNotifikasiJob`: Error transien (`409`, `429`, `502`–`504`, unreachable/timeout) kini memicu `$this->release($this->backoff)` dengan status tetap `pending` hingga batas `$tries = 3`, sedangkan error permanen (`401`/`403`/`404`/`500`) langsung menandai `gagal`.
+- **Manajemen OpenWA via Frontend (`Pengaturan → Integrasi`)**:
+  - `OpenWaManagerService`: Proxy backend ke OpenWA REST API (`/health/ready`, daftar/buat/start sesi, QR base64 `qrCode`, pairing code nomor Indonesia, pembuatan API key ber-role `operator` scoped lewat `allowedSessions`, dan proteksi path traversal `sessionId`).
+  - `SettingsRbac` & `settings-rbac.blade.php`: Setup otomatis 1-klik (membuat sesi UUID, start engine, mencetak operator key, dan menyimpan terenkripsi), indikator health & status sesi, modal/panel QR Code + polling otomatis hingga `ready`, kode pairing 8 karakter, validasi wajib `wa_session` saat memilih OpenWA, masking token di state Livewire (enkripsi `Crypt::encryptString` saat simpan), serta pencatatan uji kirim ke `NotifikasiKeluar`.
+- **Dokumentasi & Pengujian**:
+  - Memperbarui `deploy/openwa/README.md` & `.env.example` terkait prasyarat Docker Compose v2, pemakaian UUID sesi, dan alur setup UI.
+  - Menambahkan `tests/Feature/OpenWaManagerServiceTest.php` serta memperluas `tests/Feature/WhatsAppGatewayTest.php` dan `tests/Feature/PengaturanSistemIntegrationTest.php`.
+
 ## 2026-11-24 — Hybrid Database Sync: Audit Hardening, Akuntansi & Backoffice Parity
 
 - **Keamanan & Retry**:

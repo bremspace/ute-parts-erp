@@ -4,6 +4,8 @@ namespace App\Modules\Notifikasi\Services;
 
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PelangganService;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -25,7 +27,7 @@ class WhatsAppGatewayService
     ) {}
 
     /**
-     * @return array{ok: bool, provider: string, error: ?string, chat_id: ?string}
+     * @return array{ok: bool, provider: string, error: ?string, chat_id: ?string, retryable: bool}
      */
     public function kirim(?string $tujuan, string $pesan): array
     {
@@ -37,7 +39,7 @@ class WhatsAppGatewayService
      * agar tidak perlu menyimpan dulu ke tabel konfigurasi).
      *
      * @param  array<string, mixed>  $config
-     * @return array{ok: bool, provider: string, error: ?string, chat_id: ?string}
+     * @return array{ok: bool, provider: string, error: ?string, chat_id: ?string, retryable: bool}
      */
     public function kirimDenganConfig(array $config, ?string $tujuan, string $pesan): array
     {
@@ -49,6 +51,7 @@ class WhatsAppGatewayService
                 'provider' => $provider,
                 'error' => 'gateway WA belum dikonfigurasi. Atur kredensial gateway WA sebelum mengirim.',
                 'chat_id' => null,
+                'retryable' => false,
             ];
         }
 
@@ -68,7 +71,27 @@ class WhatsAppGatewayService
         $saved = $this->konfigurasi->get('wa_gateway_config');
 
         if (is_array($saved) && filled($saved['url'] ?? null) && filled($saved['token'] ?? null)) {
+            // Decrypt token if encrypted
+            if (filled($saved['token'])) {
+                try {
+                    $saved['token'] = Crypt::decryptString($saved['token']);
+                } catch (DecryptException) {
+                    // Legacy plaintext — use as-is
+                }
+            }
+
             return $saved;
+        }
+
+        // Fallback: check OpenWA .env config first, then generic WA
+        $openwa = config('services.openwa', []);
+        if (is_array($openwa) && filled($openwa['api_key'] ?? null)) {
+            return [
+                'provider' => self::PROVIDER_OPENWA,
+                'url' => $openwa['url'] ?? 'http://127.0.0.1:2785/api',
+                'token' => $openwa['api_key'],
+                'session' => $openwa['session'] ?? '',
+            ];
         }
 
         $env = config('services.wa', []);
@@ -81,7 +104,7 @@ class WhatsAppGatewayService
      * Header X-API-Key, body { chatId, text }.
      *
      * @param  array<string, mixed>  $config
-     * @return array{ok: bool, provider: string, error: ?string, chat_id: ?string}
+     * @return array{ok: bool, provider: string, error: ?string, chat_id: ?string, retryable: bool}
      */
     protected function kirimOpenWa(array $config, ?string $tujuan, string $pesan): array
     {
@@ -93,11 +116,24 @@ class WhatsAppGatewayService
                 'provider' => self::PROVIDER_OPENWA,
                 'error' => 'Format nomor WhatsApp tujuan tidak valid.',
                 'chat_id' => null,
+                'retryable' => false,
             ];
         }
 
-        $session = trim((string) ($config['session'] ?? '')) ?: 'default';
-        $base = rtrim((string) $config['url'], '/');
+        $session = trim((string) ($config['session'] ?? ''));
+        if ($session === '' || preg_match('/^[a-zA-Z0-9._-]+$/', $session) !== 1) {
+            return [
+                'ok' => false,
+                'provider' => self::PROVIDER_OPENWA,
+                'error' => $session === ''
+                    ? 'ID Sesi OpenWA belum diisi. Atur lewat Pengaturan → Integrasi.'
+                    : 'Format ID Sesi OpenWA tidak valid.',
+                'chat_id' => $chatId,
+                'retryable' => false,
+            ];
+        }
+
+        $base = self::normalizeOpenWaUrl((string) $config['url']);
         $timeout = (int) ($config['timeout'] ?? config('services.openwa.timeout', 20));
 
         try {
@@ -120,6 +156,7 @@ class WhatsAppGatewayService
                 'provider' => self::PROVIDER_OPENWA,
                 'error' => 'Gateway OpenWA tidak dapat dihubungi: '.$e->getMessage(),
                 'chat_id' => $chatId,
+                'retryable' => true,
             ];
         }
 
@@ -129,6 +166,7 @@ class WhatsAppGatewayService
                 'provider' => self::PROVIDER_OPENWA,
                 'error' => null,
                 'chat_id' => $chatId,
+                'retryable' => false,
             ];
         }
 
@@ -139,11 +177,14 @@ class WhatsAppGatewayService
             'http' => $response->status(),
         ]);
 
-        $pesanError = match ($response->status()) {
-            401, 403 => 'OpenWA menolak API key (HTTP '.$response->status().'). Periksa API key / scope sesi.',
-            404 => 'Sesi OpenWA tidak ditemukan (HTTP 404). Periksa ID sesi.',
+        $status = $response->status();
+        $pesanError = match ($status) {
+            401, 403 => 'OpenWA menolak API key (HTTP '.$status.'). Periksa API key / scope sesi.',
+            404 => 'Sesi OpenWA tidak ditemukan (HTTP 404). Periksa ID sesi (UUID) di Pengaturan → Integrasi.',
+            409 => 'Sesi OpenWA belum ready (HTTP 409). Scan QR dulu lewat Pengaturan → Integrasi.',
             429 => 'OpenWA membatasi laju kirim (HTTP 429). Coba lagi nanti.',
-            default => 'OpenWA error HTTP '.$response->status().'.',
+            503 => 'OpenWA sedang restart / tidak siap (HTTP 503). Coba lagi nanti.',
+            default => 'OpenWA error HTTP '.$status.'.',
         };
 
         return [
@@ -151,6 +192,7 @@ class WhatsAppGatewayService
             'provider' => self::PROVIDER_OPENWA,
             'error' => $pesanError,
             'chat_id' => $chatId,
+            'retryable' => in_array($status, [409, 429, 502, 503, 504], true),
         ];
     }
 
@@ -158,7 +200,7 @@ class WhatsAppGatewayService
      * Provider gaya Fonnte/Wablas: Authorization header + {target, message}.
      *
      * @param  array<string, mixed>  $config
-     * @return array{ok: bool, provider: string, error: ?string, chat_id: ?string}
+     * @return array{ok: bool, provider: string, error: ?string, chat_id: ?string, retryable: bool}
      */
     protected function kirimGeneric(array $config, ?string $tujuan, string $pesan): array
     {
@@ -170,6 +212,7 @@ class WhatsAppGatewayService
                 'provider' => (string) ($config['provider'] ?? 'custom'),
                 'error' => 'Format nomor WhatsApp tujuan tidak valid.',
                 'chat_id' => null,
+                'retryable' => false,
             ];
         }
 
@@ -187,6 +230,7 @@ class WhatsAppGatewayService
                 'provider' => (string) ($config['provider'] ?? 'custom'),
                 'error' => 'Gateway WA tidak dapat dihubungi: '.$e->getMessage(),
                 'chat_id' => $target,
+                'retryable' => true,
             ];
         }
 
@@ -196,14 +240,18 @@ class WhatsAppGatewayService
                 'provider' => (string) ($config['provider'] ?? 'custom'),
                 'error' => null,
                 'chat_id' => $target,
+                'retryable' => false,
             ];
         }
+
+        $status = $response->status();
 
         return [
             'ok' => false,
             'provider' => (string) ($config['provider'] ?? 'custom'),
-            'error' => 'Gateway WA error HTTP '.$response->status().'.',
+            'error' => 'Gateway WA error HTTP '.$status.'.',
             'chat_id' => $target,
+            'retryable' => in_array($status, [429, 502, 503, 504], true),
         ];
     }
 
@@ -229,6 +277,17 @@ class WhatsAppGatewayService
         }
 
         return $kanonik;
+    }
+
+    /**
+     * Normalize OpenWA base URL: strip trailing slashes, ensure ends with /api.
+     */
+    public static function normalizeOpenWaUrl(string $url): string
+    {
+        $url = rtrim(trim($url), '/');
+        $url = preg_replace('#/api$#i', '', $url) ?? $url;
+
+        return $url.'/api';
     }
 
     /**
