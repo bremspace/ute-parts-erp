@@ -19,40 +19,10 @@
         else if (['po', 'grn', 'retur', 'histori_po'].includes(value)) subModul = 'pengadaan';
     })"
 >
-    <!-- Header with 2-Tier Sub-Modul Tabs and Actions (No Overlapping on Mobile/Desktop) -->
+    <div>
+    <!-- Header dengan quick action; navigasi ada di sidebar -->
     <div class="border-b border-black/10 dark:border-white/5 pb-4 space-y-3">
-        <!-- Tier 1: Sub-Modul Selector & Desktop Quick Actions -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div class="flex items-center gap-1 p-1 bg-black/5 dark:bg-white/[0.04] rounded-2xl border border-black/10 dark:border-white/5 w-full sm:w-auto overflow-x-auto scrollbar-none flex-nowrap">
-                <button
-                    type="button"
-                    @click="setSubModul('inventori')"
-                    :class="subModul === 'inventori' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
-                    class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer"
-                >
-                    <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg>
-                    <span>Inventori</span>
-                </button>
-                <button
-                    type="button"
-                    @click="setSubModul('operasional')"
-                    :class="subModul === 'operasional' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
-                    class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer"
-                >
-                    <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>
-                    <span>Operasional</span>
-                </button>
-                <button
-                    type="button"
-                    @click="setSubModul('pengadaan')"
-                    :class="subModul === 'pengadaan' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
-                    class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer"
-                >
-                    <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2m9 0H9m5 0a2 2 0 1 0 4 0m-4 0a2 2 0 1 1 4 0m0 0h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14M6 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm11 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
-                    <span>Pengadaan</span>
-                </button>
-            </div>
-
             <!-- Tab-specific Quick Action (Desktop) -->
             <div class="hidden lg:flex items-center gap-2 flex-shrink-0">
                 @if(in_array($activeTab, ['produk', 'stok']))
@@ -161,105 +131,6 @@
                 @endif
             </div>
         </div>
-
-        <!-- Tier 2: Contextual Sub-Nav Tabs & Mobile Actions -->
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
-            <!-- Contextual Tabs: smooth horizontal scroll on mobile, scrollbar-none, touch-pan-x -->
-            <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:mx-0 sm:px-0 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x overscroll-x-contain">
-                <!-- Group: Inventori -->
-                <div x-show="subModul === 'inventori'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0">
-                    <a
-                        href="{{ url('/app/wms/produk') }}"
-                        wire:click.prevent="pindahTab('produk')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer inline-flex items-center justify-center {{ in_array($activeTab, ['produk', 'stok']) ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        Master Produk & Stok
-                    </a>
-
-                    <!-- Tab Monitoring Margin & Harga (Khusus Owner / Super Admin) -->
-                    @if(function_exists('isSuperAdminOrOwner') && (isSuperAdminOrOwner() || auth()->user()?->can('pengaturan.manage')))
-                    <a
-                        href="{{ url('/app/wms/monitoring_harga') }}"
-                        wire:click.prevent="pindahTab('monitoring_harga')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer inline-flex items-center justify-center gap-1.5 {{ $activeTab === 'monitoring_harga' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                        title="Monitoring Margin & Guard Anti-Rugi Harga Jual"
-                    >
-                        <span>🛡️</span>
-                        <span>Monitoring Margin &amp; Harga</span>
-                    </a>
-                    @endif
-
-                    <!-- Tombol Auto ABC WMS Seluruh Produk (Sejajar dengan Master Produk & Stok) -->
-                    @can('wms.create')
-                    <button
-                        type="button"
-                        @click="if (confirm('Jalankan klasifikasi otomatis kelas WMS (ABC Pareto) dan parameter ROP / Min-Max untuk seluruh master produk aktif berdasarkan pergerakan 90 hari terakhir?')) $dispatch('wms-auto-abc')"
-                        class="px-3 sm:px-3.5 py-2 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer whitespace-nowrap min-h-[44px]"
-                        title="Kalkulasi otomatis kelas ABC dan parameter restock seluruh produk"
-                    >
-                        <span>⚡ Auto ABC (WMS)</span>
-                    </button>
-                    @endcan
-                </div>
-
-                <!-- Group: Operasional -->
-                <div x-show="subModul === 'operasional'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0" x-cloak>
-                    <a
-                        href="{{ url('/app/wms/transfer') }}"
-                        wire:click.prevent="pindahTab('transfer')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer inline-flex items-center justify-center {{ $activeTab === 'transfer' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        Transfer Antar Gudang
-                    </a>
-                    <a
-                        href="{{ url('/app/wms/opname') }}"
-                        wire:click.prevent="pindahTab('opname')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer inline-flex items-center justify-center {{ $activeTab === 'opname' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        Stock Opname
-                    </a>
-                    {{-- [F3-7] Cycle count — halaman terpisah (bukan tab child) --}}
-                    <a
-                        href="{{ route('wms.cycle-count') }}"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 inline-flex items-center cursor-pointer"
-                        title="Jadwal & task cycle count otomatis"
-                    >
-                        Cycle Count
-                    </a>
-                </div>
-
-                <!-- Group: Pengadaan -->
-                <div x-show="subModul === 'pengadaan'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0 pr-2 sm:pr-0" x-cloak>
-                    <a
-                        href="{{ url('/app/wms/po') }}"
-                        wire:click.prevent="pindahTab('po')"
-                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 inline-flex items-center justify-center {{ $activeTab === 'po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        PO & Supplier
-                    </a>
-                    <a
-                        href="{{ url('/app/wms/grn') }}"
-                        wire:click.prevent="pindahTab('grn')"
-                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 inline-flex items-center justify-center {{ $activeTab === 'grn' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        GRN
-                    </a>
-                    <a
-                        href="{{ url('/app/wms/retur') }}"
-                        wire:click.prevent="pindahTab('retur')"
-                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 inline-flex items-center justify-center {{ $activeTab === 'retur' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        Retur Pembelian
-                    </a>
-                    <a
-                        href="{{ url('/app/wms/histori_po') }}"
-                        wire:click.prevent="pindahTab('histori_po')"
-                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 inline-flex items-center justify-center {{ $activeTab === 'histori_po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        Histori Pengadaan
-                    </a>
-                </div>
-            </div>
 
             <!-- Tab-specific Quick Action (Mobile/Tablet) -->
             <div class="lg:hidden w-full flex-shrink-0">

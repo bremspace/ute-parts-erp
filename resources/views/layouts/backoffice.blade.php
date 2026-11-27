@@ -267,32 +267,53 @@
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
                         @php
-                            $isWmsInventori = request()->is('app/wms*') && (
-                                request('sub') === 'inventori' ||
-                                in_array(request('tab'), ['produk', 'stok', 'monitoring_harga']) ||
-                                (!request()->has('sub') && !request()->has('tab') && !request()->is('app/wms/cycle-count*'))
-                            );
-                            $isWmsOperasional = request()->is('app/wms*') && (
-                                request('sub') === 'operasional' ||
-                                in_array(request('tab'), ['transfer', 'opname']) ||
-                                request()->is('app/wms/cycle-count*')
-                            );
-                            $isWmsPengadaan = request()->is('app/wms*') && (
-                                request('sub') === 'pengadaan' ||
-                                in_array(request('tab'), ['po', 'grn', 'retur', 'histori_po'])
-                            );
+                            $subLinkClass = 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors';
+                            $subLinkIdle = 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5';
+                            $subLinkActive = 'bg-up-primary text-white font-semibold';
+                            $wmsTab = (string) request('tab');
+                            $wmsSub = (string) request('sub');
                         @endphp
-                        <a href="/app/wms?sub=inventori" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWmsInventori ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $isWmsInventori ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                            <span>Inventori</span>
-                        </a>
-                        <a href="/app/wms?sub=operasional" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWmsOperasional ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $isWmsOperasional ? 'bg-white' : 'bg-up-mint/60' }}"></span>
-                            <span>Operasional</span>
-                        </a>
-                        <a href="/app/wms?sub=pengadaan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWmsPengadaan ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $isWmsPengadaan ? 'bg-white' : 'bg-up-accent/60' }}"></span>
-                            <span>Pengadaan</span>
+
+                        <div x-data="{ open: {{ (in_array($wmsTab, ['produk','stok','monitoring_harga']) || $wmsSub === 'inventori') ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-primary/60"></span>Inventori</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/wms/produk" class="{{ $subLinkClass }} {{ $wmsTab === 'produk' ? $subLinkActive : $subLinkIdle }}">Master Produk &amp; Stok</a>
+                                <a href="/app/wms/stok" class="{{ $subLinkClass }} {{ $wmsTab === 'stok' ? $subLinkActive : $subLinkIdle }}">Stok per Gudang</a>
+                                <a href="/app/wms/monitoring_harga" class="{{ $subLinkClass }} {{ $wmsTab === 'monitoring_harga' ? $subLinkActive : $subLinkIdle }}">Monitoring Margin &amp; Harga</a>
+                                <a href="/app/wms/import-export" class="{{ $subLinkClass }} {{ request()->is('app/wms/import-export*') ? $subLinkActive : $subLinkIdle }}">Import / Export Master</a>
+                                <a href="/app/wms/import-foto" class="{{ $subLinkClass }} {{ request()->is('app/wms/import-foto*') ? $subLinkActive : $subLinkIdle }}">Import Foto Produk</a>
+                            </div>
+                        </div>
+
+                        <div x-data="{ open: {{ (in_array($wmsTab, ['transfer','opname']) || request()->is('app/wms/cycle-count*') || $wmsSub === 'operasional') ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-mint/60"></span>Operasional</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/wms/transfer" class="{{ $subLinkClass }} {{ $wmsTab === 'transfer' ? $subLinkActive : $subLinkIdle }}">Transfer Stok</a>
+                                <a href="/app/wms/opname" class="{{ $subLinkClass }} {{ $wmsTab === 'opname' ? $subLinkActive : $subLinkIdle }}">Stock Opname</a>
+                                <a href="/app/wms/cycle-count" class="{{ $subLinkClass }} {{ request()->is('app/wms/cycle-count*') ? $subLinkActive : $subLinkIdle }}">Cycle Count</a>
+                            </div>
+                        </div>
+
+                        <div x-data="{ open: {{ (in_array($wmsTab, ['po','grn','retur','histori_po']) || $wmsSub === 'pengadaan') ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-accent/60"></span>Pengadaan</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/wms/po" class="{{ $subLinkClass }} {{ $wmsTab === 'po' ? $subLinkActive : $subLinkIdle }}">Purchase Order</a>
+                                <a href="/app/wms/grn" class="{{ $subLinkClass }} {{ $wmsTab === 'grn' ? $subLinkActive : $subLinkIdle }}">Penerimaan Barang (GRN)</a>
+                                <a href="/app/wms/retur" class="{{ $subLinkClass }} {{ $wmsTab === 'retur' ? $subLinkActive : $subLinkIdle }}">Retur Pembelian</a>
+                                <a href="/app/wms/histori_po" class="{{ $subLinkClass }} {{ $wmsTab === 'histori_po' ? $subLinkActive : $subLinkIdle }}">Histori Pengadaan</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div x-show="isDropdownOpen('wms')"
                         </a>
                     </div>
                 </div>
