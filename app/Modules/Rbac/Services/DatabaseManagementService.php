@@ -213,13 +213,26 @@ class DatabaseManagementService
     /**
      * Restore database dari file .sql.gz, .sql, atau .zip (Full Snapshot) lokal server.
      */
-    public function restore(string $filePath, ?string $targetDatabase = null): array
+    public function restore(string $filePath, ?string $targetDatabase = null, ?string $appKey = null): array
     {
         @set_time_limit(1800);
         @ini_set('memory_limit', '512M');
 
         if (! File::exists($filePath)) {
             throw new RuntimeException("File backup tidak ditemukan: {$filePath}");
+        }
+
+        // Backup .sql.gz tidak membawa APP_KEY. Untuk restore antar-server,
+        // kunci sumber wajib diisi agar field terenkripsi bisa dibaca (tidak "MAC is invalid").
+        $manualAppKey = null;
+        if (is_string($appKey) && trim($appKey) !== '') {
+            $manualAppKey = trim($appKey);
+            $decoded = str_starts_with($manualAppKey, 'base64:')
+                ? base64_decode(substr($manualAppKey, 7), true)
+                : false;
+            if ($decoded === false || strlen($decoded) !== 32) {
+                throw new RuntimeException('APP_KEY tidak valid. Gunakan kunci format base64:... (32 byte) dari .env server sumber.');
+            }
         }
 
         $connName = config('database.default');
@@ -340,6 +353,20 @@ class DatabaseManagementService
             @unlink($tempSql);
             if ($tempExtractDir && File::isDirectory($tempExtractDir)) {
                 File::deleteDirectory($tempExtractDir);
+            }
+        }
+
+        // APP_KEY manual untuk backup .sql.gz dari server lain.
+        // Tidak dipakai saat restore ke database target inspeksi.
+        if ($manualAppKey && ! $isCustomTarget) {
+            try {
+                if ($this->updateService->updateEnv(['APP_KEY' => $manualAppKey])) {
+                    $appKeySynced = true;
+                } else {
+                    Log::warning('Sinkronisasi APP_KEY manual gagal: .env tidak dapat ditulisi.');
+                }
+            } catch (Throwable $e) {
+                Log::warning('Sinkronisasi APP_KEY manual dilewati: '.$e->getMessage());
             }
         }
 

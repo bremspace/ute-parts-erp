@@ -291,6 +291,13 @@
                 </div>
 
                 <div>
+                    <label class="block text-xs font-semibold text-ink-300 mb-1">APP_KEY Server Sumber <span class="font-normal text-ink-500">(opsional, untuk .sql.gz dari server lain)</span></label>
+                    <input type="password" wire:model="restoreAppKey" placeholder="base64:..." autocomplete="off"
+                        class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs font-mono text-white focus:border-up-primary focus:ring-0">
+                    <p class="mt-1 text-[11px] text-ink-500">Isi kalau backup berasal dari server lain. Tanpa ini, data terenkripsi akan error &quot;MAC is invalid&quot;.</p>
+                </div>
+
+                <div>
                     <label class="block text-xs font-semibold text-ink-300 mb-1">Masukkan Kata Sandi Anda untuk Otorisasi:</label>
                     <input type="password" wire:model="confirmPassword" placeholder="Kata sandi akun saat ini"
                         class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-primary focus:ring-0">

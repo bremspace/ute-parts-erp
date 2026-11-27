@@ -21,6 +21,8 @@ class DatabaseManagement extends Component
 
     public string $confirmPassword = '';
 
+    public string $restoreAppKey = '';
+
     public string $confirmResetText = '';
 
     public bool $showResetModal = false;
@@ -527,9 +529,10 @@ class DatabaseManagement extends Component
         }
 
         try {
-            $res = $dbService->restore($targetPath);
+            $res = $dbService->restore($targetPath, null, $this->restoreAppKey ?: null);
             $this->showRestoreModal = false;
             $this->confirmPassword = '';
+            $this->restoreAppKey = '';
             $this->uploadedBackupFile = null;
 
             $extraMsg = '';

@@ -51,6 +51,21 @@ class DatabaseManagementEnterpriseTest extends TestCase
         }
     }
 
+    public function test_restore_menolak_app_key_tidak_valid(): void
+    {
+        $service = app(DatabaseManagementService::class);
+        $dummy = $service->getBackupDirectory().DIRECTORY_SEPARATOR.'dummy-app-key-invalid.sql.gz';
+        file_put_contents($dummy, 'dummy');
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('APP_KEY tidak valid');
+            $service->restore($dummy, null, 'bukan-kunci');
+        } finally {
+            @unlink($dummy);
+        }
+    }
+
     public function test_kasir_dilarang_mengakses_database_management(): void
     {
         $this->actingAs($this->kasir);
