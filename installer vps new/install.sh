@@ -148,13 +148,34 @@ render "${CFG_DIR}/php-fpm-www.conf.tpl" /etc/php/${PHP_VERSION}/fpm/pool.d/www.
     PHP_MAX_CHILDREN "$PHP_MAX_CHILDREN" \
     PHP_START_SERVERS "$PHP_START_SERVERS" \
     PHP_MIN_SPARE "$PHP_MIN_SPARE" \
-    PHP_MAX_SPARE "$PHP_MAX_SPARE" \
-    TIMEZONE "$TIMEZONE"
+    PHP_MAX_SPARE "$PHP_MAX_SPARE"
 
-log "Uji konfigurasi PHP-FPM..."
-if ! "$PHP_FPM_BIN" -t 2>&1 | tee /tmp/ute-php-fpm-test.log; then
-    fail "Konfigurasi PHP-FPM tidak valid. Perbaiki /etc/php/${PHP_VERSION}/fpm/pool.d/www.conf lalu jalankan ulang installer."
+log "Uji & auto-fix konfigurasi PHP-FPM..."
+FPM_CONF="/etc/php/${PHP_VERSION}/fpm/pool.d/www.conf"
+FPM_OK=no
+for _attempt in 1 2 3 4 5 6; do
+    if "$PHP_FPM_BIN" -t > /tmp/ute-php-fpm-test.log 2>&1; then
+        FPM_OK=yes
+        break
+    fi
+
+    cat /tmp/ute-php-fpm-test.log
+    unknown_key="$(grep -o "unknown entry '[^']*'" /tmp/ute-php-fpm-test.log \
+        | head -1 | sed -E "s/.*'([^']*)'.*/\1/" || true)"
+
+    if [[ -z "$unknown_key" ]]; then
+        fail "Konfigurasi PHP-FPM tidak valid dengan error di atas (bukan directive unknown)."
+    fi
+
+    warn "PHP-FPM ${PHP_VERSION} tidak mengenal '$unknown_key' — menghapus otomatis..."
+    strip_fpm_directive "$FPM_CONF" "$unknown_key"
+done
+
+if [[ "$FPM_OK" != "yes" ]]; then
+    cat /tmp/ute-php-fpm-test.log
+    fail "Gagal auto-fix konfigurasi PHP-FPM setelah beberapa percobaan."
 fi
+ok "Konfigurasi PHP-FPM valid."
 
 service_restart "$PHP_FPM_SERVICE"
 
