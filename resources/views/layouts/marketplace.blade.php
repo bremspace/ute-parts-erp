@@ -129,7 +129,13 @@
         $identityPosition = $webConfig['store_identity_position'] ?? 'footer';
         $storePhone = trim((string) ($webConfig['store_phone'] ?? ''));
         $storeAddress = trim((string) ($webConfig['store_address'] ?? ''));
-        $storeTel = preg_replace('/[^0-9+]/', '', $storePhone);
+
+        // Satu sumber nomor & pesan untuk kontak header/footer dan tombol mengapung.
+        // Jika wa_number belum diisi CMS, pakai store_phone — jangan pakai nomor contoh.
+        $waTujuan = $webConfig['wa_number'] ?? $storePhone;
+        $waPesanDasar = trim((string) ($webConfig['wa_default_msg'] ?? ('Halo Admin '.config('app.name', 'UTEParts').', saya ingin tanya produk...')));
+        $waPesan = $waPesanDasar."\n\nSumber: ".url()->full();
+        $waLink = \App\Support\WhatsAppHelper::buatLink($waTujuan, $waPesan);
     @endphp
     @if (in_array($identityPosition, ['header', 'both'], true) && ($storePhone || $storeAddress))
         <div class="border-b border-slate-200/70 dark:border-white/[0.06] bg-white/70 dark:bg-[#0B1120]/70 backdrop-blur">
@@ -153,7 +159,7 @@
                     @if ($storeAddress)
                         <span class="hidden sm:block w-px h-7 bg-slate-200 dark:bg-white/10"></span>
                     @endif
-                    <a href="tel:{{ $storeTel }}" class="flex items-center gap-2.5 group min-w-0 sm:ml-auto">
+                    <a href="{{ $waLink }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 group min-w-0 sm:ml-auto">
                         <span class="w-7 h-7 shrink-0 rounded-full bg-up-mint/15 text-up-mint flex items-center justify-center">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.5-1.2c-.477-.127-.97.062-1.228.456l-.836 1.253a14.966 14.966 0 01-6.518-6.518l1.253-.836c.394-.258.583-.751.456-1.228l-1.2-4.5A2.25 2.25 0 005.023 2.25H3.75a2.25 2.25 0 00-2.25 2.25v2.25z"/>
@@ -659,7 +665,7 @@
                             </div>
                         @endif
                         @if ($storePhone)
-                            <a href="tel:{{ $storeTel }}" class="flex items-center gap-2.5 group">
+                            <a href="{{ $waLink }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 group">
                                 <span class="w-6 h-6 shrink-0 rounded-full bg-up-mint/15 text-up-mint flex items-center justify-center">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.5-1.2c-.477-.127-.97.062-1.228.456l-.836 1.253a14.966 14.966 0 01-6.518-6.518l1.253-.836c.394-.258.583-.751.456-1.228l-1.2-4.5A2.25 2.25 0 005.023 2.25H3.75a2.25 2.25 0 00-2.25 2.25v2.25z"/>
@@ -699,9 +705,8 @@
     <!-- Floating WhatsApp Action (@emil-design-eng tactile) -->
     @if ($webConfig['wa_floating_active'] ?? true)
         @php
-            $waNum = preg_replace('/[^0-9]/', '', $webConfig['wa_number'] ?? '6281234567890');
-            $waMsg = urlencode($webConfig['wa_default_msg'] ?? ('Halo Admin ' . config('app.name', 'Bremspace') . ', saya ingin tanya produk...'));
-            $waUrl = "https://wa.me/{$waNum}?text={$waMsg}";
+            // Memakai $waLink dari blok identitas: nomor sama, pesan sama, rujukan URL sama.
+            $waUrl = $waLink;
         @endphp
         <div class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-40 group"
              x-data="{ showTooltip: false }">

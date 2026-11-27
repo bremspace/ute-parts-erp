@@ -12,6 +12,7 @@ class UteRestoreCommand extends Command
         {file? : Nama berkas backup .sql.gz di storage/app/backups atau path absolut}
         {--target-db= : Target nama database MySQL (misal uteparts_test_restore untuk inspeksi tanpa menimpa database utama)}
         {--latest : Otomatis pulihkan dari file backup paling mutakhir}
+        {--app-key= : APP_KEY server sumber saat restore berkas .sql.gz dari server lain}
         {--force : Lewati konfirmasi manual}';
 
     protected $description = 'Restore database Ute Parts dari berkas backup (.sql.gz)';
@@ -76,10 +77,10 @@ class UteRestoreCommand extends Command
         $this->info('Memulai proses restore database...');
 
         try {
-            $result = $dbService->restore($targetPath, $targetDb);
+            $result = $dbService->restore($targetPath, $targetDb, $this->option('app-key'));
             $this->info("Restore berhasil dari berkas: {$result['restored_from']} ke database '{$result['target_database']}'");
             if (! empty($result['app_key_synced'])) {
-                $this->info('✓ Kunci enkripsi APP_KEY di .env berhasil disinkronkan otomatis dari snapshot manifest.');
+                $this->info('✓ APP_KEY server sumber berhasil disinkronkan ke .env.');
             }
             if (! empty($result['media_restored'])) {
                 $this->info('✓ Seluruh berkas media storage/app/public berhasil diekstrak & symlink diperbarui.');

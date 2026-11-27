@@ -18,7 +18,7 @@ class WebKonsumenSeeder extends Seeder
             [
                 'group_key' => 'branding',
                 'setting_key' => 'store_logo_url',
-                'setting_value' => '/icons/icon.svg',
+                'setting_value' => '/images/ut-mark.svg',
                 'value_type' => 'image',
                 'deskripsi' => 'URL logo toko resmi',
             ],
@@ -208,7 +208,7 @@ class WebKonsumenSeeder extends Seeder
             [
                 'group_key' => 'contact',
                 'setting_key' => 'wa_number',
-                'setting_value' => '6281234567890',
+                'setting_value' => '6281299505350',
                 'value_type' => 'string',
                 'deskripsi' => 'Nomor WhatsApp resmi Customer Service',
             ],

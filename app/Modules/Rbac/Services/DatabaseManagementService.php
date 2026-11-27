@@ -222,6 +222,19 @@ class DatabaseManagementService
             throw new RuntimeException("File backup tidak ditemukan: {$filePath}");
         }
 
+        // Backup .sql.gz tidak membawa APP_KEY. Untuk restore antar-server,
+        // kunci sumber wajib diisi agar field terenkripsi bisa dibaca (tidak "MAC is invalid").
+        $manualAppKey = null;
+        if (is_string($appKeyOverride) && trim($appKeyOverride) !== '') {
+            $manualAppKey = trim($appKeyOverride);
+            $decoded = str_starts_with($manualAppKey, 'base64:')
+                ? base64_decode(substr($manualAppKey, 7), true)
+                : false;
+            if ($decoded === false || strlen($decoded) !== 32) {
+                throw new RuntimeException('APP_KEY tidak valid. Gunakan kunci format base64:... (32 byte) dari .env server sumber.');
+            }
+        }
+
         $connName = config('database.default');
         $conn = config("database.connections.{$connName}");
         $driver = $conn['driver'] ?? 'mysql';
@@ -232,34 +245,6 @@ class DatabaseManagementService
         }
 
         $appKeySynced = false;
-
-        // APP_KEY bisa diisi manual saat backup bukan Full Snapshot ZIP.
-        // Data terenkripsi (2FA, kredensial gateway, dll.) hanya bisa dibaca
-        // dengan kunci yang sama seperti saat backup dibuat.
-        if (! empty($appKeyOverride)) {
-            $key = trim($appKeyOverride);
-            $decoded = str_starts_with($key, 'base64:')
-                ? base64_decode(substr($key, 7), true)
-                : false;
-
-            if ($decoded === false || strlen($decoded) !== 32) {
-                throw new RuntimeException('APP_KEY tidak valid. Gunakan nilai lengkap dari .env produksi (base64:...).');
-            }
-
-            if (config('app.key') !== $key) {
-                try {
-                    if ($this->updateService->updateEnv(['APP_KEY' => $key])) {
-                        $appKeySynced = true;
-                        config(['app.key' => $key]);
-                        app()->forgetInstance('encrypter');
-                    } else {
-                        Log::warning('Gagal sinkronisasi APP_KEY override: .env tidak writable.');
-                    }
-                } catch (Throwable $e) {
-                    Log::warning('Gagal sinkronisasi APP_KEY override: '.$e->getMessage());
-                }
-            }
-        }
 
         // 1. Ambil emergency pre-restore snapshot otomatis (hanya jika menimpa database utama)
         $preBackup = null;
@@ -371,6 +356,20 @@ class DatabaseManagementService
             @unlink($tempSql);
             if ($tempExtractDir && File::isDirectory($tempExtractDir)) {
                 File::deleteDirectory($tempExtractDir);
+            }
+        }
+
+        // APP_KEY manual untuk backup .sql.gz dari server lain.
+        // Tidak dipakai saat restore ke database target inspeksi.
+        if ($manualAppKey && ! $isCustomTarget) {
+            try {
+                if ($this->updateService->updateEnv(['APP_KEY' => $manualAppKey])) {
+                    $appKeySynced = true;
+                } else {
+                    Log::warning('Sinkronisasi APP_KEY manual gagal: .env tidak dapat ditulisi.');
+                }
+            } catch (Throwable $e) {
+                Log::warning('Sinkronisasi APP_KEY manual dilewati: '.$e->getMessage());
             }
         }
 

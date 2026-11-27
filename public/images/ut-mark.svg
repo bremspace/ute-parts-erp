@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="t">
+  <title id="t">UT monogram — UTEPARTS</title>
+
+  <!-- Flat ink badge. No gradients, no glow: drawn like a stamped shop mark. -->
+  <rect x="8" y="8" width="240" height="240" rx="46" fill="#101827"/>
+  <rect x="17" y="17" width="222" height="222" rx="39" fill="none" stroke="#F5EFE2" stroke-opacity="0.22" stroke-width="2"/>
+
+  <!-- Hand-set UT. Slightly uneven curves and slant, like brush lettering. -->
+  <g fill="none" stroke="#F5EFE2" stroke-width="19" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M69 73 L69 143 C69 168 83 184 105 183 C127 182 141 167 141 142 L141 73"/>
+    <path d="M155 77 L204 74"/>
+    <path d="M180 79 L177 183"/>
+  </g>
+
+  <!-- One warm tip on the T bar: the only colour accent. -->
+  <path d="M192 75 L204 74" fill="none" stroke="#E8873B" stroke-width="19" stroke-linecap="round"/>
+
+  <!-- Two tiny ink nicks, kept irregular so the mark reads hand-made. -->
+  <path d="M62 143 L62 149" stroke="#F5EFE2" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+  <path d="M185 168 L185 174" stroke="#E8873B" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+</svg>

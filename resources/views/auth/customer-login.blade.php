@@ -13,9 +13,9 @@
 @php
     $bgImage = $webConfig['customer_login_bg_image'] ?? '';
     $overlayMode = $webConfig['customer_login_bg_overlay'] ?? 'scrim_dark';
-    $waNumber = $webConfig['wa_number'] ?? '6281234567890';
-    $waNumberClean = preg_replace('/[^0-9]/', '', $waNumber);
-    $waMsg = urlencode("Halo Admin " . config('app.name', 'Bremspace') . ", saya lupa kata sandi akun pelanggan saya. Mohon bantuan reset kata sandi.");
+    $waNumber = $webConfig['wa_number'] ?? ($webConfig['store_phone'] ?? null);
+    $waMsg = "Halo Admin ".config('app.name', 'UTEParts').", saya lupa kata sandi akun pelanggan saya. Mohon bantuan reset kata sandi.\n\nSumber: ".url()->full();
+    $waUrl = \App\Support\WhatsAppHelper::buatLink($waNumber, $waMsg);
 @endphp
 <body class="bg-[#0B0F19] text-ink-900 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
     <!-- Dynamic Custom Background Foto & Scrim Overlay -->
@@ -80,7 +80,7 @@
                             Kata Sandi
                         </label>
                         <!-- Trigger Pop-up Info Lupa Kata Sandi via CS WhatsApp / Toko -->
-                        <a href="https://wa.me/{{ $waNumberClean }}?text={{ $waMsg }}" target="_blank" rel="noopener noreferrer"
+                        <a href="{{ $waUrl }}" target="_blank" rel="noopener noreferrer"
                            class="text-[11px] font-semibold text-up-primary hover:text-up-primary-dark dark:hover:text-indigo-400 transition-colors">
                             Lupa kata sandi?
                         </a>
