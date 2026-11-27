@@ -890,8 +890,28 @@ if (-not (Test-Path $pubStorage)) {
     Write-Host " [OK] Symlink berkas publik storage:link dibuat." -ForegroundColor Green
 }
 
-# 6h. Bersihkan Cache Framework
+# 6h. Hapus public/hot sisa dev server jika ada & Bersihkan Cache Framework
+$pubHot = Join-Path $projectRoot 'public\hot'
+if (Test-Path $pubHot) { Remove-Item -Path $pubHot -Force -ErrorAction SilentlyContinue }
 & $phpExe $artisan optimize:clear 2>$null | Out-Null
+
+# 6i. Build ulang asset Vite jika belum ada manifest atau diminta -ForceRebuildAssets
+$manifestPath = Join-Path $projectRoot 'public\build\manifest.json'
+if ($hasNode -and ($ForceRebuildAssets -or -not (Test-Path $manifestPath))) {
+    Write-Host " [INFO] Mengompilasi asset frontend (npm run build)..." -ForegroundColor Cyan
+    Push-Location $projectRoot
+    try {
+        if (-not (Test-Path (Join-Path $projectRoot 'node_modules'))) {
+            & npm.cmd install --no-audit --no-fund --ignore-scripts 2>$null | Out-Null
+        }
+        & npm.cmd run build 2>$null | Out-Null
+        Write-Host " [OK] Asset frontend berhasil dikompilasi." -ForegroundColor Green
+    } catch {
+        Write-Host " [PERINGATAN] Gagal kompilasi asset via npm; menggunakan asset bawaan." -ForegroundColor Yellow
+    } finally {
+        Pop-Location
+    }
+}
 
 # ==============================================================================
 # 7. Menyalakan Web Server & Membuka Antarmuka Aplikasi
@@ -955,12 +975,12 @@ if (-not (Test-Path $storageLogs)) {
     New-Item -ItemType Directory -Path $storageLogs -Force | Out-Null
 }
 
-# Jalankan PHP Built-in Server di Background dengan server.php
+# Jalankan PHP Built-in Server di Background dengan -t public dan server.php
+$docRoot = Join-Path $projectRoot 'public'
 $serverProc = $null
 if (Test-Path $serverRouter) {
-    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "server.php" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErrLog -PassThru
+    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"", "`"$serverRouter`"" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErrLog -PassThru
 } else {
-    $docRoot = Join-Path $projectRoot 'public'
     $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $serverLog -RedirectStandardError $serverErrLog -PassThru
 }
 

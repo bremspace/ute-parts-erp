@@ -222,9 +222,11 @@ if not "%LAN_IP%"=="" (
     set "NETWORK_URL=http://%LAN_IP%:%PORT%!TARGET_PATH!"
 )
 
+if exist "%ROOT_DIR%\public\hot" del /f /q "%ROOT_DIR%\public\hot" >nul 2>nul
+
 set "ONLINE_URL="
-if exist "%~dp0.env" (
-    for /f "tokens=1,2 delims==" %%A in ('findstr /b "APP_URL=" "%~dp0.env"') do (
+if exist "%ROOT_DIR%\.env" (
+    for /f "tokens=1,2 delims==" %%A in ('findstr /b "APP_URL=" "%ROOT_DIR%\.env"') do (
         set "RAW_APP_URL=%%B"
         set "RAW_APP_URL=!RAW_APP_URL:"=!"
         echo !RAW_APP_URL! | findstr /v "localhost 127.0.0.1" >nul 2>nul
@@ -238,7 +240,7 @@ if exist "%~dp0.env" (
 :: 10. Buat Shortcut di Desktop jika belum ada
 :: -----------------------------------------------------------------------------
 if not exist "%USERPROFILE%\Desktop\Bremspace ERP POS.lnk" (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $desktop = [System.Environment]::GetFolderPath('Desktop'); $s = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP POS.lnk')); $s.TargetPath = '%~dp0start_app.bat'; $s.WorkingDirectory = '%~dp0'; if (Test-Path '%~dp0public\favicon.ico') { $s.IconLocation = '%~dp0public\favicon.ico' }; $s.Description = 'Bremspace ERP & POS System'; $s.Save()" >nul 2>nul
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $desktop = [System.Environment]::GetFolderPath('Desktop'); $s = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP POS.lnk')); $s.TargetPath = '%~dp0start_app.bat'; $s.WorkingDirectory = '%ROOT_DIR%'; if (Test-Path '%ROOT_DIR%\public\favicon.ico') { $s.IconLocation = '%ROOT_DIR%\public\favicon.ico' }; $s.Description = 'Bremspace ERP & POS System'; $s.Save()" >nul 2>nul
 )
 
 :: -----------------------------------------------------------------------------

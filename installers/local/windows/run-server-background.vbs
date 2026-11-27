@@ -37,7 +37,7 @@ Set objShell = CreateObject("WScript.Shell")
 Dim routerScript
 routerScript = baseDir & "\server.php"
 If objFSO.FileExists(routerScript) Then
-    cmd = "%comspec% /c """ & phpBin & " -S 0.0.0.0:" & port & " """ & routerScript & """ >> """ & logFile & """ 2>&1"""
+    cmd = "%comspec% /c """ & phpBin & " -S 0.0.0.0:" & port & " -t """ & docRoot & """ """ & routerScript & """ >> """ & logFile & """ 2>&1"""
 Else
     cmd = "%comspec% /c """ & phpBin & " -S 0.0.0.0:" & port & " -t """ & docRoot & """ >> """ & logFile & """ 2>&1"""
 End If

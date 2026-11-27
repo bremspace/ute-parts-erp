@@ -95,9 +95,14 @@ if lsof -i :"$PORT" >/dev/null 2>&1 || nc -z 127.0.0.1 "$PORT" >/dev/null 2>&1; 
 fi
 
 # 7. Nyalakan Web Server di Background jika belum aktif
+rm -f public/hot 2>/dev/null || true
 if [ "$SERVER_ALREADY_RUNNING" = "0" ]; then
     echo "ℹ [INFO] Menyalakan Web Server di port $PORT..."
-    nohup "$PHP_BIN" -S 0.0.0.0:"$PORT" -t public > storage/logs/server.log 2>&1 &
+    if [ -f "server.php" ]; then
+        nohup "$PHP_BIN" -S 0.0.0.0:"$PORT" -t public server.php > storage/logs/server.log 2>&1 &
+    else
+        nohup "$PHP_BIN" -S 0.0.0.0:"$PORT" -t public > storage/logs/server.log 2>&1 &
+    fi
     SERVER_PID=$!
     echo "$SERVER_PID" > storage/framework/server.pid
     sleep 1

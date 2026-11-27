@@ -578,13 +578,21 @@ if (Test-Path $envFile) {
 # ------------------------------------------------------------------------------
 Write-Host "[8/8] Menyalakan server di background pada port $port..." -ForegroundColor Cyan
 
+$pubHot = Join-Path $projectRoot 'public\hot'
+if (Test-Path $pubHot) { Remove-Item -Path $pubHot -Force -ErrorAction SilentlyContinue }
+
 $docRoot = Join-Path $projectRoot 'public'
+$serverRouter = Join-Path $projectRoot 'server.php'
 $logFile = Join-Path $projectRoot 'storage\logs\server.log'
 $errLogFile = Join-Path $projectRoot 'storage\logs\server-error.log'
 $pidFile = Join-Path $projectRoot 'storage\framework\server.pid'
 
 # Jalankan server secara independen di background
-$serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $errLogFile -PassThru
+if (Test-Path $serverRouter) {
+    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"", "`"$serverRouter`"" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $errLogFile -PassThru
+} else {
+    $serverProc = Start-Process -FilePath $phpExe -ArgumentList "-S", "0.0.0.0:$port", "-t", "`"$docRoot`"" -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $errLogFile -PassThru
+}
 
 # Catat PID proses server
 if ($serverProc) {

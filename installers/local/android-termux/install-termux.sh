@@ -211,7 +211,12 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 echo "ℹ Menyalakan web server Bremspace di background pada port $PORT..."
-nohup "$PHP_BIN" -S 0.0.0.0:"$PORT" -t public > storage/logs/server.log 2>&1 &
+rm -f public/hot 2>/dev/null || true
+if [ -f "server.php" ]; then
+    nohup "$PHP_BIN" -S 0.0.0.0:"$PORT" -t public server.php > storage/logs/server.log 2>&1 &
+else
+    nohup "$PHP_BIN" -S 0.0.0.0:"$PORT" -t public > storage/logs/server.log 2>&1 &
+fi
 SERVER_PID=$!
 echo "$SERVER_PID" > "$PID_FILE"
 sleep 1
