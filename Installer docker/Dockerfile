@@ -8,8 +8,8 @@ RUN npm run build
 
 FROM php:8.4-apache
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git unzip libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libicu-dev libonig-dev libxml2-dev default-mysql-client \
- && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    git unzip libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libwebp-dev libicu-dev libonig-dev libxml2-dev default-mysql-client \
+ && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
  && docker-php-ext-install -j"$(nproc)" pdo_mysql mbstring exif pcntl bcmath gd zip intl opcache \
  && a2enmod rewrite headers \
  && rm -rf /var/lib/apt/lists/*
