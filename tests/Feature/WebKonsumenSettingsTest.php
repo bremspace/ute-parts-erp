@@ -106,6 +106,23 @@ class WebKonsumenSettingsTest extends TestCase
         $this->assertStringEndsWith('.svg', $logoUrl);
     }
 
+    public function test_storefront_wa_link_uses_store_number_and_reference_url(): void
+    {
+        $service = app(WebKonsumenService::class);
+        $service->saveSettings([
+            'store_phone' => '62812-9950-5350',
+            'wa_number' => '6281299505350',
+            'wa_default_msg' => 'Halo Admin UTEParts',
+            'wa_floating_active' => true,
+        ]);
+
+        $response = $this->get('/shop');
+
+        $response->assertOk();
+        $response->assertSee('https://wa.me/6281299505350?text=', false);
+        $response->assertSee('Sumber%3A', false);
+    }
+
     public function test_can_manage_banners_crud(): void
     {
         // 1. Create banner

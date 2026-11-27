@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS web_banners (
 | | `allowed_filters` | json | `{"brand":true,"kategori":true,"kualitas":true,"hp":true,"kondisi":true}` | Filter yang diizinkan tampil di sidebar & mobile sheet |
 | | `catalog_per_page` | int | `24` | Jumlah grid produk per pagination |
 | `contact` | `wa_floating_active` | bool | `true` | Tombol mengapung WhatsApp di pojok kanan bawah |
-| | `wa_number` | string | "6281234567890" | Nomor tujuan CS toko |
+| | `wa_number` | string | "6281299505350" | Nomor tujuan CS toko |
 | | `wa_default_msg` | string | "Halo Admin Ute Parts, saya ingin konsultasi sparepart..." | Pesan otomatis pembuka WhatsApp |
 | | `operating_hours` | string | "Senin - Sabtu: 08:30 - 20:30 WIB" | Jam operasional di footer |
 | | `social_links` | json | `{"instagram":"","tiktok":"","shopee":"","tokopedia":""}` | URL akun media sosial resmi |

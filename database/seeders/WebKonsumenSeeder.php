@@ -208,7 +208,7 @@ class WebKonsumenSeeder extends Seeder
             [
                 'group_key' => 'contact',
                 'setting_key' => 'wa_number',
-                'setting_value' => '6281234567890',
+                'setting_value' => '6281299505350',
                 'value_type' => 'string',
                 'deskripsi' => 'Nomor WhatsApp resmi Customer Service',
             ],
