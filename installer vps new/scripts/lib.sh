@@ -92,6 +92,39 @@ if [[ -z "${LIB_UTE_LOADED:-}" ]]; then
         command -v "$1" >/dev/null 2>&1
     }
 
+    # Pasang Docker + plugin compose. Ubuntu 24.04 sering belum menyediakan
+    # docker-compose-plugin di repo default, jadi tambahkan repo resmi Docker.
+    install_docker() {
+        if command_exists docker && docker compose version >/dev/null 2>&1; then
+            ok "Docker & compose plugin sudah terpasang."
+            systemctl enable --now docker >/dev/null 2>&1 || true
+            return 0
+        fi
+
+        apt-get update -qq
+
+        if apt-cache policy docker-compose-plugin 2>/dev/null | awk '/Candidate:/{print $2}' | grep -qv '^(none)$'; then
+            apt_install docker.io docker-compose-plugin
+        else
+            warn "docker-compose-plugin tidak ada di repo Ubuntu, menambahkan repo resmi Docker..."
+            apt_install ca-certificates curl gnupg
+            install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+            chmod a+r /etc/apt/keyrings/docker.asc
+            local codename
+            codename="$(. /etc/os-release && printf '%s' "$VERSION_CODENAME")"
+            printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
+                "$(dpkg --print-architecture)" "$codename" \
+                > /etc/apt/sources.list.d/docker.list
+            apt-get update -qq
+            apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        fi
+
+        systemctl enable --now docker >/dev/null 2>&1 || true
+        docker --version
+        docker compose version
+    }
+
     # Hapus baris pool FPM dengan key tertentu, aman untuk karakter regex.
     # Hasilkan sertifikat self-signed sementara. Set global SSL_CERT / SSL_KEY.
     make_selfsigned() {
