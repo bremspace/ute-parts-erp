@@ -3998,19 +3998,19 @@
                                         type="password"
                                         wire:model="integrasiForm.wa_token"
                                         class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono"
-                                        placeholder="{{ $waTokenConfigured ? 'Kosongkan jika tidak ingin mengganti token tersimpan' : 'Masukkan token / API key gateway WA' }}"
+                                        placeholder="{{ $waTokenConfigured ? 'Kosongkan jika tidak ingin mengganti token tersimpan' : (($integrasiForm['wa_provider'] ?? '') === 'openwa' ? 'Kosongkan dulu — terisi otomatis saat Setup Otomatis di bawah' : 'Masukkan token / API key gateway WA') }}"
                                     />
                                     <p class="text-[10px] text-ink-400 mt-1">
                                         {{ ($integrasiForm['wa_provider'] ?? '') === 'openwa'
-                                            ? 'Gunakan key role operator (atau biarkan Setup Otomatis di bawah membuatnya).'
+                                            ? 'Kosongkan saat pertama kali setup — tombol ⚡ Setup Otomatis di bawah akan mencetak dan menyimpan Operator Key ini.'
                                             : 'Dapatkan dari dashboard penyedia WA gateway Anda.' }}
                                     </p>
                                 </div>
                                 @if(($integrasiForm['wa_provider'] ?? '') === 'openwa')
                                     <div>
                                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">ID Sesi OpenWA (UUID) *</label>
-                                        <input type="text" wire:model="integrasiForm.wa_session" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="UUID sesi dari OpenWA (gunakan Setup Otomatis)" />
-                                        <p class="text-[10px] text-ink-400 mt-1">OpenWA memakai <span class="font-mono">UUID</span> sesi, bukan nama tampilan. Gunakan panel OpenWA di bawah untuk membuat/memilih sesi otomatis.</p>
+                                        <input type="text" wire:model="integrasiForm.wa_session" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Kosongkan dulu — terisi otomatis UUID saat Setup Otomatis" />
+                                        <p class="text-[10px] text-ink-400 mt-1">Berisi <span class="font-mono">UUID</span> sesi OpenWA. Biarkan kosong saat setup awal, nanti terisi otomatis oleh panel di bawah.</p>
                                         @error('integrasiForm.wa_session') <p class="text-up-red text-[10px] mt-1">{{ $message }}</p> @enderror
                                     </div>
                                 @else
@@ -4076,7 +4076,7 @@
                                         <div>
                                             <p class="text-[11px] font-bold text-white">Setup Otomatis 1-Klik (Admin Key Dipakai Sekali)</p>
                                             <p class="text-[10px] text-ink-400 mt-0.5">
-                                                Tempel Master Admin Key dari container VPS (<span class="font-mono text-ink-300">cat /app/data/.api-key</span>). ERP akan otomatis membuat sesi, menyalakan engine, mencetak Operator API Key scoped, lalu langsung menghapus Admin Key dari form.
+                                                Kosongkan 2 kolom di atas, lalu tempel Master Admin Key dari VPS (<code class="font-mono text-ink-200 select-all">docker exec openwa-api cat /app/data/.api-key</code>). ERP otomatis membuat UUID sesi, menyalakan engine, mengisi Operator API Key terenkripsi, lalu menghapus Admin Key.
                                             </p>
                                         </div>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

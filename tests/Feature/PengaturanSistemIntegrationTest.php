@@ -329,7 +329,7 @@ class PengaturanSistemIntegrationTest extends TestCase
             ->test(SettingsRbac::class)
             ->set('integrasiForm.wa_provider', 'openwa')
             ->set('integrasiForm.wa_url', 'http://127.0.0.1:2785')
-            ->set('openwaAdminKey', 'owa_k1_admin_master')
+            ->set('openwaAdminKey', '"X-API-Key: owa_k1_admin_master"')
             ->call('setupOpenWaOtomatis')
             ->assertSet('integrasiForm.wa_session', $uuid)
             ->assertSet('integrasiForm.wa_token', '')

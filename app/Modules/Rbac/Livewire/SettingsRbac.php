@@ -2034,12 +2034,20 @@ class SettingsRbac extends Component
         $this->refreshWaRecentLogs();
     }
 
+    private function sanitizeApiKey(string $raw): string
+    {
+        $clean = trim($raw, " \t\n\r\0\x0B\"'`");
+        $clean = preg_replace('/^(?:x-api-key\s*:\s*|bearer\s+)/i', '', $clean) ?? $clean;
+
+        return trim($clean, " \t\n\r\0\x0B\"'`");
+    }
+
     /**
      * Resolve effective WA token: explicit form input overrides stored config for the active provider.
      */
     private function resolveWaToken(): string
     {
-        $formToken = trim((string) ($this->integrasiForm['wa_token'] ?? ''));
+        $formToken = $this->sanitizeApiKey((string) ($this->integrasiForm['wa_token'] ?? ''));
         if ($formToken !== '') {
             return $formToken;
         }
@@ -2118,7 +2126,7 @@ class SettingsRbac extends Component
         }
 
         $url = (string) ($this->integrasiForm['wa_url'] ?? '');
-        $key = trim($this->openwaAdminKey) ?: $this->resolveWaToken();
+        $key = $this->sanitizeApiKey($this->openwaAdminKey) ?: $this->resolveWaToken();
 
         if (blank($url) || blank($key)) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Isi URL OpenWA dan Admin/Operator Key terlebih dahulu.']);
@@ -2128,8 +2136,9 @@ class SettingsRbac extends Component
 
         $list = app(OpenWaManagerService::class)->listSessions($url, $key);
         if (! $list['ok']) {
-            $this->openwaHealth = 'offline';
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memuat daftar sesi: '.$list['error']]);
+            $err = (string) $list['error'];
+            $this->openwaHealth = (str_contains($err, '401') || str_contains($err, '403')) ? 'online' : 'offline';
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memuat daftar sesi: '.$err]);
 
             return;
         }
@@ -2171,7 +2180,7 @@ class SettingsRbac extends Component
 
         $url = (string) ($this->integrasiForm['wa_url'] ?? '');
         $sessionId = trim((string) ($this->integrasiForm['wa_session'] ?? ''));
-        $key = trim($this->openwaAdminKey) ?: $this->resolveWaToken();
+        $key = $this->sanitizeApiKey($this->openwaAdminKey) ?: $this->resolveWaToken();
 
         if (blank($url) || blank($sessionId) || blank($key)) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'URL, ID Sesi OpenWA, dan Token/Key wajib terisi.']);
@@ -2200,7 +2209,7 @@ class SettingsRbac extends Component
         }
 
         $url = (string) ($this->integrasiForm['wa_url'] ?? '');
-        $adminKey = trim($this->openwaAdminKey);
+        $adminKey = $this->sanitizeApiKey($this->openwaAdminKey);
         if (blank($url) || blank($adminKey)) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'URL OpenWA dan Master Admin Key wajib diisi.']);
 
@@ -2221,7 +2230,11 @@ class SettingsRbac extends Component
         // 1. Cari sesi yang sudah ada atau buat sesi baru
         $list = $manager->listSessions($url, $adminKey);
         if (! $list['ok']) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memeriksa sesi OpenWA: '.$list['error']]);
+            $err = (string) $list['error'];
+            $hint = (str_contains($err, '401') || str_contains($err, '403'))
+                ? ' Ambil Master Admin Key penuh (owa_k1_...) lewat: docker exec openwa-api cat /app/data/.api-key'
+                : '';
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memeriksa sesi OpenWA: '.$err.$hint]);
 
             return;
         }
@@ -2310,7 +2323,7 @@ class SettingsRbac extends Component
 
         $url = (string) ($this->integrasiForm['wa_url'] ?? '');
         $sessionId = trim((string) ($this->integrasiForm['wa_session'] ?? ''));
-        $token = $this->resolveWaToken() ?: trim($this->openwaAdminKey);
+        $token = $this->resolveWaToken() ?: $this->sanitizeApiKey($this->openwaAdminKey);
 
         if (blank($url) || blank($sessionId) || blank($token)) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'URL OpenWA, ID Sesi (UUID), dan API Key wajib terisi.']);
@@ -2340,7 +2353,7 @@ class SettingsRbac extends Component
 
         $url = (string) ($this->integrasiForm['wa_url'] ?? '');
         $sessionId = trim((string) ($this->integrasiForm['wa_session'] ?? ''));
-        $token = $this->resolveWaToken() ?: trim($this->openwaAdminKey);
+        $token = $this->resolveWaToken() ?: $this->sanitizeApiKey($this->openwaAdminKey);
         $phone = trim($this->openwaPairingPhone);
 
         if (blank($url) || blank($sessionId) || blank($token) || blank($phone)) {
@@ -2368,7 +2381,7 @@ class SettingsRbac extends Component
 
         $url = (string) ($this->integrasiForm['wa_url'] ?? '');
         $sessionId = trim((string) ($this->integrasiForm['wa_session'] ?? ''));
-        $token = $this->resolveWaToken() ?: trim($this->openwaAdminKey);
+        $token = $this->resolveWaToken() ?: $this->sanitizeApiKey($this->openwaAdminKey);
 
         if (blank($url) || blank($sessionId) || blank($token)) {
             return;
