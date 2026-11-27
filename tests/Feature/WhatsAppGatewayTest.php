@@ -7,6 +7,9 @@ use App\Modules\Notifikasi\Jobs\KirimNotifikasiJob;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Notifikasi\Services\WhatsAppGatewayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -157,5 +160,95 @@ class WhatsAppGatewayTest extends TestCase
         $this->assertSame('gagal', $log->status);
         $this->assertStringContainsString('500', (string) $log->error);
         $this->assertStringNotContainsString('rahasia', (string) $log->error);
+    }
+
+    public function test_normalisasi_url_openwa_memastikan_akhiran_api_idempoten(): void
+    {
+        $this->assertSame('http://127.0.0.1:2785/api', WhatsAppGatewayService::normalizeOpenWaUrl('http://127.0.0.1:2785'));
+        $this->assertSame('http://127.0.0.1:2785/api', WhatsAppGatewayService::normalizeOpenWaUrl('http://127.0.0.1:2785/api'));
+        $this->assertSame('http://127.0.0.1:2785/api', WhatsAppGatewayService::normalizeOpenWaUrl('http://127.0.0.1:2785/api/'));
+    }
+
+    public function test_config_mendekripsi_token_db_dan_fallback_ke_services_openwa(): void
+    {
+        $this->setConfig([
+            'provider' => 'openwa',
+            'url' => 'http://127.0.0.1:2785',
+            'token' => Crypt::encryptString('token-terenkripsi-123'),
+            'session' => '550e8400-e29b-41d4-a716-446655440000',
+        ]);
+
+        $cfg = app(WhatsAppGatewayService::class)->config();
+        $this->assertSame('token-terenkripsi-123', $cfg['token']);
+
+        DB::table('konfigurasi')->where('kunci', 'wa_gateway_config')->delete();
+        Cache::forget('crm-konfigurasi:wa_gateway_config');
+        config([
+            'services.openwa.url' => 'http://127.0.0.1:2785/api',
+            'services.openwa.api_key' => 'env-openwa-key',
+            'services.openwa.session' => 'uuid-env-session',
+        ]);
+
+        $fallback = app(WhatsAppGatewayService::class)->config();
+        $this->assertSame('openwa', $fallback['provider']);
+        $this->assertSame('env-openwa-key', $fallback['token']);
+        $this->assertSame('uuid-env-session', $fallback['session']);
+    }
+
+    public function test_openwa_409_dan_503_diberi_pesan_jelas_serta_job_release_untuk_retry(): void
+    {
+        $this->setConfig([
+            'provider' => 'openwa',
+            'url' => 'http://127.0.0.1:2785',
+            'token' => 'rahasia',
+            'session' => '550e8400-e29b-41d4-a716-446655440000',
+        ]);
+
+        Http::fakeSequence()
+            ->push(['error' => 'not ready'], 409)
+            ->push(['error' => 'restarting'], 503);
+
+        $svc = app(WhatsAppGatewayService::class);
+        $r409 = $svc->kirim('081234567890', 'Tes 409');
+        $this->assertFalse($r409['ok']);
+        $this->assertStringContainsString('409', (string) $r409['error']);
+        $this->assertTrue((bool) ($r409['retryable'] ?? false));
+
+        $log = NotifikasiKeluar::create([
+            'tipe' => 'wa',
+            'tujuan' => '081234567890',
+            'judul' => 'Tes Retry',
+            'konten' => 'Halo',
+            'status' => 'pending',
+        ]);
+
+        KirimNotifikasiJob::dispatchSync($log->id);
+
+        $log->refresh();
+        $this->assertSame('pending', $log->status);
+        $this->assertStringContainsString('503', (string) $log->error);
+    }
+
+    public function test_openwa_html_atau_success_false_http_200_ditolak(): void
+    {
+        $this->setConfig([
+            'provider' => 'openwa',
+            'url' => 'http://127.0.0.1:2785/api',
+            'token' => 'rahasia',
+            'session' => '550e8400-e29b-41d4-a716-446655440000',
+        ]);
+
+        Http::fakeSequence()
+            ->push('<html><body>Login</body></html>', 200, ['Content-Type' => 'text/html'])
+            ->push(['success' => false, 'message' => 'Session disconnected'], 200);
+
+        $svc = app(WhatsAppGatewayService::class);
+        $html = $svc->kirim('081234567890', 'Tes HTML');
+        $this->assertFalse($html['ok']);
+        $this->assertFalse($html['retryable']);
+
+        $jsonFalse = $svc->kirim('081234567890', 'Tes False');
+        $this->assertFalse($jsonFalse['ok']);
+        $this->assertFalse($jsonFalse['retryable']);
     }
 }

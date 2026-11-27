@@ -27,12 +27,12 @@
     "file": "assets/instrument-sans-600-normal-B9e8oLYv.woff",
     "src": "_instrument-sans-600-normal-B9e8oLYv.woff"
   },
-  "_preload-helper-CXsPmoLB.js": {
-    "file": "assets/preload-helper-CXsPmoLB.js",
+  "_preload-helper-COEFE5Ve.js": {
+    "file": "assets/preload-helper-COEFE5Ve.js",
     "name": "preload-helper"
   },
   "node_modules/html5-qrcode/esm/index.js": {
-    "file": "assets/esm-C3eub2L5.js",
+    "file": "assets/esm-n4glgE_v.js",
     "name": "esm",
     "src": "node_modules/html5-qrcode/esm/index.js",
     "isDynamicEntry": true,
@@ -47,7 +47,7 @@
     "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-DlP4EXW-.css",
+    "file": "assets/app-CLYl3B5b.css",
     "name": "app",
     "names": [
       "app.css"
@@ -56,27 +56,27 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-C4LnO5qf.js",
+    "file": "assets/app-DOC0WS2M.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
-      "_preload-helper-CXsPmoLB.js"
+      "_preload-helper-COEFE5Ve.js"
     ],
     "dynamicImports": [
       "node_modules/workbox-window/build/workbox-window.prod.es5.mjs"
     ],
     "css": [
-      "assets/app-DlP4EXW-.css"
+      "assets/app-CLYl3B5b.css"
     ]
   },
   "resources/js/backoffice.js": {
-    "file": "assets/backoffice-CWRqxkBf.js",
+    "file": "assets/backoffice-XZSPn1XF.js",
     "name": "backoffice",
     "src": "resources/js/backoffice.js",
     "isEntry": true,
     "imports": [
-      "_preload-helper-CXsPmoLB.js"
+      "_preload-helper-COEFE5Ve.js"
     ],
     "dynamicImports": [
       "node_modules/html5-qrcode/esm/index.js"

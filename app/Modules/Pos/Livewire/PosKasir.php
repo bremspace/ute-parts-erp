@@ -532,13 +532,16 @@ class PosKasir extends Component
     {
         $userId = auth()->id();
         if ($userId) {
-            $pref = UserPreference::getPref($userId, 'pos_kasir_custom_filters');
-            if (is_array($pref)) {
-                $this->visibleFilters = array_merge($this->visibleFilters, $pref);
+            $prefs = UserPreference::getManyPrefs($userId, [
+                'pos_kasir_custom_filters',
+                'pos_kasir_selected_gudang_id',
+            ]);
+            if (is_array($prefs['pos_kasir_custom_filters'] ?? null)) {
+                $this->visibleFilters = array_merge($this->visibleFilters, $prefs['pos_kasir_custom_filters']);
             }
 
             // Load saved warehouse preference
-            $savedGudangId = UserPreference::getPref($userId, 'pos_kasir_selected_gudang_id');
+            $savedGudangId = $prefs['pos_kasir_selected_gudang_id'] ?? null;
             if ($savedGudangId && Gudang::where('id', $savedGudangId)->where('cabang_id', session('cabang_id'))->exists()) {
                 $this->selectedGudangId = (int) $savedGudangId;
             }
@@ -1669,6 +1672,7 @@ class PosKasir extends Component
     {
         $faktor = max(1, (int) round((float) ($item['box_faktor'] ?? $item['konversi'] ?? 1)));
         $satuan = strtolower((string) ($item['satuan'] ?? 'pcs'));
+
         return ($faktor > 1 && $satuan !== 'pcs') ? 'Potongan Kemasan' : 'Potongan Member (Tier)';
     }
 
@@ -4169,7 +4173,7 @@ class PosKasir extends Component
             // [F2-3] computed props SN — pass eksplisit (WAIBS)
             'snCari' => $this->snCari,
             'snItemKey' => $this->snItemKey,
-            'daftarServisSiapBayar' => $this->daftarServisSiapBayar,
+            'daftarServisSiapBayar' => $this->showBayarServisModal ? $this->daftarServisSiapBayar : collect(),
             // [POS-ONLINE-PICKUP] computed props pesanan online — pass eksplisit (WAIBS)
             'jumlahPesananOnline' => $this->jumlahPesananOnline,
             'pesananOnlineHasil' => $this->pesananOnlineHasil,

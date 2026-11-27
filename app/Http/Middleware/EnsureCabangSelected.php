@@ -8,6 +8,7 @@ use App\Modules\Wms\Models\Rak;
 use App\Services\BranchContextManager;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureCabangSelected
@@ -84,6 +85,11 @@ class EnsureCabangSelected
      */
     protected function ensureDefaultWarehouseAndShelf(int $cabangId): void
     {
+        $cacheKey = "cabang-wh-shelf-ok:{$cabangId}";
+        if (Cache::has($cacheKey)) {
+            return;
+        }
+
         try {
             $gudang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first();
             if (! $gudang) {
@@ -101,6 +107,8 @@ class EnsureCabangSelected
                     ['gudang_id' => $gudang->id, 'nama' => 'Rak Utama', 'is_active' => true]
                 );
             }
+
+            Cache::put($cacheKey, true, 300);
         } catch (\Throwable) {
         }
     }

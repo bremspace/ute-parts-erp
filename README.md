@@ -1,324 +1,115 @@
-# Ute Parts ERP & Marketplace
+# Bremspace ERP — Multi-Branch Sparepart & Servis HP Platform
 
-Sistem ERP & Omnichannel modern untuk bisnis sparepart & servis elektronik/gadget/motor: Point of Sale (POS) kasir offline-ready, manajemen work-order servis, marketplace konsumen, reseller & komisi multi-aktor, HR & payroll, akunting double-entry, inventori gudang (WMS), serta approval workflow berjenjang — terintegrasi penuh dalam satu platform modular.
+Sistem operasional terpadu (**Backoffice ERP/POS** + **Storefront Marketplace Publik**) untuk toko retail suku cadang smartphone, konter HP, reseller B2B, dan bengkel servis HP multi-cabang.
 
----
-
-## Daftar Isi
-- [Teknologi & Arsitektur](#teknologi--arsitektur)
-- [Modul & Fitur Utama](#modul--fitur-utama)
-- [Dual PWA Multi-Scope](#dual-pwa-multi-scope-pwa-konsumen-vs-backoffice)
-- [Kebutuhan Sistem](#kebutuhan-sistem)
-- [Instalasi Dependensi Sistem Operasi](#instalasi-dependensi-sistem-operasi)
-  - [Ubuntu / Debian / WSL2](#1-ubuntu--debian--wsl2)
-  - [macOS](#2-macos-homebrew)
-  - [Windows](#3-windows)
-- [Instalasi Proyek (Langkah Demi Langkah)](#instalasi-proyek-langkah-demi-langkah)
-- [Menjalankan Aplikasi di Lingkungan Dev](#menjalankan-aplikasi-di-lingkungan-dev)
-- [Akun Bawaan Backoffice](#akun-bawaan-backoffice-default-credentials)
-- [Perintah QA & Testing](#perintah-qa--testing)
-- [Panduan Migrasi Server](#panduan-migrasi-server)
-- [Lisensi](#lisensi)
+Dirancang ringan untuk VPS Linux standalone maupun mode **Hybrid Offline/Online Store Node**, lengkap dengan **Dynamic Tier Pricing**, **Servis Kanban & Approval Pelanggan**, **Omnichannel Shopee**, **Gateway Pembayaran Duitku**, **Kurir Biteship**, serta **Self-Hosted WhatsApp Gateway (OpenWA)**.
 
 ---
 
-## Teknologi & Arsitektur
+## Arsitektur & Fitur Utama
 
-- **Backend:** Laravel 13 (PHP 8.3+)
-- **Frontend:** TALL Stack — Tailwind CSS v4, Alpine.js, Livewire v3, Vite v8
-- **Database:** MySQL 8.0+ / MariaDB 10.6+ (Production), SQLite in-memory (Unit & Feature Tests)
-- **Desain Sistem:** "Ute Prism" (Glassmorphism, tabular-nums, palette electric indigo `--up-primary` & radiant orange `--up-accent`)
-- **PWA:** Vite Plugin PWA dengan Service Worker Workbox, Dual Multi-Scope Manifest, Screen Wake Lock API
-- **Queue:** Database driver (asinkron untuk notifikasi, laporan, dan email)
+Aplikasi terdiri dari **16 modul domain modular** di `app/Modules/` yang terhubung dalam dua zona utama:
 
----
+### 1. Backoffice ERP (`/app/*`) — Desktop-First, Dark Mode Default
+- **Dashboard (`Dashboard`):** Widget analitik peran-spesifik (omzet harian, grafik performa, ringkasan servis, persediaan kritis).
+- **Kasir POS (`Pos`):** Layar kasir cepat dengan barcode scanner, shortcut keyboard (`F2`, `F4`, `F6`), park/hold transaksi, auto-pricing tier pelanggan, retur penjualan, pesanan online, serta cetak struk thermal ESC/POS.
+- **Manajemen Gudang & Produk (`Wms`):** Katalog sparepart dengan kompatibilitas Merk/Tipe HP, SKU varian, kartu stok terikat gudang/rak, transfer antar-cabang, Purchase Order (PO), penerimaan barang (GRN), cycle count & stock opname, pencetakan barcode, serta import/export Excel (`maatwebsite/laravel-excel`).
+- **Kanban Servis & Garansi (`Servis`):** State machine tiket servis ketat (`Diterima → Diagnosa → Estimasi → Approved → Dikerjakan → QC → Selesai → Diambil`), token link persetujuan pelanggan tanpa login, tracking klaim garansi, penggunaan part fisik (potong stok) vs jasa, dan penjurnalan HPP/pendapatan otomatis.
+- **Akunting (`Akunting`):** Bagan Akun (COA), jurnal double-entry otomatis dari POS/Servis/Pembelian, buku besar, piutang/utang, neraca saldo, laba rugi, depresiasi aset, dan export laporan.
+- **CRM & Loyalti (`Crm`):** Manajemen profil pelanggan, tier membership dinamis, poin loyalitas, broadcast kampanye WhatsApp, serta lead & sales pipeline.
+- **Reseller & Bagi Hasil (`Reseller`):** Skema komisi multi-aktor, dashboard performa mitra/sales, dan pencairan komisi.
+- **HR & Payroll (`Hr`):** Data karyawan tersinkron ke user RBAC, shift & absensi, penilaian KPI bulanan otomatis, slip gaji, serta approval payroll.
+- **Omnichannel & Webhook (`Omnichannel`, `Webhook`):** Adapter sinkronisasi katalog/stok/pesanan Shopee Open API dan outbound webhook terautentikasi.
+- **Approval Engine (`Workflow`) & Laporan (`Report`):** Mesin persetujuan bertingkat (PO, GRN, cycle count, payroll) dan laporan analitik drilldown dengan export.
+- **RBAC, Keamanan & Pengaturan Sistem (`Rbac`):** Hak akses berbasis Spatie Permission, scoping ketat per `cabang_id`, 2FA Google Authenticator, manajemen sesi perangkat, audit trail (`spatie/laravel-activitylog`), backup/restore snapshot SQL, upgrade domain/Cloudflare Tunnel, tema & palet desain, serta automasi QRIS dinamis Android.
+- **Notifikasi & Gateway WA (`Notifikasi`):** Queue job asinkron untuk WhatsApp (**OpenWA self-hosted**, Fonnte, Wablas, Custom Webhook), Email, dan pusat notifikasi In-App real-time.
+- **Hybrid Sync (`Sync`):** Sinkronisasi asimetris node toko lokal dengan server cloud pusat (`sync:flush`, `sync:pull`) untuk ketahanan kasir saat internet terputus.
 
-## Modul & Fitur Utama
-
-Aplikasi terdiri dari 15 modul domain terisolasi di `app/Modules/`:
-
-| Modul | Direktori | Kemampuan Utama |
-|---|---|---|
-| **POS Kasir** | `app/Modules/Pos` | Kasir sentuh & scanner barcode kamera, hold/park transaksi, split payment (tunai, transfer, QRIS, piutang), sesi buka/tutup kas, printer thermal ESC/POS, dan toggle Screen Wake Lock. |
-| **Servis** | `app/Modules/Servis` | Work order, tracking tiket servis konsumen via token/QR, state machine status pengerjaan, manajemen teknisi & pemakaian sparepart, approval token estimasi biaya. |
-| **Gudang (WMS)** | `app/Modules/Wms` | Manajemen produk & varian SKU, mutasi stok antar cabang, cycle count/opname, penerimaan barang PO (GRN) dengan scanner barcode, tracking nomor seri (SN), ekspor pricelist per tier harga, serta **Bulk Import & Auto-Mapping Foto Produk** (ekstraksi nama file/folder/ZIP ke SKU, kompresi WebP otomatis, dual-engine GD/Imagick). |
-| **Marketplace** | `app/Modules/Marketplace` | Katalog toko publik mobile-first, keranjang belanja, checkout Duitku payment gateway, kurir ongkir otomatis Biteship, tracking pesanan. |
-| **Reseller & Komisi** | `app/Modules/Reseller` | Portal reseller, perhitungan komisi otomatis multi-aktor (reseller, sales internal, teknisi), riwayat pencairan saldo. |
-| **Akunting** | `app/Modules/Akunting` | Chart of Accounts (COA), auto-jurnal transaksi kasir/servis/pembelian, buku besar, neraca, laba-rugi, depresiasi aset otomatis. |
-| **CRM** | `app/Modules/Crm` | Data pelanggan, tier membership (Retail, Silver, Gold, Platinum), sales pipeline & lead tracking, riwayat service HP pelanggan. |
-| **HR & Payroll** | `app/Modules/Hr` | Data karyawan, absensi shift berbasis cabang, KPI teknisi/staff, slip gaji payroll dengan potongan/tunjangan & approval bertingkat. |
-| **Workflow** | `app/Modules/Workflow` | Engine persetujuan multi-level untuk PO, GRN selisih, cycle count, dan payroll; inbox approval terpusat. |
-| **Platform** | `Dashboard`, `Rbac`, `Report` | Role & permission berbasis Spatie dengan filter cabang ketat (`cabang_id`), dashboard widget interaktif, drilldown report viewer ekspor data terkurasi. |
-| **Integrasi** | `Notifikasi`, `Omnichannel`, `Webhook` | WhatsApp Gateway queue, sinkronisasi marketplace Shopee API, outbound webhook. |
+### 2. Marketplace & Portal Konsumen (`/`) — Mobile-First, Light Mode Default
+- Katalog sparepart responsif dengan filter merk/tipe HP & pencarian cerdas.
+- Registrasi, login member, profil akun, dan histori belanja/poin.
+- Keranjang & checkout multi-origin kurir **Biteship** + pembayaran online **Duitku** (QRIS, Virtual Account, E-Wallet) dengan webhook idempoten.
+- Pelacakan tiket servis publik & halaman approval estimasi biaya pelanggan via token unik.
 
 ---
 
-## Dual PWA Multi-Scope (PWA Konsumen vs Backoffice)
+## Stack Teknologi (Terverifikasi)
 
-Ute Parts mendukung arsitektur **Multi-Scope Progressive Web App**:
-1. **PWA Toko Konsumen (`/manifest.json`)**:
-   - Scope: `/` | Start URL: `/`
-   - Ditujukan untuk pembeli dan pelanggan toko untuk mencari katalog sparepart dan tracking servis HP.
-2. **PWA Backoffice ERP (`/manifest-backoffice.json`)**:
-   - Scope: `/app/` | Start URL: `/app/dashboard` (atau `/app/pos`)
-   - Dilengkapi icon badge "ERP", shortcut operasional (Kasir POS, Gudang WMS, Servis), serta utilitas **Screen Wake Lock API** agar layar kasir tidak mati/terkunci otomatis saat transaksi.
-   - Staf dapat menginstal PWA Toko dan PWA ERP berdampingan di satu perangkat Android/iOS/Desktop.
+- **Backend:** PHP `8.4+`, Laravel `13.x`, Livewire `4.x`, Laravel Sanctum `4.x`
+- **Frontend:** Tailwind CSS `4.x`, Alpine.js, Vite `8.x`, `vite-plugin-pwa`, Instrument Sans (Bunny Fonts)
+- **Database & Queue:** MySQL / MariaDB (produksi), SQLite `:memory:` (automated tests), driver queue `database` + Supervisor
+- **Paket Inti:** `spatie/laravel-permission`, `spatie/laravel-activitylog`, `maatwebsite/excel`, `pragmarx/google2fa`, `bacon/bacon-qr-code`, `picqer/php-barcode-generator`
+- **QA & Analisis Statis:** PHPUnit `13.x`, Laravel Pint (`PSR-12`), Larastan / PHPStan, Deptrac, PHPInsights
 
 ---
 
-## Kebutuhan Sistem
+## Setup Lokal / VPS Baru
 
-- **PHP:** Versi 8.3 atau 8.4
-  - Ekstensi wajib: `bcmath`, `curl`, `dom`, `fileinfo`, `gd`, `intl`, `mbstring`, `openssl`, `pdo_mysql`, `pdo_sqlite`, `tokenizer`, `xml`, `zip`.
-  - Ekstensi pemrosesan gambar mutakhir (disarankan): `imagick` & paket sistem `imagemagick libheif-examples` (untuk decoding foto HEIC Apple iOS, AVIF, TIFF, BMP, PSD, SVG, dan RAW).
-- **Database:** MySQL 8.0+, MariaDB 10.6+, atau PostgreSQL 15+ (SQLite didukung untuk testing).
-- **Composer:** Versi 2.x
-- **Node.js:** Versi 20.x LTS atau lebih baru, beserta **npm**.
-- **Memory (RAM):** Minimal 1 GB (server/VPS dengan swap 2GB), disarankan 2–4 GB untuk lingkungan produksi optimal.
-
----
-
-## Instalasi Dependensi Sistem Operasi
-
-### 1. Ubuntu / Debian / WSL2
-
+### 1. Instalasi Cepat
 ```bash
-# Update paket sistem
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y software-properties-common curl git unzip ca-certificates lsb-release
-
-# Tambahkan repository PHP Sury
-sudo add-apt-repository ppa:ondrej/php -y
-sudo apt update
-
-# Install PHP 8.4 dan ekstensi yang dibutuhkan
-sudo apt install -y php8.4-cli php8.4-fpm php8.4-mysql php8.4-sqlite3 \
-    php8.4-mbstring php8.4-xml php8.4-curl php8.4-zip php8.4-gd \
-    php8.4-bcmath php8.4-intl php8.4-opcache php8.4-imagick \
-    imagemagick libheif-examples supervisor logrotate
-
-# Install MySQL Server
-sudo apt install -y mysql-server
-
-# Install Composer
-curl -sS https://getcomposer.org/installer | php
-sudo mv composer.phar /usr/local/bin/composer
-
-# Install Node.js 20 LTS & npm
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-```
-
-### 2. macOS (Homebrew)
-
-```bash
-brew update
-brew install php@8.3 composer node@20 mysql
-brew services start mysql
-```
-
-### 3. Windows
-Gunakan **WSL2 (Windows Subsystem for Linux)** dengan distro **Ubuntu 24.04 LTS** (ikuti panduan Ubuntu di atas), atau gunakan environment stack **Laragon** dengan PHP 8.3, Node.js 20, dan MySQL 8.
-
----
-
-## Instalasi Proyek (Langkah Demi Langkah)
-
-### 1. Clone Repositori
-```bash
-git clone https://github.com/bremspace/ute-parts-erp.git
+git clone <repo-url> ute-parts-erp
 cd ute-parts-erp
+composer setup
 ```
 
-### 2. Install Dependensi PHP
+Perintah `composer setup` menjalankan:
+1. `composer install`
+2. Menyalin `.env.example` ke `.env` jika belum ada
+3. `php artisan key:generate`
+4. `php artisan migrate --force`
+5. `php artisan db:seed --force --no-interaction`
+6. `npm install --ignore-scripts && npm run build`
+
+### 2. Menjalankan Server Development
 ```bash
-composer install
-```
+# Terminal 1 — Laravel PHP server
+composer dev
 
-### 3. Salin Konfigurasi Environment
-```bash
-cp .env.example .env
-php artisan key:generate
-```
-
-### 4. Konfigurasi Database
-Buka file `.env`, sesuaikan kredensial database Anda:
-```dotenv
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=uteparts_db
-DB_USERNAME=root
-DB_PASSWORD=rahasia_anda
-```
-
-Buat database di MySQL jika belum ada:
-```bash
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS uteparts_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-```
-
-### 5. Jalankan Migrasi & Database Seeder
-Perintah ini akan membuat skema tabel, akun default seluruh role, hak akses Spatie, data cabang awal, dan Chart of Accounts (COA):
-```bash
-php artisan migrate --seed
-```
-
-### 6. Hubungkan Berkas Storage Publik
-```bash
-php artisan storage:link
-```
-
-### 7. Atur Hak Akses Direktori (Linux / macOS / VPS)
-```bash
-chmod -R 775 storage bootstrap/cache
-# Jika di server production:
-# sudo chown -R www-data:www-data storage bootstrap/cache
-```
-
-### 8. Install Dependensi Frontend & Kompilasi Asset
-```bash
-npm install
-npm run build
-```
-
----
-
-## Menjalankan Aplikasi di Lingkungan Dev
-
-Buka dua tab terminal terpisah:
-
-**Terminal 1 — Server Laravel & Antrian:**
-```bash
-php artisan serve
-```
-*(Opsional untuk menjalankan pemrosesan antrian background job)*:
-```bash
-php artisan queue:listen --tries=3
-```
-
-**Terminal 2 — Vite Hot Module Reloading (HMR):**
-```bash
+# Terminal 2 — Vite HMR asset watcher
 npm run dev
 ```
 
-Akses aplikasi melalui browser:
-- **Toko Konsumen / Marketplace:** `http://localhost:8000/`
-- **Backoffice ERP:** `http://localhost:8000/app/login`
-- **Layar Kasir POS:** `http://localhost:8000/app/pos`
+### 3. Integrasi Eksternal & Service Produksi
+Salin dan sesuaikan variabel di `.env` (referensi lengkap ada di `.env.example`):
+- **WhatsApp Gateway (OpenWA Self-Hosted):** Pasang kontainer lewat `deploy/openwa/` lalu ikuti panduan UI 1-klik di [Panduan Pemasangan OpenWA](docs/PANDUAN-OPENWA.md).
+- **Queue Worker (Wajib di Produksi):** Pasang konfigurasi Supervisor dari `deploy/supervisor/ute-parts-queue.conf` agar notifikasi WA/Email, sync stok, dan pekerjaan latar belakang berjalan lewat `queue:work database`.
+- **Payment & Ongkir:** Isi `DUITKU_*`, `BITESHIP_*`, dan `SHOPEE_*` di `.env` atau via **Pengaturan → Gateway & Integrasi**.
+- **Scheduler Cron (`routes/console.php`):** Pasang cron Laravel setiap menit (`* * * * * php artisan schedule:run >> /dev/null 2>&1`) untuk cek SLA servis (`servis:cek-batas-waktu`), rekonsiliasi Duitku (`duitku:rekon`), KPI bulanan, dan scheduler Hybrid Sync.
 
 ---
 
-## Akun Bawaan Backoffice (Default Credentials)
+## Testing & Quality Assurance
 
-Semua akun default menggunakan password: `Password123!`
-
-Akses login: `http://localhost:8000/app/login`
-
-| Role | Nama Akun | Email | Hak Akses Utama |
-|---|---|---|---|
-| `super-admin` | Super Admin UteParts | `superadmin@uteparts.id` | Akses penuh seluruh sistem, pengaturan cabang & RBAC |
-| `owner` | Owner UteParts | `owner@uteparts.id` | Akses eksekutif laporan laba rugi, neraca, performa cabang |
-| `admin-toko` | Admin Toko UteParts | `admintoko@uteparts.id` | Operasional cabang: POS, Gudang, Servis, CRM |
-| `kasir` | Kasir UteParts | `kasir@uteparts.id` | Layar kasir POS, sesi kas harian, cek katalog sparepart |
-| `teknisi` | Teknisi UteParts | `teknisi@uteparts.id` | Kanban board servis, diagnosa HP, pasang part & estimasi |
-| `staff-gudang` | Staff Gudang UteParts | `gudang@uteparts.id` | Penerimaan barang PO (GRN), cycle count, transfer stok |
-| `finance` | Finance UteParts | `finance@uteparts.id` | Akunting, COA, jurnal, persetujuan payroll & komisi |
-| `marketing` | Marketing UteParts | `marketing@uteparts.id` | CRM lead pipeline, broadcast promo, membership tier |
-| `kelola-hr` | HR Manager UteParts | `hr@uteparts.id` | Manajemen karyawan, jadwal shift, KPI, proses payroll |
-
-> **Perhatian Keamanan:** Segera ganti password bawaan setelah deploy ke lingkungan produksi.
-
----
-
-## Perintah QA & Testing
-
-Test suite dijalankan menggunakan **PHPUnit 12** pada database SQLite in-memory:
+Seluruh unit & feature tests berjalan terisolasi di atas SQLite `:memory:` (`phpunit.xml`):
 
 ```bash
-# Menjalankan smoke test seluruh halaman
-php artisan test --filter=SmokeSemuaHalamanTest
+# Jalankan seluruh test suite
+composer test
 
-# Menjalankan pengujian fungsional POS & Stok
-php artisan test --filter="PosBayarServisIntegrationTest|PosStokSinkronTest"
+# Jalankan test tertentu
+php artisan test --filter=PricingServiceTest
 
-# Menjalankan pengujian nomor seri (SN)
-php artisan test --filter=SerialNumberTest
-
-# Pipeline QA otomatis (Pint, Larastan Level 6, Deptrac, Composer Audit)
-./scripts/qa-auto.sh
-
-# Laravel Pint Formatter
-./vendor/bin/pint
+# Code formatting check & static analysis & arsitektur modul
+composer qa:format     # vendor/bin/pint --test
+composer qa:stan       # vendor/bin/phpstan analyse
+composer qa:deptrac    # vendor/bin/deptrac analyse
+composer qa            # Jalankan seluruh gerbang QA
 ```
 
 ---
 
-## Opsi One-Click Installer (Instalasi Cepat)
+## Dokumentasi & Referensi
 
-Untuk mempercepat deployment di server atau komputer baru tanpa konfigurasi manual, tersedia metode One-Click Installer:
-
-### 1. One-Click Launcher Ekstraksi ZIP (Windows / Linux / macOS)
-Cukup ekstrak file ZIP proyek, lalu klik file launcher sesuai sistem operasi Anda:
-- **Windows:** Klik 2x file `start-install.bat`
-- **Linux / macOS:** Jalankan `./start-install.sh` (atau klik kanan -> *Run*)
-
-*Skrip launcher otomatis mendeteksi PHP lokal (PATH, Laragon, XAMPP), memastikan dependensi vendor lengkap, memilih port lokal bebas (8000+), langsung meluncurkan web browser ke GUI installer `http://localhost:PORT/install.php`, dan menjalankan server.*
-
----
-
-### 2. Standalone VPS / Server Ubuntu (Nginx + PHP 8.4 + Supervisor)
-Jalankan satu baris perintah interaktif (TUI Wizard) sebagai `root` di VPS kosong / server lokal Ubuntu 22.04 / 24.04:
-```bash
-sudo bash start-install-vps.sh
-```
-*TUI interaktif akan memandu pengisian Domain/IP, nama aplikasi, mode fitur, kredensial database terisolasi (127.0.0.1), akun Super Admin pertama, swap anti-OOM, Nginx, PHP 8.4-FPM, Supervisor worker, cron, dan SSL Let's Encrypt secara otomatis tanpa perlu membuka nano.*
+- **Panduan OpenWA (Self-Hosted WhatsApp Gateway):** [docs/PANDUAN-OPENWA.md](docs/PANDUAN-OPENWA.md) & [deploy/openwa/README.md](deploy/openwa/README.md)
+- **Setup Awal & Migrasi VPS ke Lokal:** [docs/PANDUAN-SETUP-AWAL-MIGRASI.md](docs/PANDUAN-SETUP-AWAL-MIGRASI.md) & [docs/MIGRASI-VPS-KE-LOKAL.md](docs/MIGRASI-VPS-KE-LOKAL.md)
+- **Kasir Offline, Hybrid Sync & Failover:** [docs/hybrid-sync-runbook.md](docs/hybrid-sync-runbook.md) & [docs/PANDUAN-KASIR-OFFLINE-DAN-FAILOVER.md](docs/PANDUAN-KASIR-OFFLINE-DAN-FAILOVER.md)
+- **Otomasi QRIS & Duitku:** [docs/PANDUAN-OTOMASI-QRIS-ANDROID.md](docs/PANDUAN-OTOMASI-QRIS-ANDROID.md) & [docs/DUITKU-SETUP.md](docs/DUITKU-SETUP.md)
+- **Deployment, Maintenance & CI/CD:** [docs/DEPLOY.md](docs/DEPLOY.md), [docs/SERVER-MAINTENANCE.md](docs/SERVER-MAINTENANCE.md), [docs/PANDUAN-CI-CD.md](docs/PANDUAN-CI-CD.md)
+- **Akun Default Backoffice & QA Tools:** [docs/AKUN-BACKOFFICE.md](docs/AKUN-BACKOFFICE.md) & [docs/QA-TOOLS.md](docs/QA-TOOLS.md)
+- **Arsitektur & Riwayat Perubahan:** `docs/adr/`, [DESIGN.md](DESIGN.md), [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
 ---
 
-### 4. Web-based Graphical Installer (Via Browser)
-Buka browser dan akses URL installer visual:
-```
-https://yourdomain.com/install.php
-```
-*GUI installer Ute Prism menyediakan 4 langkah interaktif ramah pengguna:*
-1. **Diagnostik Kesehatan Server:** Deteksi otomatis OS, RAM, Swap, Disk, ekstensi PHP (termasuk Imagick/GD untuk gambar multi-format), izin folder, dan tools sistem.
-2. **Koneksi Database MySQL:** Uji koneksi realtime dengan 1 tombol dan opsi pembuatan database otomatis.
-3. **Bisnis & Git CI/CD:** Form kredensial `.env` tanpa koding (Duitku, Biteship, WA Gateway, serta webhook auto-deploy `POST /webhook/git-deploy`).
-4. **AI Development Node:** Pilihan instalasi otomatis OpenCode CLI, service 9router di port 20128, codebase-memory-mcp, serta AGENTS.md & skills sebagai node maintenance mandiri di server baru.
+## Hak Cipta
 
----
-
-## Otomasi Git CI/CD (Webhook Auto-Deploy)
-
-Aplikasi telah dilengkapi endpoint webhook aman untuk auto-deploy saat Anda push ke branch `main`:
-- **Endpoint:** `POST /webhook/git-deploy`
-- **Keamanan:** Verifikasi tanda tangan GitHub HMAC-SHA256 (`X-Hub-Signature-256`) atau token `GIT_DEPLOY_SECRET`.
-- **Aksi Otomatis:** Saat menerima webhook valid, server otomatis menjalankan `git pull`, `php artisan migrate --force`, dan `php artisan optimize`.
-
----
-
-## Panduan Migrasi Server
-
-Aplikasi ini 100% cloud-ready dan portable, siap dipindahkan ke **VPS baru yang lebih proper** maupun **Server Fisik Lokal (On-Premise) yang memiliki IP Publik**:
-
-### 1. Migrasi ke VPS Baru (Ubuntu + Nginx + PHP-FPM 8.4 + SSL)
-Gunakan panduan deploy produksi tanpa panel (standalone VPS dengan supervisord & OPcache):
-📖 **[Panduan Lengkap Deploy Production ke VPS Baru](docs/DEPLOY.md)**
-
-### 2. Migrasi ke Server Lokal (Kantor / Toko) dengan IP Publik atau Cloudflare Tunnel
-Gunakan panduan pemindahan data lengkap dari backup database, transfer media, restore, hingga konfigurasi IP publik / tunneling:
-📖 **[Panduan Lengkap Migrasi ke Server Lokal Hingga Online](docs/MIGRASI-VPS-KE-LOKAL.md)**
-
-### Checklist Kesiapan Migrasi (Quick Checklist)
-1. **Database Dump:** `mysqldump -u root -p uteparts_db --single-transaction --quick > backup.sql`
-2. **Media Storage:** Arsipkan folder fisik `storage/app/public/` (`tar -czvf storage_media.tar.gz -C storage/app public`).
-3. **Konfigurasi Target:** Salin `.env`, sesuaikan `APP_URL`, `DB_*`, dan kredensial Duitku/Biteship.
-4. **Symlink Storage:** Jalankan `php artisan storage:link` di server baru.
-5. **Worker & Scheduler:** Pasang daemon Supervisor untuk queue (`php artisan queue:work --tries=3`) dan cron scheduler (`* * * * * php /path-to-app/artisan schedule:run >> /dev/null 2>&1`).
-6. **Optimasi Produksi:** `php artisan config:cache && php artisan route:cache && php artisan view:cache`
-
----
-
-## Lisensi
-
-Aplikasi ini dilisensikan di bawah lisensi [MIT](LICENSE).
+Lisensi internal proyek **Bremspace ERP**. Lihat detail dependensi open-source pada `composer.json` dan `package.json`.

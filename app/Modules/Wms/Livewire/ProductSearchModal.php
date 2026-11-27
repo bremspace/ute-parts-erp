@@ -12,6 +12,7 @@ use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ScanResolverService;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -353,6 +354,31 @@ class ProductSearchModal extends Component
 
     public function render()
     {
+        $kualitasList = KualitasProduk::with('brand')
+            ->where('is_active', true)
+            ->when($this->filterBrandId, fn ($q) => $q->forBrand($this->filterBrandId))
+            ->orderByRaw('brand_id IS NULL ASC')
+            ->orderBy('nama')
+            ->get();
+
+        // Saat modal tertutup, lewati query katalog berat & ribuan TipeHp (tetap render wrapper cepat)
+        if (! $this->isOpen) {
+            return view('modules.wms.livewire.product-search-modal', [
+                'products' => new LengthAwarePaginator([], 0, 20),
+                'curatedSupplier' => null,
+                'curatedProductCount' => 0,
+                'supplierScope' => $this->supplierScope,
+                'kategoriList' => collect(),
+                'brandList' => collect(),
+                'kualitasList' => $kualitasList,
+                'tipeHpList' => collect(),
+                'brandKompatibelList' => [],
+                'modelKompatibelList' => [],
+                'kondisiList' => [],
+                'satuanList' => collect(),
+            ]);
+        }
+
         $cabangId = session('cabang_id');
 
         $query = Produk::query()
@@ -363,6 +389,7 @@ class ProductSearchModal extends Component
                 'kualitas',
                 'supplier',
                 'satuanKonversi',
+                'tipeHps',
             ])
             ->withSum('stokItems as total_stok', 'jumlah')
             ->where('is_active', true);
@@ -463,12 +490,7 @@ class ProductSearchModal extends Component
             'supplierScope' => $this->supplierScope,
             'kategoriList' => KategoriProduk::getTree(),
             'brandList' => Brand::where('is_active', true)->orderBy('nama')->get(),
-            'kualitasList' => KualitasProduk::with('brand')
-                ->where('is_active', true)
-                ->when($this->filterBrandId, fn ($q) => $q->forBrand($this->filterBrandId))
-                ->orderByRaw('brand_id IS NULL ASC')
-                ->orderBy('nama')
-                ->get(),
+            'kualitasList' => $kualitasList,
             'tipeHpList' => TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get(),
             'brandKompatibelList' => $brandKompatibelList,
             'modelKompatibelList' => $modelKompatibelList,

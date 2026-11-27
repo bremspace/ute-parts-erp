@@ -58,6 +58,7 @@ class DatabaseManagementService
         // ponytail: artisan optimize:clear + Cache::flush + permission cache covers 99% needs; add targeted redis tagging when distributed cache introduced.
         Artisan::call('optimize:clear');
         Cache::flush();
+        app(KonfigurasiService::class)->flushMemoryCache();
 
         if (class_exists(PermissionRegistrar::class)) {
             app(PermissionRegistrar::class)->forgetCachedPermissions();

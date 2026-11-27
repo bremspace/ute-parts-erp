@@ -3,6 +3,40 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-27 — Optimasi Performa Menyeluruh, Panduan OpenWA & Pembaruan README
+
+- **Optimasi Performa Aplikasi (`AppServiceProvider`, `SettingsRbac`, `WMS`, `Layout`)**:
+  - `AppServiceProvider`: Hapus pemanggilan `forgetCachedPermissions()` di `boot()` yang mereset cache Spatie Permission di setiap request HTTP, dan ikat `KonfigurasiService` sebagai singleton per-request dengan request-scoped RAM memoization (`flushMemoryCache()` saat `set()` / `clearServerCache()`).
+  - `SettingsRbac`: Tunda DNS lookup (`checkDomainDns`) dari `mount()` agar hanya berjalan saat tab `jaringan` aktif atau tombol cek DNS diklik — menghilangkan jeda timeout DNS 5–10 detik pada tab `users`, `role`, `database`, dan `integrasi`.
+  - `EnsureCabangSelected` & `layouts/backoffice.blade.php` & `NotificationCenter`: Cache pengecekan gudang/rak default cabang, cache badge counter sidebar 30 detik, reuse query `daftarCabangAkses()`, dan longgarkan interval polling `NotificationCenter` menjadi 60 detik.
+  - `ProductSearchModal` & `searchable-select`: Tambahkan eager loading `tipeHps` untuk membasmi N+1 kompatibilitas HP di `/app/wms`, hapus duplikasi `@js($normalizedOptions)` (`originalOptions`), hilangkan loop `<option>` DOM tersembunyi yang tidak terpakai, dan bagikan opsi besar identik dalam 1 request via `window.__pSelOpts`.
+- **Optimasi Infrastruktur VPS (Nginx & PHP-FPM 8.4)**:
+  - Aktifkan `gzip_proxied any;` di `/etc/nginx/conf.d/99-gzip-proxied.conf` agar kompresi tetap aktif di balik proxy Cloudflare.
+  - Set OPcache (`max_accelerated_files=32531`, `memory_consumption=256`, `interned_strings_buffer=32`, `revalidate_freq=2`), `realpath_cache_size=4096K`, serta naikkan worker `www.conf` (`pm.max_children=16`, `pm.max_requests=500`).
+- **Audit Mendalam N+1, Query Berat & PWA Precache (Pass 2)**:
+  - `vite.config.js` & `public/build/`: Aktifkan `build.emptyOutDir: true` dan bersihkan 135+ aset build usang (`23 MB` → `1.1 MB`), sehingga service worker PWA (`sw.js`) hanya men-precache 13 entri aktif (~`940 KiB`), bukan ratusan file mati.
+  - Cache runtime server `.env` dipindahkan dari `database` ke `file` (berbagi izin `www-data` antara PHP-FPM dan Supervisor) — memangkas belasan transaksi `SELECT/DELETE/INSERT cache` di setiap perpindahan menu.
+  - `SafeFileCacheStore` (`app/Support/SafeFileCacheStore.php`) didaftarkan di `AppServiceProvider::register()` untuk driver `file`: memastikan direktori (`0775`) dan file (`0664`) cache yang terlanjur dibuat oleh proses `root` (`artisan` CLI / dev server) otomatis dialihkan ke owner web runtime (`www-data`) serta melakukan self-heal bila ada file cache lama yang tidak writable — mencegah error HTTP 500 `file_put_contents(): Permission denied` di `EnsureSetupCompleted`.
+  - `ProductSearchModal`: Lewati query `Produk::paginate`, ribuan `TipeHp`, `Supplier`, `Brand`, serta HTML modal (`-155 KB`) ketika modal dalam kondisi tertutup.
+  - `ProdukTab`: Ganti `withCount('stokLogs')` di daftar utama menjadi `withExists('stokLogs as has_stok_logs')`, tunda query modal-only (`Rak`, `TipeHp` bulk, `Kualitas` create/edit, daftar produk substitusi), dan gabungkan preferensi user lewat `UserPreference::getManyPrefs()`.
+  - `PosKasir` & `Produk::scopeUrutKetersediaanDanTerlaris`: Ganti 3 correlated subquery stok/terjual dengan 2 derived `LEFT JOIN`, tunda loading relasi servis `daftarServisSiapBayar` hingga modal servis dibuka, serta batch preferensi user.
+  - `GrnService`, `GrnTab`, `AkuntingDashboard`, & `SettingsRbac`: Ganti loop saldo kas/bank N+1 dengan 1 query `GROUP BY akun_coa_id`, ubah `whereDate('tanggal', ...)` Buku Besar ke range timestamp sargable agar index `(akun_coa_id, tanggal)` terpakai, gabungkan status count GRN dengan `GROUP BY status`, dan batch pembacaan `loyalitasForm` lewat `KonfigurasiService::getMany()`.
+- **Dokumentasi**:
+  - Menambahkan [docs/PANDUAN-OPENWA.md](PANDUAN-OPENWA.md) berisi langkah lengkap Docker Compose, sizing RAM `whatsapp-web.js` vs `baileys`, ambil admin key aman SSH mobile, setup 1-klik ERP, QR/pairing code, Supervisor queue worker, warm-up anti-ban, dan troubleshooting.
+  - Memperbarui [README.md](../README.md) sesuai arsitektur 16 modul **Bremspace ERP**, stack PHP 8.4 / Laravel 13 / Livewire 4 / Tailwind 4 / Vite 8, Hybrid Sync, OpenWA, serta command QA terbaru.
+
+## 2026-11-27 — OpenWA Gateway: Audit Perbaikan, Enkripsi Kredensial & Manajemen UI 1-Klik
+
+- **Perbaikan Celah & Keandalan Gateway**:
+  - `WhatsAppGatewayService`: Normalisasi URL OpenWA (`normalizeOpenWaUrl()` menjamin akhiran `/api`), fallback otomatis ke `config('services.openwa')` saat konfigurasi DB kosong, pemetaan error HTTP `409`/`503`, dekripsi token dari DB (tetap kompatibel dengan nilai plaintext lama), dan metadata `retryable` untuk klasifikasi retry.
+  - `KirimNotifikasiJob`: Error transien (`409`, `429`, `502`–`504`, unreachable/timeout) kini memicu `$this->release($this->backoff)` dengan status tetap `pending` hingga batas `$tries = 3`, sedangkan error permanen (`401`/`403`/`404`/`500`) langsung menandai `gagal`.
+- **Manajemen OpenWA via Frontend (`Pengaturan → Integrasi`)**:
+  - `OpenWaManagerService`: Proxy backend ke OpenWA REST API (`/health/ready`, daftar/buat/start sesi, QR base64 `qrCode`, pairing code nomor Indonesia, pembuatan API key ber-role `operator` scoped lewat `allowedSessions`, dan proteksi path traversal `sessionId`).
+  - `SettingsRbac` & `settings-rbac.blade.php`: Setup otomatis 1-klik (membuat sesi UUID, start engine, mencetak operator key, dan menyimpan terenkripsi), indikator health & status sesi, modal/panel QR Code + polling otomatis hingga `ready`, kode pairing 8 karakter, validasi wajib `wa_session` saat memilih OpenWA, masking token di state Livewire (enkripsi `Crypt::encryptString` saat simpan), serta pencatatan uji kirim ke `NotifikasiKeluar`.
+- **Dokumentasi & Pengujian**:
+  - Memperbarui `deploy/openwa/README.md` & `.env.example` terkait prasyarat Docker Compose v2, pemakaian UUID sesi, dan alur setup UI.
+  - Menambahkan `tests/Feature/OpenWaManagerServiceTest.php` serta memperluas `tests/Feature/WhatsAppGatewayTest.php` dan `tests/Feature/PengaturanSistemIntegrationTest.php`.
+
 ## 2026-11-24 — Hybrid Database Sync: Audit Hardening, Akuntansi & Backoffice Parity
 
 - **Keamanan & Retry**:

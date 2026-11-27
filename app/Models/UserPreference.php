@@ -33,6 +33,25 @@ class UserPreference extends Model
     }
 
     /**
+     * Ambil beberapa preferensi user dalam satu query (`whereIn`).
+     *
+     * @param  array<int, string>  $keys
+     * @return array<string, mixed>
+     */
+    public static function getManyPrefs(int $userId, array $keys): array
+    {
+        $keys = array_values(array_unique($keys));
+        if ($keys === []) {
+            return [];
+        }
+
+        return static::where('user_id', $userId)
+            ->whereIn('key', $keys)
+            ->pluck('value', 'key')
+            ->all();
+    }
+
+    /**
      * Helper to set user preference.
      */
     public static function setPref(int $userId, string $key, mixed $value): static

@@ -10,6 +10,7 @@ use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Marketplace\Services\DuitkuService;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
+use App\Modules\Notifikasi\Services\OpenWaManagerService;
 use App\Modules\Notifikasi\Services\WaTemplateService;
 use App\Modules\Notifikasi\Services\WhatsAppGatewayService;
 use App\Modules\Pos\Models\QrisCabang;
@@ -35,8 +36,10 @@ use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportAtributService;
 use App\Support\NomorTeleponIndonesia;
 use App\Traits\ParsesNominal;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -334,6 +337,27 @@ class SettingsRbac extends Component
     /** @var array<int, array<string, mixed>> Riwayat WA terbaru untuk panel status. */
     public array $waRecentLogs = [];
 
+    /** Indikator aman untuk frontend bahwa token WA sudah tersimpan (tanpa mengirim rahasia). */
+    public bool $waTokenConfigured = false;
+
+    /** OpenWA management state */
+    public ?string $openwaHealth = null;
+
+    public string $openwaQrData = '';
+
+    public string $openwaPairingCode = '';
+
+    public array $openwaSessionStatus = [];
+
+    /** @var array<int, array<string, mixed>> Daftar sesi OpenWA yang berhasil dimuat. */
+    public array $openwaSessions = [];
+
+    public string $openwaSessionName = 'bremspace-erp';
+
+    public string $openwaAdminKey = '';
+
+    public string $openwaPairingPhone = '';
+
     public ?string $duitkuTestStatus = null;
 
     public string $duitkuTestMessage = '';
@@ -362,6 +386,7 @@ class SettingsRbac extends Component
             $this->printerSubTab = $sub;
             $this->standalonePrinter = true;
             $this->loadQrisConfig();
+
             return;
         }
 
@@ -405,9 +430,12 @@ class SettingsRbac extends Component
 
         $config = app(KonfigurasiService::class);
 
-        // Nilai TERSIMPAN dari tabel konfigurasi, fallback default bila kosong
-        foreach (array_keys($this->loyalitasForm) as $kunci) {
-            $this->loyalitasForm[$kunci] = (float) ($config->get($kunci) ?? $config->defaults()[$kunci]);
+        // Nilai TERSIMPAN dari tabel konfigurasi (1 query whereIn), fallback default bila kosong
+        $loyalitasKeys = array_keys($this->loyalitasForm);
+        $savedLoyalitas = $config->getMany($loyalitasKeys);
+        $defaultsLoyalitas = $config->defaults();
+        foreach ($loyalitasKeys as $kunci) {
+            $this->loyalitasForm[$kunci] = (float) ($savedLoyalitas[$kunci] ?? $defaultsLoyalitas[$kunci]);
         }
 
         // Sinkronkan diskon langsung dari master TierMembership agar identik dengan CRM
@@ -444,7 +472,17 @@ class SettingsRbac extends Component
 
         if (in_array($normalized, self::VALID_TABS, true)) {
             $this->activeTab = $normalized;
+            if ($normalized === 'jaringan' && $this->dnsCheckResult === null) {
+                $this->loadNetworkConfig(checkDns: true);
+            }
             $this->dispatch('tab-changed', tab: $tab, url: url('/app/pengaturan/'.$tab));
+        }
+    }
+
+    public function updatedActiveTab(string $value): void
+    {
+        if ($value === 'jaringan' && $this->dnsCheckResult === null) {
+            $this->loadNetworkConfig(checkDns: true);
         }
     }
 
@@ -1228,24 +1266,44 @@ class SettingsRbac extends Component
         if (is_array($savedWa)) {
             $this->integrasiForm['wa_provider'] = $savedWa['provider'] ?? 'fonnte';
             $this->integrasiForm['wa_url'] = $savedWa['url'] ?? 'https://api.fonnte.com/send';
-            $this->integrasiForm['wa_token'] = $savedWa['token'] ?? '';
             $this->integrasiForm['wa_device_id'] = $savedWa['device_id'] ?? '';
             $this->integrasiForm['wa_session'] = $savedWa['session'] ?? '';
             $this->integrasiForm['wa_auto_notif_transaksi'] = (bool) ($savedWa['auto_notif_transaksi'] ?? true);
             $this->integrasiForm['wa_auto_notif_servis'] = (bool) ($savedWa['auto_notif_servis'] ?? true);
-        } else {
-            // Fallback ke config('services.wa')
-            $envWa = config('services.wa', []);
-            if (is_array($envWa)) {
-                $this->integrasiForm['wa_url'] = $envWa['url'] ?: 'https://api.fonnte.com/send';
-                $this->integrasiForm['wa_token'] = $envWa['token'] ?: '';
-                $this->integrasiForm['wa_device_id'] = $envWa['device_id'] ?: '';
+
+            // Jangan pernah kirim token asli ke state publik Livewire.
+            $rawToken = (string) ($savedWa['token'] ?? '');
+            if ($rawToken !== '') {
+                try {
+                    $decrypted = Crypt::decryptString($rawToken);
+                    $this->waTokenConfigured = $decrypted !== '';
+                } catch (DecryptException) {
+                    $this->waTokenConfigured = true;
+                }
+            } else {
+                $this->waTokenConfigured = false;
             }
+            $this->integrasiForm['wa_token'] = '';
+        } else {
+            // Fallback ke config('services.openwa') / config('services.wa')
+            $openwa = config('services.openwa', []);
+            $envWa = config('services.wa', []);
+            if (is_array($openwa) && filled($openwa['api_key'] ?? null)) {
+                $this->integrasiForm['wa_provider'] = 'openwa';
+                $this->integrasiForm['wa_url'] = (string) ($openwa['url'] ?: 'http://127.0.0.1:2785/api');
+                $this->integrasiForm['wa_session'] = (string) ($openwa['session'] ?? '');
+                $this->waTokenConfigured = true;
+            } elseif (is_array($envWa)) {
+                $this->integrasiForm['wa_url'] = $envWa['url'] ?: 'https://api.fonnte.com/send';
+                $this->integrasiForm['wa_device_id'] = $envWa['device_id'] ?: '';
+                $this->waTokenConfigured = filled($envWa['token'] ?? null);
+            }
+            $this->integrasiForm['wa_token'] = '';
         }
 
         $envOpenWa = config('services.openwa', []);
-        if (is_array($envOpenWa)) {
-            $this->integrasiForm['wa_session'] = $this->integrasiForm['wa_session'] ?: ($envOpenWa['session'] ?? '');
+        if (is_array($envOpenWa) && filled($envOpenWa['api_key'] ?? null)) {
+            $this->integrasiForm['wa_session'] = $this->integrasiForm['wa_session'] ?: (string) ($envOpenWa['session'] ?? '');
         }
 
         $savedDuitku = $config->get('duitku_gateway_config');
@@ -1496,8 +1554,16 @@ class SettingsRbac extends Component
             $this->integrasiForm['wa_url'] = 'https://kudus.wablas.com/api/send-message';
         } elseif ($this->integrasiForm['wa_provider'] === 'openwa') {
             $this->integrasiForm['wa_url'] = (string) (config('services.openwa.url') ?: 'http://127.0.0.1:2785/api');
-            $this->integrasiForm['wa_session'] = $this->integrasiForm['wa_session'] ?: (string) (config('services.openwa.session') ?: 'default');
+            if (filled(config('services.openwa.api_key'))) {
+                $this->integrasiForm['wa_session'] = $this->integrasiForm['wa_session'] ?: (string) (config('services.openwa.session') ?: '');
+            }
         }
+
+        $this->openwaHealth = null;
+        $this->openwaQrData = '';
+        $this->openwaPairingCode = '';
+        $this->openwaSessionStatus = [];
+        $this->waTokenConfigured = $this->resolveWaToken() !== '';
     }
 
     /** Muat 8 log WA terbaru untuk panel status/error di halaman integrasi. */
@@ -1627,13 +1693,21 @@ class SettingsRbac extends Component
             return;
         }
 
+        $token = $this->resolveWaToken();
+        if ($token === '') {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Token / API Key WhatsApp wajib diisi sebelum melakukan tes.',
+            ]);
+
+            return;
+        }
+
         $this->validate([
-            'integrasiForm.wa_token' => 'required|string',
-            'integrasiForm.wa_url' => 'required|url',
+            'integrasiForm.wa_url' => 'required|url:http,https',
             'integrasiForm.wa_test_number' => 'required|string|min:9|max:20',
         ], [
             'integrasiForm.wa_test_number.required' => 'Nomor WhatsApp tujuan tes wajib diisi.',
-            'integrasiForm.wa_token.required' => 'Token / API Key WhatsApp wajib diisi sebelum melakukan tes.',
         ]);
 
         $service = app(WaTemplateService::class);
@@ -1658,7 +1732,7 @@ class SettingsRbac extends Component
         $hasil = app(WhatsAppGatewayService::class)->kirimDenganConfig([
             'provider' => $this->integrasiForm['wa_provider'] ?? 'custom',
             'url' => $this->integrasiForm['wa_url'],
-            'token' => $this->integrasiForm['wa_token'],
+            'token' => $token,
             'session' => $this->integrasiForm['wa_session'] ?? '',
             'timeout' => (int) config('services.openwa.timeout', 20),
         ], $tujuan, "🧪 TEST TEMPLATE ({$service->event($event)['label']})\n\n".$pesan);
@@ -1706,10 +1780,10 @@ class SettingsRbac extends Component
 
         $this->validate([
             'integrasiForm.wa_provider' => 'required|in:fonnte,wablas,custom,openwa',
-            'integrasiForm.wa_url' => 'required|url',
+            'integrasiForm.wa_url' => 'required|url:http,https',
             'integrasiForm.wa_token' => 'nullable|string|max:255',
             'integrasiForm.wa_device_id' => 'nullable|string|max:100',
-            'integrasiForm.wa_session' => 'nullable|string|max:100',
+            'integrasiForm.wa_session' => 'nullable|required_if:integrasiForm.wa_provider,openwa|string|max:100',
             'integrasiForm.duitku_mode' => 'required|in:sandbox,production',
             'integrasiForm.duitku_merchant_code' => 'nullable|string|max:100',
             'integrasiForm.duitku_api_key' => 'nullable|string|max:255',
@@ -1758,15 +1832,11 @@ class SettingsRbac extends Component
         $this->integrasiForm['wa_auto_notif_transaksi'] = $grupTransaksiAktif;
         $this->integrasiForm['wa_auto_notif_servis'] = $grupServisAktif;
 
-        $config->set('wa_gateway_config', [
-            'provider' => $this->integrasiForm['wa_provider'],
-            'url' => $this->integrasiForm['wa_url'],
-            'token' => $this->integrasiForm['wa_token'],
-            'device_id' => $this->integrasiForm['wa_device_id'],
-            'session' => $this->integrasiForm['wa_session'],
-            'auto_notif_transaksi' => $grupTransaksiAktif,
-            'auto_notif_servis' => $grupServisAktif,
-        ], 'Konfigurasi WhatsApp Gateway');
+        $this->persistWaGatewayConfig(
+            token: $this->resolveWaToken(),
+            autoTransaksi: $grupTransaksiAktif,
+            autoServis: $grupServisAktif,
+        );
 
         // 2. Duitku Config
         $logoPath = (string) ($this->integrasiForm['duitku_logo'] ?? '');
@@ -1915,13 +1985,23 @@ class SettingsRbac extends Component
             return;
         }
 
+        $token = $this->resolveWaToken();
+        if ($token === '') {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Token / API Key WhatsApp wajib diisi sebelum melakukan tes.',
+            ]);
+
+            return;
+        }
+
         $this->validate([
-            'integrasiForm.wa_token' => 'required|string',
-            'integrasiForm.wa_url' => 'required|url',
+            'integrasiForm.wa_url' => 'required|url:http,https',
             'integrasiForm.wa_test_number' => 'required|string|min:9|max:20',
+            'integrasiForm.wa_session' => 'nullable|required_if:integrasiForm.wa_provider,openwa|string|max:100',
         ], [
             'integrasiForm.wa_test_number.required' => 'Nomor WhatsApp tujuan tes wajib diisi.',
-            'integrasiForm.wa_token.required' => 'Token / API Key WhatsApp wajib diisi sebelum melakukan tes.',
+            'integrasiForm.wa_session.required_if' => 'ID Sesi OpenWA wajib diisi atau jalankan Setup Otomatis.',
         ]);
 
         $pesan = '🔔 *Uji Coba WhatsApp Gateway '.config('app.name', 'Bremspace')." ERP*\n\nKoneksi WhatsApp Gateway berhasil terhubung dengan sistem.\n\n📅 Waktu: ".now()->format('d M Y H:i:s')."\n👤 Diuji oleh: ".auth()->user()->name."\n\n_Pesan ini dikirim otomatis oleh sistem._";
@@ -1929,24 +2009,439 @@ class SettingsRbac extends Component
         $hasil = app(WhatsAppGatewayService::class)->kirimDenganConfig([
             'provider' => $this->integrasiForm['wa_provider'],
             'url' => $this->integrasiForm['wa_url'],
-            'token' => $this->integrasiForm['wa_token'],
+            'token' => $token,
             'session' => $this->integrasiForm['wa_session'],
             'timeout' => (int) config('services.openwa.timeout', 20),
         ], $this->integrasiForm['wa_test_number'], $pesan);
+
+        NotifikasiKeluar::create([
+            'tipe' => 'wa',
+            'kategori' => 'sistem',
+            'tujuan' => $hasil['chat_id'] ?: $this->integrasiForm['wa_test_number'],
+            'judul' => 'Uji Coba WA Gateway',
+            'konten' => $pesan,
+            'payload' => [
+                'wa_test' => true,
+                'provider' => $this->integrasiForm['wa_provider'],
+            ],
+            'status' => $hasil['ok'] ? 'terkirim' : 'gagal',
+            'error' => $hasil['ok'] ? null : $hasil['error'],
+            'user_id' => auth()->id(),
+            'cabang_id' => session('cabang_id'),
+        ]);
 
         if ($hasil['ok']) {
             $this->waTestStatus = 'success';
             $this->dispatch('alert', [
                 'type' => 'success',
-                'message' => 'Pesan tes WhatsApp berhasil dikirim ke '.$this->integrasiForm['wa_test_number'].'!',
+                'message' => 'Pesan tes WhatsApp berhasil dikirim ke '.$this->maskNomor((string) $this->integrasiForm['wa_test_number']).'!',
             ]);
         } else {
             $this->waTestStatus = 'error';
-            // Pesan error sudah dibuat aman oleh gateway service (tanpa token).
             $this->dispatch('alert', [
                 'type' => 'error',
                 'message' => 'Gagal kirim WA: '.$hasil['error'],
             ]);
+        }
+
+        $this->refreshWaRecentLogs();
+    }
+
+    private function formatOpenWaAuthError(string $key, string $err): string
+    {
+        if (! str_contains($err, '401') && ! str_contains($err, '403')) {
+            return $err;
+        }
+
+        $preview = WhatsAppGatewayService::maskKredensial($key).' · '.strlen($key).' karakter';
+
+        return $err.' Key diterima: '.$preview.'. Jalankan: docker exec openwa-api cat /app/data/.api-key; echo ""';
+    }
+
+    private function sanitizeApiKey(string $raw): string
+    {
+        $clean = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}\x{00A0}]/u', '', $raw) ?? $raw;
+        $clean = trim($clean, " \t\n\r\0\x0B\"'`");
+        $clean = preg_replace('/^(?:x-api-key\s*:\s*|bearer\s+)/i', '', $clean) ?? $clean;
+        $clean = trim($clean, " \t\n\r\0\x0B\"'`");
+
+        // Tangani copy-paste terminal mobile yang terpotong baris (\n/spasi) atau menempel prompt shell.
+        $compact = preg_replace('/\s+/', '', $clean) ?? $clean;
+        if (preg_match('/(owa_k\d+_[a-f0-9]{64})/i', $compact, $m) === 1) {
+            return strtolower($m[1]);
+        }
+
+        return $clean;
+    }
+
+    /**
+     * Resolve effective WA token: explicit form input overrides stored config for the active provider.
+     */
+    private function resolveWaToken(): string
+    {
+        $formToken = $this->sanitizeApiKey((string) ($this->integrasiForm['wa_token'] ?? ''));
+        if ($formToken !== '') {
+            return $formToken;
+        }
+
+        $activeProvider = (string) ($this->integrasiForm['wa_provider'] ?? 'fonnte');
+        $saved = app(KonfigurasiService::class)->get('wa_gateway_config');
+        if (is_array($saved) && ($saved['provider'] ?? '') === $activeProvider && filled($saved['token'] ?? null)) {
+            try {
+                return Crypt::decryptString((string) $saved['token']);
+            } catch (DecryptException) {
+                return (string) $saved['token'];
+            }
+        }
+
+        if ($activeProvider === WhatsAppGatewayService::PROVIDER_OPENWA) {
+            return (string) config('services.openwa.api_key', '');
+        }
+
+        return '';
+    }
+
+    /**
+     * Simpan konfigurasi WA gateway dengan token terenkripsi dan clear input sensitif dari state UI.
+     */
+    private function persistWaGatewayConfig(string $token, bool $autoTransaksi, bool $autoServis): void
+    {
+        $url = (string) ($this->integrasiForm['wa_url'] ?? '');
+        if (($this->integrasiForm['wa_provider'] ?? '') === WhatsAppGatewayService::PROVIDER_OPENWA && $url !== '') {
+            $url = WhatsAppGatewayService::normalizeOpenWaUrl($url);
+            $this->integrasiForm['wa_url'] = $url;
+        }
+
+        app(KonfigurasiService::class)->set('wa_gateway_config', [
+            'provider' => $this->integrasiForm['wa_provider'],
+            'url' => $url,
+            'token' => $token !== '' ? Crypt::encryptString($token) : '',
+            'device_id' => $this->integrasiForm['wa_device_id'],
+            'session' => $this->integrasiForm['wa_session'],
+            'auto_notif_transaksi' => $autoTransaksi,
+            'auto_notif_servis' => $autoServis,
+        ], 'Konfigurasi WhatsApp Gateway');
+
+        $this->integrasiForm['wa_token'] = '';
+        $this->waTokenConfigured = $token !== '';
+    }
+
+    // ── OpenWA Management Methods ───────────────────────────────────────
+
+    public function cekHealthOpenWa(): void
+    {
+        if (! $this->boleh('pengaturan.manage')) {
+            return;
+        }
+
+        $url = (string) ($this->integrasiForm['wa_url'] ?? '');
+        if (blank($url)) {
+            $this->openwaHealth = 'offline';
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'URL OpenWA belum diisi.']);
+
+            return;
+        }
+
+        $result = app(OpenWaManagerService::class)->health($url);
+        $this->openwaHealth = $result['ok'] ? 'online' : 'offline';
+
+        $this->dispatch('alert', [
+            'type' => $result['ok'] ? 'success' : 'error',
+            'message' => $result['ok'] ? 'OpenWA online dan siap menerima koneksi.' : ('OpenWA: '.$result['error']),
+        ]);
+    }
+
+    public function muatSesiOpenWa(): void
+    {
+        if (! $this->boleh('pengaturan.manage')) {
+            return;
+        }
+
+        $url = (string) ($this->integrasiForm['wa_url'] ?? '');
+        $key = $this->sanitizeApiKey($this->openwaAdminKey) ?: $this->resolveWaToken();
+
+        if (blank($url) || blank($key)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Isi URL OpenWA dan Admin/Operator Key terlebih dahulu.']);
+
+            return;
+        }
+
+        $list = app(OpenWaManagerService::class)->listSessions($url, $key);
+        if (! $list['ok']) {
+            $err = (string) $list['error'];
+            $this->openwaHealth = (str_contains($err, '401') || str_contains($err, '403')) ? 'online' : 'offline';
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memuat daftar sesi: '.$this->formatOpenWaAuthError($key, $err)]);
+
+            return;
+        }
+
+        $this->openwaHealth = 'online';
+        $this->openwaSessions = $list['data'];
+
+        if ($this->openwaSessions !== [] && blank($this->integrasiForm['wa_session'] ?? '')) {
+            $firstId = (string) ($this->openwaSessions[0]['id'] ?? '');
+            if ($firstId !== '') {
+                $this->integrasiForm['wa_session'] = $firstId;
+                $this->openwaSessionStatus = $this->openwaSessions[0];
+            }
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => count($this->openwaSessions).' sesi OpenWA ditemukan.',
+        ]);
+    }
+
+    public function pilihSesiOpenWa(string $sessionId): void
+    {
+        if (! $this->boleh('pengaturan.manage')) {
+            return;
+        }
+
+        $this->integrasiForm['wa_session'] = trim($sessionId);
+        $this->openwaQrData = '';
+        $this->openwaPairingCode = '';
+        $this->refreshOpenWaSessionStatus();
+    }
+
+    public function startSesiOpenWa(): void
+    {
+        if (! $this->boleh('pengaturan.manage')) {
+            return;
+        }
+
+        $url = (string) ($this->integrasiForm['wa_url'] ?? '');
+        $sessionId = trim((string) ($this->integrasiForm['wa_session'] ?? ''));
+        $key = $this->sanitizeApiKey($this->openwaAdminKey) ?: $this->resolveWaToken();
+
+        if (blank($url) || blank($sessionId) || blank($key)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'URL, ID Sesi OpenWA, dan Token/Key wajib terisi.']);
+
+            return;
+        }
+
+        $result = app(OpenWaManagerService::class)->startSession($url, $key, $sessionId);
+        if (! $result['ok']) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memulai sesi: '.$result['error']]);
+
+            return;
+        }
+
+        $this->refreshOpenWaSessionStatus();
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Sesi OpenWA sedang dimulai. Tunggu status qr_ready lalu muat QR Code.',
+        ]);
+    }
+
+    public function setupOpenWaOtomatis(): void
+    {
+        if (! $this->boleh('pengaturan.manage')) {
+            return;
+        }
+
+        $url = (string) ($this->integrasiForm['wa_url'] ?? '');
+        $adminKey = $this->sanitizeApiKey($this->openwaAdminKey);
+        if (blank($url) || blank($adminKey)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'URL OpenWA dan Master Admin Key wajib diisi.']);
+
+            return;
+        }
+
+        $manager = app(OpenWaManagerService::class);
+
+        $health = $manager->health($url);
+        if (! $health['ok']) {
+            $this->openwaHealth = 'offline';
+            $this->dispatch('alert', ['type' => 'error', 'message' => $health['error']]);
+
+            return;
+        }
+        $this->openwaHealth = 'online';
+
+        // 1. Cari sesi yang sudah ada atau buat sesi baru
+        $list = $manager->listSessions($url, $adminKey);
+        if (! $list['ok']) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Gagal memeriksa sesi OpenWA: '.$this->formatOpenWaAuthError($adminKey, (string) $list['error']),
+            ]);
+
+            return;
+        }
+
+        $sessions = $list['data'];
+        $this->openwaSessions = $sessions;
+        $requestedIdOrName = trim((string) ($this->integrasiForm['wa_session'] ?? ''));
+        $session = null;
+        if ($requestedIdOrName !== '') {
+            foreach ($sessions as $item) {
+                if (($item['id'] ?? '') === $requestedIdOrName || ($item['name'] ?? '') === $requestedIdOrName) {
+                    $session = $item;
+                    break;
+                }
+            }
+        }
+        $session = $session ?: ($sessions[0] ?? null);
+
+        if (! $session) {
+            $name = trim($this->openwaSessionName) ?: ('erp-'.now()->format('ymd'));
+            $create = $manager->createSession($url, $adminKey, $name);
+            if (! $create['ok'] || ! is_array($create['data'])) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal membuat sesi OpenWA: '.($create['error'] ?? 'respons kosong')]);
+
+                return;
+            }
+            $session = $create['data'];
+            $this->openwaSessions[] = $session;
+        }
+
+        $sessionId = (string) ($session['id'] ?? '');
+        if ($sessionId === '') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'OpenWA tidak mengembalikan UUID sesi.']);
+
+            return;
+        }
+
+        // 2. Pastikan engine sesi berjalan (hindari restart bila sudah ready)
+        if (! OpenWaManagerService::isReadyStatus($session['status'] ?? null)) {
+            $manager->startSession($url, $adminKey, $sessionId);
+        }
+
+        // 3. Cetak API Key khusus OPERATOR (session-scoped)
+        $opKey = $manager->createOperatorKey($url, $adminKey, $sessionId);
+        if (! $opKey['ok'] || blank($opKey['data']['apiKey'] ?? null)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal membuat API key operator: '.($opKey['error'] ?? 'kosong')]);
+
+            return;
+        }
+
+        $operatorToken = (string) $opKey['data']['apiKey'];
+
+        // 4. Simpan langsung terenkripsi ke database & bersihkan Admin Key dari state
+        $this->integrasiForm['wa_provider'] = WhatsAppGatewayService::PROVIDER_OPENWA;
+        $this->integrasiForm['wa_session'] = $sessionId;
+
+        $grupTransaksiAktif = (bool) ($this->waTemplateForm['groups']['transaksi']['enabled'] ?? true);
+        $grupServisAktif = (bool) ($this->waTemplateForm['groups']['servis_pelanggan']['enabled'] ?? true)
+            || (bool) ($this->waTemplateForm['groups']['servis_internal']['enabled'] ?? true);
+
+        $this->persistWaGatewayConfig($operatorToken, $grupTransaksiAktif, $grupServisAktif);
+        $this->openwaAdminKey = '';
+
+        app(AuditService::class)->catat(
+            'Konfigurasi',
+            'update',
+            null,
+            "Setup otomatis gateway OpenWA berhasil (sesi: {$sessionId})"
+        );
+
+        $this->refreshOpenWaSessionStatus();
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => OpenWaManagerService::isReadyStatus($this->openwaSessionStatus['status'] ?? null)
+                ? 'OpenWA terhubung dan sesi sudah siap mengirim pesan.'
+                : 'Sesi OpenWA dibuat dan API key operator tersimpan aman. Scan QR untuk menautkan WhatsApp.',
+        ]);
+    }
+
+    public function getQrOpenWa(): void
+    {
+        if (! $this->boleh('pengaturan.manage')) {
+            return;
+        }
+
+        $url = (string) ($this->integrasiForm['wa_url'] ?? '');
+        $sessionId = trim((string) ($this->integrasiForm['wa_session'] ?? ''));
+        $token = $this->resolveWaToken() ?: $this->sanitizeApiKey($this->openwaAdminKey);
+
+        if (blank($url) || blank($sessionId) || blank($token)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'URL OpenWA, ID Sesi (UUID), dan API Key wajib terisi.']);
+
+            return;
+        }
+
+        $result = app(OpenWaManagerService::class)->getQr($url, $token, $sessionId);
+
+        if ($result['ok']) {
+            $qr = (string) ($result['data']['qr'] ?? '');
+            $this->openwaQrData = str_starts_with($qr, 'data:image/') ? $qr : '';
+            if ($this->openwaQrData === '') {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Format QR dari OpenWA bukan gambar base64 PNG.']);
+            }
+        } else {
+            $this->openwaQrData = '';
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal mengambil QR: '.$result['error']]);
+        }
+    }
+
+    public function getPairingCodeOpenWa(): void
+    {
+        if (! $this->boleh('pengaturan.manage')) {
+            return;
+        }
+
+        $url = (string) ($this->integrasiForm['wa_url'] ?? '');
+        $sessionId = trim((string) ($this->integrasiForm['wa_session'] ?? ''));
+        $token = $this->resolveWaToken() ?: $this->sanitizeApiKey($this->openwaAdminKey);
+        $phone = trim($this->openwaPairingPhone);
+
+        if (blank($url) || blank($sessionId) || blank($token) || blank($phone)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Lengkapi URL, ID Sesi, API Key, dan nomor HP WhatsApp.']);
+
+            return;
+        }
+
+        $result = app(OpenWaManagerService::class)->getPairingCode($url, $token, $sessionId, $phone);
+
+        if ($result['ok']) {
+            $this->openwaPairingCode = (string) ($result['data']['code'] ?? '');
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Kode pairing berhasil dibuat. Masukkan ke WhatsApp HP → Perangkat Tertaut.']);
+        } else {
+            $this->openwaPairingCode = '';
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal mengambil kode pairing: '.$result['error']]);
+        }
+    }
+
+    public function refreshOpenWaSessionStatus(): void
+    {
+        if (! $this->boleh('pengaturan.manage')) {
+            return;
+        }
+
+        $url = (string) ($this->integrasiForm['wa_url'] ?? '');
+        $sessionId = trim((string) ($this->integrasiForm['wa_session'] ?? ''));
+        $token = $this->resolveWaToken() ?: $this->sanitizeApiKey($this->openwaAdminKey);
+
+        if (blank($url) || blank($sessionId) || blank($token)) {
+            return;
+        }
+
+        $manager = app(OpenWaManagerService::class);
+        $result = $manager->getSessionStatus($url, $token, $sessionId);
+
+        if (! $result['ok'] || ! is_array($result['data'])) {
+            $this->openwaSessionStatus = [];
+
+            return;
+        }
+
+        $this->openwaHealth = 'online';
+        $this->openwaSessionStatus = $result['data'];
+        $status = strtolower((string) ($this->openwaSessionStatus['status'] ?? ''));
+
+        if (OpenWaManagerService::isReadyStatus($status)) {
+            $this->openwaQrData = '';
+            $this->openwaPairingCode = '';
+        } elseif ($status === 'qr_ready' && $this->openwaQrData === '') {
+            $qrRes = $manager->getQr($url, $token, $sessionId);
+            if ($qrRes['ok']) {
+                $qr = (string) ($qrRes['data']['qr'] ?? '');
+                if (str_starts_with($qr, 'data:image/')) {
+                    $this->openwaQrData = $qr;
+                }
+            }
         }
     }
 
@@ -4597,7 +5092,7 @@ class SettingsRbac extends Component
         $this->atributActivePreviewTab = $tab;
     }
 
-    public function loadNetworkConfig(?NetworkManagementService $service = null): void
+    public function loadNetworkConfig(?NetworkManagementService $service = null, ?bool $checkDns = null): void
     {
         $service = $service ?: app(NetworkManagementService::class);
         $this->networkStatus = $service->getStatus();
@@ -4606,7 +5101,8 @@ class SettingsRbac extends Component
         $this->networkConfig['tunnel_token'] = $this->networkStatus['tunnel_token'];
         $this->networkConfig['custom_lan_url'] = 'http://'.($this->networkStatus['lan_ip'] ?: 'localhost').':1741';
 
-        if (! empty($this->networkConfig['domain'])) {
+        $shouldCheckDns = $checkDns ?? ($this->activeTab === 'jaringan');
+        if ($shouldCheckDns && ! empty($this->networkConfig['domain'])) {
             $this->dnsCheckResult = $service->checkDomainDns(
                 $this->networkConfig['domain'],
                 $this->networkConfig['tunnel_token'] ?: null

@@ -410,17 +410,19 @@ class ProdukTab extends Component
     {
         $userId = auth()->id();
         if ($userId) {
-            $prefFilters = UserPreference::getPref($userId, 'wms_produk_tab_custom_filters');
-            if (is_array($prefFilters)) {
-                $this->visibleFilters = array_merge($this->visibleFilters, $prefFilters);
+            $prefs = UserPreference::getManyPrefs($userId, [
+                'wms_produk_tab_custom_filters',
+                'wms_produk_tab_visible_columns',
+                'wms_produk_tab_hidden_gudangs',
+            ]);
+            if (is_array($prefs['wms_produk_tab_custom_filters'] ?? null)) {
+                $this->visibleFilters = array_merge($this->visibleFilters, $prefs['wms_produk_tab_custom_filters']);
             }
-            $prefCols = UserPreference::getPref($userId, 'wms_produk_tab_visible_columns');
-            if (is_array($prefCols)) {
-                $this->visibleColumns = array_merge($this->visibleColumns, $prefCols);
+            if (is_array($prefs['wms_produk_tab_visible_columns'] ?? null)) {
+                $this->visibleColumns = array_merge($this->visibleColumns, $prefs['wms_produk_tab_visible_columns']);
             }
-            $prefGudangs = UserPreference::getPref($userId, 'wms_produk_tab_hidden_gudangs');
-            if (is_array($prefGudangs)) {
-                $this->hiddenGudangs = $prefGudangs;
+            if (is_array($prefs['wms_produk_tab_hidden_gudangs'] ?? null)) {
+                $this->hiddenGudangs = $prefs['wms_produk_tab_hidden_gudangs'];
             }
         }
     }
@@ -4306,7 +4308,7 @@ class ProdukTab extends Component
             'hargaTier.tierMembership',
             'satuanKonversi',
         ])
-            ->withCount('stokLogs')
+            ->withExists('stokLogs as has_stok_logs')
             ->withSum([
                 'stokItems as total_stok' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId))),
             ], 'jumlah')
@@ -4652,13 +4654,18 @@ class ProdukTab extends Component
             }, array_filter($savedKondisi, fn ($k) => ($k['is_active'] ?? true))))
             : $defaultKondisi;
 
-        $merekHpOptions = TipeHp::where('is_active', true)
-            ->distinct()
-            ->orderBy('merk')
-            ->pluck('merk')
-            ->filter()
-            ->values()
-            ->all();
+        $needsAnyModal = $this->showProdukModal || $this->showEditProdukModal || $this->showQuickAddModal || $this->showBulkEditModal || $this->showSaldoAwalModal;
+        $needsCreateOrEdit = $this->showProdukModal || $this->showEditProdukModal;
+
+        $merekHpOptions = ($needsCreateOrEdit || $this->showQuickAddModal)
+            ? TipeHp::where('is_active', true)
+                ->distinct()
+                ->orderBy('merk')
+                ->pluck('merk')
+                ->filter()
+                ->values()
+                ->all()
+            : [];
 
         $tipeHpCreateOptions = ! empty($this->kompatibelMerekHp)
             ? TipeHp::where('is_active', true)
@@ -4676,38 +4683,41 @@ class ProdukTab extends Component
                 ->get()
             : collect();
 
-        $selectedCreateTipeHps = ! empty($this->produkForm['tipe_hp_ids'])
+        $selectedCreateTipeHps = ($this->showProdukModal && ! empty($this->produkForm['tipe_hp_ids']))
             ? TipeHp::whereIn('id', (array) $this->produkForm['tipe_hp_ids'])->orderBy('merk')->orderBy('model')->get()
             : collect();
 
-        $selectedEditTipeHps = ! empty($this->editProdukForm['tipe_hp_ids'])
+        $selectedEditTipeHps = ($this->showEditProdukModal && ! empty($this->editProdukForm['tipe_hp_ids']))
             ? TipeHp::whereIn('id', (array) $this->editProdukForm['tipe_hp_ids'])->orderBy('merk')->orderBy('model')->get()
             : collect();
 
-        $tipeHpList = TipeHp::where('is_active', true)
-            ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
-            ->orderBy('merk')
-            ->orderBy('model')
-            ->get();
-        $tipeHpOptions = $tipeHpList->map(fn ($t) => [
-            'id' => $t->id,
-            'label' => $t->nama_tampilan,
-        ])->all();
+        $tipeHpList = $this->showBulkEditModal
+            ? TipeHp::where('is_active', true)
+                ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
+                ->orderBy('merk')
+                ->orderBy('model')
+                ->get()
+            : collect();
+        $tipeHpOptions = [];
 
-        $selectedIds = array_filter(array_merge(
-            (array) ($this->produkForm['produk_kompatibel_ids'] ?? []),
-            (array) ($this->editProdukForm['produk_kompatibel_ids'] ?? [])
-        ));
+        $selectedIds = $needsCreateOrEdit
+            ? array_filter(array_merge(
+                (array) ($this->produkForm['produk_kompatibel_ids'] ?? []),
+                (array) ($this->editProdukForm['produk_kompatibel_ids'] ?? [])
+            ))
+            : [];
 
         $selectedProduk = ! empty($selectedIds)
             ? Produk::whereIn('id', $selectedIds)->select('id', 'nama')->get()
             : collect();
 
-        $topProduk = Produk::where('is_active', true)
-            ->select('id', 'nama')
-            ->orderBy('nama')
-            ->limit(100)
-            ->get();
+        $topProduk = $needsCreateOrEdit
+            ? Produk::where('is_active', true)
+                ->select('id', 'nama')
+                ->orderBy('nama')
+                ->limit(100)
+                ->get()
+            : collect();
 
         $allProdukList = $selectedProduk->merge($topProduk)->unique('id')->values();
         $allProdukOptions = $allProdukList->map(fn ($p) => [
@@ -4803,19 +4813,23 @@ class ProdukTab extends Component
             ->orderBy('nama')
             ->get();
 
-        $kualitasCreateOptions = KualitasProduk::with('brand')
-            ->where('is_active', true)
-            ->forBrand(! empty($this->produkForm['brand_id']) ? (int) $this->produkForm['brand_id'] : null)
-            ->orderByRaw('brand_id IS NULL ASC')
-            ->orderBy('nama')
-            ->get();
+        $kualitasCreateOptions = ($this->showProdukModal || ! empty($this->produkForm['brand_id']))
+            ? KualitasProduk::with('brand')
+                ->where('is_active', true)
+                ->forBrand(! empty($this->produkForm['brand_id']) ? (int) $this->produkForm['brand_id'] : null)
+                ->orderByRaw('brand_id IS NULL ASC')
+                ->orderBy('nama')
+                ->get()
+            : collect();
 
-        $kualitasEditOptions = KualitasProduk::with('brand')
-            ->where('is_active', true)
-            ->forBrand(! empty($this->editProdukForm['brand_id']) ? (int) $this->editProdukForm['brand_id'] : null)
-            ->orderByRaw('brand_id IS NULL ASC')
-            ->orderBy('nama')
-            ->get();
+        $kualitasEditOptions = ($this->showEditProdukModal || ! empty($this->editProdukForm['brand_id']))
+            ? KualitasProduk::with('brand')
+                ->where('is_active', true)
+                ->forBrand(! empty($this->editProdukForm['brand_id']) ? (int) $this->editProdukForm['brand_id'] : null)
+                ->orderByRaw('brand_id IS NULL ASC')
+                ->orderBy('nama')
+                ->get()
+            : collect();
 
         $suppliersMaster = Supplier::where('is_active', true)->orderBy('nama')->get();
         $satuanUnitsMaster = SatuanUnit::where('is_active', true)->orderBy('kode')->get();
@@ -4825,7 +4839,7 @@ class ProdukTab extends Component
         $gudangsCabang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->get();
 
         $quickAddMerk = trim($this->quickAddForm['merk'] ?? $this->quickAddSelectedMerk ?? '');
-        $quickAddExistingModels = (! empty($quickAddMerk) && $quickAddMerk !== '__custom__')
+        $quickAddExistingModels = ($this->showQuickAddModal && ! empty($quickAddMerk) && $quickAddMerk !== '__custom__')
             ? TipeHp::where('is_active', true)
                 ->where('merk', $quickAddMerk)
                 ->distinct()
@@ -4848,7 +4862,7 @@ class ProdukTab extends Component
             'gudangs' => $gudangs,
             'gudangsCabang' => $gudangsCabang,
             'hiddenGudangs' => $this->hiddenGudangs,
-            'raks' => Rak::with('gudang')->get(),
+            'raks' => $needsAnyModal ? Rak::with('gudang')->get() : collect(),
             'produks' => $produks,
             'perPage' => $this->perPage,
             'selectedProdukIds' => $this->selectedProdukIds,

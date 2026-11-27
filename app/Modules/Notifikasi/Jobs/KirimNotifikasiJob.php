@@ -96,7 +96,24 @@ class KirimNotifikasiJob implements ShouldQueue
             return true;
         }
 
-        $this->tandaiGagal($log, (string) $hasil['error']);
+        $error = (string) $hasil['error'];
+
+        if ($hasil['retryable'] && $this->attempts() < $this->tries) {
+            $log->update([
+                'status' => 'pending',
+                'error' => 'Menunggu kirim ulang: '.$error,
+            ]);
+
+            Log::info("WA transient error, retrying (attempt {$this->attempts()}/{$this->tries})", [
+                'notifikasi_id' => $log->id,
+                'error' => $error,
+            ]);
+            $this->release($this->backoff);
+
+            return false;
+        }
+
+        $this->tandaiGagal($log, $error);
 
         return false;
     }

@@ -12,7 +12,9 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Models\DeviceSession;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -234,7 +236,10 @@ class PengaturanSistemIntegrationTest extends TestCase
         $config = app(KonfigurasiService::class);
         $wa = $config->get('wa_gateway_config');
         $this->assertIsArray($wa);
-        $this->assertEquals('token-wa-secret-123', $wa['token']);
+        $this->assertNotEquals('token-wa-secret-123', $wa['token']);
+        $this->assertEquals('token-wa-secret-123', Crypt::decryptString($wa['token']));
+        $component->assertSet('integrasiForm.wa_token', '');
+        $component->assertSet('waTokenConfigured', true);
 
         $duitku = $config->get('duitku_gateway_config');
         $this->assertIsArray($duitku);
@@ -244,6 +249,13 @@ class PengaturanSistemIntegrationTest extends TestCase
         $biteship = $config->get('biteship_gateway_config');
         $this->assertIsArray($biteship);
         $this->assertEquals('biteship-api-key-test', $biteship['api_key']);
+
+        // Menyimpan ulang tanpa mengisi ulang wa_token wajib mempertahankan token tersimpan.
+        $component->set('integrasiForm.duitku_merchant_code', 'D5678')
+            ->call('simpanIntegrasi')
+            ->assertDispatched('alert');
+        $waAfter = $config->get('wa_gateway_config');
+        $this->assertEquals('token-wa-secret-123', Crypt::decryptString($waAfter['token']));
     }
 
     public function test_toggle_duitku_di_settings_rbac_tersinkron_ke_web_konsumen_settings(): void
@@ -273,5 +285,115 @@ class PengaturanSistemIntegrationTest extends TestCase
 
         $this->assertFalse((bool) $config->get('payment_mp_duitku_enabled'));
         $this->assertFalse((bool) $webKonsumen->get('payment_mp_duitku_enabled'));
+    }
+
+    public function test_openwa_validasi_sesi_dan_setup_otomatis_dari_ui(): void
+    {
+        $this->actingAs($this->superAdmin);
+        session(['cabang_id' => $this->cabang->id]);
+
+        // 1. Memilih openwa tanpa ID sesi gagal validasi saat simpan
+        Livewire::withQueryParams(['tab' => 'integrasi'])
+            ->test(SettingsRbac::class)
+            ->set('integrasiForm.wa_provider', 'openwa')
+            ->assertSee('Manajemen Gateway OpenWA')
+            ->set('integrasiForm.wa_session', '')
+            ->call('simpanIntegrasi')
+            ->assertHasErrors(['integrasiForm.wa_session']);
+
+        // 2. Setup otomatis 1-klik membuat sesi, key operator, QR & menyimpan terenkripsi
+        $uuid = '550e8400-e29b-41d4-a716-446655440000';
+        Http::fake([
+            'http://127.0.0.1:2785/api/health/ready' => Http::response(['status' => 'ok'], 200),
+            'http://127.0.0.1:2785/api/sessions' => fn ($req) => $req->method() === 'POST'
+                ? Http::response(['id' => $uuid, 'name' => 'bremspace-erp', 'status' => 'created'], 201)
+                : Http::response([], 200),
+            'http://127.0.0.1:2785/api/sessions/'.$uuid.'/start' => Http::response(['status' => 'starting'], 200),
+            'http://127.0.0.1:2785/api/auth/api-keys' => Http::response(['apiKey' => 'owa_op_auto_999'], 201),
+            'http://127.0.0.1:2785/api/sessions/'.$uuid => Http::sequence()
+                ->push(['id' => $uuid, 'name' => 'bremspace-erp', 'status' => 'qr_ready'], 200)
+                ->push(['id' => $uuid, 'name' => 'bremspace-erp', 'status' => 'ready', 'me' => ['id' => '628111222333@c.us']], 200),
+            'http://127.0.0.1:2785/api/sessions/'.$uuid.'/qr' => Http::response([
+                'qrCode' => 'data:image/png;base64,iVBORw0KGgo=',
+                'status' => 'qr_ready',
+            ], 200),
+            'http://127.0.0.1:2785/api/sessions/'.$uuid.'/pairing-code' => Http::response([
+                'code' => '1234-5678',
+            ], 200),
+            'http://127.0.0.1:2785/api/sessions/'.$uuid.'/messages/send-text' => Http::response([
+                'ok' => true,
+            ], 200),
+        ]);
+
+        $fullWrappedKey = "owa_k1_12f2519a9e2f948dd1976100\n4c2a7935869bcb359429787fd8b0646f1a979e09root@indra:~#";
+
+        $component = Livewire::withQueryParams(['tab' => 'integrasi'])
+            ->test(SettingsRbac::class)
+            ->set('integrasiForm.wa_provider', 'openwa')
+            ->set('integrasiForm.wa_url', 'http://127.0.0.1:2785')
+            ->set('openwaAdminKey', $fullWrappedKey)
+            ->call('setupOpenWaOtomatis')
+            ->assertSet('integrasiForm.wa_session', $uuid)
+            ->assertSet('integrasiForm.wa_token', '')
+            ->assertSet('openwaAdminKey', '')
+            ->assertSet('waTokenConfigured', true)
+            ->assertSet('openwaQrData', 'data:image/png;base64,iVBORw0KGgo=');
+
+        Http::assertSent(fn ($req) => str_contains($req->url(), '/api/sessions')
+            && $req->header('X-API-Key')[0] === 'owa_k1_12f2519a9e2f948dd19761004c2a7935869bcb359429787fd8b0646f1a979e09');
+
+        $saved = app(KonfigurasiService::class)->get('wa_gateway_config');
+        $this->assertSame('openwa', $saved['provider']);
+        $this->assertSame('http://127.0.0.1:2785/api', $saved['url']);
+        $this->assertSame($uuid, $saved['session']);
+        $this->assertSame('owa_op_auto_999', Crypt::decryptString($saved['token']));
+
+        // Pairing code menormalisasi nomor & menyimpan kode
+        $component->set('openwaPairingPhone', '08111222333')
+            ->call('getPairingCodeOpenWa')
+            ->assertSet('openwaPairingCode', '1234-5678');
+
+        // Refresh status saat sesi ready otomatis membersihkan QR & pairing code
+        $component->call('refreshOpenWaSessionStatus')
+            ->assertSet('openwaQrData', '')
+            ->assertSet('openwaPairingCode', '')
+            ->assertSet('openwaSessionStatus.phone', '628111222333');
+
+        // Tes kirim WA langsung pakai token operator tersimpan & catat log ke NotifikasiKeluar.
+        $component->set('integrasiForm.wa_test_number', '081234567890')
+            ->call('testKirimWa')
+            ->assertSet('waTestStatus', 'success');
+
+        $this->assertDatabaseHas('notifikasi_keluar', [
+            'tipe' => 'wa',
+            'tujuan' => '6281234567890@c.us',
+            'status' => 'terkirim',
+        ]);
+
+        // Submenu integrasi ?sub=wa dan ?sub=duitku tetap merender HTML valid
+        $this->get('/app/pengaturan?tab=integrasi&sub=wa')
+            ->assertStatus(200)
+            ->assertSee('WhatsApp Gateway');
+        $this->get('/app/pengaturan?tab=integrasi&sub=duitku')
+            ->assertStatus(200)
+            ->assertSee('Payment Gateway Duitku');
+    }
+
+    public function test_pengguna_tanpa_izin_dilarang_mengelola_openwa(): void
+    {
+        $this->actingAs($this->kasir);
+        session(['cabang_id' => $this->cabang->id]);
+
+        Http::fake();
+
+        Livewire::withQueryParams(['tab' => 'integrasi'])
+            ->test(SettingsRbac::class)
+            ->set('integrasiForm.wa_url', 'http://127.0.0.1:2785')
+            ->set('openwaAdminKey', 'owa_k1_admin_master')
+            ->call('setupOpenWaOtomatis')
+            ->call('getQrOpenWa')
+            ->call('cekHealthOpenWa');
+
+        Http::assertNothingSent();
     }
 }

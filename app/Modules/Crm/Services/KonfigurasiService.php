@@ -23,8 +23,18 @@ class KonfigurasiService
 
     private const CACHE_PREFIX = 'crm-konfigurasi:';
 
+    /** @var array<string, array{nilai: mixed}> */
+    private array $requestMemo = [];
+
     public function get(string $kunci, mixed $default = null): mixed
     {
+        // Request-scoped RAM memoization mencegah SELECT berulang ke CACHE_STORE=database dalam 1 HTTP request
+        // Dinonaktifkan pada driver array (unit test) agar tidak bentrok dengan manipulasi DB langsung di test.
+        $useRequestMemo = config('cache.default') !== 'array';
+        if ($useRequestMemo && array_key_exists($kunci, $this->requestMemo)) {
+            return $this->requestMemo[$kunci]['nilai'];
+        }
+
         // [B-15d] Cache per-kunci (invalidasi di set()) — 1 query per kunci hilang.
         //
         // Nilai dibungkus array `['nilai' => …]`: `Cache::remember()` memakai
@@ -35,6 +45,10 @@ class KonfigurasiService
             self::CACHE_TTL,
             fn (): array => ['nilai' => $this->ambilNilai($kunci) ?? $default]
         );
+
+        if ($useRequestMemo) {
+            $this->requestMemo[$kunci] = $hit;
+        }
 
         return $hit['nilai'];
     }
@@ -55,13 +69,15 @@ class KonfigurasiService
         }
 
         $rows = DB::table('konfigurasi')->whereIn('kunci', $kunci)->get();
-        if ($rows->isEmpty()) {
-            return [];
-        }
-
         $hasil = [];
         foreach ($rows as $row) {
             $hasil[$row->kunci] = $this->decode((string) $row->nilai);
+        }
+
+        if (config('cache.default') !== 'array') {
+            foreach ($kunci as $k) {
+                $this->requestMemo[$k] = ['nilai' => $hasil[$k] ?? null];
+            }
         }
 
         return $hasil;
@@ -89,7 +105,13 @@ class KonfigurasiService
         }
 
         // [B-15d] Invalidasi cache WAJIB di titik tulis (satu-satunya jalur tulis).
+        unset($this->requestMemo[$kunci]);
         Cache::forget(self::CACHE_PREFIX.$kunci);
+    }
+
+    public function flushMemoryCache(): void
+    {
+        $this->requestMemo = [];
     }
 
     /**

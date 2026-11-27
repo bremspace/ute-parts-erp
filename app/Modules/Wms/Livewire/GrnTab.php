@@ -989,10 +989,14 @@ class GrnTab extends Component
 
         // [P1-1] GRN dibatasi cabang aktif session
         $baseGrnQuery = Grn::query()->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId));
-        $countDraft = (clone $baseGrnQuery)->where('status', 'draft')->count();
-        $countTerima = (clone $baseGrnQuery)->where('status', 'terima')->count();
-        $countDitolak = (clone $baseGrnQuery)->where('status', 'ditolak')->count();
-        $countTotal = (clone $baseGrnQuery)->count();
+        $statusCounts = (clone $baseGrnQuery)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+        $countDraft = (int) ($statusCounts['draft'] ?? 0);
+        $countTerima = (int) ($statusCounts['terima'] ?? 0);
+        $countDitolak = (int) ($statusCounts['ditolak'] ?? 0);
+        $countTotal = (int) $statusCounts->sum();
         $countPoSiapTerima = $poList->count();
 
         $grnList = (clone $baseGrnQuery)
@@ -1010,9 +1014,10 @@ class GrnTab extends Component
         $cabangId = (int) session('cabang_id');
         $totalHpp = $this->hitungEstimasiTotalHpp();
 
-        // [KAS-SALDO] Muat kas dengan saldo cukup untuk pembayaran GRN tunai
-        $akunKasCukup = GrnService::getKasDenganSaldoCukup($totalHpp, $cabangId);
-        $semuaKas = GrnService::getKasDenganSaldoAktual($cabangId);
+        // [KAS-SALDO] Muat kas dengan saldo aktual satu kali lalu ambil daftar cukupnya
+        $kasBundle = GrnService::getKasDanSaldoCukup($totalHpp, $cabangId);
+        $semuaKas = $kasBundle['semua'];
+        $akunKasCukup = $kasBundle['cukup'];
 
         // Jika akun_kas_bank yang dipilih saat ini tidak ada di daftar kas cukup, set otomatis
         if (! empty($this->grnForm['is_cash']) && $akunKasCukup->isNotEmpty()) {

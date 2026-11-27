@@ -13,15 +13,14 @@ Integrasi WhatsApp untuk Bremspace ERP. OpenWA adalah gateway REST self-hosted
 
 ## 1. Prasyarat
 
-- Docker engine (sudah ada di VPS ini: 29.x).
-- Plugin `docker compose` v2 — **belum ada** di VPS ini. Pasang dengan:
+- Docker engine (VPS ini: `29.x`) & plugin `docker compose` v2 (`v2.39.x`, sudah terpasang). Bila setup di server baru yang belum memiliki plugin compose:
   ```bash
   sudo bash deploy/openwa/install-compose.sh
   ```
 - Nomor WhatsApp **khusus** yang siap dipakai gateway (jangan nomor pribadi/
   utama). Nomor ini yang nanti discan QR-nya.
 
-## 2. Jalankan
+## 2. Jalankan kontainer (1x di terminal VPS)
 
 ```bash
 cd deploy/openwa
@@ -30,40 +29,31 @@ docker compose up -d
 docker compose logs -f openwa-api
 ```
 
-Ambil API key admin sekali jadi (dicetak di log, juga tersimpan di dalam container):
+Ambil Master Admin Key sekali jadi dari dalam kontainer:
 
 ```bash
 docker exec openwa-api cat /app/data/.api-key
 ```
 
-## 3. Buat sesi & pairing nomor
+## 3. Setup Sesi, API Key Operator, dan Scan QR via UI ERP
 
-Buka dashboard di `http://127.0.0.1:2785` (hanya bisa dari dalam VPS, mis. lewat
-SSH tunnel: `ssh -L 2785:127.0.0.1:2785 user@vps`).
+Tidak perlu SSH tunnel ke dasbor OpenWA. Buka ERP: **Pengaturan → Integrasi → WhatsApp Gateway**
 
-1. Masuk dengan API key admin.
-2. Buat sesi (nama default: `default`).
-3. Start sesi → scan QR dengan **nomor khusus** tadi.
-4. Setelah status connected, buat API key baru ber-role **operator**, scope ke
-   sesi `default` (jangan pakai key admin untuk aplikasi).
-5. Salin key operator itu.
+1. Pilih Provider: `OpenWA (Self-Hosted Gateway)`.
+2. Pastikan API Endpoint URL: `http://127.0.0.1:2785/api`.
+3. Pada panel **Setup Otomatis 1-Klik**, tempel Master Admin Key dari langkah 2, lalu klik **Hubungkan & Buat Sesi Otomatis**.
+   - ERP otomatis memeriksa `/api/health/ready`, membuat sesi (mendapat **UUID** `sessionId`), menyalakan engine, mencetak API Key ber-role `operator` scoped ke sesi tersebut, menyimpannya terenkripsi di DB, dan menghapus Admin Key dari form.
+4. Scan QR Code yang tampil di UI lewat WhatsApp HP (**Perangkat Tertaut → Tautkan Perangkat**), atau gunakan tab **Kode Pairing 8 Karakter**.
+5. Setelah status menjadi **Terhubung & Siap**, isi nomor uji coba lalu klik **Kirim Pesan Uji Coba**.
 
-## 4. Hubungkan ke ERP
-
-Di ERP: **Pengaturan → Integrasi → WhatsApp Gateway**
-
-- Provider: `OpenWA (Self-Hosted Gateway)`
-- API Endpoint URL: `http://127.0.0.1:2785/api`
-- Token / API Key: key **operator** dari langkah 3
-- ID Sesi OpenWA: `default`
-- Klik **Uji Coba WhatsApp** untuk memvalidasi, lalu Simpan.
+> Catatan teknis: OpenWA memakai **UUID** `sessionId` (bukan nama sesi) pada path API `/api/sessions/{sessionId}/...`. Setup otomatis dari UI sudah mengisi UUID tersebut secara tepat.
 
 Atau lewat `.env` ERP (fallback bila belum diatur di UI):
 
 ```
-WA_GATEWAY_URL=http://127.0.0.1:2785/api
-WA_GATEWAY_TOKEN=<api-key-operator>
-WA_GATEWAY_DEVICE_ID=default
+WA_OPENWA_URL=http://127.0.0.1:2785/api
+WA_OPENWA_API_KEY=<api-key-operator>
+WA_OPENWA_SESSION=<uuid-sesi>
 ```
 
 ## 5. Keamanan (wajib dipatuhi)

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Services\BranchContextManager;
+use App\Support\SafeFileCacheStore;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
@@ -16,7 +17,6 @@ use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Spatie\Activitylog\Support\CauserResolver;
 use Spatie\Permission\Middleware\PermissionMiddleware;
-use Spatie\Permission\PermissionRegistrar;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,6 +26,20 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(BranchContextManager::class);
+        $this->app->singleton(KonfigurasiService::class);
+
+        $this->app->afterResolving('cache', function ($cache): void {
+            $cache->extend('file', function ($app, array $config) use ($cache) {
+                $store = (new SafeFileCacheStore(
+                    $app['files'],
+                    $config['path'],
+                    $config['permission'] ?? null,
+                    $app['config']['cache.serializable_classes'] ?? null,
+                ))->setLockDirectory($config['lock_path'] ?? null);
+
+                return $cache->repository($store, $config);
+            });
+        });
     }
 
     /**
@@ -97,13 +111,6 @@ class AppServiceProvider extends ServiceProvider
         // Gate::before di atas tetap menjamin super-admin/owner tidak pernah
         // terkunci, jadi registrasi ini tidak mengambil hak mereka.
         Livewire::addPersistentMiddleware(PermissionMiddleware::class);
-
-        // [F3-1] Refresh permission cache idempotent (skip jika tabel cache belum ada / saat composer dump)
-        try {
-            app()[PermissionRegistrar::class]->forgetCachedPermissions();
-        } catch (\Throwable $e) {
-            // Abaikan saat booting tanpa database/migrasi (mis. composer install/package:discover di CI)
-        }
 
         // [ISO-27001 / A.8.15] Security Event Audit Logging (Authentication & Session)
         Event::listen(Login::class, function (Login $event) {
