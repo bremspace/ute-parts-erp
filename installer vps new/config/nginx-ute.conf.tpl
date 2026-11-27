@@ -13,8 +13,8 @@ server {
     root {{APP_DIR}}/public;
     index index.php;
 
-    ssl_certificate     /etc/letsencrypt/live/{{DOMAIN}}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/{{DOMAIN}}/privkey.pem;
+    ssl_certificate     {{SSL_CERT}};
+    ssl_certificate_key {{SSL_KEY}};
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
     ssl_session_cache shared:SSL:10m;
