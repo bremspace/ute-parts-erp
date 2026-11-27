@@ -91,4 +91,24 @@ if [[ -z "${LIB_UTE_LOADED:-}" ]]; then
     command_exists() {
         command -v "$1" >/dev/null 2>&1
     }
+
+    # Hapus baris pool FPM dengan key tertentu, aman untuk karakter regex.
+    strip_fpm_directive() {
+        local __file="$1" __key="$2" __tmp
+        __tmp="$(mktemp)"
+        awk -v key="$__key" '
+            {
+                line = $0
+                sub(/^[[:space:]]*/, "", line)
+                if (index(line, "=") > 0) {
+                    k = substr(line, 1, index(line, "=") - 1)
+                    gsub(/[[:space:]]+$/, "", k)
+                    if (k == key) next
+                }
+                print
+            }
+        ' "$__file" > "$__tmp"
+        cat "$__tmp" > "$__file"
+        rm -f "$__tmp"
+    }
 fi

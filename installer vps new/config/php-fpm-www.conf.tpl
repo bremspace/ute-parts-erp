@@ -19,6 +19,3 @@ catch_workers_output = yes
 clear_env = no
 
 security.limit_extensions = .php
-
-env.PATH = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-env.TZ = {{TIMEZONE}}
