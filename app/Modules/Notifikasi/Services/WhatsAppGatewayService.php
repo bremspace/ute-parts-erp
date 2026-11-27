@@ -177,6 +177,7 @@ class WhatsAppGatewayService
                     'provider' => self::PROVIDER_OPENWA,
                     'error' => 'OpenWA mengembalikan HTML/bukan JSON (kemungkinan halaman login). Periksa URL & port API OpenWA.',
                     'chat_id' => $chatId,
+                    'retryable' => false,
                 ];
             }
 
@@ -186,6 +187,7 @@ class WhatsAppGatewayService
                     'provider' => self::PROVIDER_OPENWA,
                     'error' => 'OpenWA menolak pengiriman: '.(string) ($json['message'] ?? $json['error'] ?? 'unknown error'),
                     'chat_id' => $chatId,
+                    'retryable' => false,
                 ];
             }
 
@@ -270,6 +272,7 @@ class WhatsAppGatewayService
                     'provider' => (string) ($config['provider'] ?? 'custom'),
                     'error' => 'Gateway menolak pengiriman: '.(string) ($json['message'] ?? $json['error'] ?? 'unknown error'),
                     'chat_id' => $target,
+                    'retryable' => false,
                 ];
             }
 

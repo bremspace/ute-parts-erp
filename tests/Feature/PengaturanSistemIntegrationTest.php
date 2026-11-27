@@ -364,6 +364,14 @@ class PengaturanSistemIntegrationTest extends TestCase
             'tujuan' => '6281234567890@c.us',
             'status' => 'terkirim',
         ]);
+
+        // Submenu integrasi ?sub=wa dan ?sub=duitku tetap merender HTML valid
+        $this->get('/app/pengaturan?tab=integrasi&sub=wa')
+            ->assertStatus(200)
+            ->assertSee('WhatsApp Gateway');
+        $this->get('/app/pengaturan?tab=integrasi&sub=duitku')
+            ->assertStatus(200)
+            ->assertSee('Payment Gateway Duitku');
     }
 
     public function test_pengguna_tanpa_izin_dilarang_mengelola_openwa(): void

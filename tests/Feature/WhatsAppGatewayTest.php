@@ -228,4 +228,27 @@ class WhatsAppGatewayTest extends TestCase
         $this->assertSame('pending', $log->status);
         $this->assertStringContainsString('503', (string) $log->error);
     }
+
+    public function test_openwa_html_atau_success_false_http_200_ditolak(): void
+    {
+        $this->setConfig([
+            'provider' => 'openwa',
+            'url' => 'http://127.0.0.1:2785/api',
+            'token' => 'rahasia',
+            'session' => '550e8400-e29b-41d4-a716-446655440000',
+        ]);
+
+        Http::fakeSequence()
+            ->push('<html><body>Login</body></html>', 200, ['Content-Type' => 'text/html'])
+            ->push(['success' => false, 'message' => 'Session disconnected'], 200);
+
+        $svc = app(WhatsAppGatewayService::class);
+        $html = $svc->kirim('081234567890', 'Tes HTML');
+        $this->assertFalse($html['ok']);
+        $this->assertFalse($html['retryable']);
+
+        $jsonFalse = $svc->kirim('081234567890', 'Tes False');
+        $this->assertFalse($jsonFalse['ok']);
+        $this->assertFalse($jsonFalse['retryable']);
+    }
 }

@@ -4687,9 +4687,9 @@
                     @endif
                 </div>
 
-                    @if($isub === '' || $isub === 'wa')
                 <!-- Sidebar Test & Status (Col Span 1) -->
                 <div class="space-y-6">
+                    @if($isub === '' || $isub === 'wa')
                     <x-prism.glass-card title="Status Pengiriman WA" subtitle="8 aktivitas terbaru, termasuk yang sengaja dimatikan">
                         <div class="space-y-2">
                             @forelse($waRecentLogs as $log)

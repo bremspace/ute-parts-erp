@@ -386,6 +386,7 @@ class SettingsRbac extends Component
             $this->printerSubTab = $sub;
             $this->standalonePrinter = true;
             $this->loadQrisConfig();
+
             return;
         }
 
