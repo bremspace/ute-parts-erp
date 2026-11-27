@@ -296,6 +296,17 @@
                         class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-primary focus:ring-0">
                 </div>
 
+                <div>
+                    <label class="block text-xs font-semibold text-ink-300 mb-1">
+                        APP_KEY produksi <span class="text-ink-500 font-normal">(opsional, untuk .sql/.sql.gz)</span>
+                    </label>
+                    <input type="text" wire:model.defer="restoreAppKey" placeholder="base64:...."
+                        class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs font-mono text-white focus:border-up-primary focus:ring-0">
+                    <p class="text-[10px] text-amber-300 mt-1">
+                        Isi hanya bila backup bukan Full Snapshot ZIP, atau bila masih muncul <span class="font-mono">The MAC is invalid</span>. Salin dari <span class="font-mono">.env</span> produksi.
+                    </p>
+                </div>
+
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" wire:click="$set('showRestoreModal', false)"
                         class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white text-xs font-semibold">
