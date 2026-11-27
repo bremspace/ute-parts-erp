@@ -136,6 +136,7 @@ PHP_PKGS=(
 apt_install "${PHP_PKGS[@]}" composer
 
 PHP_BIN="/usr/bin/php${PHP_VERSION}"
+PHP_FPM_BIN="/usr/sbin/php-fpm${PHP_VERSION}"
 PHP_FPM_SERVICE="php${PHP_VERSION}-fpm"
 PHP_SOCKET="/run/php/php${PHP_VERSION}-fpm.sock"
 
@@ -149,6 +150,11 @@ render "${CFG_DIR}/php-fpm-www.conf.tpl" /etc/php/${PHP_VERSION}/fpm/pool.d/www.
     PHP_MIN_SPARE "$PHP_MIN_SPARE" \
     PHP_MAX_SPARE "$PHP_MAX_SPARE" \
     TIMEZONE "$TIMEZONE"
+
+log "Uji konfigurasi PHP-FPM..."
+if ! "$PHP_FPM_BIN" -t 2>&1 | tee /tmp/ute-php-fpm-test.log; then
+    fail "Konfigurasi PHP-FPM tidak valid. Perbaiki /etc/php/${PHP_VERSION}/fpm/pool.d/www.conf lalu jalankan ulang installer."
+fi
 
 service_restart "$PHP_FPM_SERVICE"
 

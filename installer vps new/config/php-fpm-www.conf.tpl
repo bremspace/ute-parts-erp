@@ -16,7 +16,6 @@ pm.max_spare_servers = {{PHP_MAX_SPARE}}
 pm.max_requests = 500
 
 catch_workers_output = yes
-decorate_workers_output = no
 clear_env = no
 
 security.limit_extensions = .php
