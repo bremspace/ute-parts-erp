@@ -97,9 +97,14 @@ if [[ -z "${LIB_UTE_LOADED:-}" ]]; then
     make_selfsigned() {
         local __name="$1"; shift
         local __dir="/etc/ssl/ute-selfsigned/${__name}"
-        local __san="" __d
+        local __san="" __d __entry
         for __d in "$@"; do
-            if [[ -z "$__san" ]]; then __san="DNS:${__d}"; else __san="${__san},DNS:${__d}"; fi
+            if [[ "$__d" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ || "$__d" == *:* ]]; then
+                __entry="IP:${__d}"
+            else
+                __entry="DNS:${__d}"
+            fi
+            if [[ -z "$__san" ]]; then __san="$__entry"; else __san="${__san},${__entry}"; fi
         done
 
         mkdir -p "$__dir"

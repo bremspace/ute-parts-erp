@@ -3,6 +3,7 @@
 set -Eeuo pipefail
 
 DOMAIN="{{DOMAIN}}"
+SERVER_IP="{{SERVER_IP}}"
 WA_DOMAIN="{{WA_DOMAIN}}"
 APP_DIR="{{APP_DIR}}"
 PHP_BIN="{{PHP_BIN}}"
@@ -60,6 +61,7 @@ log ""
 log "=== HTTP ==="
 check_http "https://${DOMAIN}/login-pelanggan"
 check_http "https://${DOMAIN}/shop"
+check_http "http://${SERVER_IP}/login-pelanggan"
 
 if [[ -n "$WA_DOMAIN" ]]; then
     check_http "https://${WA_DOMAIN}/api/health"

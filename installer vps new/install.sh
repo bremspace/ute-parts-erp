@@ -54,6 +54,12 @@ ask REPO_BRANCH "Branch" "main"
 ask WA_DOMAIN "Subdomain panel OpenWA" "wa.${DOMAIN}"
 ask TIMEZONE "Timezone" "Asia/Jakarta"
 
+PUBLIC_IP="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
+[[ -n "$PUBLIC_IP" ]] || PUBLIC_IP="$(curl -fsS --max-time 5 https://ifconfig.me/ip 2>/dev/null || true)"
+PRIVATE_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+ask SERVER_IP "IP publik VPS yang dipakai untuk akses (deteksi: ${PUBLIC_IP:-tidak terdeteksi})" "$PUBLIC_IP"
+[[ -n "$SERVER_IP" ]] || fail "IP publik wajib diisi agar akses via IP bisa dikonfigurasi."
+
 if confirm "Pasang OpenWA self-hosted di VPS ini juga?" y; then
     OPENWA_LOCAL=yes
 else
@@ -321,6 +327,14 @@ else
     make_selfsigned "erp" "${ERP_SAN_DOMAINS[@]}"
 fi
 
+# Sertifikat untuk akses via IP. Let's Encrypt tidak mencakup alamat IP,
+# jadi selalu pakai self-signed dengan SAN IP publik + IP privat.
+IP_SAN_LIST=("$SERVER_IP")
+[[ -n "${PRIVATE_IP:-}" && "$PRIVATE_IP" != "$SERVER_IP" ]] && IP_SAN_LIST+=("$PRIVATE_IP")
+make_selfsigned "erp-ip" "${IP_SAN_LIST[@]}"
+IP_SSL_CERT="$SSL_CERT"
+IP_SSL_KEY="$SSL_KEY"
+
 rm -f /etc/nginx/sites-enabled/ute-parts-bootstrap
 render "${CFG_DIR}/nginx-ute.conf.tpl" /etc/nginx/sites-available/ute-parts \
     DOMAIN "$DOMAIN" \
@@ -328,7 +342,9 @@ render "${CFG_DIR}/nginx-ute.conf.tpl" /etc/nginx/sites-available/ute-parts \
     APP_DIR "$APP_DIR" \
     PHP_SOCKET "$PHP_SOCKET" \
     SSL_CERT "$SSL_CERT" \
-    SSL_KEY "$SSL_KEY"
+    SSL_KEY "$SSL_KEY" \
+    IP_SSL_CERT "$IP_SSL_CERT" \
+    IP_SSL_KEY "$IP_SSL_KEY"
 ln -sf /etc/nginx/sites-available/ute-parts /etc/nginx/sites-enabled/ute-parts
 
 # Tentukan sertifikat OpenWA.
@@ -359,6 +375,11 @@ SERTIFIKAT LET'S ENCRYPT BELUM AKTIF - $(date '+%F %T')
 
 Installer tetap lanjut memakai sertifikat self-signed sementara.
 Browser akan menampilkan peringatan "Not secure" sampai sertifikat asli dipasang.
+
+Akses tetap bisa lewat:
+- Domain: https://${DOMAIN}
+- IP HTTP: http://${SERVER_IP}  (NAT external -> VPS port 80)
+- IP HTTPS: https://${SERVER_IP} (NAT external -> VPS port 443, self-signed)
 
 Penyebab umum:
 - Domain masih di-proxy Cloudflare (orange cloud). Challenge HTTP-01 tidak sampai ke VPS.
@@ -471,6 +492,7 @@ install -d -m 0700 "$BACKUP_DIR"
 
 render "${SCRIPTS_DIR}/healthcheck.sh.tpl" /usr/local/bin/ute-healthcheck \
     DOMAIN "$DOMAIN" \
+    SERVER_IP "$SERVER_IP" \
     WA_DOMAIN "$WA_DOMAIN" \
     APP_DIR "$APP_DIR" \
     PHP_BIN "$PHP_BIN" \
@@ -498,6 +520,8 @@ CRED_FILE=/root/ute-install-credentials.txt
 cat > "$CRED_FILE" <<EOF
 UTEParts VPS install - $(date '+%F %T')
 Domain ERP      : https://${DOMAIN}
+Akses IP HTTP   : http://${SERVER_IP}  (NAT: port 80 -> VPS 80)
+Akses IP HTTPS  : https://${SERVER_IP} (NAT: port 443 -> VPS 443, self-signed)
 Panel OpenWA    : https://${WA_DOMAIN:-<tidak dipasang lokal>}
 App path        : ${APP_DIR}
 PHP             : ${PHP_VERSION}
@@ -541,6 +565,7 @@ ok "INSTALL SELESAI"
 printf '\n'
 printf '%bRingkasan:%b\n' "$GREEN" "$NC"
 printf '  URL ERP      : https://%s\n' "$DOMAIN"
+printf '  Akses IP     : http://%s  (HTTP) / https://%s (self-signed)\n' "$SERVER_IP" "$SERVER_IP"
 printf '  Panel WA     : %s\n' "${WA_DOMAIN:-tidak dipasang lokal}"
 printf '  Kredensial   : %s\n' "$CRED_FILE"
 if [[ "$OPENWA_LOCAL" == "yes" ]]; then
