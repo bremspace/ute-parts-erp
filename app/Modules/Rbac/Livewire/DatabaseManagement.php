@@ -540,9 +540,11 @@ class DatabaseManagement extends Component
                 $extraMsg .= ' Media public storage dipulihkan.';
             }
 
+            $extraMsg .= ' Jika muncul "The MAC is invalid", hapus cookie browser situs ini lalu login ulang (APP_KEY berubah mengikuti backup).';
+
             $this->dispatch('alert', [
                 'type' => 'success',
-                'message' => "Database berhasil dipulihkan dari '{$res['restored_from']}'.{$extraMsg} Sistem kembali normal.",
+                'message' => "Database berhasil dipulihkan dari '{$res['restored_from']}'.{$extraMsg}",
             ]);
         } catch (Throwable $e) {
             $this->dispatch('alert', [

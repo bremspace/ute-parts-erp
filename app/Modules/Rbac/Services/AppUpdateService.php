@@ -32,6 +32,11 @@ class AppUpdateService
     public function updateEnv(array $values): bool
     {
         $envPath = base_path('.env');
+        // Di Docker, .env adalah symlink ke storage/.env. Tulis ke target
+        // aslinya supaya perubahan APP_KEY tidak hilang saat container restart.
+        if (is_link($envPath)) {
+            $envPath = realpath($envPath) ?: $envPath;
+        }
         if (! File::exists($envPath) || ! is_writable($envPath)) {
             Log::warning("File .env tidak dapat ditulisi (permission denied atau file tidak ada): {$envPath}");
 
