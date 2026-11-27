@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Services\BranchContextManager;
+use App\Support\SafeFileCacheStore;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
@@ -26,6 +27,19 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(BranchContextManager::class);
         $this->app->singleton(KonfigurasiService::class);
+
+        $this->app->afterResolving('cache', function ($cache): void {
+            $cache->extend('file', function ($app, array $config) use ($cache) {
+                $store = (new SafeFileCacheStore(
+                    $app['files'],
+                    $config['path'],
+                    $config['permission'] ?? null,
+                    $app['config']['cache.serializable_classes'] ?? null,
+                ))->setLockDirectory($config['lock_path'] ?? null);
+
+                return $cache->repository($store, $config);
+            });
+        });
     }
 
     /**
