@@ -26,6 +26,7 @@ use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Models\ApprovalRule;
 use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ParsesNominal;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -896,10 +897,13 @@ class AkuntingDashboard extends Component
         $sampai = $this->bukuBesarSampai ?: $this->periodeSampai;
         $cabangId = $this->cabangScopeId();
 
-        // 1. Hitung saldo awal kumulatif sebelum tanggal $dari
+        $dariStart = Carbon::parse($dari)->startOfDay();
+        $sampaiEnd = Carbon::parse($sampai)->endOfDay();
+
+        // 1. Hitung saldo awal kumulatif sebelum tanggal $dari (range timestamp sargable agar index terpakai)
         // [A-1/F-02] hanya jurnal disetujui (atau baris legacy tanpa header).
         $queryAwal = ExportLaporanService::hanyaDisetujui(
-            JurnalAkuntansi::where('akun_coa_id', $akun->id)->whereDate('tanggal', '<', $dari)
+            JurnalAkuntansi::where('akun_coa_id', $akun->id)->where('tanggal', '<', $dariStart)
         );
         if ($cabangId !== null) {
             $queryAwal->where('cabang_id', $cabangId);
@@ -913,8 +917,7 @@ class AkuntingDashboard extends Component
         $queryPeriode = ExportLaporanService::hanyaDisetujui(
             JurnalAkuntansi::with(['cabang', 'user'])
                 ->where('akun_coa_id', $akun->id)
-                ->whereDate('tanggal', '>=', $dari)
-                ->whereDate('tanggal', '<=', $sampai)
+                ->whereBetween('tanggal', [$dariStart, $sampaiEnd])
         );
         if ($cabangId !== null) {
             $queryPeriode->where('cabang_id', $cabangId);
@@ -1565,17 +1568,21 @@ class AkuntingDashboard extends Component
             ->orderBy('kode')
             ->get();
 
-        return $akunKas->map(function ($akun) use ($cabangId, $sampai) {
-            $query = JurnalAkuntansi::query()
-                ->where('akun_coa_id', $akun->id)
-                ->where('tanggal', '<=', $sampai.' 23:59:59');
+        $mutasiMap = $akunKas->isNotEmpty()
+            ? JurnalAkuntansi::query()
+                ->whereIn('akun_coa_id', $akunKas->pluck('id'))
+                ->where('tanggal', '<=', $sampai.' 23:59:59')
+                ->when($cabangId !== null, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->selectRaw('akun_coa_id, COALESCE(SUM(debit), 0) as deb, COALESCE(SUM(kredit), 0) as kre')
+                ->groupBy('akun_coa_id')
+                ->get()
+                ->keyBy('akun_coa_id')
+            : collect();
 
-            if ($cabangId !== null) {
-                $query->where('cabang_id', $cabangId);
-            }
-
-            $debit = (float) $query->sum('debit');
-            $kredit = (float) $query->sum('kredit');
+        return $akunKas->map(function ($akun) use ($mutasiMap) {
+            $row = $mutasiMap->get($akun->id);
+            $debit = (float) ($row->deb ?? 0);
+            $kredit = (float) ($row->kre ?? 0);
             $saldo = $akun->saldo_normal === 'debit' ? $debit - $kredit : $kredit - $debit;
 
             return [

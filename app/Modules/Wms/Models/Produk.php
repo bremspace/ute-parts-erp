@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -792,33 +793,37 @@ class Produk extends Model
      */
     public function scopeUrutKetersediaanDanTerlaris($query, ?int $gudangId = null, ?int $cabangId = null)
     {
-        $stokSubquery = StokItem::query()
-            ->selectRaw('COALESCE(SUM(stok_items.jumlah), 0)')
-            ->whereColumn('stok_items.produk_id', 'produk.id');
+        // Agregasi 1x lewat derived LEFT JOIN (menggantikan 3 correlated subquery per baris produk)
+        $stokAgg = StokItem::query()
+            ->selectRaw('stok_items.produk_id, COALESCE(SUM(stok_items.jumlah), 0) as stok_katalog')
+            ->groupBy('stok_items.produk_id');
 
         if ($gudangId) {
-            $stokSubquery->where('stok_items.gudang_id', $gudangId);
+            $stokAgg->where('stok_items.gudang_id', $gudangId);
         } elseif ($cabangId) {
-            $stokSubquery->whereIn('stok_items.gudang_id', function ($gq) use ($cabangId) {
+            $stokAgg->whereIn('stok_items.gudang_id', function ($gq) use ($cabangId) {
                 $gq->select('id')->from('gudang')->where('cabang_id', $cabangId);
             });
         }
 
-        $terjualSubquery = TransaksiItem::query()
-            ->selectRaw('COALESCE(SUM(transaksi_item.jumlah), 0)')
-            ->whereColumn('transaksi_item.produk_id', 'produk.id');
+        $terjualAgg = TransaksiItem::query()
+            ->selectRaw('transaksi_item.produk_id, COALESCE(SUM(transaksi_item.jumlah), 0) as total_terjual')
+            ->groupBy('transaksi_item.produk_id');
 
         if (empty($query->getQuery()->columns)) {
             $query->select('produk.*');
         }
 
-        $query->selectSub($stokSubquery, 'stok_katalog')
-            ->selectSub($terjualSubquery, 'total_terjual');
-
         return $query
-            ->orderByRaw('CASE WHEN ('.$stokSubquery->toSql().') > 0 THEN 1 ELSE 0 END DESC', $stokSubquery->getBindings())
-            ->orderByDesc('total_terjual')
-            ->orderByDesc('stok_katalog')
+            ->leftJoinSub($stokAgg, 'sk_sort', 'sk_sort.produk_id', '=', 'produk.id')
+            ->leftJoinSub($terjualAgg, 'tt_sort', 'tt_sort.produk_id', '=', 'produk.id')
+            ->addSelect([
+                DB::raw('COALESCE(sk_sort.stok_katalog, 0) as stok_katalog'),
+                DB::raw('COALESCE(tt_sort.total_terjual, 0) as total_terjual'),
+            ])
+            ->orderByRaw('CASE WHEN COALESCE(sk_sort.stok_katalog, 0) > 0 THEN 1 ELSE 0 END DESC')
+            ->orderByRaw('COALESCE(tt_sort.total_terjual, 0) DESC')
+            ->orderByRaw('COALESCE(sk_sort.stok_katalog, 0) DESC')
             ->orderBy('produk.id', 'asc');
     }
 

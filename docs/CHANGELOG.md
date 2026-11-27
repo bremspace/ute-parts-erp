@@ -13,6 +13,13 @@ Format: `[Fase X] T-XX — ringkasan`.
 - **Optimasi Infrastruktur VPS (Nginx & PHP-FPM 8.4)**:
   - Aktifkan `gzip_proxied any;` di `/etc/nginx/conf.d/99-gzip-proxied.conf` agar kompresi tetap aktif di balik proxy Cloudflare.
   - Set OPcache (`max_accelerated_files=32531`, `memory_consumption=256`, `interned_strings_buffer=32`, `revalidate_freq=2`), `realpath_cache_size=4096K`, serta naikkan worker `www.conf` (`pm.max_children=16`, `pm.max_requests=500`).
+- **Audit Mendalam N+1, Query Berat & PWA Precache (Pass 2)**:
+  - `vite.config.js` & `public/build/`: Aktifkan `build.emptyOutDir: true` dan bersihkan 135+ aset build usang (`23 MB` → `1.1 MB`), sehingga service worker PWA (`sw.js`) hanya men-precache 13 entri aktif (~`940 KiB`), bukan ratusan file mati.
+  - Cache runtime server `.env` dipindahkan dari `database` ke `file` (berbagi izin `www-data` antara PHP-FPM dan Supervisor) — memangkas belasan transaksi `SELECT/DELETE/INSERT cache` di setiap perpindahan menu.
+  - `ProductSearchModal`: Lewati query `Produk::paginate`, ribuan `TipeHp`, `Supplier`, `Brand`, serta HTML modal (`-155 KB`) ketika modal dalam kondisi tertutup.
+  - `ProdukTab`: Ganti `withCount('stokLogs')` di daftar utama menjadi `withExists('stokLogs as has_stok_logs')`, tunda query modal-only (`Rak`, `TipeHp` bulk, `Kualitas` create/edit, daftar produk substitusi), dan gabungkan preferensi user lewat `UserPreference::getManyPrefs()`.
+  - `PosKasir` & `Produk::scopeUrutKetersediaanDanTerlaris`: Ganti 3 correlated subquery stok/terjual dengan 2 derived `LEFT JOIN`, tunda loading relasi servis `daftarServisSiapBayar` hingga modal servis dibuka, serta batch preferensi user.
+  - `GrnService`, `GrnTab`, `AkuntingDashboard`, & `SettingsRbac`: Ganti loop saldo kas/bank N+1 dengan 1 query `GROUP BY akun_coa_id`, ubah `whereDate('tanggal', ...)` Buku Besar ke range timestamp sargable agar index `(akun_coa_id, tanggal)` terpakai, gabungkan status count GRN dengan `GROUP BY status`, dan batch pembacaan `loyalitasForm` lewat `KonfigurasiService::getMany()`.
 - **Dokumentasi**:
   - Menambahkan [docs/PANDUAN-OPENWA.md](PANDUAN-OPENWA.md) berisi langkah lengkap Docker Compose, sizing RAM `whatsapp-web.js` vs `baileys`, ambil admin key aman SSH mobile, setup 1-klik ERP, QR/pairing code, Supervisor queue worker, warm-up anti-ban, dan troubleshooting.
   - Memperbarui [README.md](../README.md) sesuai arsitektur 16 modul **Bremspace ERP**, stack PHP 8.4 / Laravel 13 / Livewire 4 / Tailwind 4 / Vite 8, Hybrid Sync, OpenWA, serta command QA terbaru.

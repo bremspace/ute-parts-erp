@@ -1,4 +1,5 @@
 <div>
+@if($isOpen || $showCustomFilterSettings)
     <!-- Modal -->
     <div x-data="{ show: @entangle('isOpen') }"
          x-on:open-product-search-modal.window="show = true"
@@ -120,6 +121,7 @@
                 @endif
 
                 <!-- Search Input & Barcode Scan -->
+                @if($isOpen)
                 <div class="p-4 sm:p-6 pb-3 space-y-3">
                     @if($context === 'po' && $curatedSupplier)
                         <div class="flex items-center justify-between gap-2 p-1.5 rounded-2xl bg-white/[0.04] border border-white/10 flex-wrap">
@@ -554,7 +556,9 @@
                         Tutup
                     </button>
                 </div>
+                @endif
             </div>
         </div>
     </div>
+@endif
 </div>

@@ -69,13 +69,15 @@ class KonfigurasiService
         }
 
         $rows = DB::table('konfigurasi')->whereIn('kunci', $kunci)->get();
-        if ($rows->isEmpty()) {
-            return [];
-        }
-
         $hasil = [];
         foreach ($rows as $row) {
             $hasil[$row->kunci] = $this->decode((string) $row->nilai);
+        }
+
+        if (config('cache.default') !== 'array') {
+            foreach ($kunci as $k) {
+                $this->requestMemo[$k] = ['nilai' => $hasil[$k] ?? null];
+            }
         }
 
         return $hasil;

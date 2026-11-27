@@ -109,29 +109,31 @@ class GrnService
      *
      * @return Collection<int, AkunCOA>
      */
-    public static function getKasDenganSaldoCukup(float $nominal, int $cabangId): Collection
+    /**
+     * Kembalikan daftar semua kas/bank beserta kas/bank bersaldo cukup dalam satu query GROUP BY.
+     *
+     * @return array{semua: Collection<int, AkunCOA>, cukup: Collection<int, AkunCOA>}
+     */
+    public static function getKasDanSaldoCukup(float $nominal, int $cabangId): array
     {
-        $akunList = AkunCOA::whereIn('kelompok', ['kas', 'bank'])
-            ->where('is_active', true)
-            ->orderBy('kode')
-            ->get();
+        $semua = static::getKasDenganSaldoAktual($cabangId);
+        $cukup = $semua->filter(fn (AkunCOA $akun) => $nominal <= 0 || $akun->saldo_aktual >= $nominal)->values();
 
-        $cukupList = collect();
-
-        foreach ($akunList as $akun) {
-            $saldo = static::hitungSaldoKasCabang($akun->id, $cabangId);
-            $akun->saldo_aktual = $saldo;
-
-            if ($nominal <= 0 || $saldo >= $nominal) {
-                $cukupList->push($akun);
-            }
-        }
-
-        return $cukupList;
+        return ['semua' => $semua, 'cukup' => $cukup];
     }
 
     /**
-     * Dapatkan semua akun kas/bank aktif dengan saldo aktual pada cabang terkait.
+     * Dapatkan daftar akun kas/bank yang aktif dan memiliki saldo mencukupi pada cabang terkait.
+     *
+     * @return Collection<int, AkunCOA>
+     */
+    public static function getKasDenganSaldoCukup(float $nominal, int $cabangId): Collection
+    {
+        return static::getKasDanSaldoCukup($nominal, $cabangId)['cukup'];
+    }
+
+    /**
+     * Dapatkan semua akun kas/bank aktif dengan saldo aktual pada cabang terkait (1 query GROUP BY).
      *
      * @return Collection<int, AkunCOA>
      */
@@ -142,8 +144,23 @@ class GrnService
             ->orderBy('kode')
             ->get();
 
+        if ($akunList->isEmpty()) {
+            return $akunList;
+        }
+
+        $sums = DB::table('jurnal_akuntansi')
+            ->whereIn('akun_coa_id', $akunList->pluck('id'))
+            ->where('cabang_id', $cabangId)
+            ->selectRaw('akun_coa_id, COALESCE(SUM(debit), 0) as total_debit, COALESCE(SUM(kredit), 0) as total_kredit')
+            ->groupBy('akun_coa_id')
+            ->get()
+            ->keyBy('akun_coa_id');
+
         foreach ($akunList as $akun) {
-            $akun->saldo_aktual = static::hitungSaldoKasCabang($akun->id, $cabangId);
+            $sum = $sums->get($akun->id);
+            $debit = (float) ($sum->total_debit ?? 0);
+            $kredit = (float) ($sum->total_kredit ?? 0);
+            $akun->saldo_aktual = round($akun->saldo_normal === 'debit' ? $debit - $kredit : $kredit - $debit, 2);
         }
 
         return $akunList;

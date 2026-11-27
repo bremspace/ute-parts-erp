@@ -1909,7 +1909,7 @@
                                              window.addEventListener('resize', closeOnScroll);
                                          }
                                      }">
-                                    @if(isSuperAdminOrOwner() && (int) ($p->total_stok ?? 0) === 0 && (int) ($p->stok_logs_count ?? 0) === 0)
+                                    @if(isSuperAdminOrOwner() && (int) ($p->total_stok ?? 0) === 0 && ! ($p->has_stok_logs ?? ((int) ($p->stok_logs_count ?? 0) > 0)))
                                         <button wire:click="openSaldoAwalModal({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-bold text-xs cursor-pointer whitespace-nowrap active:scale-95 transition" title="Input Saldo Awal Fisik (Ekuitas Modal Pemilik)">
                                             📥 + Saldo Awal
                                         </button>
@@ -2176,7 +2176,7 @@
                                 <span class="text-[10px]">Pilih</span>
                             </label>
                             <div class="flex items-center gap-1.5">
-                                @if(isSuperAdminOrOwner() && (int) ($p->total_stok ?? 0) === 0 && (int) ($p->stok_logs_count ?? 0) === 0)
+                                @if(isSuperAdminOrOwner() && (int) ($p->total_stok ?? 0) === 0 && ! ($p->has_stok_logs ?? ((int) ($p->stok_logs_count ?? 0) > 0)))
                                     <button wire:click="openSaldoAwalModal({{ $p->id }})" class="px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-[11px] font-bold border border-emerald-500/40 cursor-pointer active:scale-95 transition" title="Input Saldo Awal Fisik">
                                         📥 + Saldo Awal
                                     </button>

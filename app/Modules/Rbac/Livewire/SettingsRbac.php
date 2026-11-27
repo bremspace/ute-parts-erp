@@ -430,9 +430,12 @@ class SettingsRbac extends Component
 
         $config = app(KonfigurasiService::class);
 
-        // Nilai TERSIMPAN dari tabel konfigurasi, fallback default bila kosong
-        foreach (array_keys($this->loyalitasForm) as $kunci) {
-            $this->loyalitasForm[$kunci] = (float) ($config->get($kunci) ?? $config->defaults()[$kunci]);
+        // Nilai TERSIMPAN dari tabel konfigurasi (1 query whereIn), fallback default bila kosong
+        $loyalitasKeys = array_keys($this->loyalitasForm);
+        $savedLoyalitas = $config->getMany($loyalitasKeys);
+        $defaultsLoyalitas = $config->defaults();
+        foreach ($loyalitasKeys as $kunci) {
+            $this->loyalitasForm[$kunci] = (float) ($savedLoyalitas[$kunci] ?? $defaultsLoyalitas[$kunci]);
         }
 
         // Sinkronkan diskon langsung dari master TierMembership agar identik dengan CRM
