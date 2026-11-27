@@ -52,6 +52,29 @@ class PrintThermalJob implements ShouldQueue
         });
     }
 
+    private function breakdownText($item): string
+    {
+        $faktor = max(1, (int) round((float) ($item->konversi ?? 1)));
+        $qty = max(0, (int) ($item->jumlah ?? 0));
+        if ($faktor <= 1 || $qty <= 0) {
+            return '';
+        }
+        $box = intdiv($qty, $faktor);
+        $sisa = $qty % $faktor;
+        if ($box <= 0) {
+            return '';
+        }
+        $satuan = strtoupper((string) ($item->satuan ?? 'box'));
+        return $box.' '.$satuan.($sisa > 0 ? ' + '.$sisa.' PCS' : '');
+    }
+
+    private function alasanPotongan($item): string
+    {
+        $faktor = max(1, (int) round((float) ($item->konversi ?? 1)));
+        $satuan = strtolower((string) ($item->satuan ?? 'pcs'));
+        return ($faktor > 1 && $satuan !== 'pcs') ? 'Potongan Kemasan' : 'Potongan Member (Tier)';
+    }
+
     protected function prosesCetak(Transaksi $transaksi): void
     {
         $items = [];
@@ -70,6 +93,8 @@ class PrintThermalJob implements ShouldQueue
                 'subtotal' => (float) $item->subtotal,
                 'harga_retail' => $hargaDasar,
                 'satuan' => $item->satuan ?: 'pcs',
+                'breakdown' => $this->breakdownText($item),
+                'alasan_harga' => $this->alasanPotongan($item),
                 'catatan' => $catatan ?: null,
                 'diskon_per_unit' => $diskonPerUnit,
                 'diskon_total' => $diskonPerUnit * $qty,

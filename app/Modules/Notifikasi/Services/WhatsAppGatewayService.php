@@ -161,6 +161,34 @@ class WhatsAppGatewayService
         }
 
         if ($response->successful()) {
+            $json = $response->json();
+
+            // Portal/login HTML sering balas HTTP 200. Jangan anggap itu sukses.
+            if (! is_array($json)) {
+                Log::warning('OpenWA mengembalikan non-JSON', [
+                    'session' => $session,
+                    'chat_id' => $chatId,
+                    'http' => $response->status(),
+                    'content_type' => $response->header('Content-Type'),
+                ]);
+
+                return [
+                    'ok' => false,
+                    'provider' => self::PROVIDER_OPENWA,
+                    'error' => 'OpenWA mengembalikan HTML/bukan JSON (kemungkinan halaman login). Periksa URL & port API OpenWA.',
+                    'chat_id' => $chatId,
+                ];
+            }
+
+            if (array_key_exists('success', $json) && ! $json['success']) {
+                return [
+                    'ok' => false,
+                    'provider' => self::PROVIDER_OPENWA,
+                    'error' => 'OpenWA menolak pengiriman: '.(string) ($json['message'] ?? $json['error'] ?? 'unknown error'),
+                    'chat_id' => $chatId,
+                ];
+            }
+
             return [
                 'ok' => true,
                 'provider' => self::PROVIDER_OPENWA,
@@ -235,6 +263,16 @@ class WhatsAppGatewayService
         }
 
         if ($response->successful()) {
+            $json = $response->json();
+            if (is_array($json) && array_key_exists('success', $json) && ! $json['success']) {
+                return [
+                    'ok' => false,
+                    'provider' => (string) ($config['provider'] ?? 'custom'),
+                    'error' => 'Gateway menolak pengiriman: '.(string) ($json['message'] ?? $json['error'] ?? 'unknown error'),
+                    'chat_id' => $target,
+                ];
+            }
+
             return [
                 'ok' => true,
                 'provider' => (string) ($config['provider'] ?? 'custom'),

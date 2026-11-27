@@ -911,7 +911,7 @@ class PosKasir extends Component
     {
         return array_reduce(
             $this->cart,
-            fn ($carry, $item) => $carry + (((float) ($item['harga_dasar'] ?? $item['harga'])) * (int) ($item['qty'] ?? 1)),
+            fn ($carry, $item) => $carry + (((float) ($item['harga_pcs'] ?? $item['harga_dasar'] ?? $item['harga'])) * (int) ($item['qty'] ?? 1)),
             0.0
         );
     }
@@ -922,12 +922,33 @@ class PosKasir extends Component
             return 0.0;
         }
 
-        return max(0.0, $this->subtotalRetail - $this->subtotal);
+        return (float) array_sum(array_map(
+            fn ($it) => ((float) ($it['diskon'] ?? 0)) * ((int) ($it['qty'] ?? 1)),
+            $this->cart
+        ));
+    }
+
+    public function getTotalDiskonProperty(): float
+    {
+        return max(0.0,
+            $this->diskonTierTotal
+            + $this->potonganKemasan
+            + (float) $this->diskonPartai
+            + (float) $this->diskonPoin
+            + (float) $this->diskonTotal
+        );
+    }
+
+    public function getTotalDiskonDppProperty(): float
+    {
+        // Subtotal sudah bersih setelah potongan kemasan, jadi DPP tidak boleh
+        // mengurangkannya dua kali.
+        return max(0.0, $this->totalDiskon - $this->potonganKemasan);
     }
 
     public function getHematTotalProperty(): float
     {
-        return $this->diskonTierTotal + $this->diskonTotal;
+        return $this->totalDiskon;
     }
 
     public function getPotensiKomisiTotalProperty(): float
@@ -986,7 +1007,7 @@ class PosKasir extends Component
         $pajakService = app(PajakService::class);
 
         if (! $cabangId || ! $pajakService->enabled($cabangId)) {
-            $this->dpp = max(0.0, $this->subtotal - $this->diskonTotal);
+            $this->dpp = max(0.0, $this->subtotal - $this->totalDiskonDpp);
             $this->pajakNominal = 0.0;
             $this->ppnPersen = 0.0;
 
@@ -995,7 +1016,7 @@ class PosKasir extends Component
 
         // [H11] inclusive: dpp = net/(1+persen), ppn = net - dpp, total = net.
         // getTotalAkhirProperty (dpp + pajakNominal) benar utk kedua mode.
-        $result = $pajakService->hitungPenjualan($cabangId, $this->subtotal, $this->diskonTotal);
+        $result = $pajakService->hitungPenjualan($cabangId, $this->subtotal, $this->totalDiskonDpp);
         $this->dpp = (float) $result['dpp'];
         $this->pajakNominal = (float) $result['ppn_nominal'];
         $this->ppnPersen = (float) $result['ppn_percent'];
@@ -1305,12 +1326,12 @@ class PosKasir extends Component
 
     public function getDiskonTotalProperty(): float
     {
-        $diskon = $this->diskonNominal;
+        // Hanya diskon manual dari kasir. Partai/poin/tier/kemasan punya getter
+        // sendiri dan dijumlahkan di totalDiskon agar label tidak tumpang tindih.
+        $diskon = (float) $this->diskonNominal;
         if ($this->diskonPersen > 0) {
-            $diskon += round(($this->subtotal * $this->diskonPersen) / 100, 2);
+            $diskon += round(($this->subtotal * (float) $this->diskonPersen) / 100, 2);
         }
-        $diskon += $this->diskonPartai;
-        $diskon += $this->diskonPoin;
 
         return min($this->subtotal, $diskon);
     }
@@ -1501,11 +1522,13 @@ class PosKasir extends Component
             return;
         }
 
-        $satuanSuffix = ($satuanTarget !== $satuanDasar) ? "-{$satuanTarget}" : '';
-        $itemKey = ($variantId ? "{$produkId}-{$variantId}" : "{$produkId}-0").$satuanSuffix;
+        // Qty selalu dalam satuan dasar (pcs). Kalau tambah per box, langsung
+        // masukkan jumlah pcs-nya agar tidak rancu saat qty diubah.
+        $qtyTambah = (int) round($faktorKonversi);
+        $itemKey = ($variantId ? "{$produkId}-{$variantId}" : "{$produkId}-0");
 
         if (isset($this->cart[$itemKey])) {
-            if ($this->cart[$itemKey]['qty'] + 1 > $stokMaxSatuan) {
+            if ($this->cart[$itemKey]['qty'] + $qtyTambah > $stokMaxSatuan) {
                 $pesan = $faktorKonversi > 1
                     ? "Stok {$produk->nama} maksimal {$stokMaxSatuan} {$satuanTarget} di gudang ini (tersedia {$stokTersedia} {$satuanDasar})"
                     : "Stok {$produk->nama} maksimal {$stokTersedia} unit di gudang ini";
@@ -1517,11 +1540,14 @@ class PosKasir extends Component
 
                 return;
             }
-            $this->cart[$itemKey]['qty'] += 1;
-            $this->cart[$itemKey]['subtotal'] = $this->cart[$itemKey]['qty'] * $harga;
+            $this->cart[$itemKey]['qty'] += $qtyTambah;
             $this->cart[$itemKey]['stok_max'] = $stokMaxSatuan;
             if (empty($this->cart[$itemKey]['sku'])) {
                 $this->cart[$itemKey]['sku'] = $itemSku;
+            }
+            $this->rehitungHargaBox($itemKey);
+            if (! ($this->cart[$itemKey]['box_faktor'] ?? 0)) {
+                $this->cart[$itemKey]['subtotal'] = $this->cart[$itemKey]['qty'] * $this->cart[$itemKey]['harga'];
             }
         } else {
             $this->cart[$itemKey] = [
@@ -1530,21 +1556,30 @@ class PosKasir extends Component
                 'sku' => $itemSku,
                 'nama' => $produk->nama,
                 'varian' => $variant?->nama_varian ?? 'Standar',
-                'satuan' => $satuanTarget,
-                'konversi' => $faktorKonversi,
+                'satuan' => $satuanDasar,
+                'satuan_dasar' => $satuanDasar,
+                'konversi' => 1.0,
                 'daftar_satuan' => $daftarSatuan,
-                'harga' => $harga,
+                'harga' => $baseHarga,
+                'harga_pcs' => $baseHarga,
+                'box_faktor' => $faktorKonversi > 1 ? (int) round($faktorKonversi) : 0,
+                'box_harga' => $faktorKonversi > 1 ? $harga : 0,
+                'sisa_pcs' => 0,
+                'potongan_kemasan' => 0,
+                'breakdown' => $faktorKonversi > 1 ? '1 '.$satuanTarget : '',
+                'alasan_harga' => $faktorKonversi > 1 ? 'Harga Kemasan / Per Box' : null,
                 'harga_dasar' => (float) ($pricing['harga_dasar'] * $faktorKonversi),
-                'qty' => 1,
-                'diskon' => (float) ($pricing['diskon_nominal'] ?? 0.0) * $faktorKonversi,
-                'potensi_komisi' => (float) ($pricing['potensi_komisi'] ?? 0.0) * $faktorKonversi,
+                'qty' => $qtyTambah,
+                'diskon' => (float) ($pricing['diskon_nominal'] ?? 0.0),
+                'potensi_komisi' => (float) ($pricing['potensi_komisi'] ?? 0.0),
                 'tier_nama' => $pricing['tier'] ?? null,
-                'subtotal' => $harga,
+                'subtotal' => $faktorKonversi > 1 ? $harga : $baseHarga,
                 'stok_max' => $stokMaxSatuan,
                 'flex' => (bool) $produk->harga_fleksibel,
                 'sn' => (bool) $produk->sn,
                 'sn_list' => [],
             ];
+            $this->rehitungHargaBox($itemKey);
         }
 
         // Reset computed properties cache & recalc pajak SETELAH item masuk keranjang
@@ -1561,6 +1596,80 @@ class PosKasir extends Component
         if (isset($this->cart[$itemKey])) {
             $this->cart[$itemKey]['catatan'] = trim($catatan);
         }
+    }
+
+    /** Total potongan kemasan dari semua item di keranjang. */
+    public function getPotonganKemasanProperty(): float
+    {
+        return (float) array_sum(array_column($this->cart, 'potongan_kemasan'));
+    }
+
+    /** Ringkasan qty kemasan + sisa pcs, mengikuti format keranjang marketplace. */
+    public function breakdownItem(array $item): string
+    {
+        $faktor = max(1, (int) round((float) ($item['box_faktor'] ?? $item['konversi'] ?? 1)));
+        $qty = max(0, (int) ($item['qty'] ?? 0));
+        if ($faktor <= 1 || $qty <= 0) {
+            return '';
+        }
+
+        $box = intdiv($qty, $faktor);
+        $sisa = $qty % $faktor;
+        if ($box <= 0) {
+            return '';
+        }
+
+        // Qty disimpan dalam pcs, jadi label kemasan harus tetap BOX.
+        return $box.' BOX'.($sisa > 0 ? ' + '.$sisa.' PCS' : '');
+    }
+
+    /** Hitung ulang harga efektif per pcs & breakdown setelah qty berubah. */
+    private function rehitungHargaBox(string $itemKey): void
+    {
+        if (! isset($this->cart[$itemKey])) {
+            return;
+        }
+        $item = &$this->cart[$itemKey];
+
+        $faktor = max(0, (int) round((float) ($item['box_faktor'] ?? 0)));
+        $boxHarga = (float) ($item['box_harga'] ?? 0);
+        if ($faktor < 2 || $boxHarga <= 0) {
+            return;
+        }
+
+        $hargaPcs = (float) ($item['harga_pcs'] ?? $item['harga'] ?? 0);
+        $qty = max(0, (int) ($item['qty'] ?? 0));
+        $boxes = intdiv($qty, $faktor);
+        $sisa = $qty % $faktor;
+
+        $item['satuan'] = $item['satuan_dasar'] ?? 'pcs';
+        $item['konversi'] = 1.0;
+        $item['qty_satuan'] = $boxes;
+        $item['sisa_pcs'] = $sisa;
+
+        if ($boxes > 0 && $qty > 0) {
+            $total = ($boxes * $boxHarga) + ($sisa * $hargaPcs);
+            $item['harga'] = $total / $qty;
+            $item['subtotal'] = $total;
+            $item['potongan_kemasan'] = max(0, ($qty * $hargaPcs) - $total);
+            $item['breakdown'] = $boxes.' box'.($sisa > 0 ? ' + '.$sisa.' pcs' : '');
+            $item['alasan_harga'] = 'Harga Kemasan / Per Box';
+            $item['diskon'] = 0;
+        } else {
+            $item['harga'] = $hargaPcs;
+            $item['subtotal'] = $qty * $hargaPcs;
+            $item['potongan_kemasan'] = 0;
+            $item['breakdown'] = '';
+            $item['alasan_harga'] = '';
+        }
+    }
+
+    /** Label potongan: kemasan bila beli per satuan, tier/member bila bukan. */
+    public function labelPotonganItem(array $item): string
+    {
+        $faktor = max(1, (int) round((float) ($item['box_faktor'] ?? $item['konversi'] ?? 1)));
+        $satuan = strtolower((string) ($item['satuan'] ?? 'pcs'));
+        return ($faktor > 1 && $satuan !== 'pcs') ? 'Potongan Kemasan' : 'Potongan Member (Tier)';
     }
 
     /** Ubah satuan item keranjang (Multi-Satuan POS). */
@@ -1617,15 +1726,22 @@ class PosKasir extends Component
         $satuanSuffix = ($newSatuanKode !== $satuanDasar) ? "-{$newSatuanKode}" : '';
         $newItemKey = ($item['sku_variant_id'] ? "{$item['produk_id']}-{$item['sku_variant_id']}" : "{$item['produk_id']}-0").$satuanSuffix;
 
-        $item['satuan'] = $newSatuanKode;
-        $item['konversi'] = $faktorKonversi;
-        $item['harga'] = $harga;
+        $item['satuan'] = $satuanDasar;
+        $item['satuan_dasar'] = $satuanDasar;
+        $item['konversi'] = 1.0;
+        $item['harga'] = $baseHarga;
+        $item['harga_pcs'] = $baseHarga;
+        $item['box_faktor'] = $faktorKonversi > 1 ? (int) round($faktorKonversi) : 0;
+        $item['box_harga'] = $faktorKonversi > 1 ? $harga : 0;
+        $item['sisa_pcs'] = 0;
+        $item['breakdown'] = '';
+        $item['alasan_harga'] = null;
         $item['harga_dasar'] = (float) ($pricing['harga_dasar'] * $faktorKonversi);
-        $item['diskon'] = (float) ($pricing['diskon_nominal'] ?? 0.0) * $faktorKonversi;
-        $item['potensi_komisi'] = (float) ($pricing['potensi_komisi'] ?? 0.0) * $faktorKonversi;
-        $item['qty'] = $newQty;
-        $item['stok_max'] = $maxQty;
-        $item['subtotal'] = $newQty * $harga;
+        $item['diskon'] = (float) ($pricing['diskon_nominal'] ?? 0.0);
+        $item['potensi_komisi'] = (float) ($pricing['potensi_komisi'] ?? 0.0);
+        $item['qty'] = $faktorKonversi > 1 ? $currentQty * (int) round($faktorKonversi) : $newQty;
+        $item['stok_max'] = $faktorKonversi > 1 ? (int) floor($stokTersedia) : $maxQty;
+        $item['subtotal'] = $item['qty'] * $baseHarga;
 
         if ($newItemKey !== $itemKey) {
             unset($this->cart[$itemKey]);
@@ -1638,6 +1754,7 @@ class PosKasir extends Component
         } else {
             $this->cart[$itemKey] = $item;
         }
+        $this->rehitungHargaBox($newItemKey);
 
         $this->resetComputedTotals();
         $this->hitungDiskonPartai();
@@ -1827,7 +1944,12 @@ class PosKasir extends Component
         // Sinkronkan batas keras di keranjang (dipakai cart-content & resume)
         $this->cart[$itemKey]['stok_max'] = $stokMaxSatuan;
         $this->cart[$itemKey]['qty'] = $newQty;
-        $this->cart[$itemKey]['subtotal'] = $newQty * $this->cart[$itemKey]['harga'];
+
+        // Qty selalu pcs. Hitung ulang harga efektif + breakdown kemasan bila ada.
+        $this->rehitungHargaBox($itemKey);
+        if (! ($this->cart[$itemKey]['box_faktor'] ?? 0)) {
+            $this->cart[$itemKey]['subtotal'] = $newQty * $this->cart[$itemKey]['harga'];
+        }
 
         // [P2-1] Qty turun → sn_list dipangkas (keep first N) agar count == qty
         // segera, bukan baru ketahuan di gate bayar. Qty naik tidak di-fill —
@@ -2712,14 +2834,20 @@ class PosKasir extends Component
                 $saldoPoin = $pelangganModel?->poin_loyalty ?? ($pelangganSaatTransaksi?->poin_loyalty ?? 0);
 
                 $itemsReceipt = array_map(function ($it) {
-                    $hargaDasar = (float) ($it['harga_dasar'] ?? $it['harga']);
+                    // Untuk item hasil auto-konversi box, harga_dasar = harga box.
+                    // Struk memakai harga retail PER PCS (harga_pcs), bukan harga box.
+                    $hargaDasar = (float) ($it['harga_pcs'] ?? $it['harga_dasar'] ?? $it['harga']);
                     $hargaSatuan = (float) ($it['harga'] ?? 0);
                     $qty = (int) ($it['qty'] ?? 1);
                     $diskonPerUnit = max(0, $hargaDasar - $hargaSatuan);
                     $diskonTotal = $diskonPerUnit * $qty;
+                    $isBox = (int) ($it['box_faktor'] ?? 0) > 1;
 
                     return array_merge($it, [
+                        'satuan' => $isBox ? 'pcs' : ($it['satuan'] ?? 'pcs'),
                         'harga_retail' => $hargaDasar,
+                        'breakdown' => $this->breakdownItem($it),
+                        'alasan_harga' => $it['alasan_harga'] ?? null,
                         'diskon_per_unit' => $diskonPerUnit,
                         'diskon_total' => $diskonTotal,
                         'subtotal_retail' => $hargaDasar * $qty,
@@ -2727,13 +2855,13 @@ class PosKasir extends Component
                 }, array_values($this->cart));
 
                 $totalRetail = array_sum(array_column($itemsReceipt, 'subtotal_retail'));
-                // Potongan Tier (member) dihitung dari diskon item, bukan selisih retail-subtotal
-                // (selisih retail-subtotal juga mencakup diskon satuan box/kemasan).
+                // Potongan kemasan diambil langsung dari field item, bukan dari sisa
+                // selisih retail-subtotal (biar tidak salah label jadi potongan member).
+                $diskonBoxStruk = (float) array_sum(array_column($itemsReceipt, 'potongan_kemasan'));
                 $totalDiskonTier = (float) array_sum(array_map(
                     fn ($it) => ((float) ($it['diskon'] ?? 0)) * ((int) ($it['qty'] ?? 1)),
                     $itemsReceipt
                 ));
-                $diskonBoxStruk = max(0.0, $totalRetail - $this->subtotal - $totalDiskonTier);
 
                 $sisaPoin = $saldoPoin;
                 $diskonTierStruk = ($this->modeRewardMitra === 'komisi_akumulasi' ? 0.0 : $totalDiskonTier);
@@ -2741,7 +2869,7 @@ class PosKasir extends Component
                 if ($this->diskonPersen > 0) {
                     $diskonKasirLangsung += round(($this->subtotal * $this->diskonPersen) / 100, 2);
                 }
-                $hematTotal = $diskonTierStruk + $this->diskonPartai + $this->diskonPoin + $diskonKasirLangsung;
+                $hematTotal = $diskonTierStruk + $diskonBoxStruk + $this->diskonPartai + $this->diskonPoin + $diskonKasirLangsung;
 
                 $isPiutang = in_array(strtolower($this->metodeBayar), ['piutang', 'kasbon']);
                 $jatuhTempoTgl = $isPiutang ? now()->addDays(30)->format('d/m/Y') : null;

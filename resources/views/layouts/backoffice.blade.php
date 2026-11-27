@@ -267,32 +267,53 @@
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
                         @php
-                            $isWmsInventori = request()->is('app/wms*') && (
-                                request('sub') === 'inventori' ||
-                                in_array(request('tab'), ['produk', 'stok', 'monitoring_harga']) ||
-                                (!request()->has('sub') && !request()->has('tab') && !request()->is('app/wms/cycle-count*'))
-                            );
-                            $isWmsOperasional = request()->is('app/wms*') && (
-                                request('sub') === 'operasional' ||
-                                in_array(request('tab'), ['transfer', 'opname']) ||
-                                request()->is('app/wms/cycle-count*')
-                            );
-                            $isWmsPengadaan = request()->is('app/wms*') && (
-                                request('sub') === 'pengadaan' ||
-                                in_array(request('tab'), ['po', 'grn', 'retur', 'histori_po'])
-                            );
+                            $subLinkClass = 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors';
+                            $subLinkIdle = 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5';
+                            $subLinkActive = 'bg-up-primary text-white font-semibold';
+                            $wmsTab = (string) request('tab');
+                            $wmsSub = (string) request('sub');
                         @endphp
-                        <a href="/app/wms?sub=inventori" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWmsInventori ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $isWmsInventori ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                            <span>Inventori</span>
-                        </a>
-                        <a href="/app/wms?sub=operasional" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWmsOperasional ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $isWmsOperasional ? 'bg-white' : 'bg-up-mint/60' }}"></span>
-                            <span>Operasional</span>
-                        </a>
-                        <a href="/app/wms?sub=pengadaan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWmsPengadaan ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $isWmsPengadaan ? 'bg-white' : 'bg-up-accent/60' }}"></span>
-                            <span>Pengadaan</span>
+
+                        <div x-data="{ open: {{ (in_array($wmsTab, ['produk','stok','monitoring_harga']) || $wmsSub === 'inventori') ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-primary/60"></span>Inventori</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/wms/produk" class="{{ $subLinkClass }} {{ $wmsTab === 'produk' ? $subLinkActive : $subLinkIdle }}">Master Produk &amp; Stok</a>
+                                <a href="/app/wms/stok" class="{{ $subLinkClass }} {{ $wmsTab === 'stok' ? $subLinkActive : $subLinkIdle }}">Stok per Gudang</a>
+                                <a href="/app/wms/monitoring_harga" class="{{ $subLinkClass }} {{ $wmsTab === 'monitoring_harga' ? $subLinkActive : $subLinkIdle }}">Monitoring Margin &amp; Harga</a>
+                                <a href="/app/wms/import-export" class="{{ $subLinkClass }} {{ request()->is('app/wms/import-export*') ? $subLinkActive : $subLinkIdle }}">Import / Export Master</a>
+                                <a href="/app/wms/import-foto" class="{{ $subLinkClass }} {{ request()->is('app/wms/import-foto*') ? $subLinkActive : $subLinkIdle }}">Import Foto Produk</a>
+                            </div>
+                        </div>
+
+                        <div x-data="{ open: {{ (in_array($wmsTab, ['transfer','opname']) || request()->is('app/wms/cycle-count*') || $wmsSub === 'operasional') ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-mint/60"></span>Operasional</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/wms/transfer" class="{{ $subLinkClass }} {{ $wmsTab === 'transfer' ? $subLinkActive : $subLinkIdle }}">Transfer Stok</a>
+                                <a href="/app/wms/opname" class="{{ $subLinkClass }} {{ $wmsTab === 'opname' ? $subLinkActive : $subLinkIdle }}">Stock Opname</a>
+                                <a href="/app/wms/cycle-count" class="{{ $subLinkClass }} {{ request()->is('app/wms/cycle-count*') ? $subLinkActive : $subLinkIdle }}">Cycle Count</a>
+                            </div>
+                        </div>
+
+                        <div x-data="{ open: {{ (in_array($wmsTab, ['po','grn','retur','histori_po']) || $wmsSub === 'pengadaan') ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-accent/60"></span>Pengadaan</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/wms/po" class="{{ $subLinkClass }} {{ $wmsTab === 'po' ? $subLinkActive : $subLinkIdle }}">Purchase Order</a>
+                                <a href="/app/wms/grn" class="{{ $subLinkClass }} {{ $wmsTab === 'grn' ? $subLinkActive : $subLinkIdle }}">Penerimaan Barang (GRN)</a>
+                                <a href="/app/wms/retur" class="{{ $subLinkClass }} {{ $wmsTab === 'retur' ? $subLinkActive : $subLinkIdle }}">Retur Pembelian</a>
+                                <a href="/app/wms/histori_po" class="{{ $subLinkClass }} {{ $wmsTab === 'histori_po' ? $subLinkActive : $subLinkIdle }}">Histori Pengadaan</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div x-show="isDropdownOpen('wms')"
                         </a>
                     </div>
                 </div>
@@ -522,54 +543,114 @@
                     <button
                         type="button"
                         @click="toggleDropdown('pengaturan')"
-                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/pengaturan*', 'app/keamanan*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
+                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/pengaturan*', 'app/keamanan*', 'app/printer*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
                         title="Pengaturan & Sistem"
                     >
-                        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                        </svg>
+                        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                         <span class="sidebar-label">Pengaturan &amp; Sistem</span>
-                        <svg class="sidebar-chevron ml-auto w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': isDropdownOpen('pengaturan') }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <svg class="sidebar-chevron ml-auto w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': isDropdownOpen('pengaturan') }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                     </button>
-                    <div x-show="isDropdownOpen('pengaturan')"
-                         x-collapse
-                         class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
+                    <div x-show="isDropdownOpen('pengaturan')" x-collapse class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
                         @php
-                            $isAkses = request()->is('app/pengaturan*') && (in_array(request('tab'), ['users', 'role', 'cabang']) || (!request()->has('tab') && !request()->routeIs('pengaturan.web-konsumen')));
-                            $isKatalog = request()->is('app/pengaturan*') && in_array(request('tab'), ['master_produk', 'export_import']);
-                            $isWebKonsumen = request()->routeIs('pengaturan.web-konsumen');
-                            $isOperasional = request()->is('app/pengaturan*') && in_array(request('tab'), ['loyalitas', 'pajak', 'qris', 'master', 'printer', 'integrasi']);
-                            $isSistem = (request()->is('app/pengaturan*') && in_array(request('tab'), ['database', 'audit', 'keamanan', 'tema'])) || request()->is('app/keamanan*');
+                            $subLinkClass = 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors';
+                            $subLinkIdle = 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5';
+                            $subLinkActive = 'bg-up-primary text-white font-semibold';
                         @endphp
 
                         @canany(['pengaturan.manage', 'user.view'])
-                            <a href="/app/pengaturan?tab=users" title="Pusat Pengaturan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkses ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $isAkses ? 'bg-white' : 'bg-indigo-400' }}"></span>
-                                <span>Akses &amp; Pengguna</span>
-                            </a>
+                        <div x-data="{ open: {{ (request('tab') === 'users' || request('tab') === 'role' || request('tab') === 'cabang' || !request()->has('tab')) ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>Akses &amp; Pengguna</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/pengaturan?tab=users" class="{{ $subLinkClass }} {{ request('tab') === 'users' ? $subLinkActive : $subLinkIdle }}">Manajemen Pengguna</a>
+                                <a href="/app/pengaturan?tab=role" class="{{ $subLinkClass }} {{ request('tab') === 'role' ? $subLinkActive : $subLinkIdle }}">Role &amp; Hak Akses</a>
+                                <a href="/app/pengaturan?tab=cabang" class="{{ $subLinkClass }} {{ request('tab') === 'cabang' ? $subLinkActive : $subLinkIdle }}">Cabang, Gudang &amp; Rak</a>
+                            </div>
+                        </div>
                         @endcanany
 
                         @can('pengaturan.manage')
-                            <a href="/app/pengaturan?tab=master_produk" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isKatalog ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $isKatalog ? 'bg-white' : 'bg-sky-400' }}"></span>
-                                <span>Katalog &amp; Master Part</span>
-                            </a>
-                            <a href="{{ route('pengaturan.web-konsumen') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWebKonsumen ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $isWebKonsumen ? 'bg-white' : 'bg-pink-400' }}"></span>
-                                <span>Toko &amp; Web Konsumen</span>
-                            </a>
-                            <a href="/app/pengaturan?tab=loyalitas" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isOperasional ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $isOperasional ? 'bg-white' : 'bg-up-amber' }}"></span>
-                                <span>Operasional &amp; Bisnis</span>
-                            </a>
-                            <a href="/app/pengaturan?tab=printer" class="sr-only">Printer</a>
-                            <a href="/app/pengaturan?tab=integrasi" class="sr-only">Integrasi</a>
-                            <a href="/app/pengaturan?tab=database" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isSistem ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $isSistem ? 'bg-white' : 'bg-purple-400' }}"></span>
-                                <span>Sistem &amp; Keamanan</span>
-                            </a>
+                        <div x-data="{ open: {{ (in_array(request('tab'), ['master_produk', 'export_import']) || request()->routeIs('pengaturan.web-konsumen')) ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>Katalog &amp; Master Part</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/pengaturan?tab=master_produk&amp;sub=kategori" class="{{ $subLinkClass }} {{ request('sub') === 'kategori' ? $subLinkActive : $subLinkIdle }}">Kategori Produk</a>
+                                <a href="/app/pengaturan?tab=master_produk&amp;sub=brand" class="{{ $subLinkClass }} {{ request('sub') === 'brand' ? $subLinkActive : $subLinkIdle }}">Brand Part</a>
+                                <a href="/app/pengaturan?tab=master_produk&amp;sub=kualitas" class="{{ $subLinkClass }} {{ request('sub') === 'kualitas' ? $subLinkActive : $subLinkIdle }}">Kualitas / Grade</a>
+                                <a href="/app/pengaturan?tab=master_produk&amp;sub=satuan" class="{{ $subLinkClass }} {{ request('sub') === 'satuan' ? $subLinkActive : $subLinkIdle }}">Satuan Unit</a>
+                                <a href="/app/pengaturan?tab=master_produk&amp;sub=kondisi" class="{{ $subLinkClass }} {{ request('sub') === 'kondisi' ? $subLinkActive : $subLinkIdle }}">Kondisi Barang</a>
+                                <a href="/app/pengaturan?tab=master_produk&amp;sub=tipe_hp" class="{{ $subLinkClass }} {{ request('sub') === 'tipe_hp' ? $subLinkActive : $subLinkIdle }}">Tipe HP</a>
+                                <a href="/app/pengaturan?tab=export_import" class="{{ $subLinkClass }} {{ request('tab') === 'export_import' ? $subLinkActive : $subLinkIdle }}">Export &amp; Import Master</a>
+                                <a href="{{ route('pengaturan.web-konsumen') }}" class="{{ $subLinkClass }} {{ request()->routeIs('pengaturan.web-konsumen') ? $subLinkActive : $subLinkIdle }}">Toko &amp; Web Konsumen (CMS)</a>
+                            </div>
+                        </div>
+
+                        <div x-data="{ open: {{ in_array(request('tab'), ['loyalitas', 'pajak', 'qris']) ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Kebijakan Bisnis</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/pengaturan?tab=loyalitas" class="{{ $subLinkClass }} {{ request('tab') === 'loyalitas' ? $subLinkActive : $subLinkIdle }}">Loyalitas &amp; Komisi</a>
+                                <a href="/app/pengaturan?tab=pajak" class="{{ $subLinkClass }} {{ request('tab') === 'pajak' ? $subLinkActive : $subLinkIdle }}">Pajak &amp; PPN</a>
+                                <a href="/app/pengaturan?tab=qris" class="{{ $subLinkClass }} {{ request('tab') === 'qris' ? $subLinkActive : $subLinkIdle }}">QRIS Toko</a>
+                            </div>
+                        </div>
+
+                        <div x-data="{ open: {{ (request('tab') === 'master' || request()->route('sub')) ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-amber"></span>Operasional &amp; Periferal</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/pengaturan?tab=master" class="{{ $subLinkClass }} {{ request('tab') === 'master' ? $subLinkActive : $subLinkIdle }}">Master Servis &amp; Garansi</a>
+                                <div x-data="{ openPrinter: {{ request()->route('sub') ? 'true' : 'false' }} }">
+                                    <button type="button" @click="openPrinter = !openPrinter" class="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-[11px] font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                        <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-mint"></span>Printer &amp; Cetak</span>
+                                        <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': openPrinter }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                                    </button>
+                                    <div x-show="openPrinter" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                        <a href="{{ route('printer.sub', ['sub' => 'struk']) }}" class="{{ $subLinkClass }} {{ request()->route('sub') === 'struk' ? $subLinkActive : $subLinkIdle }}">Template Struk</a>
+                                        <a href="{{ route('printer.sub', ['sub' => 'label']) }}" class="{{ $subLinkClass }} {{ request()->route('sub') === 'label' ? $subLinkActive : $subLinkIdle }}">Label Barcode &amp; QR</a>
+                                        <a href="{{ route('printer.sub', ['sub' => 'wms_doc']) }}" class="{{ $subLinkClass }} {{ request()->route('sub') === 'wms_doc' ? $subLinkActive : $subLinkIdle }}">Dokumen WMS</a>
+                                        <a href="{{ route('printer.sub', ['sub' => 'hr_slip']) }}" class="{{ $subLinkClass }} {{ request()->route('sub') === 'hr_slip' ? $subLinkActive : $subLinkIdle }}">Slip Gaji HR</a>
+                                        <a href="{{ route('printer.sub', ['sub' => 'laporan']) }}" class="{{ $subLinkClass }} {{ request()->route('sub') === 'laporan' ? $subLinkActive : $subLinkIdle }}">Laporan Keuangan</a>
+                                        <a href="{{ route('printer.sub', ['sub' => 'pengiriman']) }}" class="{{ $subLinkClass }} {{ request()->route('sub') === 'pengiriman' ? $subLinkActive : $subLinkIdle }}">Label Pengiriman</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div x-data="{ open: {{ request('tab') === 'integrasi' ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>Gateway Integrasi</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/pengaturan?tab=integrasi&amp;sub=wa" class="{{ $subLinkClass }} {{ request('sub') === 'wa' ? $subLinkActive : $subLinkIdle }}">WhatsApp Gateway</a>
+                                <a href="/app/pengaturan?tab=integrasi&amp;sub=duitku" class="{{ $subLinkClass }} {{ request('sub') === 'duitku' ? $subLinkActive : $subLinkIdle }}">Payment Gateway Duitku</a>
+                                <a href="/app/pengaturan?tab=integrasi&amp;sub=biteship" class="{{ $subLinkClass }} {{ request('sub') === 'biteship' ? $subLinkActive : $subLinkIdle }}">Logistik Biteship</a>
+                                <a href="/app/pengaturan?tab=integrasi&amp;sub=hybrid" class="{{ $subLinkClass }} {{ request('sub') === 'hybrid' ? $subLinkActive : $subLinkIdle }}">Hybrid Sync (Lokal &amp; Cloud)</a>
+                            </div>
+                        </div>
+
+                        <div x-data="{ open: {{ (in_array(request('tab'), ['database', 'jaringan', 'tema', 'keamanan']) || request()->is('app/audit-log*')) ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>Sistem &amp; Keamanan</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/pengaturan?tab=database" class="{{ $subLinkClass }} {{ request('tab') === 'database' ? $subLinkActive : $subLinkIdle }}">Database &amp; Backup</a>
+                                <a href="/app/pengaturan?tab=jaringan" class="{{ $subLinkClass }} {{ request('tab') === 'jaringan' ? $subLinkActive : $subLinkIdle }}">Jaringan &amp; Domain</a>
+                                <a href="/app/pengaturan?tab=tema" class="{{ $subLinkClass }} {{ request('tab') === 'tema' ? $subLinkActive : $subLinkIdle }}">Tema &amp; Palet</a>
+                                <a href="/app/pengaturan?tab=keamanan" class="{{ $subLinkClass }} {{ request('tab') === 'keamanan' ? $subLinkActive : $subLinkIdle }}">Keamanan &amp; 2FA</a>
+                                <a href="/app/audit-log" class="{{ $subLinkClass }} {{ request()->is('app/audit-log*') ? $subLinkActive : $subLinkIdle }}">Audit Trail</a>
+                            </div>
+                        </div>
                         @endcan
                     </div>
                 </div>

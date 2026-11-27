@@ -762,6 +762,12 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
             'produk', 'transfer', 'opname', 'po', 'grn', 'retur', 'stok', 'histori_po', 'monitoring_harga',
         ])
         ->middleware('permission:wms.view');
+    // Printer & Cetak — halaman tersendiri, tetap di bawah menu Pengaturan
+    Route::get('/printer/{sub}', SettingsRbac::class)
+        ->name('printer.sub')
+        ->whereIn('sub', ['struk', 'label', 'wms_doc', 'hr_slip', 'laporan', 'pengiriman'])
+        ->middleware('permission:pengaturan.manage');
+
     // WMS Chunked Bulk Foto Upload
 
     // WMS Export & Import Master Produk & Foto

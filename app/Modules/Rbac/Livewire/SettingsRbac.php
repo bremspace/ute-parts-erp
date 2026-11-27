@@ -318,6 +318,10 @@ class SettingsRbac extends Component
         'sync_pull_interval_seconds' => 30,
     ];
 
+    public bool $standalonePrinter = false;
+
+    public bool $standaloneMaster = false;
+
     public ?string $waTestStatus = null;
 
     /** @var array<string, mixed> Konfigurasi template WA (master, grup, event). */
@@ -375,8 +379,16 @@ class SettingsRbac extends Component
         'remote' => [],
     ];
 
-    public function mount(?string $tab = null): void
+    public function mount(?string $tab = null, ?string $sub = null): void
     {
+        if ($sub !== null && in_array($sub, ['struk', 'label', 'wms_doc', 'hr_slip', 'laporan', 'pengiriman'], true)) {
+            $this->activeTab = 'printer';
+            $this->printerSubTab = $sub;
+            $this->standalonePrinter = true;
+            $this->loadQrisConfig();
+            return;
+        }
+
         $tabParam = $tab ?: (string) request('tab', '');
         if ($tabParam) {
             if ($tabParam === 'operasional' || $tabParam === 'bisnis') {
@@ -402,6 +414,8 @@ class SettingsRbac extends Component
             $sub = (string) request('sub');
             if (in_array($sub, ['kategori', 'brand', 'kualitas', 'satuan', 'kondisi', 'tipe_hp', 'merk_hp'], true)) {
                 $this->masterProdukSubTab = $sub;
+                $this->activeTab = 'master_produk';
+                $this->standaloneMaster = true;
             }
         }
         if (request()->has('psub')) {

@@ -710,6 +710,8 @@ class PesananOnlineIndex extends Component
                     'harga' => (float) $it->harga_satuan,
                     'harga_retail' => $retail,
                     'subtotal' => (float) $it->subtotal,
+                    'breakdown' => $this->breakdownText($it),
+                    'alasan_harga' => $this->alasanPotongan($it),
                     'catatan' => $catatan ?: null,
                 ];
             })->toArray(),
@@ -735,6 +737,29 @@ class PesananOnlineIndex extends Component
         ];
 
         $this->showReceiptModal = true;
+    }
+
+    private function breakdownText($item): string
+    {
+        $faktor = max(1, (int) round((float) ($item->konversi ?? 1)));
+        $qty = max(0, (int) ($item->jumlah ?? 0));
+        if ($faktor <= 1 || $qty <= 0) {
+            return '';
+        }
+        $box = intdiv($qty, $faktor);
+        $sisa = $qty % $faktor;
+        if ($box <= 0) {
+            return '';
+        }
+        $satuan = strtoupper((string) ($item->satuan ?? 'box'));
+        return $box.' '.$satuan.($sisa > 0 ? ' + '.$sisa.' PCS' : '');
+    }
+
+    private function alasanPotongan($item): string
+    {
+        $faktor = max(1, (int) round((float) ($item->konversi ?? 1)));
+        $satuan = strtolower((string) ($item->satuan ?? 'pcs'));
+        return ($faktor > 1 && $satuan !== 'pcs') ? 'Potongan Kemasan' : 'Potongan Member (Tier)';
     }
 
     private function gudangIdPesanan(?Transaksi $trx): ?int
