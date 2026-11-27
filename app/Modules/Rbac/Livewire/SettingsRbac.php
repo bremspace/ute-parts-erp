@@ -469,7 +469,17 @@ class SettingsRbac extends Component
 
         if (in_array($normalized, self::VALID_TABS, true)) {
             $this->activeTab = $normalized;
+            if ($normalized === 'jaringan' && $this->dnsCheckResult === null) {
+                $this->loadNetworkConfig(checkDns: true);
+            }
             $this->dispatch('tab-changed', tab: $tab, url: url('/app/pengaturan/'.$tab));
+        }
+    }
+
+    public function updatedActiveTab(string $value): void
+    {
+        if ($value === 'jaringan' && $this->dnsCheckResult === null) {
+            $this->loadNetworkConfig(checkDns: true);
         }
     }
 
@@ -5079,7 +5089,7 @@ class SettingsRbac extends Component
         $this->atributActivePreviewTab = $tab;
     }
 
-    public function loadNetworkConfig(?NetworkManagementService $service = null): void
+    public function loadNetworkConfig(?NetworkManagementService $service = null, ?bool $checkDns = null): void
     {
         $service = $service ?: app(NetworkManagementService::class);
         $this->networkStatus = $service->getStatus();
@@ -5088,7 +5098,8 @@ class SettingsRbac extends Component
         $this->networkConfig['tunnel_token'] = $this->networkStatus['tunnel_token'];
         $this->networkConfig['custom_lan_url'] = 'http://'.($this->networkStatus['lan_ip'] ?: 'localhost').':1741';
 
-        if (! empty($this->networkConfig['domain'])) {
+        $shouldCheckDns = $checkDns ?? ($this->activeTab === 'jaringan');
+        if ($shouldCheckDns && ! empty($this->networkConfig['domain'])) {
             $this->dnsCheckResult = $service->checkDomainDns(
                 $this->networkConfig['domain'],
                 $this->networkConfig['tunnel_token'] ?: null

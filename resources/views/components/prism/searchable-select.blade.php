@@ -136,6 +136,20 @@
         }
         $normalizedOptions[$i]['children_count'] = $cCount;
     }
+
+    // Deduplikasi JSON opsi besar dalam satu response HTTP agar tidak mengirim 173KB TipeHp berulang kali
+    $optHash = null;
+    $optIsCachedReuse = false;
+    if ($optCount > 25 && ($__req = request())) {
+        $optHash = substr(md5(json_encode($normalizedOptions)), 0, 12);
+        $__seenHashes = $__req->attributes->get('__prism_sel_hashes', []);
+        if (isset($__seenHashes[$optHash])) {
+            $optIsCachedReuse = true;
+        } else {
+            $__seenHashes[$optHash] = true;
+            $__req->attributes->set('__prism_sel_hashes', $__seenHashes);
+        }
+    }
 @endphp
 
 <div
@@ -143,8 +157,14 @@
         open: false,
         alignRight: false,
         search: '',
-        options: @js($normalizedOptions),
-        originalOptions: @js($normalizedOptions),
+        @if($optIsCachedReuse)
+            options: ((window.__pSelOpts && window.__pSelOpts['{{ $optHash }}']) ? [...window.__pSelOpts['{{ $optHash }}']] : []),
+        @elseif($optHash)
+            options: ((window.__pSelOpts = window.__pSelOpts || {})['{{ $optHash }}'] = @js($normalizedOptions)).slice(),
+        @else
+            options: @js($normalizedOptions),
+        @endif
+        originalOptions: [],
         selected: $wire.entangle('{{ $model }}').live,
         clearable: @js($clearable),
         defaultCollapsedProp: @js($defaultCollapsed),
@@ -156,6 +176,9 @@
         sortable: @js($sortable),
 
         init() {
+            if (this.sortable) {
+                this.originalOptions = [...this.options];
+            }
             this.hasHierarchy = this.options.some(o => o.level > 0 || o.is_parent);
             this.hasGroups = this.options.some(o => !!o.group);
             this.initCollapseState();
@@ -407,13 +430,6 @@
     @click.outside="open = false"
     @keydown.escape.window="open = false"
 >
-    <select class="hidden sr-only" tabindex="-1" aria-hidden="true">
-        <option value="">{{ $placeholder }}</option>
-        @foreach($normalizedOptions as $opt)
-            <option value="{{ $opt['value'] }}">{{ $opt['label'] }}</option>
-        @endforeach
-    </select>
-
     <!-- Trigger Button -->
     <button
         type="button"

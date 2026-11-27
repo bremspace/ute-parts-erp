@@ -62,10 +62,13 @@
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/backoffice.js'])
     @livewireStyles
 </head>
+@php
+    $__cabangAksesList = auth()->check() ? auth()->user()->daftarCabangAkses() : collect();
+@endphp
 <body class="bg-[var(--up-bg-root)] text-[var(--up-text-main)] font-sans antialiased h-screen h-[100dvh] flex flex-col overflow-hidden selection:bg-up-primary selection:text-white"
       x-data="sidebarManager()"
       @keydown.escape.window="sidebarOpen = false"
-      data-cabang-count="{{ auth()->user()?->daftarCabangAkses()->count() ?? 0 }}"
+      data-cabang-count="{{ $__cabangAksesList->count() }}"
       data-cabang-id="{{ session('cabang_id') ?? '' }}"
       style="padding-bottom: env(safe-area-inset-bottom, 0);">
     <!-- Skip to main content (WCAG 2.4.1) -->
@@ -114,7 +117,7 @@
                             {{ session('cabang_nama', 'Cabang Pusat (CBG-01)') }}
                         </span>
                     </div>
-                    @if(auth()->check() && auth()->user()->daftarCabangAkses()->count() > 1)
+                    @if($__cabangAksesList->count() > 1)
                         <button
                             type="button"
                             class="sidebar-branch-ganti text-[11px] font-semibold text-up-primary hover:text-indigo-400 cursor-pointer transition-colors"
@@ -204,7 +207,11 @@
                                     <span>Pesanan Online</span>
                                 </div>
                                 @php
-                                    $pendingOnlineCount = \App\Modules\Pos\Models\Transaksi::where('sumber', 'marketplace')->whereIn('status', ['lunas', 'menunggu_pembayaran'])->when(session('cabang_id'), fn($q, $cid) => $q->where('cabang_id', $cid))->count();
+                                    $pendingOnlineCount = \Illuminate\Support\Facades\Cache::remember(
+                                        'backoffice-online-badge-'.(session('cabang_id') ?? 'all'),
+                                        30,
+                                        fn () => \App\Modules\Pos\Models\Transaksi::where('sumber', 'marketplace')->whereIn('status', ['lunas', 'menunggu_pembayaran'])->when(session('cabang_id'), fn($q, $cid) => $q->where('cabang_id', $cid))->count()
+                                    );
                                 @endphp
                                 @if($pendingOnlineCount > 0)
                                     <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
@@ -219,7 +226,11 @@
                                     <span>Retur Konsumen</span>
                                 </div>
                                 @php
-                                    $pendingReturCount = \App\Modules\Pos\Models\ReturnPenjualan::where('status', 'draft')->when(session('cabang_id'), fn($q, $cid) => $q->where('cabang_id', $cid))->count();
+                                    $pendingReturCount = \Illuminate\Support\Facades\Cache::remember(
+                                        'backoffice-retur-badge-'.(session('cabang_id') ?? 'all'),
+                                        30,
+                                        fn () => \App\Modules\Pos\Models\ReturnPenjualan::where('status', 'draft')->when(session('cabang_id'), fn($q, $cid) => $q->where('cabang_id', $cid))->count()
+                                    );
                                 @endphp
                                 @if($pendingReturCount > 0)
                                     <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-up-red/20 text-up-red border border-up-red/30">
@@ -974,7 +985,7 @@
             <p class="text-xs text-ink-500 dark:text-ink-400 mb-3">Cabang aktif akan dipakai Dashboard, POS, WMS, dan modul lain.</p>
 
             <div class="space-y-2">
-                @foreach(auth()->user()->daftarCabangAkses() as $cb)
+                @foreach($__cabangAksesList as $cb)
                     <button type="button"
                             @click="switchBranch({{ $cb->id }})"
                             class="w-full text-left px-4 py-3 rounded-xl border transition-[background-color,border-color,transform] duration-140 cursor-pointer active:scale-[0.98]

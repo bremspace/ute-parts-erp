@@ -3,6 +3,20 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-27 — Optimasi Performa Menyeluruh, Panduan OpenWA & Pembaruan README
+
+- **Optimasi Performa Aplikasi (`AppServiceProvider`, `SettingsRbac`, `WMS`, `Layout`)**:
+  - `AppServiceProvider`: Hapus pemanggilan `forgetCachedPermissions()` di `boot()` yang mereset cache Spatie Permission di setiap request HTTP, dan ikat `KonfigurasiService` sebagai singleton per-request dengan request-scoped RAM memoization (`flushMemoryCache()` saat `set()` / `clearServerCache()`).
+  - `SettingsRbac`: Tunda DNS lookup (`checkDomainDns`) dari `mount()` agar hanya berjalan saat tab `jaringan` aktif atau tombol cek DNS diklik — menghilangkan jeda timeout DNS 5–10 detik pada tab `users`, `role`, `database`, dan `integrasi`.
+  - `EnsureCabangSelected` & `layouts/backoffice.blade.php` & `NotificationCenter`: Cache pengecekan gudang/rak default cabang, cache badge counter sidebar 30 detik, reuse query `daftarCabangAkses()`, dan longgarkan interval polling `NotificationCenter` menjadi 60 detik.
+  - `ProductSearchModal` & `searchable-select`: Tambahkan eager loading `tipeHps` untuk membasmi N+1 kompatibilitas HP di `/app/wms`, hapus duplikasi `@js($normalizedOptions)` (`originalOptions`), hilangkan loop `<option>` DOM tersembunyi yang tidak terpakai, dan bagikan opsi besar identik dalam 1 request via `window.__pSelOpts`.
+- **Optimasi Infrastruktur VPS (Nginx & PHP-FPM 8.4)**:
+  - Aktifkan `gzip_proxied any;` di `/etc/nginx/conf.d/99-gzip-proxied.conf` agar kompresi tetap aktif di balik proxy Cloudflare.
+  - Set OPcache (`max_accelerated_files=32531`, `memory_consumption=256`, `interned_strings_buffer=32`, `revalidate_freq=2`), `realpath_cache_size=4096K`, serta naikkan worker `www.conf` (`pm.max_children=16`, `pm.max_requests=500`).
+- **Dokumentasi**:
+  - Menambahkan [docs/PANDUAN-OPENWA.md](PANDUAN-OPENWA.md) berisi langkah lengkap Docker Compose, sizing RAM `whatsapp-web.js` vs `baileys`, ambil admin key aman SSH mobile, setup 1-klik ERP, QR/pairing code, Supervisor queue worker, warm-up anti-ban, dan troubleshooting.
+  - Memperbarui [README.md](../README.md) sesuai arsitektur 16 modul **Bremspace ERP**, stack PHP 8.4 / Laravel 13 / Livewire 4 / Tailwind 4 / Vite 8, Hybrid Sync, OpenWA, serta command QA terbaru.
+
 ## 2026-11-27 — OpenWA Gateway: Audit Perbaikan, Enkripsi Kredensial & Manajemen UI 1-Klik
 
 - **Perbaikan Celah & Keandalan Gateway**:

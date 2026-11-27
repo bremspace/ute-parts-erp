@@ -363,6 +363,7 @@ class ProductSearchModal extends Component
                 'kualitas',
                 'supplier',
                 'satuanKonversi',
+                'tipeHps',
             ])
             ->withSum('stokItems as total_stok', 'jumlah')
             ->where('is_active', true);
