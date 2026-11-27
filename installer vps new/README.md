@@ -222,6 +222,7 @@ installer vps new/
 
 | Gejala | Cek |
 |---|---|
+| Login sukses tapi 419 Page Expired | `SESSION_SECURE_COOKIE=false` di `.env`, lalu `ute-deploy` + hapus cookie browser. Ini terjadi kalau akses lewat IP/HTTP karena cookie Secure tidak tersimpan. |
 | Nginx 502 | `systemctl status php*-fpm`, `ute-healthcheck` |
 | Queue tidak jalan | `supervisorctl status`, `supervisorctl restart ute:*` |
 | WA timeout | pastikan URL dari ERP bisa di-curl dari **server ERP** |
