@@ -93,6 +93,30 @@ if [[ -z "${LIB_UTE_LOADED:-}" ]]; then
     }
 
     # Hapus baris pool FPM dengan key tertentu, aman untuk karakter regex.
+    # Hasilkan sertifikat self-signed sementara. Set global SSL_CERT / SSL_KEY.
+    make_selfsigned() {
+        local __name="$1"; shift
+        local __dir="/etc/ssl/ute-selfsigned/${__name}"
+        local __san="" __d
+        for __d in "$@"; do
+            if [[ -z "$__san" ]]; then __san="DNS:${__d}"; else __san="${__san},DNS:${__d}"; fi
+        done
+
+        mkdir -p "$__dir"
+        chmod 0700 "$__dir"
+
+        if [[ ! -s "$__dir/fullchain.pem" || ! -s "$__dir/privkey.pem" ]]; then
+            openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+                -keyout "$__dir/privkey.pem" \
+                -out "$__dir/fullchain.pem" \
+                -subj "/CN=${1:-$_name}" \
+                -addext "subjectAltName=${__san}" >/dev/null 2>&1
+        fi
+
+        SSL_CERT="$__dir/fullchain.pem"
+        SSL_KEY="$__dir/privkey.pem"
+    }
+
     strip_fpm_directive() {
         local __file="$1" __key="$2" __tmp
         __tmp="$(mktemp)"

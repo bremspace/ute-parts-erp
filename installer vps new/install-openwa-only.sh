@@ -30,13 +30,18 @@ apt_install curl ca-certificates git gnupg lsb-release \
 timedatectl set-timezone "$TIMEZONE" >/dev/null 2>&1 || true
 systemctl enable --now docker >/dev/null 2>&1 || true
 
-install -d -m 0755 /var/www/certbot
+install -d -m 0755 /var/www/certbot/.well-known/acme-challenge
 rm -f /etc/nginx/sites-enabled/default
 cat > /etc/nginx/sites-available/openwa-bootstrap <<EOF
 server {
     listen 80;
     server_name ${WA_DOMAIN};
-    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location /.well-known/acme-challenge/ {
+        alias /var/www/certbot/.well-known/acme-challenge/;
+        default_type "text/plain";
+        add_header Cache-Control "no-store" always;
+        try_files \$uri =404;
+    }
     location / { return 404; }
 }
 EOF
@@ -44,9 +49,30 @@ ln -sf /etc/nginx/sites-available/openwa-bootstrap /etc/nginx/sites-enabled/open
 nginx -t
 service_restart nginx
 
-certbot certonly --webroot -w /var/www/certbot \
+WA_CERT_OK=yes
+if ! certbot certonly --webroot -w /var/www/certbot \
     --non-interactive --agree-tos -m "$EMAIL" --keep-until-expiring \
-    -d "$WA_DOMAIN" || fail "Gagal mendapatkan sertifikat."
+    -d "$WA_DOMAIN"; then
+    WA_CERT_OK=no
+    warn "Gagal sertifikat Let's Encrypt untuk ${WA_DOMAIN}. Lanjut dengan self-signed."
+fi
+
+if [[ "$WA_CERT_OK" == "yes" ]]; then
+    SSL_CERT="/etc/letsencrypt/live/${WA_DOMAIN}/fullchain.pem"
+    SSL_KEY="/etc/letsencrypt/live/${WA_DOMAIN}/privkey.pem"
+else
+    make_selfsigned "openwa" "$WA_DOMAIN"
+    cat > /root/openwa-ssl-warning.txt <<EOF
+Sertifikat Let's Encrypt gagal untuk ${WA_DOMAIN}.
+Sementara memakai self-signed. Perbaiki DNS (matikan proxy Cloudflare /
+arahkan A record ke VPS ini), lalu:
+  sudo certbot certonly --webroot -w /var/www/certbot \\
+    --non-interactive --agree-tos -m ${EMAIL} --keep-until-expiring \\
+    -d ${WA_DOMAIN}
+  sudo systemctl reload nginx
+EOF
+    chmod 0600 /root/openwa-ssl-warning.txt
+fi
 
 install -d -m 0755 /opt/openwa
 cp "${CFG_DIR}/openwa/docker-compose.yml" /opt/openwa/docker-compose.yml
@@ -78,7 +104,9 @@ fi
 
 rm -f /etc/nginx/sites-enabled/openwa-bootstrap
 render "${CFG_DIR}/nginx-openwa.conf.tpl" /etc/nginx/sites-available/openwa \
-    WA_DOMAIN "$WA_DOMAIN"
+    WA_DOMAIN "$WA_DOMAIN" \
+    SSL_CERT "$SSL_CERT" \
+    SSL_KEY "$SSL_KEY"
 ln -sf /etc/nginx/sites-available/openwa /etc/nginx/sites-enabled/openwa
 nginx -t
 service_restart nginx

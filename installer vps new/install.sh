@@ -255,13 +255,23 @@ chown -R www-data:www-data storage bootstrap/cache public/build
 log "== Pasang Nginx + sertifikat =="
 apt_install nginx certbot python3-certbot-nginx
 rm -f /etc/nginx/sites-enabled/default
-install -d -m 0755 /var/www/certbot
+install -d -m 0755 /var/www/certbot/.well-known/acme-challenge
+
+BOOT_CHALLENGE=$(cat <<'CHUNK'
+    location /.well-known/acme-challenge/ {
+        alias /var/www/certbot/.well-known/acme-challenge/;
+        default_type "text/plain";
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+    }
+CHUNK
+)
 
 cat > /etc/nginx/sites-available/ute-parts-bootstrap <<EOF
 server {
     listen 80;
     server_name ${SERVER_NAMES};
-    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+${BOOT_CHALLENGE}
     location / { return 404; }
 }
 EOF
@@ -271,7 +281,7 @@ if [[ "$OPENWA_LOCAL" == "yes" ]]; then
 server {
     listen 80;
     server_name ${WA_DOMAIN};
-    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+${BOOT_CHALLENGE}
     location / { return 404; }
 }
 EOF
@@ -282,14 +292,33 @@ ln -sf /etc/nginx/sites-available/ute-parts-bootstrap /etc/nginx/sites-enabled/u
 nginx -t
 service_restart nginx
 
-certbot certonly --webroot -w /var/www/certbot \
+CERT_OK=yes
+if ! certbot certonly --webroot -w /var/www/certbot \
     --non-interactive --agree-tos -m "$EMAIL" --keep-until-expiring \
-    "${CERT_DOMAINS_ARGS[@]}" || fail "Gagal mendapatkan sertifikat untuk ${DOMAIN}."
+    "${CERT_DOMAINS_ARGS[@]}"; then
+    CERT_OK=no
+    warn "Gagal sertifikat Let's Encrypt untuk ${DOMAIN}. Installer lanjut dengan self-signed."
+fi
 
+WA_CERT_OK=yes
 if [[ "$OPENWA_LOCAL" == "yes" ]]; then
-    certbot certonly --webroot -w /var/www/certbot \
+    if ! certbot certonly --webroot -w /var/www/certbot \
         --non-interactive --agree-tos -m "$EMAIL" --keep-until-expiring \
-        -d "$WA_DOMAIN" || fail "Gagal mendapatkan sertifikat untuk ${WA_DOMAIN}."
+        -d "$WA_DOMAIN"; then
+        WA_CERT_OK=no
+        warn "Gagal sertifikat Let's Encrypt untuk ${WA_DOMAIN}. Installer lanjut dengan self-signed."
+    fi
+fi
+
+# Tentukan sertifikat ERP.
+ERP_SAN_DOMAINS=("$DOMAIN")
+[[ "$WITH_WWW" == "yes" ]] && ERP_SAN_DOMAINS+=("www.$DOMAIN")
+
+if [[ "$CERT_OK" == "yes" ]]; then
+    SSL_CERT="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
+    SSL_KEY="/etc/letsencrypt/live/${DOMAIN}/privkey.pem"
+else
+    make_selfsigned "erp" "${ERP_SAN_DOMAINS[@]}"
 fi
 
 rm -f /etc/nginx/sites-enabled/ute-parts-bootstrap
@@ -297,16 +326,64 @@ render "${CFG_DIR}/nginx-ute.conf.tpl" /etc/nginx/sites-available/ute-parts \
     DOMAIN "$DOMAIN" \
     SERVER_NAMES "$SERVER_NAMES" \
     APP_DIR "$APP_DIR" \
-    PHP_SOCKET "$PHP_SOCKET"
+    PHP_SOCKET "$PHP_SOCKET" \
+    SSL_CERT "$SSL_CERT" \
+    SSL_KEY "$SSL_KEY"
 ln -sf /etc/nginx/sites-available/ute-parts /etc/nginx/sites-enabled/ute-parts
 
+# Tentukan sertifikat OpenWA.
 if [[ "$OPENWA_LOCAL" == "yes" ]]; then
+    if [[ "$WA_CERT_OK" == "yes" ]]; then
+        WA_SSL_CERT="/etc/letsencrypt/live/${WA_DOMAIN}/fullchain.pem"
+        WA_SSL_KEY="/etc/letsencrypt/live/${WA_DOMAIN}/privkey.pem"
+    else
+        make_selfsigned "openwa" "$WA_DOMAIN"
+        WA_SSL_CERT="$SSL_CERT"
+        WA_SSL_KEY="$SSL_KEY"
+    fi
+
     rm -f /etc/nginx/sites-enabled/openwa-bootstrap
     render "${CFG_DIR}/nginx-openwa.conf.tpl" /etc/nginx/sites-available/openwa \
-        WA_DOMAIN "$WA_DOMAIN"
+        WA_DOMAIN "$WA_DOMAIN" \
+        SSL_CERT "$WA_SSL_CERT" \
+        SSL_KEY "$WA_SSL_KEY"
     ln -sf /etc/nginx/sites-available/openwa /etc/nginx/sites-enabled/openwa
 else
     WA_DOMAIN=""
+fi
+
+if [[ "$CERT_OK" == "no" || "$WA_CERT_OK" == "no" ]]; then
+    SSL_NOTE=/root/ute-ssl-warning.txt
+    cat > "$SSL_NOTE" <<EOF
+SERTIFIKAT LET'S ENCRYPT BELUM AKTIF - $(date '+%F %T')
+
+Installer tetap lanjut memakai sertifikat self-signed sementara.
+Browser akan menampilkan peringatan "Not secure" sampai sertifikat asli dipasang.
+
+Penyebab umum:
+- Domain masih di-proxy Cloudflare (orange cloud). Challenge HTTP-01 tidak sampai ke VPS.
+- A record belum mengarah ke IP VPS ini.
+- Port 80 diblokir dari internet / Cloudflare.
+
+Solusi:
+1. Di Cloudflare DNS, set record ${DOMAIN} dan www.${DOMAIN} ke "DNS only" (abu-abu),
+   atau pastikan Cloudflare bisa menjangkau port 80 VPS Anda.
+2. Tunggu DNS propagate, lalu jalankan:
+   sudo certbot certonly --webroot -w /var/www/certbot \\
+     --non-interactive --agree-tos -m ${EMAIL} --keep-until-expiring \\
+     ${CERT_DOMAINS_ARGS[*]}
+3. Setelah sukses:
+   sudo ute-deploy
+   sudo systemctl reload nginx
+
+Untuk OpenWA (jika dipasang lokal):
+   sudo certbot certonly --webroot -w /var/www/certbot \\
+     --non-interactive --agree-tos -m ${EMAIL} --keep-until-expiring \\
+     -d ${WA_DOMAIN:-wa.${DOMAIN}}
+   sudo systemctl reload nginx
+EOF
+    chmod 0600 "$SSL_NOTE"
+    warn "Detail sertifikat: ${SSL_NOTE}"
 fi
 
 nginx -t
