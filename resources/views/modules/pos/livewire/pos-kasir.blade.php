@@ -1690,6 +1690,12 @@
                             <h5 class="text-xs font-semibold text-ink-900 dark:text-white truncate" title="{{ $item['nama'] }}">
                                 {{ $item['nama'] }}
                             </h5>
+                            @php
+                                $breakdownList = $this->breakdownItem($item);
+                            @endphp
+                            @if($breakdownList !== '')
+                                <span class="px-1 py-0.5 rounded bg-up-mint/10 text-up-mint text-[9px] font-bold flex-shrink-0">{{ $breakdownList }}</span>
+                            @endif
                         </div>
 
                         <!-- Dropdown / Badge Satuan Ringkas -->
@@ -1798,9 +1804,14 @@
                                 >+</button>
                             </div>
 
-                            <span class="justify-self-end sm:justify-self-auto text-xs font-black text-up-mint tabular-nums min-w-[75px] text-right">
-                                Rp {{ number_format($item['subtotal'] ?? ($item['harga'] * $item['qty']), 0, ',', '.') }}
-                            </span>
+                            <div class="justify-self-end sm:justify-self-auto text-right min-w-[75px]">
+                                @if(($item['potongan_kemasan'] ?? 0) > 0)
+                                    <span class="block text-[8px] text-emerald-500 font-semibold tabular-nums">Pot. Kemasan -{{ number_format($item['potongan_kemasan'], 0, ',', '.') }}</span>
+                                @endif
+                                <span class="text-xs font-black text-up-mint tabular-nums">
+                                    Rp {{ number_format($item['subtotal'] ?? ($item['harga'] * $item['qty']), 0, ',', '.') }}
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -1849,6 +1860,14 @@
                                         <h5 class="text-xs sm:text-sm font-semibold text-ink-900 dark:text-white leading-snug">
                                             {{ $item['nama'] }}
                                         </h5>
+                                        @php
+                                            $breakdown = $this->breakdownItem($item);
+                                        @endphp
+                                        @if($breakdown !== '')
+                                            <span class="px-2 py-0.5 rounded-md bg-up-mint/10 text-up-mint text-[10px] font-bold border border-up-mint/25" title="Box penuh pakai harga box, sisa pcs pakai harga retail">
+                                                {{ $breakdown }}
+                                            </span>
+                                        @endif
                                         @if(($item['varian'] ?? 'Standar') !== 'Standar')
                                             <span class="px-2 py-0.5 rounded-md bg-ink-100 dark:bg-white/10 text-ink-700 dark:text-ink-300 text-[10px] font-medium">
                                                 {{ $item['varian'] }}
@@ -1988,7 +2007,7 @@
                                         </span>
                                         @if(($item['diskon'] ?? 0) > 0)
                                             <span class="text-[9px] text-emerald-500 font-medium tabular-nums">
-                                                Hemat Rp {{ number_format($item['diskon'], 0, ',', '.') }}
+                                                {{ $this->labelPotonganItem($item) }} -Rp {{ number_format($item['diskon'], 0, ',', '.') }}
                                             </span>
                                         @endif
                                         @if(($item['konversi'] ?? 1) > 1)
@@ -2025,9 +2044,19 @@
                                 </div>
                             </td>
                             <td class="py-2.5 px-3 text-right">
-                                <span class="text-xs sm:text-sm font-bold text-up-mint tabular-nums">
-                                    Rp {{ number_format($item['subtotal'] ?? ($item['harga'] * $item['qty']), 0, ',', '.') }}
-                                </span>
+                                <div class="flex flex-col items-end">
+                                    @if(($item['potongan_kemasan'] ?? 0) > 0)
+                                        <span class="text-[9px] text-ink-400 line-through tabular-nums">
+                                            Rp {{ number_format(($item['qty'] ?? 0) * ($item['harga_pcs'] ?? $item['harga'] ?? 0), 0, ',', '.') }}
+                                        </span>
+                                        <span class="text-[9px] text-emerald-500 font-semibold tabular-nums">
+                                            Potongan Kemasan -Rp {{ number_format($item['potongan_kemasan'], 0, ',', '.') }}
+                                        </span>
+                                    @endif
+                                    <span class="text-xs sm:text-sm font-bold text-up-mint tabular-nums">
+                                        Rp {{ number_format($item['subtotal'] ?? ($item['harga'] * $item['qty']), 0, ',', '.') }}
+                                    </span>
+                                </div>
                             </td>
                             <td class="py-2.5 px-2.5 text-center">
                                 <button
@@ -2187,49 +2216,75 @@
             <!-- Right Breakdown & Action Buttons -->
             <div class="flex items-center gap-3 sm:gap-4 flex-wrap ml-auto w-full sm:w-auto justify-between sm:justify-end">
                 <!-- Mini Breakdown -->
-                <div class="flex items-center gap-2 sm:gap-3 text-xs text-ink-600 dark:text-ink-400 flex-wrap">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-0.5 text-xs text-ink-600 dark:text-ink-400">
+                    @if($this->potonganKemasan > 0)
+                        <div>
+                            <span>Retail:</span>
+                            <span class="line-through tabular-nums">Rp {{ number_format($this->subtotalRetail, 0, ',', '.') }}</span>
+                        </div>
+                    @endif
                     <div>
                         <span>Subtotal:</span>
                         <span class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
                     </div>
-                    @if($diskonTotal > 0)
-                        <button
-                            type="button"
-                            wire:click="openDiskonModal"
-                            class="text-up-amber font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-                            title="Klik untuk ubah Diskon Langsung"
-                        >
-                            <span>Diskon:</span>
-                            <span class="tabular-nums">-Rp {{ number_format($diskonTotal, 0, ',', '.') }}</span>
-                        </button>
-                    @else
-                        <button
-                            type="button"
-                            wire:click="openDiskonModal"
-                            class="px-2 py-0.5 rounded-md bg-up-amber/10 hover:bg-up-amber/20 text-up-amber border border-up-amber/25 font-bold text-[11px] cursor-pointer transition active:scale-95"
-                            title="Beri Diskon Langsung pada transaksi"
-                        >
-                            + Diskon Langsung
-                        </button>
-                    @endif
-                    @if($diskonPartai > 0)
-                        <div class="text-up-mint font-semibold text-[11px]">
-                            <span>Partai:</span>
-                            <span class="tabular-nums">-Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
-                        </div>
-                    @endif
-                    @if($diskonPoin > 0)
-                        <div class="text-emerald-500 font-semibold text-[11px]">
-                            <span>Poin:</span>
-                            <span class="tabular-nums">-Rp {{ number_format($diskonPoin, 0, ',', '.') }}</span>
-                        </div>
-                    @endif
-                    @if($pajakNominal > 0)
-                        <div>
-                            <span>PPN:</span>
-                            <span class="font-semibold text-ink-900 dark:text-white tabular-nums">+Rp {{ number_format($pajakNominal, 0, ',', '.') }}</span>
-                        </div>
-                    @endif
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        @if($this->diskonTierTotal > 0)
+                            <div class="text-sky-500 font-semibold">
+                                <span>Potongan Tier:</span>
+                                <span class="tabular-nums">-Rp {{ number_format($this->diskonTierTotal, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                        @if($this->potonganKemasan > 0)
+                            <div class="text-up-mint font-semibold">
+                                <span>Potongan Kemasan:</span>
+                                <span class="tabular-nums">-Rp {{ number_format($this->potonganKemasan, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                        @if($diskonPartai > 0)
+                            <div class="text-up-accent font-semibold">
+                                <span>Potongan Partai{{ $diskonPartaiPersen > 0 ? ' ('.(float) $diskonPartaiPersen.'%)' : '' }}:</span>
+                                <span class="tabular-nums">-Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                        @if($diskonPoin > 0)
+                            <div class="text-emerald-500 font-semibold">
+                                <span>Potongan Poin:</span>
+                                <span class="tabular-nums">-Rp {{ number_format($diskonPoin, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                        @if($diskonTotal > 0)
+                            <button
+                                type="button"
+                                wire:click="openDiskonModal"
+                                class="text-up-amber font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                                title="Klik untuk ubah Diskon Langsung"
+                            >
+                                <span>Potongan Kasir:</span>
+                                <span class="tabular-nums">-Rp {{ number_format($diskonTotal, 0, ',', '.') }}</span>
+                            </button>
+                        @else
+                            <button
+                                type="button"
+                                wire:click="openDiskonModal"
+                                class="px-2 py-0.5 rounded-md bg-up-amber/10 hover:bg-up-amber/20 text-up-amber border border-up-amber/25 font-bold text-[11px] cursor-pointer transition active:scale-95"
+                                title="Beri Diskon Langsung pada transaksi"
+                            >
+                                + Diskon Langsung
+                            </button>
+                        @endif
+                        @if($this->totalDiskon > 0)
+                            <div class="font-bold text-ink-900 dark:text-white">
+                                <span>Total Diskon:</span>
+                                <span class="tabular-nums">-Rp {{ number_format($this->totalDiskon, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                        @if($pajakNominal > 0)
+                            <div>
+                                <span>PPN:</span>
+                                <span class="font-semibold tabular-nums">+Rp {{ number_format($pajakNominal, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
                 <!-- Action Buttons: Batal, Tahan & BAYAR (Responsif Mobile & Desktop) -->

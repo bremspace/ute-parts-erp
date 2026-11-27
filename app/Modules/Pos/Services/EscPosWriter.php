@@ -227,6 +227,9 @@ class EscPosWriter
             foreach ($this->wrap($nama) as $namaLine) {
                 $this->bold(true)->text($namaLine)->bold(false);
             }
+            if (! empty($item['breakdown'])) {
+                $this->text('  '.$item['breakdown']);
+            }
 
             $qtySatuan = ($item['qty'] ?? 1).' '.$this->unitLabel($item['satuan'] ?? null);
             $harga = $this->money($item['harga'] ?? 0);
@@ -238,20 +241,16 @@ class EscPosWriter
             $unitLbl = $this->unitLabel($item['satuan'] ?? null);
 
             if ($hargaRetail > $hargaJual && in_array($strikethroughMode, ['esc_b', 'reverse'], true)) {
-                // Opsi B: harga Retail dicoret, Harga Box, qty x box = subtotal, Potongan Box.
+                // Opsi B: satu baris "qty x <harga normal dicoret> harga diskon = subtotal".
                 $opsiBItem = true;
-                $qty = (int) ($item['qty'] ?? 1);
                 $normal = $this->money($hargaRetail);
                 $disc = $this->money($hargaJual);
-                $potongan = $this->money(($hargaRetail - $hargaJual) * $qty);
 
-                // Seluruh baris dicetak sebagai raster agar label + nominal tetap searis.
-                $this->strikeRaster('Harga Retail: '.$normal, strlen('Harga Retail: '), strlen($normal));
+                // Baris raster agar coret tengah tetap searis dengan nominal.
+                $awalan = $qtySatuan.' x ';
+                $ringkas = $awalan.$normal.' '.$disc.' = '.$rightVal;
+                $this->strikeRaster($ringkas, strlen($awalan), strlen($normal));
                 $this->feed(1)->alignLeft();
-
-                $this->text('Harga Box: '.$disc);
-                $this->text($qtySatuan.' x '.$disc.' = '.$rightVal);
-                $this->text('Potongan Box: -'.$potongan);
             } elseif ($hargaRetail > $hargaJual) {
                 $this->text($this->pad("{$qtySatuan} x (".$this->money($hargaRetail).') -> '.$this->money($hargaJual), $rightVal));
             } else {
@@ -272,7 +271,16 @@ class EscPosWriter
         }
 
         // ========== SUBTOTAL BREAKDOWN & TOTALS ==========
-        // Opsi B sudah menampilkan subtotal dan Potongan Box di baris item.
+        // Opsi B menampilkan potongan agregat dengan label yang jelas.
+        if ($opsiBItem) {
+            if (! empty($data['diskon_box']) && (float) $data['diskon_box'] > 0) {
+                $this->text($this->pad('Potongan Kemasan:', '-'.$this->money($data['diskon_box'])));
+            }
+            if (! empty($data['diskon_tier']) && (float) $data['diskon_tier'] > 0) {
+                $this->text($this->pad('Potongan Member (Tier):', '-'.$this->money($data['diskon_tier'])));
+            }
+        }
+        // Opsi B sudah menampilkan subtotal dan Potongan Harga di baris item.
         if (! $opsiBItem) {
             $showBreakdown = $data['show_subtotal_breakdown'] ?? true;
 

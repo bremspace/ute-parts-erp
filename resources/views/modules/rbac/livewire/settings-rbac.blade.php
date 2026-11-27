@@ -1,4 +1,4 @@
-<div class="space-y-6"
+<div class="space-y-6 {{ $standalonePrinter ? 'printer-standalone' : '' }}"
     x-data="{
         subModul: @js(in_array($activeTab, ['users', 'role', 'cabang']) ? 'akses' : (in_array($activeTab, ['master_produk', 'export_import']) ? 'katalog' : (in_array($activeTab, ['loyalitas', 'pajak', 'qris']) ? 'kebijakan' : (in_array($activeTab, ['master', 'printer']) ? 'operasional' : ($activeTab === 'integrasi' ? 'integrasi' : 'sistem'))))),
         searchQuery: '',
@@ -24,12 +24,6 @@
             { id: 'qris', label: 'QRIS Toko & Dinamis', subModul: 'kebijakan', tab: 'qris', subTab: null, icon: '📱', group: 'Kebijakan & Transaksi', desc: 'Upload QRIS toko, konversi otomatis ke QR dinamis nominal belanja kasir & kirim WA', keywords: 'qris dinamis barcode scan pembayaran kasir toko gopay ovo dana bca transfer tagihan' },
 
             { id: 'servis', label: 'Master Servis & Garansi', subModul: 'operasional', tab: 'master', subTab: null, icon: '🛠️', group: 'Operasional & Periferal', desc: 'Katalog jasa servis, estimasi waktu teknisi, masa garansi klaim', keywords: 'servis service jasa perbaikan teknisi garansi klaim pengerjaan tarif' },
-            { id: 'struk', label: 'Template Struk & Faktur POS', subModul: 'operasional', tab: 'printer', subTab: 'struk', icon: '🧾', group: 'Operasional & Periferal', desc: 'Kustomisasi header/footer struk thermal, QR retur, kertas 58/80mm', keywords: 'struk printer thermal nota faktur kasir thermal print kertas retur' },
-            { id: 'label', label: 'Format Label Barcode & QR SKU', subModul: 'operasional', tab: 'printer', subTab: 'label', icon: '🏷️', group: 'Operasional & Periferal', desc: 'Tata letak cetak stiker barcode produk untuk scanner gudang', keywords: 'label barcode qr code stiker cetak scanner printer bluetooth label' },
-            { id: 'wms_doc', label: 'Format Cetak Dokumen WMS (PO & GRN)', subModul: 'operasional', tab: 'printer', subTab: 'wms_doc', icon: '📦', group: 'Operasional & Periferal', desc: 'Ukuran kertas A5/A4 dan margin cetak Purchase Order serta Bukti Penerimaan Barang', keywords: 'po wms grn print cetak kertas a5 a4 margin nota logistik penerimaan' },
-            { id: 'hr_slip', label: 'Format Cetak Slip Gaji HR', subModul: 'operasional', tab: 'printer', subTab: 'hr_slip', icon: '💼', group: 'Operasional & Periferal', desc: 'Format kertas A5/A4/80mm, rincian komisi, potongan, dan tanda tangan slip gaji', keywords: 'slip gaji payroll hr komisi potongan cetak print karyawan' },
-            { id: 'laporan_doc', label: 'Format Cetak Laporan Keuangan', subModul: 'operasional', tab: 'printer', subTab: 'laporan', icon: '📊', group: 'Operasional & Periferal', desc: 'Ukuran kertas A4/F4 lanskap, kop surat, 3 kolom tanda tangan laporan', keywords: 'laporan cetak print keuangan pajak neraca audit kertas tanda tangan' },
-            { id: 'label_pengiriman', label: 'Format Label Pengiriman Ekspedisi', subModul: 'operasional', tab: 'printer', subTab: 'pengiriman', icon: '🚚', group: 'Operasional & Periferal', desc: 'Ukuran stiker thermal 100x150 / 80x100, barcode resi, peringatan fragile', keywords: 'label pengiriman ekspedisi resi kurir paket pesanan online thermal fragile' },
 
             { id: 'wa', label: 'WhatsApp Gateway & Notifikasi', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '💬', group: 'Gateway & Integrasi', desc: 'Konfigurasi Fonnte / Wablas, token API, dan pengujian kirim WA', keywords: 'whatsapp wa fonnte wablas gateway notifikasi pesan chat token phone' },
             { id: 'duitku', label: 'Payment Gateway Duitku', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '💳', group: 'Gateway & Integrasi', desc: 'Atur Merchant Code, API Key, Sandbox vs Production, dan callback URL', keywords: 'payment pembayaran duitku gateway qris va virtual account kartu kredit sandbox' },
@@ -126,6 +120,13 @@
         });
     "
 >
+    @if($standalonePrinter)
+        <style>
+            .printer-standalone > div.glass-panel,
+            .printer-standalone > div.grid { display: none !important; }
+        </style>
+    @endif
+
     <!-- TOP TOOLBAR: Redesigned Spotlight Finder & Overview -->
     <div class="glass-panel p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 shadow-sm space-y-4">
         <!-- Header Title & Quick Search -->
@@ -225,261 +226,7 @@
         </div>
         </div>
 
-        <!-- Tier 1: Group Feature Categories (6 Kelompok Jelas & Terstruktur) -->
-        <div class="flex sm:grid sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 border-t border-black/5 dark:border-white/5 overflow-x-auto pb-1.5 max-w-full flex-nowrap sm:flex-wrap scrollbar-none scroll-smooth touch-pan-x -mx-1 px-1 sm:mx-0 sm:px-0">
-            <!-- 1. Akses & Organisasi -->
-            <button
-                type="button"
-                wire:click="setSubModul('akses')"
-                @click="setSubModul('akses')"
-                :class="subModul === 'akses' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
-                class="flex-shrink-0 w-[140px] sm:w-auto p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
-            >
-                <div class="flex items-center justify-between">
-                    <span class="text-lg">👥</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'akses' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">3 Menu</span>
-                </div>
-                <div>
-                    <h3 class="text-xs font-bold leading-snug">Akses & Tim</h3>
-                    <p class="text-[10px] opacity-75 truncate">User, Role, Cabang</p>
-                </div>
-            </button>
-
-            <!-- 2. Katalog & Produk -->
-            <button
-                type="button"
-                wire:click="setSubModul('katalog')"
-                @click="setSubModul('katalog')"
-                :class="subModul === 'katalog' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
-                class="flex-shrink-0 w-[140px] sm:w-auto p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
-            >
-                <div class="flex items-center justify-between">
-                    <span class="text-lg">📦</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'katalog' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">3 Menu</span>
-                </div>
-                <div>
-                    <h3 class="text-xs font-bold leading-snug">Katalog Part</h3>
-                    <p class="text-[10px] opacity-75 truncate">Kategori, Brand, Web Toko</p>
-                </div>
-            </button>
-
-            <!-- 3. Kebijakan & Transaksi -->
-            <button
-                type="button"
-                wire:click="setSubModul('kebijakan')"
-                @click="setSubModul('kebijakan')"
-                :class="subModul === 'kebijakan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
-                class="flex-shrink-0 w-[140px] sm:w-auto p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
-            >
-                <div class="flex items-center justify-between">
-                    <span class="text-lg">💎</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'kebijakan' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">2 Aturan</span>
-                </div>
-                <div>
-                    <h3 class="text-xs font-bold leading-snug">Kebijakan Bisnis</h3>
-                    <p class="text-[10px] opacity-75 truncate">Loyalitas, PPN, Pajak</p>
-                </div>
-            </button>
-
-            <!-- 4. Operasional & Periferal -->
-            <button
-                type="button"
-                wire:click="setSubModul('operasional')"
-                @click="setSubModul('operasional')"
-                :class="subModul === 'operasional' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
-                class="flex-shrink-0 w-[140px] sm:w-auto p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
-            >
-                <div class="flex items-center justify-between">
-                    <span class="text-lg">🛠️</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'operasional' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">3 Fitur</span>
-                </div>
-                <div>
-                    <h3 class="text-xs font-bold leading-snug">Operasional Toko</h3>
-                    <p class="text-[10px] opacity-75 truncate">Servis, Struk, Label</p>
-                </div>
-            </button>
-
-            <!-- 5. Gateway & Integrasi -->
-            <button
-                type="button"
-                wire:click="setSubModul('integrasi')"
-                @click="setSubModul('integrasi')"
-                :class="subModul === 'integrasi' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
-                class="flex-shrink-0 w-[140px] sm:w-auto p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
-            >
-                <div class="flex items-center justify-between">
-                    <span class="text-lg">🔌</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'integrasi' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">3 Gateway</span>
-                </div>
-                <div>
-                    <h3 class="text-xs font-bold leading-snug">Gateway Integrasi</h3>
-                    <p class="text-[10px] opacity-75 truncate">WhatsApp, Duitku, Biteship</p>
-                </div>
-            </button>
-
-            <!-- 6. Sistem & Keuangan -->
-            <button
-                type="button"
-                wire:click="setSubModul('sistem')"
-                @click="setSubModul('sistem')"
-                :class="subModul === 'sistem' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
-                class="flex-shrink-0 w-[140px] sm:w-auto p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
-            >
-                <div class="flex items-center justify-between">
-                    <span class="text-lg">💾</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'sistem' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">4 Menu</span>
-                </div>
-                <div>
-                    <h3 class="text-xs font-bold leading-snug">Sistem & Keamanan</h3>
-                    <p class="text-[10px] opacity-75 truncate">COA, Backup, 2FA & Sesi</p>
-                </div>
-            </button>
-        </div>
-
-        <!-- Tier 2: Contextual Tabs & Quick Actions -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-black/5 dark:border-white/5">
-            <!-- Contextual Tabs: smooth horizontal scroll on mobile, scrollbar-none, touch-pan-x -->
-            <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 w-full min-w-0 flex-nowrap scrollbar-none scroll-smooth touch-pan-x -mx-1 px-1 sm:mx-0 sm:px-0">
-                <!-- Group 1: Akses & Organisasi -->
-                <div x-show="subModul === 'akses'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap flex-shrink-0 min-w-max">
-                    <button
-                        wire:click="$set('activeTab', 'users')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'users' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        👥 Manajemen Pengguna
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'role')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'role' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        🔐 Role & Hak Akses
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'cabang')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'cabang' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        🏬 Cabang, Gudang & Rak
-                    </button>
-                </div>
-
-                <!-- Group 2: Katalog & Produk -->
-                <div x-show="subModul === 'katalog'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap flex-shrink-0 min-w-max" x-cloak>
-                    <button
-                        wire:click="$set('activeTab', 'master_produk')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'master_produk' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        📦 Master Atribut Produk & Sparepart
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'export_import')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'export_import' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        📤 Export & Import Master
-                    </button>
-                    <a
-                        href="{{ route('pengaturan.web-konsumen') }}"
-                        wire:navigate
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500/20 flex items-center gap-1.5"
-                        title="Buka Halaman Pengaturan Toko & Manajemen Web Konsumen"
-                    >
-                        <span>🌐</span>
-                        <span>Toko &amp; Web Konsumen (CMS) &rarr;</span>
-                    </a>
-                </div>
-
-                <!-- Group 3: Kebijakan & Transaksi -->
-                <div x-show="subModul === 'kebijakan'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap flex-shrink-0 min-w-max" x-cloak>
-                    <button
-                        wire:click="$set('activeTab', 'loyalitas')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'loyalitas' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        💎 Strategi Loyalitas & Komisi
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'pajak')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'pajak' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        ⚖️ Pajak & Tarif PPN
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'qris')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'qris' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        📱 QRIS Toko (Upload & Dinamis)
-                    </button>
-                </div>
-
-                <!-- Group 4: Operasional & Periferal -->
-                <div x-show="subModul === 'operasional'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap flex-shrink-0 min-w-max" x-cloak>
-                    <button
-                        wire:click="$set('activeTab', 'master')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'master' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        🛠️ Master Servis & Garansi
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'printer')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'printer' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        🖨️ Printer Struk & Label Barcode
-                    </button>
-                </div>
-
-                <!-- Group 5: Gateway & Integrasi -->
-                <div x-show="subModul === 'integrasi'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap flex-shrink-0 min-w-max" x-cloak>
-                    <button
-                        wire:click="$set('activeTab', 'integrasi')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer bg-up-primary text-white shadow-md shadow-up-primary/25"
-                    >
-                        🔌 Gateway & Integrasi Eksternal (WA, Duitku, Biteship)
-                    </button>
-                </div>
-
-                <!-- Group 6: Sistem & Keuangan -->
-                <div x-show="subModul === 'sistem'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap flex-shrink-0 min-w-max" x-cloak>
-                    <button
-                        wire:click="$set('activeTab', 'tema')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'tema' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        🎨 Tema &amp; Palet Desain
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'master')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'master' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        📊 Bagan Akun (COA)
-                    </button>
-                    @if(isSuperAdminOrOwner())
-                    <button
-                        wire:click="$set('activeTab', 'database')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'database' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        💾 Basis Data & Backup
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'jaringan')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'jaringan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        🌐 Jaringan &amp; Domain Online
-                    </button>
-                    @endif
-                    @can('lihat-audit-log')
-                    <button
-                        wire:click="$set('activeTab', 'audit')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'audit' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        📜 Audit Trail & Log
-                    </button>
-                    @endcan
-                    <button
-                        wire:click="$set('activeTab', 'keamanan')"
-                        class="flex-shrink-0 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'keamanan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        🛡️ Keamanan &amp; Sesi
-                    </button>
-                </div>
-            </div>
-
+        <div>
             <!-- Tab Action Button: Responsive placement, never overlaps -->
             <div class="flex flex-wrap items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-start sm:justify-end">
                 @if($activeTab === 'users')
@@ -1349,6 +1096,7 @@
     <!-- TAB: PRINTER, STRUK & LABEL QR -->
     @if($activeTab === 'printer')
         <div class="space-y-6">
+            @if(!$standalonePrinter)
             <!-- Sub-tab Navigasi Single Source of Truth Printer & Formats -->
             <div class="flex items-center gap-2 border-b border-black/10 dark:border-white/10 pb-3 overflow-x-auto scrollbar-none scroll-smooth touch-pan-x flex-nowrap w-full min-w-0 -mx-1 px-1 sm:mx-0 sm:px-0">
                 <button
@@ -1395,6 +1143,7 @@
                 </button>
             </div>
 
+            @endif
             @if($printerSubTab === 'struk')
                 <!-- SUB-TAB 1: KUSTOMISASI TEMPLATE STRUK / FAKTUR KASIR -->
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -2449,6 +2198,7 @@
     <!-- TAB: MASTER PRODUK & KATALOG -->
     @if($activeTab === 'master_produk')
         <div class="space-y-4">
+            @if(!$standaloneMaster)
             <!-- Sub-tab Bar: Modern horizontal pill scrollbar with tactile active feedback -->
             <div class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-black/10 dark:border-white/5 scrollbar-none scroll-smooth touch-pan-x flex-nowrap w-full min-w-0 -mx-1 px-1 sm:mx-0 sm:px-0">
                 @foreach([
@@ -2470,6 +2220,7 @@
                     </button>
                 @endforeach
             </div>
+            @endif
 
             <!-- SUB-TAB 1: KATEGORI -->
             @if($masterProdukSubTab === 'kategori')

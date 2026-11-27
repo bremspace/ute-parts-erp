@@ -421,6 +421,9 @@ class EscPos {
       for (const line of this.wrap(nama)) {
         this.bold(true).text(line).bold(false);
       }
+      if (item.breakdown) {
+        this.text('  ' + item.breakdown);
+      }
 
       const qtySatuan = (item.qty || 1) + ' ' + this.unitLabel(item.satuan);
       const harga = this.money(item.harga);
@@ -430,20 +433,16 @@ class EscPos {
       const unitLbl = this.unitLabel(item.satuan);
 
       if (hargaRetail > hargaJual && ['esc_b', 'reverse'].includes(strikethrough_mode)) {
-        // Opsi B: Harga Retail dicoret, Harga Box, qty x box = subtotal, Potongan Box.
+        // Opsi B: satu baris harga normal dicoret + harga diskon.
         opsiBItem = true;
-        const qty = Number(item.qty ?? 1);
         const normal = this.money(hargaRetail);
         const disc = this.money(hargaJual);
-        const potongan = this.money((hargaRetail - hargaJual) * qty);
 
         // Seluruh baris raster agar label + nominal tetap searis.
-        this.strikeRaster('Harga Retail: ' + normal, 'Harga Retail: '.length, normal.length);
+        // Format hemat: satu baris "qty x <harga normal dicoret> harga diskon = subtotal".
+        const ringkas = `${qtySatuan} x ${normal} ${disc} = ${rightVal}`;
+        this.strikeRaster(ringkas, (qtySatuan + ' x ').length, normal.length);
         this.feed(1).alignLeft();
-
-        this.text('Harga Box: ' + disc);
-        this.text(`${qtySatuan} x ${disc} = ${rightVal}`);
-        this.text('Potongan Box: -' + potongan);
       } else if (hargaRetail > hargaJual) {
         this.text(this.pad(`${qtySatuan} x (${this.money(hargaRetail)}) -> ${this.money(hargaJual)}`, rightVal));
       } else {
@@ -464,7 +463,16 @@ class EscPos {
     }
 
     // ======== SUBTOTAL BREAKDOWN & TOTALS ========
-    // Opsi B sudah memuat subtotal dan Potongan Box di baris item.
+    // Opsi B: tampilkan potongan agregat dengan label yang jelas.
+    if (opsiBItem) {
+      if (Number(diskon_box || 0) > 0) {
+        this.text(this.pad('Potongan Kemasan:', '-' + this.money(diskon_box)));
+      }
+      if (Number(diskon_tier || 0) > 0) {
+        this.text(this.pad('Potongan Member (Tier):', '-' + this.money(diskon_tier)));
+      }
+    }
+    // Opsi B sudah memuat subtotal dan Potongan Harga di baris item.
     if (!opsiBItem) {
       if (show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0' && diskon_tier && Number(diskon_tier) > 0) {
         const subRetail = Number(subtotal_retail ?? 0) || (Number(subtotal ?? 0) + Number(diskon_tier));
@@ -717,6 +725,7 @@ class EscPos {
     for (const item of items) {
       const nama = item.nama || 'Item';
       for (const namaLine of wrap(nama)) html += line(namaLine, 'font-weight:800;');
+      if (item.breakdown) html += line('  ' + item.breakdown, 'color:#4b5563;');
 
       const qtySatuan = (item.qty || 1) + ' ' + unitLabel(item.satuan);
       const rightVal = numberOnly(item.subtotal);
@@ -725,17 +734,14 @@ class EscPos {
       const unitLbl = unitLabel(item.satuan);
 
       if (hargaRetail > hargaJual && ['esc_b', 'reverse'].includes(strikethrough_mode)) {
-        // Opsi B — Harga Retail dicoret, Harga Box, qty x box = subtotal, Potongan Box.
+        // Opsi B — Harga normal dicoret + harga diskon dalam satu baris.
         opsiBItem = true;
         const normal = money(hargaRetail);
         const disc = money(hargaJual);
-        const qty = Number(item.qty ?? 1);
-        const potongan = money((hargaRetail - hargaJual) * qty);
 
-        html += lineHtml('Harga Retail: <span style="text-decoration:line-through;">' + esc(normal) + '</span>');
-        html += line('Harga Box: ' + disc);
-        html += line(qtySatuan + ' x ' + disc + ' = ' + rightVal);
-        html += line('Potongan Box: -' + potongan);
+        // Format hemat: qty x <harga normal dicoret> harga diskon = subtotal.
+        html += lineHtml(esc(qtySatuan + ' x ') + '<span style="text-decoration:line-through;">' + esc(normal) + '</span> '
+            + esc(disc) + ' = ' + esc(rightVal));
       } else if (hargaRetail > hargaJual) {
         html += line(row(qtySatuan + ' x (' + money(hargaRetail) + ') -> ' + money(hargaJual), rightVal));
       } else {
@@ -752,7 +758,15 @@ class EscPos {
       }
     }
 
-    // TOTAL & RINCIAN — Opsi B sudah memuat subtotal di baris item.
+    // TOTAL & RINCIAN — Opsi B memuat subtotal di baris item + potongan agregat.
+    if (opsiBItem) {
+      if (Number(diskon_box || 0) > 0) {
+        html += line(row('Potongan Kemasan:', '-' + money(diskon_box)));
+      }
+      if (Number(diskon_tier || 0) > 0) {
+        html += line(row('Potongan Member (Tier):', '-' + money(diskon_tier)));
+      }
+    }
     if (!opsiBItem) {
       const showBreakdown = show_subtotal_breakdown !== false && show_subtotal_breakdown !== 0 && show_subtotal_breakdown !== '0';
       if (showBreakdown && diskon_tier && Number(diskon_tier) > 0) {
