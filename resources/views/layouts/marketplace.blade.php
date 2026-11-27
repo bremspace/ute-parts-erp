@@ -124,6 +124,51 @@
         </div>
     @endif
 
+    <!-- Identitas Toko: posisi bisa diatur dari CMS -->
+    @php
+        $identityPosition = $webConfig['store_identity_position'] ?? 'footer';
+        $storePhone = trim((string) ($webConfig['store_phone'] ?? ''));
+        $storeAddress = trim((string) ($webConfig['store_address'] ?? ''));
+        $storeTel = preg_replace('/[^0-9+]/', '', $storePhone);
+    @endphp
+    @if (in_array($identityPosition, ['header', 'both'], true) && ($storePhone || $storeAddress))
+        <div class="border-b border-slate-200/70 dark:border-white/[0.06] bg-white/70 dark:bg-[#0B1120]/70 backdrop-blur">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-6">
+                @if ($storeAddress)
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-7 h-7 shrink-0 rounded-full bg-up-primary/10 text-up-primary flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 10.5c0 4.5-7.5 10.5-7.5 10.5S4.5 15 4.5 10.5a7.5 7.5 0 1115 0z"/>
+                            </svg>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-ink-400 leading-none">Alamat Toko</p>
+                            <p class="text-xs font-semibold text-ink-800 dark:text-white truncate mt-0.5">{{ $storeAddress }}</p>
+                        </div>
+                    </div>
+                @endif
+
+                @if ($storePhone)
+                    @if ($storeAddress)
+                        <span class="hidden sm:block w-px h-7 bg-slate-200 dark:bg-white/10"></span>
+                    @endif
+                    <a href="tel:{{ $storeTel }}" class="flex items-center gap-2.5 group min-w-0 sm:ml-auto">
+                        <span class="w-7 h-7 shrink-0 rounded-full bg-up-mint/15 text-up-mint flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.5-1.2c-.477-.127-.97.062-1.228.456l-.836 1.253a14.966 14.966 0 01-6.518-6.518l1.253-.836c.394-.258.583-.751.456-1.228l-1.2-4.5A2.25 2.25 0 005.023 2.25H3.75a2.25 2.25 0 00-2.25 2.25v2.25z"/>
+                            </svg>
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block text-[9px] font-bold uppercase tracking-[0.14em] text-ink-400 leading-none">Telepon / WhatsApp</span>
+                            <span class="block text-xs font-semibold text-ink-800 dark:text-white group-hover:text-up-primary transition-colors truncate mt-0.5">{{ $storePhone }}</span>
+                        </span>
+                    </a>
+                @endif
+            </div>
+        </div>
+    @endif
+
     <!-- Top Bar: Apple-inspired chrome with optical typography -->
     <header class="bg-white dark:bg-[#090D16] border-b border-slate-200/80 dark:border-white/[0.08] sticky top-0 z-40 transition-colors duration-200 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]"
         style="padding-top: env(safe-area-inset-top, 0);">
@@ -597,6 +642,37 @@
             </div>
             <div class="space-y-1">
                 <p class="text-xs text-ink-400 dark:text-ink-500">© {{ date('Y') }} {{ config('app.name', 'Bremspace') }}. All rights reserved.</p>
+                @if (in_array($identityPosition, ['footer', 'both'], true) && ($storePhone || $storeAddress))
+                    <div class="pt-2 space-y-2">
+                        @if ($storeAddress)
+                            <div class="flex items-start gap-2.5">
+                                <span class="w-6 h-6 shrink-0 rounded-full bg-up-primary/10 text-up-primary flex items-center justify-center">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.5 10.5c0 4.5-7.5 10.5-7.5 10.5S4.5 15 4.5 10.5a7.5 7.5 0 1115 0z"/>
+                                    </svg>
+                                </span>
+                                <span class="min-w-0">
+                                    <span class="block text-[9px] font-bold uppercase tracking-[0.14em] text-ink-400 leading-none">Alamat Toko</span>
+                                    <span class="block text-[11px] font-medium text-ink-600 dark:text-ink-300 mt-0.5">{{ $storeAddress }}</span>
+                                </span>
+                            </div>
+                        @endif
+                        @if ($storePhone)
+                            <a href="tel:{{ $storeTel }}" class="flex items-center gap-2.5 group">
+                                <span class="w-6 h-6 shrink-0 rounded-full bg-up-mint/15 text-up-mint flex items-center justify-center">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.5-1.2c-.477-.127-.97.062-1.228.456l-.836 1.253a14.966 14.966 0 01-6.518-6.518l1.253-.836c.394-.258.583-.751.456-1.228l-1.2-4.5A2.25 2.25 0 005.023 2.25H3.75a2.25 2.25 0 00-2.25 2.25v2.25z"/>
+                                    </svg>
+                                </span>
+                                <span class="min-w-0">
+                                    <span class="block text-[9px] font-bold uppercase tracking-[0.14em] text-ink-400 leading-none">Telepon / WhatsApp</span>
+                                    <span class="block text-[11px] font-semibold text-ink-700 dark:text-ink-200 group-hover:text-up-primary transition-colors mt-0.5">{{ $storePhone }}</span>
+                                </span>
+                            </a>
+                        @endif
+                    </div>
+                @endif
                 @if (!empty($webConfig['operating_hours']))
                     <p class="text-[11px] text-ink-400 dark:text-ink-500">Jam Buka: {{ $webConfig['operating_hours'] }}</p>
                 @endif

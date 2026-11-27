@@ -874,6 +874,35 @@
                 </div>
 
                 <div class="pt-4 border-t border-white/[0.06] space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">No. HP / WhatsApp Toko</label>
+                            <input type="text" wire:model.live.debounce.300ms="brandingForm.store_phone"
+                                   placeholder="Contoh: 0812-3456-7890"
+                                   class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary">
+                            <p class="text-[11px] text-ink-500 mt-1">Ditampilkan sebagai identitas kontak toko di website.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Alamat Toko</label>
+                            <input type="text" wire:model.live.debounce.300ms="brandingForm.store_address"
+                                   placeholder="Contoh: Jl. Nasional No. 12, Sukabumi"
+                                   class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs placeholder:text-ink-600 focus:outline-none focus:border-up-primary">
+                            <p class="text-[11px] text-ink-500 mt-1">Ditampilkan di area identitas/footer website.</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 uppercase tracking-wider mb-1.5">Posisi Tampil Identitas Toko</label>
+                        <select wire:model.live="brandingForm.store_identity_position"
+                                class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white text-base sm:text-xs focus:outline-none focus:border-up-primary">
+                            <option value="both" class="bg-ink-900">Header &amp; Footer (Rekomendasi)</option>
+                            <option value="header" class="bg-ink-900">Header saja (atas)</option>
+                            <option value="footer" class="bg-ink-900">Footer saja (bawah)</option>
+                            <option value="hidden" class="bg-ink-900">Sembunyikan</option>
+                        </select>
+                        <p class="text-[11px] text-ink-500 mt-1">Atur di mana nomor HP dan alamat toko ditampilkan di website.</p>
+                    </div>
+
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="text-xs font-semibold text-white">Announcement / Running Text Baris Teratas</div>
