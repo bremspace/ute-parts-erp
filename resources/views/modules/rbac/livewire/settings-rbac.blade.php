@@ -3997,6 +3997,10 @@
                                     <input
                                         type="password"
                                         wire:model="integrasiForm.wa_token"
+                                        autocomplete="new-password"
+                                        autocapitalize="off"
+                                        autocorrect="off"
+                                        spellcheck="false"
                                         class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono"
                                         placeholder="{{ $waTokenConfigured ? 'Kosongkan jika tidak ingin mengganti token tersimpan' : (($integrasiForm['wa_provider'] ?? '') === 'openwa' ? 'Kosongkan dulu — terisi otomatis saat Setup Otomatis di bawah' : 'Masukkan token / API key gateway WA') }}"
                                     />
@@ -4076,7 +4080,7 @@
                                         <div>
                                             <p class="text-[11px] font-bold text-white">Setup Otomatis 1-Klik (Admin Key Dipakai Sekali)</p>
                                             <p class="text-[10px] text-ink-400 mt-0.5">
-                                                Kosongkan 2 kolom di atas, lalu tempel Master Admin Key dari VPS (<code class="font-mono text-ink-200 select-all">docker exec openwa-api cat /app/data/.api-key</code>). ERP otomatis membuat UUID sesi, menyalakan engine, mengisi Operator API Key terenkripsi, lalu menghapus Admin Key.
+                                                Kosongkan 2 kolom di atas, lalu tempel Master Admin Key dari VPS (<code class="font-mono text-ink-200 select-all">docker exec openwa-api cat /app/data/.api-key; echo ""</code>). ERP otomatis membuat UUID sesi, menyalakan engine, mengisi Operator API Key terenkripsi, lalu menghapus Admin Key.
                                             </p>
                                         </div>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -4084,9 +4088,26 @@
                                                 <label class="block text-[10px] font-semibold text-ink-300 mb-1">Nama Label Sesi</label>
                                                 <input type="text" wire:model="openwaSessionName" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" placeholder="bremspace-erp" />
                                             </div>
-                                            <div>
+                                            <div x-data="{ showAdminKey: false }">
                                                 <label class="block text-[10px] font-semibold text-ink-300 mb-1">Master Admin Key OpenWA</label>
-                                                <input type="password" wire:model="openwaAdminKey" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono" placeholder="owa_k1_... (opsional setelah setup)" />
+                                                <div class="relative flex items-center">
+                                                    <input
+                                                        :type="showAdminKey ? 'text' : 'password'"
+                                                        wire:model="openwaAdminKey"
+                                                        autocomplete="new-password"
+                                                        autocapitalize="off"
+                                                        autocorrect="off"
+                                                        spellcheck="false"
+                                                        class="w-full pl-3 pr-16 py-2 rounded-xl glass-input text-xs font-mono"
+                                                        placeholder="owa_k1_... (opsional setelah setup)"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        @click="showAdminKey = !showAdminKey"
+                                                        class="absolute right-2 px-2 py-1 rounded-md text-[10px] font-semibold text-ink-300 hover:text-white bg-white/5 hover:bg-white/10 cursor-pointer"
+                                                        x-text="showAdminKey ? 'Tutup' : 'Lihat'"
+                                                    ></button>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="flex flex-wrap items-center gap-2">

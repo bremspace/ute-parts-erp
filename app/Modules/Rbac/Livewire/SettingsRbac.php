@@ -2034,12 +2034,31 @@ class SettingsRbac extends Component
         $this->refreshWaRecentLogs();
     }
 
+    private function formatOpenWaAuthError(string $key, string $err): string
+    {
+        if (! str_contains($err, '401') && ! str_contains($err, '403')) {
+            return $err;
+        }
+
+        $preview = WhatsAppGatewayService::maskKredensial($key).' · '.strlen($key).' karakter';
+
+        return $err.' Key diterima: '.$preview.'. Jalankan: docker exec openwa-api cat /app/data/.api-key; echo ""';
+    }
+
     private function sanitizeApiKey(string $raw): string
     {
-        $clean = trim($raw, " \t\n\r\0\x0B\"'`");
+        $clean = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}\x{00A0}]/u', '', $raw) ?? $raw;
+        $clean = trim($clean, " \t\n\r\0\x0B\"'`");
         $clean = preg_replace('/^(?:x-api-key\s*:\s*|bearer\s+)/i', '', $clean) ?? $clean;
+        $clean = trim($clean, " \t\n\r\0\x0B\"'`");
 
-        return trim($clean, " \t\n\r\0\x0B\"'`");
+        // Tangani copy-paste terminal mobile yang terpotong baris (\n/spasi) atau menempel prompt shell.
+        $compact = preg_replace('/\s+/', '', $clean) ?? $clean;
+        if (preg_match('/(owa_k\d+_[a-f0-9]{64})/i', $compact, $m) === 1) {
+            return strtolower($m[1]);
+        }
+
+        return $clean;
     }
 
     /**
@@ -2138,7 +2157,7 @@ class SettingsRbac extends Component
         if (! $list['ok']) {
             $err = (string) $list['error'];
             $this->openwaHealth = (str_contains($err, '401') || str_contains($err, '403')) ? 'online' : 'offline';
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memuat daftar sesi: '.$err]);
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memuat daftar sesi: '.$this->formatOpenWaAuthError($key, $err)]);
 
             return;
         }
@@ -2230,11 +2249,10 @@ class SettingsRbac extends Component
         // 1. Cari sesi yang sudah ada atau buat sesi baru
         $list = $manager->listSessions($url, $adminKey);
         if (! $list['ok']) {
-            $err = (string) $list['error'];
-            $hint = (str_contains($err, '401') || str_contains($err, '403'))
-                ? ' Ambil Master Admin Key penuh (owa_k1_...) lewat: docker exec openwa-api cat /app/data/.api-key'
-                : '';
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memeriksa sesi OpenWA: '.$err.$hint]);
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Gagal memeriksa sesi OpenWA: '.$this->formatOpenWaAuthError($adminKey, (string) $list['error']),
+            ]);
 
             return;
         }

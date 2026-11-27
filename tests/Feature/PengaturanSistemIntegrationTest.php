@@ -325,17 +325,22 @@ class PengaturanSistemIntegrationTest extends TestCase
             ], 200),
         ]);
 
+        $fullWrappedKey = "owa_k1_12f2519a9e2f948dd1976100\n4c2a7935869bcb359429787fd8b0646f1a979e09root@indra:~#";
+
         $component = Livewire::withQueryParams(['tab' => 'integrasi'])
             ->test(SettingsRbac::class)
             ->set('integrasiForm.wa_provider', 'openwa')
             ->set('integrasiForm.wa_url', 'http://127.0.0.1:2785')
-            ->set('openwaAdminKey', '"X-API-Key: owa_k1_admin_master"')
+            ->set('openwaAdminKey', $fullWrappedKey)
             ->call('setupOpenWaOtomatis')
             ->assertSet('integrasiForm.wa_session', $uuid)
             ->assertSet('integrasiForm.wa_token', '')
             ->assertSet('openwaAdminKey', '')
             ->assertSet('waTokenConfigured', true)
             ->assertSet('openwaQrData', 'data:image/png;base64,iVBORw0KGgo=');
+
+        Http::assertSent(fn ($req) => str_contains($req->url(), '/api/sessions')
+            && $req->header('X-API-Key')[0] === 'owa_k1_12f2519a9e2f948dd19761004c2a7935869bcb359429787fd8b0646f1a979e09');
 
         $saved = app(KonfigurasiService::class)->get('wa_gateway_config');
         $this->assertSame('openwa', $saved['provider']);
