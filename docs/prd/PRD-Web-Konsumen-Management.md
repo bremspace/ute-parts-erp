@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS web_banners (
 
 | Group | Key | Tipe | Default Value | Pengaruh UI Storefront |
 |---|---|---|---|---|
-| `branding` | `store_logo_url` | image | `/icons/icon.svg` | Logo navbar dan favicon |
+| `branding` | `store_logo_url` | image | `/images/ut-mark.svg` | Logo navbar dan favicon |
 | | `topbar_text` | string | "Garansi Resmi Toko & Kirim Cepat se-Indonesia" | Marquee / announcement header |
 | | `topbar_url` | string | `null` | Link tautan running text |
 | | `topbar_active` | bool | `true` | Toggle bar pengumuman teratas |

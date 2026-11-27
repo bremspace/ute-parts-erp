@@ -48,7 +48,7 @@ class WebKonsumenSettings extends Component
 
     // Form states
     public array $brandingForm = [
-        'store_logo_url' => '/icons/icon.svg',
+        'store_logo_url' => '/images/ut-mark.svg',
         'store_phone' => '',
         'store_address' => '',
         'store_identity_position' => 'footer', // header | footer | both | hidden
@@ -209,7 +209,7 @@ class WebKonsumenSettings extends Component
         $settings = $service->getAll();
 
         // Populate Branding
-        $this->brandingForm['store_logo_url'] = $settings['store_logo_url'] ?? '/icons/icon.svg';
+        $this->brandingForm['store_logo_url'] = $settings['store_logo_url'] ?? '/images/ut-mark.svg';
         $this->brandingForm['store_phone'] = (string) ($settings['store_phone'] ?? '');
         $this->brandingForm['store_address'] = (string) ($settings['store_address'] ?? '');
         $pos = (string) ($settings['store_identity_position'] ?? 'footer');
@@ -374,9 +374,10 @@ class WebKonsumenSettings extends Component
     public function save(WebKonsumenService $service, AuditService $audit): void
     {
         // Semua upload gambar wajib divalidasi di server. accept="image/*" di HTML
-        // bisa dilewati, jadi tanpa rule ini file .php/.svg bisa mendarat di disk publik.
+        // bisa dilewati, jadi tanpa rule ini file .php bisa mendarat di disk publik.
+        // SVG diizinkan khusus logo (sesuai petunjuk UI), format lain tetap raster.
         $this->validate([
-            'uploadLogo' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',
+            'uploadLogo' => 'nullable|mimes:jpeg,png,jpg,webp,gif,svg|max:2048',
             'uploadLoginBg' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',
             'uploadHeroBg' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',
             'uploadDefaultProductPhoto' => 'nullable|mimes:jpeg,png,jpg,webp,gif|max:8192',

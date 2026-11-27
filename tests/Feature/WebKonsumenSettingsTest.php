@@ -10,7 +10,9 @@ use App\Modules\Marketplace\Services\WebKonsumenService;
 use Database\Seeders\RoleUserSeeder;
 use Database\Seeders\WebKonsumenSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -80,6 +82,28 @@ class WebKonsumenSettingsTest extends TestCase
             'setting_key' => 'hero_headline',
             'setting_value' => 'Sparepart HP Terlengkap & Presisi',
         ]);
+    }
+
+    public function test_can_save_svg_storefront_logo(): void
+    {
+        Storage::fake('public');
+
+        $svg = UploadedFile::fake()->createWithContent(
+            'ut-mark.svg',
+            (string) file_get_contents(public_path('images/ut-mark.svg')),
+            'image/svg+xml'
+        );
+
+        Livewire::actingAs($this->superAdmin)
+            ->test(WebKonsumenSettings::class)
+            ->set('uploadLogo', $svg)
+            ->call('save')
+            ->assertHasNoErrors('uploadLogo')
+            ->assertDispatched('alert');
+
+        $logoUrl = (string) app(WebKonsumenService::class)->get('store_logo_url');
+        $this->assertStringStartsWith('/storage/web-konsumen/', $logoUrl);
+        $this->assertStringEndsWith('.svg', $logoUrl);
     }
 
     public function test_can_manage_banners_crud(): void

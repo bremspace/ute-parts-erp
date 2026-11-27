@@ -869,6 +869,9 @@
                             <input type="file" wire:model="uploadLogo" accept="image/*"
                                    class="text-xs text-ink-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20">
                             <p class="text-[11px] text-ink-500">Format disarankan SVG atau PNG transparan (maks 2MB).</p>
+                            @error('uploadLogo')
+                                <p class="mt-1 text-[11px] font-semibold text-up-red">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
                 </div>
