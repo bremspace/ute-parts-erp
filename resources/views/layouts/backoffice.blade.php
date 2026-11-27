@@ -610,9 +610,10 @@
                                 <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
                             </button>
                             <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
-                                <a href="/app/pengaturan?tab=integrasi" class="{{ $subLinkClass }} {{ request('tab') === 'integrasi' ? $subLinkActive : $subLinkIdle }}">WhatsApp Gateway</a>
-                                <a href="/app/pengaturan?tab=integrasi" class="{{ $subLinkClass }} {{ request('tab') === 'integrasi' ? $subLinkActive : $subLinkIdle }}">Payment Gateway Duitku</a>
-                                <a href="/app/pengaturan?tab=integrasi" class="{{ $subLinkClass }} {{ request('tab') === 'integrasi' ? $subLinkActive : $subLinkIdle }}">Logistik Biteship</a>
+                                <a href="/app/pengaturan?tab=integrasi&amp;sub=wa" class="{{ $subLinkClass }} {{ request('sub') === 'wa' ? $subLinkActive : $subLinkIdle }}">WhatsApp Gateway</a>
+                                <a href="/app/pengaturan?tab=integrasi&amp;sub=duitku" class="{{ $subLinkClass }} {{ request('sub') === 'duitku' ? $subLinkActive : $subLinkIdle }}">Payment Gateway Duitku</a>
+                                <a href="/app/pengaturan?tab=integrasi&amp;sub=biteship" class="{{ $subLinkClass }} {{ request('sub') === 'biteship' ? $subLinkActive : $subLinkIdle }}">Logistik Biteship</a>
+                                <a href="/app/pengaturan?tab=integrasi&amp;sub=hybrid" class="{{ $subLinkClass }} {{ request('sub') === 'hybrid' ? $subLinkActive : $subLinkIdle }}">Hybrid Sync (Lokal &amp; Cloud)</a>
                             </div>
                         </div>
 

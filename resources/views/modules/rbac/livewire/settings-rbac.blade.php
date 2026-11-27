@@ -3952,9 +3952,11 @@
 
     @if($activeTab === 'integrasi')
         <div class="space-y-6">
+                @php $isub = (string) request('sub', ''); @endphp
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Main Form (Col Span 2) -->
                 <div class="lg:col-span-2 space-y-6">
+                    @if($isub === '' || $isub === 'wa')
                     <!-- WhatsApp Gateway Card -->
                     <x-prism.glass-card title="WhatsApp Gateway & Notifikasi Otomatis" subtitle="Koneksi gateway pesan keluar via WhatsApp (Fonnte, Wablas, OpenWA self-hosted, atau Custom)">
                         <div class="space-y-4">
@@ -4187,7 +4189,9 @@
                             @endif
                         </div>
                     </x-prism.glass-card>
+                    @endif
 
+                    @if($isub === '' || $isub === 'duitku')
                     <!-- Duitku Payment Gateway Card -->
                     <x-prism.glass-card title="Payment Gateway Duitku" subtitle="Integrasi pembayaran online (QRIS, VA Bank, E-Wallet, Kartu Kredit)">
                         <div class="space-y-4">
@@ -4357,7 +4361,9 @@
                             </div>
                         </div>
                     </x-prism.glass-card>
+                    @endif
 
+                    @if($isub === '' || $isub === 'biteship')
                     <!-- Biteship Logistics Card -->
                     <x-prism.glass-card title="Logistik & Ekspedisi Biteship" subtitle="Perhitungan ongkos kirim real-time dan booking kurir multi-ekspedisi">
                         <div class="space-y-4">
@@ -4376,7 +4382,9 @@
                             </div>
                         </div>
                     </x-prism.glass-card>
+                    @endif
 
+                    @if($isub === '' || $isub === 'hybrid')
                     <!-- Asymmetric Hybrid Sync Card -->
                     <x-prism.glass-card title="Asymmetric Hybrid Sync (Lokal <-> Cloud VPS)" subtitle="Sinkronisasi offline-first otomatis antara Server Toko Fisik dan Toko Online VPS">
                         <div class="mb-3 p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-2 text-[11px]">
@@ -4502,8 +4510,10 @@
                             </div>
                         </div>
                     </x-prism.glass-card>
+                    @endif
                 </div>
 
+                    @if($isub === '' || $isub === 'wa')
                 <!-- Sidebar Test & Status (Col Span 1) -->
                 <div class="space-y-6">
                     <x-prism.glass-card title="Status Pengiriman WA" subtitle="8 aktivitas terbaru, termasuk yang sengaja dimatikan">
@@ -4568,6 +4578,7 @@
                             </div>
                         </div>
                     </x-prism.glass-card>
+                    @endif
 
                     <div class="p-4 rounded-2xl glass-panel border border-white/10 space-y-3">
                         <div class="flex items-center gap-2">
@@ -4577,13 +4588,7 @@
                         <p class="text-[11px] text-ink-300 leading-relaxed">
                             Semua token dan kunci API disimpan terenkripsi di database sistem dan hanya dapat diubah oleh pengguna yang memiliki kewenangan <span class="text-up-primary font-semibold">pengaturan.manage</span>.
                         </p>
-                        <button
-                            type="button"
-                            wire:click="simpanIntegrasi"
-                            class="w-full py-2.5 px-4 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.98] cursor-pointer"
-                        >
-                            💾 Simpan Semua Konfigurasi
-                        </button>
+                        <p class="text-[10px] text-ink-400">Gunakan tombol <strong class="text-up-primary">Simpan Konfigurasi Integrasi</strong> di bagian atas untuk menyimpan perubahan.</p>
                     </div>
                 </div>
             </div>
