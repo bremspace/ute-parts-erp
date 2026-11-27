@@ -1225,6 +1225,15 @@ class ProdukTab extends Component
             }
         }
 
+        // Normalisasi barcode/SKU kosong supaya aturan unique tidak mengecek string kosong.
+        $barcodeForm = trim((string) ($this->produkForm['barcode'] ?? ''));
+        $this->produkForm['barcode'] = $barcodeForm !== '' ? $barcodeForm : null;
+        if (($this->produkForm['opsi_sku'] ?? '') === 'barcode') {
+            $this->produkForm['sku'] = $this->produkForm['barcode'];
+        } elseif (($this->produkForm['opsi_sku'] ?? 'otomatis') === 'otomatis') {
+            $this->produkForm['sku'] = null;
+        }
+
         $this->validate([
             'produkForm.nama' => 'required|string',
             'produkForm.barcode' => 'nullable|string|max:50|unique:produk,barcode',
@@ -1238,6 +1247,9 @@ class ProdukTab extends Component
             'produkForm.harga_fleksibel' => 'boolean',
             // [F2-3]
             'produkForm.sn' => 'boolean',
+        ], [
+            'produkForm.barcode.unique' => 'Barcode sudah digunakan produk lain. Kosongkan atau gunakan barcode berbeda.',
+            'produkForm.barcode.max' => 'Barcode maksimal 50 karakter.',
         ]);
 
         // [T-44] minimal 1 harga tier: retail (fallback ke harga_jual) atau salah satu tipe lain
