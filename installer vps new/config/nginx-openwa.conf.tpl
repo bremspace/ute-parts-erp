@@ -10,8 +10,8 @@ server {
     listen [::]:443 ssl http2;
     server_name {{WA_DOMAIN}};
 
-    ssl_certificate     /etc/letsencrypt/live/{{WA_DOMAIN}}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/{{WA_DOMAIN}}/privkey.pem;
+    ssl_certificate     {{SSL_CERT}};
+    ssl_certificate_key {{SSL_KEY}};
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 1d;
