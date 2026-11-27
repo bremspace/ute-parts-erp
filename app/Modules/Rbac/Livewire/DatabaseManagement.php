@@ -35,6 +35,9 @@ class DatabaseManagement extends Component
 
     public ?string $selectedRestoreFile = null;
 
+    /** APP_KEY produksi (opsional) untuk backup .sql/.sql.gz yang tidak membawa manifest. */
+    public string $restoreAppKey = '';
+
     public $uploadedBackupFile = null;
 
     /**
@@ -486,6 +489,7 @@ class DatabaseManagement extends Component
         $this->authorizeAccess();
         $this->selectedRestoreFile = $filename;
         $this->confirmPassword = '';
+        $this->restoreAppKey = '';
         $this->showRestoreModal = true;
     }
 
@@ -527,9 +531,10 @@ class DatabaseManagement extends Component
         }
 
         try {
-            $res = $dbService->restore($targetPath);
+            $res = $dbService->restore($targetPath, null, $this->restoreAppKey !== '' ? $this->restoreAppKey : null);
             $this->showRestoreModal = false;
             $this->confirmPassword = '';
+            $this->restoreAppKey = '';
             $this->uploadedBackupFile = null;
 
             $extraMsg = '';

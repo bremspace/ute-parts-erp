@@ -140,4 +140,16 @@ class DatabaseManagementUpdateTest extends TestCase
             ->assertSee('update-system.sh')
             ->assertDontSee('Pasang Pembaruan Sekarang');
     }
+
+    public function test_restore_modal_menyediakan_field_override_app_key(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        Livewire::test(DatabaseManagement::class)
+            ->call('openRestoreModal', 'backup-produksi.sql.gz')
+            ->assertSet('showRestoreModal', true)
+            ->assertSet('restoreAppKey', '')
+            ->assertSee('APP_KEY produksi')
+            ->assertSee('The MAC is invalid');
+    }
 }

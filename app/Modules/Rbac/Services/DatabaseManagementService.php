@@ -213,7 +213,7 @@ class DatabaseManagementService
     /**
      * Restore database dari file .sql.gz, .sql, atau .zip (Full Snapshot) lokal server.
      */
-    public function restore(string $filePath, ?string $targetDatabase = null): array
+    public function restore(string $filePath, ?string $targetDatabase = null, ?string $appKeyOverride = null): array
     {
         @set_time_limit(1800);
         @ini_set('memory_limit', '512M');
@@ -231,6 +231,36 @@ class DatabaseManagementService
             $conn['database'] = $targetDatabase;
         }
 
+        $appKeySynced = false;
+
+        // APP_KEY bisa diisi manual saat backup bukan Full Snapshot ZIP.
+        // Data terenkripsi (2FA, kredensial gateway, dll.) hanya bisa dibaca
+        // dengan kunci yang sama seperti saat backup dibuat.
+        if (! empty($appKeyOverride)) {
+            $key = trim($appKeyOverride);
+            $decoded = str_starts_with($key, 'base64:')
+                ? base64_decode(substr($key, 7), true)
+                : false;
+
+            if ($decoded === false || strlen($decoded) !== 32) {
+                throw new RuntimeException('APP_KEY tidak valid. Gunakan nilai lengkap dari .env produksi (base64:...).');
+            }
+
+            if (config('app.key') !== $key) {
+                try {
+                    if ($this->updateService->updateEnv(['APP_KEY' => $key])) {
+                        $appKeySynced = true;
+                        config(['app.key' => $key]);
+                        app()->forgetInstance('encrypter');
+                    } else {
+                        Log::warning('Gagal sinkronisasi APP_KEY override: .env tidak writable.');
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('Gagal sinkronisasi APP_KEY override: '.$e->getMessage());
+                }
+            }
+        }
+
         // 1. Ambil emergency pre-restore snapshot otomatis (hanya jika menimpa database utama)
         $preBackup = null;
         if (! $isCustomTarget) {
@@ -244,7 +274,6 @@ class DatabaseManagementService
         $isZip = str_ends_with(strtolower($filePath), '.zip');
         $extractedSql = null;
         $tempExtractDir = null;
-        $appKeySynced = false;
         $mediaRestored = false;
 
         if ($isZip) {
@@ -262,13 +291,15 @@ class DatabaseManagementService
             $manifestPath = $tempExtractDir.DIRECTORY_SEPARATOR.'manifest.json';
             if (File::exists($manifestPath)) {
                 $manifest = json_decode(File::get($manifestPath), true) ?: [];
-                if (! empty($manifest['app_key']) && ! $isCustomTarget) {
+                if (! empty($manifest['app_key']) && ! $isCustomTarget && ! $appKeySynced) {
                     $currentKey = config('app.key');
                     if ($currentKey !== $manifest['app_key']) {
                         try {
                             $synced = $this->updateService->updateEnv(['APP_KEY' => $manifest['app_key']]);
                             if ($synced) {
                                 $appKeySynced = true;
+                                config(['app.key' => $manifest['app_key']]);
+                                app()->forgetInstance('encrypter');
                             } else {
                                 Log::warning('Gagal sinkronisasi APP_KEY: .env tidak writable oleh proses web.');
                             }
@@ -356,7 +387,7 @@ class DatabaseManagementService
 
         $note = 'Database dipulihkan dari: '.basename($filePath).($isCustomTarget ? " (Target DB: {$targetDatabase})" : '');
         if ($appKeySynced) {
-            $note .= ' [APP_KEY berhasil disinkronkan]';
+            $note .= ' [APP_KEY berhasil disinkronkan — hapus cookie browser lalu login ulang]';
         }
         if ($mediaRestored) {
             $note .= ' [Media public storage dipulihkan]';
