@@ -32,10 +32,10 @@ API_MASTER_KEY="$(genpass)"
 apt-get update -qq
 apt_install curl ca-certificates git gnupg lsb-release \
     software-properties-common apt-transport-https nginx certbot \
-    python3-certbot-nginx docker.io docker-compose-plugin jq openssl ufw
+    python3-certbot-nginx jq openssl ufw
 
 timedatectl set-timezone "$TIMEZONE" >/dev/null 2>&1 || true
-systemctl enable --now docker >/dev/null 2>&1 || true
+install_docker
 
 install -d -m 0755 /var/www/certbot/.well-known/acme-challenge
 rm -f /etc/nginx/sites-enabled/default

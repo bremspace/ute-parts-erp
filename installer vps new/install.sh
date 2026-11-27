@@ -441,8 +441,7 @@ OPENWA_KEY=""
 SESSION_ID=""
 if [[ "$OPENWA_LOCAL" == "yes" ]]; then
     log "== Pasang OpenWA self-hosted =="
-    apt_install docker.io docker-compose-plugin
-    systemctl enable --now docker >/dev/null 2>&1 || true
+    install_docker
 
     install -d -m 0755 /opt/openwa
     cp "${CFG_DIR}/openwa/docker-compose.yml" /opt/openwa/docker-compose.yml
