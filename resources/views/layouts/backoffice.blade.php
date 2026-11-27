@@ -343,33 +343,50 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                         <span class="sidebar-label">Pelanggan & CRM</span>
-                        <svg class="sidebar-chevron ml-auto w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': isDropdownOpen('crm') }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <svg class="sidebar-chevron ml-auto w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': isDropdownOpen('crm') }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     <div x-show="isDropdownOpen('crm')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
+                        @php
+                            $subLinkClass = 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors';
+                            $subLinkIdle = 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5';
+                            $subLinkActive = 'bg-up-primary text-white font-semibold';
+                            $isCrmPelanggan = request()->is('app/crm') || request()->is('app/crm/pelanggan') || request()->is('app/crm/tier') || request()->is('app/crm/broadcast');
+                            $isCrmLeads = request()->is('app/crm/leads*') || request()->is('app/reseller*') || request()->is('app/crm/reseller*');
+                        @endphp
+
                         @can('crm.view')
-                            <a href="/app/crm" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/crm') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/crm') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                                <span>Data Pelanggan & Loyalty</span>
-                            </a>
-                            <a href="/app/crm/leads" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/crm/leads*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/crm/leads*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
-                                <span>Pipeline Leads Kanban</span>
-                            </a>
+                        <div x-data="{ open: {{ $isCrmPelanggan ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-primary/60"></span>Data Pelanggan</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                <a href="/app/crm/pelanggan" class="{{ $subLinkClass }} {{ request()->is('app/crm') || request()->is('app/crm/pelanggan') ? $subLinkActive : $subLinkIdle }}">Pelanggan &amp; Member</a>
+                                <a href="/app/crm/tier" class="{{ $subLinkClass }} {{ request()->is('app/crm/tier') ? $subLinkActive : $subLinkIdle }}">Tier Loyalty &amp; Poin</a>
+                                <a href="/app/crm/broadcast" class="{{ $subLinkClass }} {{ request()->is('app/crm/broadcast') ? $subLinkActive : $subLinkIdle }}">Riwayat Broadcast</a>
+                            </div>
+                        </div>
                         @endcan
-                        @can('reseller.view')
-                            <a href="/app/reseller" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/reseller*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/reseller*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
-                                <span>Mitra & Komisi Reseller</span>
-                            </a>
-                        @endcan
+
+                        <div x-data="{ open: {{ $isCrmLeads ? 'true' : 'false' }} }">
+                            <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-up-mint/60"></span>Leads &amp; Mitra</span>
+                                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="ml-3 pl-3 border-l border-black/10 dark:border-white/10 space-y-0.5">
+                                @can('crm.view')
+                                <a href="/app/crm/leads" class="{{ $subLinkClass }} {{ request()->is('app/crm/leads*') ? $subLinkActive : $subLinkIdle }}">Pipeline Leads Kanban</a>
+                                @endcan
+                                @can('reseller.view')
+                                <a href="/app/reseller" class="{{ $subLinkClass }} {{ request()->is('app/reseller*') ? $subLinkActive : $subLinkIdle }}">Mitra &amp; Komisi Reseller</a>
+                                @endcan
+                            </div>
+                        </div>
                     </div>
                 </div>
                 @endcanany
-
                 <!-- 6. Akunting & Laporan -->
                 @canany(['akunting.view', 'laporan.cabang'])
                 <div class="sidebar-group">
