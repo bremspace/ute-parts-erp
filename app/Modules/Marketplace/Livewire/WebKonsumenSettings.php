@@ -49,6 +49,9 @@ class WebKonsumenSettings extends Component
     // Form states
     public array $brandingForm = [
         'store_logo_url' => '/icons/icon.svg',
+        'store_phone' => '',
+        'store_address' => '',
+        'store_identity_position' => 'footer', // header | footer | both | hidden
         'topbar_active' => true,
         'topbar_text' => 'Garansi Resmi Toko & Kirim Cepat se-Indonesia',
         'topbar_url' => '',
@@ -207,6 +210,10 @@ class WebKonsumenSettings extends Component
 
         // Populate Branding
         $this->brandingForm['store_logo_url'] = $settings['store_logo_url'] ?? '/icons/icon.svg';
+        $this->brandingForm['store_phone'] = (string) ($settings['store_phone'] ?? '');
+        $this->brandingForm['store_address'] = (string) ($settings['store_address'] ?? '');
+        $pos = (string) ($settings['store_identity_position'] ?? 'footer');
+        $this->brandingForm['store_identity_position'] = in_array($pos, ['header', 'footer', 'both', 'hidden'], true) ? $pos : 'both';
         $this->brandingForm['topbar_active'] = (bool) ($settings['topbar_active'] ?? true);
         $this->brandingForm['topbar_text'] = $settings['topbar_text'] ?? '';
         $this->brandingForm['topbar_url'] = $settings['topbar_url'] ?? '';
@@ -408,6 +415,11 @@ class WebKonsumenSettings extends Component
         $payload = [
             // Branding
             'store_logo_url' => $this->brandingForm['store_logo_url'],
+            'store_phone' => (string) $this->brandingForm['store_phone'],
+            'store_address' => (string) $this->brandingForm['store_address'],
+            'store_identity_position' => in_array($this->brandingForm['store_identity_position'] ?? 'footer', ['header', 'footer', 'both', 'hidden'], true)
+                ? $this->brandingForm['store_identity_position']
+                : 'footer',
             'topbar_active' => $this->brandingForm['topbar_active'],
             'topbar_text' => $this->brandingForm['topbar_text'],
             'topbar_url' => $this->brandingForm['topbar_url'],
