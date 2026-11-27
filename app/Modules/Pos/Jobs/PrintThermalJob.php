@@ -52,7 +52,7 @@ class PrintThermalJob implements ShouldQueue
         });
     }
 
-    private function breakdownText($item): string
+    private function breakdownText(TransaksiItem $item): string
     {
         $faktor = max(1, (int) round((float) ($item->konversi ?? 1)));
         $qty = max(0, (int) ($item->jumlah ?? 0));
@@ -69,7 +69,7 @@ class PrintThermalJob implements ShouldQueue
         return $box.' '.$satuan.($sisa > 0 ? ' + '.$sisa.' PCS' : '');
     }
 
-    private function alasanPotongan($item): string
+    private function alasanPotongan(TransaksiItem $item): string
     {
         $faktor = max(1, (int) round((float) ($item->konversi ?? 1)));
         $satuan = strtolower((string) ($item->satuan ?? 'pcs'));

@@ -935,7 +935,7 @@ class PosKasir extends Component
     {
         return max(0.0,
             $this->diskonTierTotal
-            + $this->potonganKemasan
+            + $this->getPotonganKemasanProperty()
             + (float) $this->diskonPartai
             + (float) $this->diskonPoin
             + (float) $this->diskonTotal
@@ -946,12 +946,12 @@ class PosKasir extends Component
     {
         // Subtotal sudah bersih setelah potongan kemasan, jadi DPP tidak boleh
         // mengurangkannya dua kali.
-        return max(0.0, $this->totalDiskon - $this->potonganKemasan);
+        return max(0.0, $this->getTotalDiskonProperty() - $this->getPotonganKemasanProperty());
     }
 
     public function getHematTotalProperty(): float
     {
-        return $this->totalDiskon;
+        return $this->getTotalDiskonProperty();
     }
 
     public function getPotensiKomisiTotalProperty(): float
@@ -1010,7 +1010,7 @@ class PosKasir extends Component
         $pajakService = app(PajakService::class);
 
         if (! $cabangId || ! $pajakService->enabled($cabangId)) {
-            $this->dpp = max(0.0, $this->subtotal - $this->totalDiskonDpp);
+            $this->dpp = max(0.0, $this->subtotal - $this->getTotalDiskonDppProperty());
             $this->pajakNominal = 0.0;
             $this->ppnPersen = 0.0;
 
@@ -1019,7 +1019,7 @@ class PosKasir extends Component
 
         // [H11] inclusive: dpp = net/(1+persen), ppn = net - dpp, total = net.
         // getTotalAkhirProperty (dpp + pajakNominal) benar utk kedua mode.
-        $result = $pajakService->hitungPenjualan($cabangId, $this->subtotal, $this->totalDiskonDpp);
+        $result = $pajakService->hitungPenjualan($cabangId, $this->subtotal, $this->getTotalDiskonDppProperty());
         $this->dpp = (float) $result['dpp'];
         $this->pajakNominal = (float) $result['ppn_nominal'];
         $this->ppnPersen = (float) $result['ppn_percent'];

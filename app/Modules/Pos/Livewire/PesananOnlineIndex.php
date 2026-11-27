@@ -8,6 +8,7 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Marketplace\Models\Pengiriman;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\PembayaranPesananOnlineService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
@@ -739,7 +740,7 @@ class PesananOnlineIndex extends Component
         $this->showReceiptModal = true;
     }
 
-    private function breakdownText($item): string
+    private function breakdownText(TransaksiItem $item): string
     {
         $faktor = max(1, (int) round((float) ($item->konversi ?? 1)));
         $qty = max(0, (int) ($item->jumlah ?? 0));
@@ -756,7 +757,7 @@ class PesananOnlineIndex extends Component
         return $box.' '.$satuan.($sisa > 0 ? ' + '.$sisa.' PCS' : '');
     }
 
-    private function alasanPotongan($item): string
+    private function alasanPotongan(TransaksiItem $item): string
     {
         $faktor = max(1, (int) round((float) ($item->konversi ?? 1)));
         $satuan = strtolower((string) ($item->satuan ?? 'pcs'));
