@@ -1669,6 +1669,7 @@ class PosKasir extends Component
     {
         $faktor = max(1, (int) round((float) ($item['box_faktor'] ?? $item['konversi'] ?? 1)));
         $satuan = strtolower((string) ($item['satuan'] ?? 'pcs'));
+
         return ($faktor > 1 && $satuan !== 'pcs') ? 'Potongan Kemasan' : 'Potongan Member (Tier)';
     }
 

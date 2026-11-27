@@ -65,6 +65,7 @@ class PrintThermalJob implements ShouldQueue
             return '';
         }
         $satuan = strtoupper((string) ($item->satuan ?? 'box'));
+
         return $box.' '.$satuan.($sisa > 0 ? ' + '.$sisa.' PCS' : '');
     }
 
@@ -72,6 +73,7 @@ class PrintThermalJob implements ShouldQueue
     {
         $faktor = max(1, (int) round((float) ($item->konversi ?? 1)));
         $satuan = strtolower((string) ($item->satuan ?? 'pcs'));
+
         return ($faktor > 1 && $satuan !== 'pcs') ? 'Potongan Kemasan' : 'Potongan Member (Tier)';
     }
 
