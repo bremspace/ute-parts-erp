@@ -8,9 +8,10 @@ echo ======================================================================
 echo.
 
 set "STOPPED=0"
+for %%I in ("%~dp0..\..\..") do set "ROOT_DIR=%%~fI"
 
 rem 0. Hentikan kontainer Docker jika Docker Compose aktif
-if exist "%~dp0compose.yaml" (
+if exist "%ROOT_DIR%\compose.yaml" (
     where docker >nul 2>nul
     if not errorlevel 1 (
         echo [INFO] Menghentikan kontainer Docker Bremspace...
@@ -20,8 +21,8 @@ if exist "%~dp0compose.yaml" (
 )
 
 rem 1. Hentikan proses via PID file jika ada
-if exist "%~dp0storage\framework\server.pid" (
-    set /p SERVER_PID=<"%~dp0storage\framework\server.pid"
+if exist "%ROOT_DIR%\storage\framework\server.pid" (
+    set /p SERVER_PID=<"%ROOT_DIR%\storage\framework\server.pid"
     if defined SERVER_PID (
         taskkill /f /pid !SERVER_PID! >nul 2>nul
         if not errorlevel 1 (
@@ -29,11 +30,11 @@ if exist "%~dp0storage\framework\server.pid" (
             set "STOPPED=1"
         )
     )
-    del /f /q "%~dp0storage\framework\server.pid" >nul 2>nul
+    del /f /q "%ROOT_DIR%\storage\framework\server.pid" >nul 2>nul
 )
 
-if exist "%~dp0storage\framework\queue.pid" (
-    set /p QUEUE_PID=<"%~dp0storage\framework\queue.pid"
+if exist "%ROOT_DIR%\storage\framework\queue.pid" (
+    set /p QUEUE_PID=<"%ROOT_DIR%\storage\framework\queue.pid"
     if defined QUEUE_PID (
         taskkill /f /pid !QUEUE_PID! >nul 2>nul
         if not errorlevel 1 (
@@ -41,7 +42,7 @@ if exist "%~dp0storage\framework\queue.pid" (
             set "STOPPED=1"
         )
     )
-    del /f /q "%~dp0storage\framework\queue.pid" >nul 2>nul
+    del /f /q "%ROOT_DIR%\storage\framework\queue.pid" >nul 2>nul
 )
 
 rem 2. Hentikan proses yang mendengarkan di rentang port 1741-1760

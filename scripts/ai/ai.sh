@@ -7,7 +7,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
 
 # 1. Periksa & Nyalakan 9router di background (Port 20128)
 if ! curl -s --max-time 1 http://127.0.0.1:20128/v1/models >/dev/null 2>&1; then
@@ -26,7 +27,7 @@ fi
 # 2. Periksa apakah OpenCode & AI stack sudah terkonfigurasi
 if ! command -v opencode >/dev/null 2>&1 && [ ! -f "$HOME/.opencode/bin/opencode" ] && [ ! -f "/root/.opencode/bin/opencode" ]; then
     echo "⟳ Menyiapkan stack AI mandiri (OpenCode + OMO-Slim + MCP)..."
-    bash "${SCRIPT_DIR}/deploy/setup-ai-dev-stack.sh" >/dev/null 2>&1 || true
+    bash "${PROJECT_ROOT}/deploy/setup-ai-dev-stack.sh" >/dev/null 2>&1 || true
 fi
 
 # 3. Temukan binary OpenCode

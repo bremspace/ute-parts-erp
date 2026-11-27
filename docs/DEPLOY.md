@@ -406,7 +406,7 @@ cat ~/.ssh/ute_deploy
 > biasa akan gagal dengan "folder deploy tidak ditemukan".
 
 ### 10.4 Cara kerja
-1. Workflow mengunduh `deploy.sh` dari repo ke `/tmp/ute-deploy.sh`, lalu eksekusi di VPS via SSH
+1. Workflow mengunduh `installers/vps/deploy.sh` dari repo ke `/tmp/ute-deploy.sh`, lalu eksekusi di VPS via SSH
 2. Script menyimpan hash commit lama + **backup `public/build`** sebelum bekerja
 3. Bila gagal → fungsi `rollback()` kembalikan semuanya ke commit lama
 4. `.env` **tidak pernah tersentuh** (ada di `.gitignore`, tidak pulled dari GitHub)
@@ -416,7 +416,7 @@ cat ~/.ssh/ute_deploy
 ### 10.5 Deploy manual (tanpa GitHub Actions)
 ```bash
 cd /var/www/ute-parts
-DEPLOY_PATH=/var/www/ute-parts PHP_BIN=/usr/bin/php8.4 bash deploy.sh
+DEPLOY_PATH=/var/www/ute-parts PHP_BIN=/usr/bin/php8.4 bash installers/vps/deploy.sh
 ```
 
 ### 10.6 Update manual paling sederhana
@@ -671,4 +671,4 @@ curl -s https://uteparts.id/up -o /dev/null -w "%{http_code}\n"   # 200
 | PHP | 8.4 |
 | Node | 20+ |
 | Perintah QA lokal | `php scripts/qa-auto.php` (tidak perlu di production) |
-| Update berikutnya | `bash deploy.sh` atau `git pull && composer install && npm run build` |
+| Update berikutnya | `bash installers/vps/deploy.sh` atau `git pull && composer install && npm run build` |

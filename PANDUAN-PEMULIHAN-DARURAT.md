@@ -18,9 +18,9 @@ Jika Anda membuka terminal VPS (dari laptop maupun HP):
 
 Cukup jalankan:
 ```bash
-./emergency-restore.sh
+bash installers/vps/emergency-restore.sh
 ```
-*(Atau `sudo bash emergency-restore.sh`)*
+*(Atau `sudo bash installers/vps/emergency-restore.sh`)*
 
 **Apa yang dilakukan skrip ini secara otomatis?**
 1. Memastikan service MySQL aktif (`systemctl start mysql`).

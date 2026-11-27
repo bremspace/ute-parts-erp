@@ -16,7 +16,7 @@ Prasyarat: Komputer Windows 10 atau Windows 11 (64-bit).
 
 Cara Menjalankan:
 1. Ekstrak seluruh isi file ZIP ini ke folder komputer Anda (misal di C:\Bremspace).
-2. Klik ganda file: "start-install.bat".
+2. Buka folder "installers\local\windows\" dan klik ganda file: "start-install.bat".
 3. Jendela instalasi akan terbuka dan memeriksa kondisi sistem Anda secara otomatis.
 4. Anda akan melihat "Kode Mesin (Challenge Code)", contoh: BREM-XXXX-YYYY-ZZZZ.
 5. Klik tautan WhatsApp yang muncul di layar untuk mengirim kode tersebut ke 
@@ -31,7 +31,8 @@ Cara Menjalankan:
 ----------------------------------------------------------------------
 1. Ekstrak file dan buka terminal di folder aplikasi.
 2. Jalankan perintah:
-   chmod +x start-install.sh && ./start-install.sh
+   bash installers/vps/install.sh
+   (Atau untuk TUI interaktif alternatif: bash installers/vps/start-install-vps.sh)
 3. Masukkan Kode Aktivasi yang diberikan oleh Developer Bremspace.
 
 ----------------------------------------------------------------------
@@ -41,7 +42,7 @@ Khusus untuk Anda yang ingin menjadikan HP Android sebagai server kasir mandiri:
 1. Pasang aplikasi "Termux" dari F-Droid (bukan Play Store lama).
 2. Buka aplikasi Termux, lalu salin folder aplikasi ini ke penyimpanan Termux.
 3. Jalankan perintah:
-   bash start-termux.sh
+   bash installers/local/android-termux/start-termux.sh
 4. Masukkan Kode Aktivasi saat diminta.
 5. Browser Google Chrome di HP Anda akan langsung membuka aplikasi di port 1741.
 
@@ -70,8 +71,8 @@ Saat pertama kali membuka aplikasi:
 ----------------------------------------------------------------------
 6. CARA MENGHENTIKAN ATAU MEMULAI ULANG APLIKASI
 ----------------------------------------------------------------------
-- Untuk Mematikan Server : Klik ganda file "stop-server.bat"
-- Untuk Menyalakan Kembali: Klik ganda file "start-install.bat" (server langsung aktif tanpa perlu aktivasi ulang).
+- Untuk Mematikan Server : Klik ganda file "installers\local\windows\stop-server.bat"
+- Untuk Menyalakan Kembali: Klik ganda file "installers\local\windows\start_app.bat" (server langsung aktif tanpa perlu aktivasi ulang).
 
 ----------------------------------------------------------------------
 BUTUH BANTUAN TEKNIS?

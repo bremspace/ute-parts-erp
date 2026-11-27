@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 title Bremspace ERP - Unas 1-Click Installer
-cd /d "%~dp0"
+cd /d "%~dp0..\..\.."
 
 rem 0. Deteksi dan Minta Elevasi Hak Administrator jika belum elevated
 net session >nul 2>&1
@@ -24,8 +24,8 @@ echo ======================================================================
 echo.
 
 rem 1. Pastikan file engine powershell ada
-if not exist "%~dp0scripts\unas-setup.ps1" (
-    echo [ERROR] File scripts\unas-setup.ps1 tidak ditemukan!
+if not exist "%~dp0unas-setup.ps1" (
+    echo [ERROR] File unas-setup.ps1 tidak ditemukan!
     echo Pastikan Anda mengekstrak seluruh isi folder proyek dengan lengkap.
     echo ======================================================================
     pause
@@ -48,7 +48,7 @@ if errorlevel 1 (
 )
 
 rem 3. Jalankan installer dengan ExecutionPolicy Bypass
-"%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\unas-setup.ps1" %*
+"%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0unas-setup.ps1" %*
 
 set "EXIT_CODE=%ERRORLEVEL%"
 echo.

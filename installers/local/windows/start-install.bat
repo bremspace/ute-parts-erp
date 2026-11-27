@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 title Bremspace ERP dan POS System - Universal Launcher (Port 1741)
-cd /d "%~dp0"
+cd /d "%~dp0..\..\.."
 
 echo ======================================================================
 echo    Bremspace ERP dan POS System - One-Click Universal Launcher
@@ -26,10 +26,10 @@ if errorlevel 1 (
 )
 
 :: 2. Prioritaskan Docker Engine (WSL2 Native / Desktop) dengan Fallback Lokal
-if exist "%~dp0scripts\install-docker.ps1" (
-    "%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install-docker.ps1" %*
+if exist "%~dp0install-docker.ps1" (
+    "%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-docker.ps1" %*
 ) else (
-    "%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\unas-setup.ps1" %*
+    "%POWERSHELL_BIN%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0unas-setup.ps1" %*
 )
 
 set "EXIT_CODE=%ERRORLEVEL%"

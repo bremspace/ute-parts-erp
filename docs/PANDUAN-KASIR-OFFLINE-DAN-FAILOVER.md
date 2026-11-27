@@ -78,17 +78,17 @@ Jika terjadi keadaan darurat di toko (misalnya: PC kasir mati total, tersambar p
 
 Untuk memasang Bremspace ERP di PC Toko Lokal, tersedia dua metode:
 
-### 1. Metode Rekomendasi: Docker Installer (Folder `Installer docker/`)
+### 1. Metode Rekomendasi: Docker Installer (Folder `installers/docker/`)
 * **Keunggulan**: Sangat bersih, tidak perlu instalasi manual PHP, Composer, atau MySQL di Windows.
 * **Cara Pakai**:
   1. Pastikan **Docker Desktop** sudah terpasang dan berjalan di PC toko.
-  2. Masuk ke folder `Installer docker/` dan klik dua kali **`install.bat`** (atau jalankan via PowerShell `install.ps1`).
+  2. Masuk ke folder `installers/docker/` dan klik dua kali **`install.bat`** (atau jalankan via PowerShell `install.ps1`, atau `bash install.sh` di Linux/macOS).
   3. Installer otomatis mem-build image, membuat database MySQL lokal di volume persistent, membuka akses firewall port 80 untuk PC kasir lain di LAN, dan menyalakan background queue worker (`sync`) serta scheduler.
   4. Buka kasir via browser di `http://localhost/app/pos`.
 
-### 2. Metode Standalone (Folder `scripts/`)
+### 2. Metode Standalone (Folder `installers/local/`)
 * **Penggunaan**: Untuk PC toko yang sudah memiliki runtime PHP 8.2+ dan MySQL/SQLite native (misal Laragon / Linux Ubuntu).
 * **File**:
-  - Linux / macOS / WSL: `scripts/setup-local-store-node.sh`
-  - Windows: `scripts/setup-local-store-node.bat`
+  - Linux / macOS / WSL: `installers/local/linux/setup-local-store-node.sh`
+  - Windows: `installers/local/windows/setup-local-store-node.bat`
 * **Cara Pakai**: Cukup jalankan skrip tersebut, sistem akan menyiapkan file `.env`, memigrasikan database lokal, dan membuat shortcut launcher desktop `Buka-Kasir.bat`.

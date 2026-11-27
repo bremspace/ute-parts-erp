@@ -100,6 +100,7 @@ composer qa            # Jalankan seluruh gerbang QA
 
 ## Dokumentasi & Referensi
 
+- **Panduan Installer Terpusat (Lokal, Windows, Linux, Docker, VPS, Android):** [installers/README.md](installers/README.md)
 - **Panduan OpenWA (Self-Hosted WhatsApp Gateway):** [docs/PANDUAN-OPENWA.md](docs/PANDUAN-OPENWA.md) & [deploy/openwa/README.md](deploy/openwa/README.md)
 - **Setup Awal & Migrasi VPS ke Lokal:** [docs/PANDUAN-SETUP-AWAL-MIGRASI.md](docs/PANDUAN-SETUP-AWAL-MIGRASI.md) & [docs/MIGRASI-VPS-KE-LOKAL.md](docs/MIGRASI-VPS-KE-LOKAL.md)
 - **Kasir Offline, Hybrid Sync & Failover:** [docs/hybrid-sync-runbook.md](docs/hybrid-sync-runbook.md) & [docs/PANDUAN-KASIR-OFFLINE-DAN-FAILOVER.md](docs/PANDUAN-KASIR-OFFLINE-DAN-FAILOVER.md)

@@ -15,7 +15,8 @@ echo -e "${C_YELLOW}⟳ [1/4] Memeriksa & Menyalakan Service MySQL...${C_RESET}"
 systemctl start mysql 2>/dev/null || systemctl start mariadb 2>/dev/null || true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKUP_DIR="${SCRIPT_DIR}/storage/app/backups"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+BACKUP_DIR="${PROJECT_ROOT}/storage/app/backups"
 
 echo -e "${C_YELLOW}⟳ [2/4] Mencari file backup terbaru di ${BACKUP_DIR}...${C_RESET}"
 if [ ! -d "$BACKUP_DIR" ]; then
@@ -33,8 +34,8 @@ echo -e "  • Ditemukan backup: ${C_GREEN}$(basename "$LATEST_BACKUP")${C_RESET
 
 # Ambil DB_DATABASE dari .env jika ada
 DB_NAME="db_staging"
-if [ -f "${SCRIPT_DIR}/.env" ]; then
-    PARSED_DB=$(grep -E "^DB_DATABASE=" "${SCRIPT_DIR}/.env" | cut -d= -f2 | tr -d '\"' | tr -d "'" || true)
+if [ -f "${PROJECT_ROOT}/.env" ]; then
+    PARSED_DB=$(grep -E "^DB_DATABASE=" "${PROJECT_ROOT}/.env" | cut -d= -f2 | tr -d '\"' | tr -d "'" || true)
     if [ -n "$PARSED_DB" ]; then
         DB_NAME="$PARSED_DB"
     fi

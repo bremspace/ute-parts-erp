@@ -88,7 +88,7 @@ class EnsureLicenseValid
         <div class="p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300 text-left space-y-1">
             <div class="font-bold text-indigo-400">Cara Mengaktifkan:</div>
             <div>1. Buka folder instalasi sistem di komputer host.</div>
-            <div>2. Jalankan <code>start-install.bat</code> atau <code>start-install.sh</code>.</div>
+            <div>2. Jalankan <code>installers/local/windows/start-install.bat</code> (Windows) atau <code>installers/local/linux/start_app.sh</code> (Linux).</div>
             <div>3. Masukkan Kode Aktivasi resmi dari Developer Bremspace.</div>
         </div>
         <div class="text-[11px] text-slate-500">Bremspace ERP &amp; POS System &bull; Hardware Protection</div>

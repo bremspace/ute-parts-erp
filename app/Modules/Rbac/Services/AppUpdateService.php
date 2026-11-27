@@ -405,7 +405,7 @@ class AppUpdateService
         if ($this->isDocker()) {
             return [
                 'success' => false,
-                'message' => 'Aplikasi berjalan di dalam lingkungan Docker Container terisolasi. Gunakan skrip pembaruan kontainer (update-system.bat atau update-system.sh) untuk memperbarui image aplikasi.',
+                'message' => 'Aplikasi berjalan di dalam lingkungan Docker Container terisolasi. Gunakan skrip pembaruan kontainer (installers/local/windows/update-system.bat atau installers/local/linux/update-system.sh) untuk memperbarui image aplikasi.',
                 'logs' => ['[1/1] Mode Docker aktif: Pembaruan image kontainer dilakukan via host untuk menjaga persistensi basis data.'],
             ];
         }

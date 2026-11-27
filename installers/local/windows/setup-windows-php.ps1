@@ -12,7 +12,7 @@ $scriptDir = $PSScriptRoot
 if (-not $scriptDir) {
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
-$projectRoot = Split-Path -Parent $scriptDir
+$projectRoot = (Resolve-Path (Join-Path $scriptDir "..\..\..")).Path
 $toolsDir = Join-Path $projectRoot 'tools'
 $destDir = Join-Path $toolsDir 'php'
 $zipPath = Join-Path $toolsDir 'php.zip'

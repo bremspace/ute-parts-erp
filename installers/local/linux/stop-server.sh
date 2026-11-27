@@ -2,6 +2,10 @@
 # ==============================================================================
 # ERP & POS System — Stop Background Server (Port 1741)
 # ==============================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+cd "$PROJECT_ROOT"
+
 PORT=1741
 PID_FILE="storage/framework/server.pid"
 

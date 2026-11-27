@@ -16,7 +16,7 @@ try {
 } catch {}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$projectRoot = Split-Path -Parent $scriptDir
+$projectRoot = (Resolve-Path (Join-Path $scriptDir "..\..\..")).Path
 
 # Helper: Prompt input dengan nilai default
 function Prompt-User([string]$promptText, [string]$defaultValue) {
@@ -982,7 +982,7 @@ try {
     $ws = New-Object -ComObject WScript.Shell
     $desktop = [System.Environment]::GetFolderPath('Desktop')
     $shortcut = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP POS.lnk'))
-    $shortcut.TargetPath = Join-Path $projectRoot 'start_app.bat'
+    $shortcut.TargetPath = Join-Path $scriptDir 'start_app.bat'
     $shortcut.WorkingDirectory = $projectRoot
     $ico = Join-Path $projectRoot 'public\favicon.ico'
     if (Test-Path $ico) { $shortcut.IconLocation = $ico }
@@ -990,7 +990,7 @@ try {
     $shortcut.Save()
 
     $shortcutStop = $ws.CreateShortcut([System.IO.Path]::Combine($desktop, 'Bremspace ERP Stop.lnk'))
-    $shortcutStop.TargetPath = Join-Path $projectRoot 'stop-server.bat'
+    $shortcutStop.TargetPath = Join-Path $scriptDir 'stop-server.bat'
     $shortcutStop.WorkingDirectory = $projectRoot
     $shortcutStop.Description = 'Bremspace ERP & POS - Hentikan Server'
     $shortcutStop.Save()

@@ -19,7 +19,7 @@ $scriptDir = $PSScriptRoot
 if (-not $scriptDir) {
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
-$projectRoot = Split-Path -Parent $scriptDir
+$projectRoot = (Resolve-Path (Join-Path $scriptDir "..\..\..")).Path
 Set-Location -Path $projectRoot
 
 Write-Host "======================================================================" -ForegroundColor Cyan

@@ -37,7 +37,7 @@ Pada tab **Public Hostname** di Cloudflare Tunnel:
 - **Domain:** Pilih domain Anda (contoh: `namatoko.com`).
 - **Type:** Pilih `HTTP`.
 - **URL:** Masukkan alamat lokal aplikasi:
-  - Jika pakai port built-in launcher (`start-install.bat` / `start-install.sh`):  
+  - Jika pakai port built-in launcher (`installers/local/windows/start-install.bat` / `installers/local/linux/start_app.sh`):  
     `localhost:1741`
   - Jika pakai Nginx / XAMPP / Laragon standar:  
     `localhost:80`

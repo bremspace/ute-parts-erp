@@ -1,1 +1,0 @@
-scripts/pasang-bre.sh

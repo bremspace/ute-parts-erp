@@ -1,7 +1,8 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 title Bremspace ERP dan POS System - System Updater
-cd /d "%~dp0"
+for %%I in ("%~dp0..\..\..") do set "ROOT_DIR=%%~fI"
+cd /d "%ROOT_DIR%"
 
 echo ======================================================================
 echo    Bremspace ERP dan POS System - Pembaruan Sistem Otomatis (Updater)
@@ -11,15 +12,15 @@ echo.
 set "PHP_BIN=php"
 where php >nul 2>nul
 if errorlevel 1 (
-    if exist "%~dp0tools\php\php.exe" (
-        set "PHP_BIN=%~dp0tools\php\php.exe"
+    if exist "%ROOT_DIR%\tools\php\php.exe" (
+        set "PHP_BIN=%ROOT_DIR%\tools\php\php.exe"
     )
 )
 
 echo [INFO] Memeriksa lisensi dan pembaruan sistem...
 
 :: 1. Jika berjalan dengan Docker
-if exist "%~dp0compose.yaml" (
+if exist "%ROOT_DIR%\compose.yaml" (
     where docker >nul 2>nul
     if not errorlevel 1 (
         echo [INFO] Mengunduh pembaruan kontainer Docker Bremspace...

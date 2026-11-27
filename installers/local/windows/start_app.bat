@@ -9,17 +9,18 @@ echo    Memulai server & mempersiapkan seluruh layanan sistem...
 echo ======================================================================
 echo.
 
-cd /d "%~dp0"
+for %%I in ("%~dp0..\..\..") do set "ROOT_DIR=%%~fI"
+cd /d "%ROOT_DIR%"
 
 :: -----------------------------------------------------------------------------
 :: 1. Deteksi PHP Binary (Wajib PHP >= 8.4)
 :: -----------------------------------------------------------------------------
 set "PHP_BIN="
 
-if exist "%~dp0tools\php\php.exe" (
-    "%~dp0tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
+if exist "%ROOT_DIR%\tools\php\php.exe" (
+    "%ROOT_DIR%\tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
     if not errorlevel 1 (
-        set "PHP_BIN=%~dp0tools\php\php.exe"
+        set "PHP_BIN=%ROOT_DIR%\tools\php\php.exe"
         goto :PHP_CHECK_DONE
     )
 )
@@ -61,14 +62,14 @@ if exist "C:\xampp\php\php.exe" (
 
 :: Auto-Download PHP Portable jika belum ada sama sekali
 echo [INFO] Menyiapkan PHP portable di folder tools...
-if not exist "%~dp0tools" mkdir "%~dp0tools" 2>nul
-if exist "%~dp0scripts\setup-windows-php.ps1" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\setup-windows-php.ps1"
+if not exist "%ROOT_DIR%\tools" mkdir "%ROOT_DIR%\tools" 2>nul
+if exist "%~dp0setup-windows-php.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup-windows-php.ps1"
 )
-if exist "%~dp0tools\php\php.exe" (
-    "%~dp0tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
+if exist "%ROOT_DIR%\tools\php\php.exe" (
+    "%ROOT_DIR%\tools\php\php.exe" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>nul
     if not errorlevel 1 (
-        set "PHP_BIN=%~dp0tools\php\php.exe"
+        set "PHP_BIN=%ROOT_DIR%\tools\php\php.exe"
     )
 )
 
@@ -85,8 +86,8 @@ echo [OK] PHP: %PHP_BIN%
 :: -----------------------------------------------------------------------------
 :: 2. Pengecekan Status Instalasi Sistem (Auto-Install jika Fresh PC)
 :: -----------------------------------------------------------------------------
-if not exist "%~dp0storage\installed.lock" (
-    if not exist "%~dp0.env" (
+if not exist "%ROOT_DIR%\storage\installed.lock" (
+    if not exist "%ROOT_DIR%\.env" (
         echo [INFO] Sistem belum terkonfigurasi di komputer ini.
         echo [INFO] Menjalankan installer otomatis (install.bat)...
         echo.
@@ -121,11 +122,11 @@ if errorlevel 1 (
     net start MySQL >nul 2>nul
     net start MySQL80 >nul 2>nul
     net start MariaDB >nul 2>nul
-    if exist "%~dp0tools\mariadb\bin\mysqld.exe" (
-        start "" /b "%~dp0tools\mariadb\bin\mysqld.exe" --defaults-file="%~dp0tools\mariadb\my.ini" --standalone >nul 2>nul
+    if exist "%ROOT_DIR%\tools\mariadb\bin\mysqld.exe" (
+        start "" /b "%ROOT_DIR%\tools\mariadb\bin\mysqld.exe" --defaults-file="%ROOT_DIR%\tools\mariadb\my.ini" --standalone >nul 2>nul
     )
-    if exist "%~dp0tools\mysql\bin\mysqld.exe" (
-        start "" /b "%~dp0tools\mysql\bin\mysqld.exe" --defaults-file="%~dp0tools\mysql\my.ini" --standalone >nul 2>nul
+    if exist "%ROOT_DIR%\tools\mysql\bin\mysqld.exe" (
+        start "" /b "%ROOT_DIR%\tools\mysql\bin\mysqld.exe" --defaults-file="%ROOT_DIR%\tools\mysql\my.ini" --standalone >nul 2>nul
     )
     for %%P in ("C:\laragon\bin\mysql" "D:\laragon\bin\mysql" "E:\laragon\bin\mysql") do (
         if exist "%%~P" (
@@ -158,7 +159,7 @@ if not errorlevel 1 (
 :: -----------------------------------------------------------------------------
 if "%SERVER_ALREADY_RUNNING%"=="0" (
     echo [INFO] Menyalakan Web Server di port %PORT%...
-    wscript.exe "%~dp0scripts\run-server-background.vbs" "%PHP_BIN%" "%PORT%" "%~dp0public"
+    wscript.exe "%~dp0run-server-background.vbs" "%PHP_BIN%" "%PORT%" "%ROOT_DIR%\public"
     timeout /t 1 /nobreak >nul 2>nul
     echo [OK] Web Server aktif di background (Port %PORT%).
 ) else (
@@ -170,9 +171,9 @@ if "%SERVER_ALREADY_RUNNING%"=="0" (
 :: -----------------------------------------------------------------------------
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*queue:work*' })) { exit 1 }" >nul 2>nul
 if errorlevel 1 (
-    if exist "%~dp0.env" (
+    if exist "%ROOT_DIR%\.env" (
         echo [INFO] Menyalakan Background Queue Worker...
-        wscript.exe "%~dp0scripts\run-command-background.vbs" "\"%PHP_BIN%\" \"%~dp0artisan\" queue:work --queue=sync,default --sleep=3 --tries=3"
+        wscript.exe "%~dp0run-command-background.vbs" "\"%PHP_BIN%\" \"%ROOT_DIR%\artisan\" queue:work --queue=sync,default --sleep=3 --tries=3"
         echo [OK] Queue Worker aktif di background.
     )
 ) else (
@@ -182,9 +183,9 @@ if errorlevel 1 (
 :: Jalankan background scheduler (cron runner) di Windows
 powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-CimInstance Win32_Process -Filter \"Name='php.exe'\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*schedule:work*' })) { exit 1 }" >nul 2>nul
 if errorlevel 1 (
-    if exist "%~dp0.env" (
+    if exist "%ROOT_DIR%\.env" (
         echo [INFO] Menyalakan Background Scheduler (Schedule Work)...
-        wscript.exe "%~dp0scripts\run-command-background.vbs" "\"%PHP_BIN%\" \"%~dp0artisan\" schedule:work"
+        wscript.exe "%~dp0run-command-background.vbs" "\"%PHP_BIN%\" \"%ROOT_DIR%\artisan\" schedule:work"
         echo [OK] Background Scheduler aktif.
     )
 ) else (
@@ -192,10 +193,10 @@ if errorlevel 1 (
 )
 
 :: Sinkronisasi Awal saat Toko Buka (Tarik pesanan online tadi malam & kirim outbox tertunda)
-if exist "%~dp0.env" (
+if exist "%ROOT_DIR%\.env" (
     echo [INFO] Memeriksa data baru dari Cloud VPS (Catch-up sync)...
-    "%PHP_BIN%" "%~dp0artisan" sync:pull
-    "%PHP_BIN%" "%~dp0artisan" sync:flush
+    "%PHP_BIN%" "%ROOT_DIR%\artisan" sync:pull
+    "%PHP_BIN%" "%ROOT_DIR%\artisan" sync:flush
     echo [OK] Sinkronisasi awal selesai.
 )
 

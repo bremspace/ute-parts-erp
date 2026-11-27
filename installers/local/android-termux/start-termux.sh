@@ -8,9 +8,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-if [ -f "scripts/install-termux.sh" ]; then
-    bash scripts/install-termux.sh "$@"
+if [ -f "${SCRIPT_DIR}/install-termux.sh" ]; then
+    bash "${SCRIPT_DIR}/install-termux.sh" "$@"
 else
-    echo "❌ [ERROR] Berkas scripts/install-termux.sh tidak ditemukan!"
+    echo "❌ [ERROR] Berkas ${SCRIPT_DIR}/install-termux.sh tidak ditemukan!"
     exit 1
 fi

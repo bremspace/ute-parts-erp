@@ -6,6 +6,8 @@ REM ADR: 0013 | Target: PC Toko Windows (XAMPP / Laragon / Standalone PHP)
 REM ==============================================================================
 
 chcp 65001 >nul
+for %%I in ("%~dp0..\..\..") do set "ROOT_DIR=%%~fI"
+cd /d "%ROOT_DIR%"
 echo ======================================================================
 echo    Bremspace ERP — Setup PC Toko Windows (Mode Offline-First)
 echo ======================================================================

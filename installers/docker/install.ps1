@@ -40,7 +40,7 @@ try {
 
     $GitUrl = $DefaultGitUrl
     $GitBranch = $DefaultGitBranch
-    $ProjectDir = (Resolve-Path (Join-Path $ScriptDir "..")).Path
+    $ProjectDir = (Resolve-Path (Join-Path $ScriptDir "../..")).Path
 
     if ($source -eq "1") {
         $inputUrl = Read-Host "Link Git (default $DefaultGitUrl)"
