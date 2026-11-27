@@ -270,15 +270,16 @@ if [ -f "$REPO_ROOT/scripts/anti.sh" ]; then
     chmod +x "$BIN_DIR/anti"
 fi
 
-# Bash aliases
+# Bash aliases (delegasikan ke /usr/local/bin/anti agar tidak duplikat logika)
 cat <<'SHELLRC' > "$TARGET_HOME/.bash_aliases"
 # Shortcut Antigravity ERP
 anti() {
-    cd /var/www/ute-parts-erp 2>/dev/null || cd "$REPO_ROOT" || return 1
-    echo "📥 Menjalankan git pull..."
-    git pull || true
-    echo "🚀 Menyalakan Antigravity..."
-    agy "$@"
+    if [ -x /usr/local/bin/anti ]; then
+        /usr/local/bin/anti "$@"
+    else
+        cd /var/www/ute-parts-erp 2>/dev/null || return 1
+        bash scripts/anti.sh "$@"
+    fi
 }
 SHELLRC
 

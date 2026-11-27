@@ -276,7 +276,7 @@ class DatabaseManagementService
             $manifestPath = $tempExtractDir.DIRECTORY_SEPARATOR.'manifest.json';
             if (File::exists($manifestPath)) {
                 $manifest = json_decode(File::get($manifestPath), true) ?: [];
-                if (! empty($manifest['app_key']) && ! $isCustomTarget && ! $appKeySynced) {
+                if (! empty($manifest['app_key']) && ! $isCustomTarget && ! $manualAppKey) {
                     $currentKey = config('app.key');
                     if ($currentKey !== $manifest['app_key']) {
                         try {

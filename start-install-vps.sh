@@ -381,7 +381,7 @@ chown -R www-data:www-data "$TARGET_DIR"
 find "$TARGET_DIR" -type d -exec chmod 755 {} \; 2>/dev/null || true
 find "$TARGET_DIR" -type f -exec chmod 644 {} \; 2>/dev/null || true
 chmod -R 775 "${TARGET_DIR}/storage" "${TARGET_DIR}/bootstrap/cache" 2>/dev/null || true
-chmod +x "${TARGET_DIR}/artisan" "${TARGET_DIR}/start-install.sh" "${TARGET_DIR}/start-install-vps.sh" 2>/dev/null || true
+chmod +x "${TARGET_DIR}/artisan" "${TARGET_DIR}/start-install-vps.sh" 2>/dev/null || true
 touch "${TARGET_DIR}/storage/installed.lock"
 
 # STEP 9: Konfigurasi Nginx Server Block & FastCGI

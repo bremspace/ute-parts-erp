@@ -47,7 +47,7 @@ services:
       - XDG_CACHE_HOME=/tmp/.cache
       - PORT=2785
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      - ENGINE_TYPE=${ENGINE_TYPE:-whatsapp-web.js}
+      - ENGINE_TYPE=${ENGINE_TYPE:-baileys}
       - AUTO_START_SESSIONS=${AUTO_START_SESSIONS:-true}
       - SIMULATE_TYPING=${SIMULATE_TYPING:-true}
       - SIMULATE_TYPING_MAX_MS=${SIMULATE_TYPING_MAX_MS:-5000}

@@ -21,8 +21,6 @@ class DatabaseManagement extends Component
 
     public string $confirmPassword = '';
 
-    public string $restoreAppKey = '';
-
     public string $confirmResetText = '';
 
     public bool $showResetModal = false;
