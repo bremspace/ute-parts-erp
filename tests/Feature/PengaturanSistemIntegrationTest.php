@@ -202,11 +202,11 @@ class PengaturanSistemIntegrationTest extends TestCase
 
         $response = $this->get('/app/pengaturan');
         $response->assertStatus(200);
-        $response->assertSee('Pusat Pengaturan');
+        $response->assertSee('Pengaturan &amp; Sistem', false);
         $response->assertSee('/app/pengaturan?tab=users');
         $response->assertSee('/app/pengaturan?tab=master_produk');
         $response->assertSee('/app/pengaturan?tab=loyalitas');
-        $response->assertSee('/app/pengaturan?tab=printer');
+        $response->assertSee('/app/printer/struk');
         $response->assertSee('/app/pengaturan?tab=integrasi');
         $response->assertSee('/app/pengaturan?tab=database');
     }

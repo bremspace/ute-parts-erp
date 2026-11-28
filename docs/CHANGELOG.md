@@ -3,6 +3,17 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-28 — Perbaikan Test Suite & Bug DPP/Partai POS, Pagination Katalog, dan Upload Foto
+
+- **POS DPP & Partai Pricing (`PosKasir`, `PartaiPricingService`)**:
+  - `PosKasir::getTotalDiskonDppProperty()`: kurangkan juga `$this->diskonTierTotal` bersama `$this->getPotonganKemasanProperty()` karena `$item['subtotal']` sudah memperhitungkan harga tier member (`recalculateCartPrices()` / `addToCart()`), mencegah pengurangan ganda pada perhitungan DPP/PPN.
+  - `PartaiPricingService::hitung()`: gunakan jumlah satuan paket (`qty_satuan + sisa_pcs`) untuk item berkemasan (`box_faktor > 1`), mencegah pembelian 1 box (10 pcs) memicu diskon partai retail pcs.
+- **Katalog POS & Media Produk (`PosController`, `ProductImageService`)**:
+  - `PosController::products()`: hitung total produk dari `$baseQuery` sebelum menerapkan `urutKetersediaanDanTerlaris()` + `forPage()` sehingga pagination `COUNT(*)` tidak memicu query ekstra pada `stok_items`.
+  - `ProductImageService::prosesDanSimpan()`: encode WebP ke output buffer (`imagewebp(..., null, ...)`) dan tulis via `Storage::disk($disk)->put(...)` agar kompatibel dengan `Storage::fake()` maupun driver penyimpanan Flysystem lainnya.
+- **Penyelarasan Test Suite (`tests/Unit/*`, `tests/Feature/*`)**:
+  - Perbarui ekspektasi test yang tertinggal pasca-refactor sebelumnya pada `EscPosWriterItemNoteTest` (Opsi B raster strikethrough), `PosMultiSatuanIntegrationTest` (agregasi kemasan POS), `MarketplaceNplus1Test` (`searchable-select`), `FrontendRbacNavigationTest`, `PengaturanNavigationAndSecurityTabTest`, `PengaturanSistemIntegrationTest`, `SettingsDatabaseTabIntegrationTest`, `TransactionActivityLogTest`, `WmsDashboardSplitTest`, serta `ProdukFotoManagementTest` (`SatuanUnit::getDefault()`, `opsi_sku = manual`).
+
 ## 2026-11-28 — Hybrid Sync Bidireksional Penuh Backoffice & Enkripsi Shared Secret
 
 - **Enkripsi & Masking `sync_api_secret` (`SettingsRbac`, `SyncServiceProvider`, UI Integrasi)**:

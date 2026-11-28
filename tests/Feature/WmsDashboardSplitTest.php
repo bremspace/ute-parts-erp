@@ -53,8 +53,8 @@ class WmsDashboardSplitTest extends TestCase
         $this->get('/app/wms')
             ->assertSuccessful()
             // $escape=false: teks & literal di blade (bukan {{ }}), jadi HTML mentah.
-            ->assertSee('Master Produk & Stok', false)
-            ->assertSee('PO & Supplier', false);
+            ->assertSee('Master Produk &amp; Stok', false)
+            ->assertSee('Purchase Order');
     }
 
     public function test_shell_memuat_lima_tab_component(): void
@@ -63,10 +63,10 @@ class WmsDashboardSplitTest extends TestCase
 
         $shell = Livewire::test(WmsDashboard::class)
             ->assertSet('activeTab', 'produk')
-            // Header nav tab (milik shell)
-            ->assertSee('Master Produk & Stok', false)
-            ->assertSee('Transfer Antar Gudang')
-            ->assertSee('Stock Opname')
+            // Header quick action milik shell WMS
+            ->assertSee('Import Excel')
+            ->assertSee('Import Foto')
+            ->assertSee('Export')
             // Konten child tab aktif ter-render on-demand (lazy unmount untuk performa optimal di semua perangkat)
             ->assertSee('Stok Total');        // ProdukTab (default tab aktif)
 

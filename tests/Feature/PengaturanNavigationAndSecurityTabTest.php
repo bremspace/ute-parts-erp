@@ -51,7 +51,7 @@ class PengaturanNavigationAndSecurityTabTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Toko &amp; Web Konsumen', false);
         $response->assertSee(route('pengaturan.web-konsumen'));
-        $response->assertSee('Keamanan &amp; Sesi', false);
+        $response->assertSee('Keamanan &amp; 2FA', false);
     }
 
     public function test_tab_keamanan_in_settings_rbac(): void

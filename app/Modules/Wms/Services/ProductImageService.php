@@ -60,37 +60,35 @@ class ProductImageService
         $relPathThumb = "{$folder}/{$random}_thumb.webp";
 
         $storageDisk = Storage::disk($disk);
-        $absPathFull = $storageDisk->path($relPathFull);
-        $absPathThumb = $storageDisk->path($relPathThumb);
 
-        // Pastikan direktori tujuan tersedia dan dapat ditulis
-        $targetDir = dirname($absPathFull);
-        if (! is_dir($targetDir)) {
-            @mkdir($targetDir, 0775, true);
-        }
-
-        // 1. Generate Full Size Image (Max 800x800)
+        // 1. Generate Full Size Image (Max 800x800) lalu tulis melalui Storage disk agar
+        // kompatibel dengan Storage::fake() maupun local/remote filesystem.
         $fullImage = $this->resizeProporsional($srcImage, $origWidth, $origHeight, self::MAX_FULL_WIDTH, self::MAX_FULL_HEIGHT);
-        $savedFull = @imagewebp($fullImage, $absPathFull, self::FULL_QUALITY);
+        ob_start();
+        $savedFull = @imagewebp($fullImage, null, self::FULL_QUALITY);
+        $fullBytes = ob_get_clean();
         imagedestroy($fullImage);
 
         // 2. Generate Thumbnail Image (Max 250x250)
         $thumbImage = $this->resizeProporsional($srcImage, $origWidth, $origHeight, self::MAX_THUMB_WIDTH, self::MAX_THUMB_HEIGHT);
-        $savedThumb = @imagewebp($thumbImage, $absPathThumb, self::THUMB_QUALITY);
+        ob_start();
+        $savedThumb = @imagewebp($thumbImage, null, self::THUMB_QUALITY);
+        $thumbBytes = ob_get_clean();
         imagedestroy($thumbImage);
 
         imagedestroy($srcImage);
 
-        if (! $savedFull || ! file_exists($absPathFull) || filesize($absPathFull) === 0) {
+        if (! $savedFull || ! is_string($fullBytes) || $fullBytes === '' || ! $storageDisk->put($relPathFull, $fullBytes)) {
             throw new \RuntimeException('Gagal menyimpan file gambar WebP ke storage');
         }
 
-        if (! $savedThumb || ! file_exists($absPathThumb) || filesize($absPathThumb) === 0) {
+        if (! $savedThumb || ! is_string($thumbBytes) || $thumbBytes === '' || ! $storageDisk->put($relPathThumb, $thumbBytes)) {
+            $storageDisk->delete($relPathFull);
             throw new \RuntimeException('Gagal menyimpan thumbnail WebP ke storage');
         }
 
-        $fullSize = filesize($absPathFull);
-        $thumbSize = filesize($absPathThumb);
+        $fullSize = strlen($fullBytes);
+        $thumbSize = strlen($thumbBytes);
 
         return [
             'url' => '/storage/'.$relPathFull,

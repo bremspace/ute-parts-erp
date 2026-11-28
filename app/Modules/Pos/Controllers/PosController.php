@@ -21,6 +21,8 @@ use App\Modules\Wms\Services\StockReservationService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -91,19 +93,37 @@ class PosController extends Controller
 
         $pelanggan = $customerId ? Pelanggan::with('tierMembership')->find($customerId) : null;
 
-        $query = Produk::query()
-            ->where('is_active', true)
+        $baseQuery = Produk::query()
+            ->where('is_active', true);
+
+        if (! empty($search)) {
+            $baseQuery->cariPintar($search);
+        }
+
+        // Hitung total produk sebelum join agregat stok/terlaris agar COUNT(*) tidak memicu query stok_items ekstra.
+        $total = (clone $baseQuery)->count();
+        $perPage = 24;
+        $currentPage = Paginator::resolveCurrentPage();
+
+        $records = (clone $baseQuery)
             ->with([
                 'skuVariants' => fn ($q) => $q->where('is_active', true),
                 'hargaTier',
             ])
-            ->urutKetersediaanDanTerlaris($gudangId, $cabangId);
+            ->urutKetersediaanDanTerlaris($gudangId, $cabangId)
+            ->forPage($currentPage, $perPage)
+            ->get();
 
-        if (! empty($search)) {
-            $query->cariPintar($search);
-        }
-
-        $products = $query->paginate(24);
+        $products = new LengthAwarePaginator(
+            $records,
+            $total,
+            $perPage,
+            $currentPage,
+            [
+                'path' => Paginator::resolveCurrentPath(),
+                'pageName' => 'page',
+            ]
+        );
 
         $productIds = $products->getCollection()->pluck('id')->all();
         $stokItems = ($gudangId && ! empty($productIds))

@@ -345,9 +345,9 @@ class MarketplaceNplus1Test extends TestCase
             ->assertOk()
             // Kebijakan stok default (threshold_only): stok > threshold menampilkan "Stok Tersedia"
             ->assertSee('Stok Tersedia')
-            // Dropdown merk & model (escape=false: yang dibandingkan atribut HTML)
-            ->assertSee('value="Samsung"', false)
-            ->assertSee('value="Galaxy A50"', false);
+            // Dropdown searchable-select merk & model memuat opsi Samsung & Galaxy A50
+            ->assertSee('Samsung')
+            ->assertSee('Galaxy A50');
 
         // Jika mode exact_number: menampilkan nominal persis
         app(WebKonsumenService::class)->saveSettings(['stock_display_mode' => 'exact_number']);

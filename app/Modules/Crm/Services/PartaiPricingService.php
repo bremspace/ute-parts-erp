@@ -76,12 +76,15 @@ class PartaiPricingService
 
         foreach ($items as $item) {
             $qty = (int) ($item['qty'] ?? $item['jumlah'] ?? 1);
+            $partaiQty = (! empty($item['box_faktor']) && (int) $item['box_faktor'] > 1 && (isset($item['qty_satuan']) || isset($item['sisa_pcs'])))
+                ? ((int) ($item['qty_satuan'] ?? 0) + (int) ($item['sisa_pcs'] ?? 0))
+                : $qty;
             $harga = (float) ($item['harga'] ?? $item['harga_satuan'] ?? 0);
             $lineSubtotal = isset($item['subtotal']) && (float) $item['subtotal'] > 0
                 ? (float) $item['subtotal']
                 : ($harga * $qty);
 
-            $totalQty += $qty;
+            $totalQty += $partaiQty;
             $subtotal += $lineSubtotal;
         }
 

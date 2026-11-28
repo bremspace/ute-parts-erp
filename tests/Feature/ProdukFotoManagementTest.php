@@ -8,6 +8,7 @@ use App\Modules\Wms\Livewire\ProdukTab;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Services\ProductImageService;
 use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -44,6 +45,7 @@ class ProdukFotoManagementTest extends TestCase
             ['kode' => 'GDG-01'],
             ['cabang_id' => $cabang->id, 'nama' => 'Gudang Pusat', 'is_active' => true]
         );
+        SatuanUnit::getDefault();
 
         $user = User::create([
             'name' => 'Admin WMS',
@@ -152,6 +154,7 @@ class ProdukFotoManagementTest extends TestCase
             ->set('produkForm.kategori_id', $kat->id)
             ->set('produkForm.harga_beli', 35000)
             ->set('produkForm.harga_jual_retail', 70000)
+            ->set('produkForm.opsi_sku', 'manual')
             ->set('produkForm.sku', 'FLX-CHG-01')
             ->set('fotoUploads', [$file1, $file2])
             ->call('simpanProduk');
@@ -206,6 +209,7 @@ class ProdukFotoManagementTest extends TestCase
             ->set('produkForm.kategori_id', $kat->id)
             ->set('produkForm.harga_beli', 85000)
             ->set('produkForm.harga_jual_retail', 150000)
+            ->set('produkForm.opsi_sku', 'manual')
             ->set('produkForm.sku', 'CAM-MOD-01')
             ->call('simpanProduk');
 

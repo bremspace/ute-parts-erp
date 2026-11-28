@@ -52,7 +52,7 @@ class SettingsDatabaseTabIntegrationTest extends TestCase
         $this->actingAs($this->superAdmin);
 
         Livewire::test(SettingsRbac::class)
-            ->assertSeeHtml('💾 Basis Data & Backup')
+            ->assertSeeHtml('Basis Data & Backup Sistem')
             ->set('activeTab', 'database')
             ->assertSeeHtml('Manajemen Basis Data & Keselamatan Sistem');
     }
@@ -62,7 +62,7 @@ class SettingsDatabaseTabIntegrationTest extends TestCase
         $this->actingAs($this->owner);
 
         Livewire::test(SettingsRbac::class)
-            ->assertSeeHtml('💾 Basis Data & Backup')
+            ->assertSeeHtml('Basis Data & Backup Sistem')
             ->set('activeTab', 'database')
             ->assertSeeHtml('Manajemen Basis Data & Keselamatan Sistem');
     }
@@ -72,7 +72,8 @@ class SettingsDatabaseTabIntegrationTest extends TestCase
         $this->actingAs($this->kasir);
 
         Livewire::test(SettingsRbac::class)
-            ->assertDontSeeHtml('💾 Basis Data & Backup');
+            ->set('activeTab', 'database')
+            ->assertDontSeeHtml('Manajemen Basis Data & Keselamatan Sistem');
     }
 
     public function test_superadmin_dapat_menjalankan_clear_cache_server_di_settings_rbac(): void

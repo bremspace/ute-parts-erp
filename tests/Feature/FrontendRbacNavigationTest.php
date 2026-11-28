@@ -96,7 +96,8 @@ class FrontendRbacNavigationTest extends TestCase
         $response->assertDontSee('Tiket Servis');
         $response->assertDontSee('/app/akunting');
         $response->assertDontSee('/app/omnichannel');
-        $response->assertDontSee('Pusat Pengaturan');
+        $response->assertDontSee('/app/pengaturan?tab=users');
+        $response->assertDontSee('Gateway Integrasi');
     }
 
     public function test_super_admin_melihat_seluruh_menu_dan_action(): void
@@ -119,7 +120,7 @@ class FrontendRbacNavigationTest extends TestCase
         $response->assertSee('/app/akunting');
         $response->assertSee('/app/omnichannel');
         $response->assertSee('/app/approvals');
-        $response->assertSee('Pusat Pengaturan');
+        $response->assertSee('Pengaturan &amp; Sistem', false);
     }
 
     public function test_gating_action_button_wms_sesuai_permission(): void
@@ -136,7 +137,7 @@ class FrontendRbacNavigationTest extends TestCase
         $responseKasir->assertStatus(200);
         $responseKasir->assertDontSee('+ Tambah Produk');
         $responseKasir->assertDontSee('Import Excel');
-        $responseKasir->assertDontSee('⚡ Auto ABC (WMS)');
+        $responseKasir->assertDontSee('Upload Massal Foto Produk');
 
         // Staff gudang punya wms.create
         $gudang = User::factory()->create();
@@ -150,7 +151,7 @@ class FrontendRbacNavigationTest extends TestCase
         $responseGudang->assertStatus(200);
         $responseGudang->assertSee('+ Tambah Produk');
         $responseGudang->assertSee('Import Excel');
-        $responseGudang->assertSee('⚡ Auto ABC (WMS)');
+        $responseGudang->assertSee('Upload Massal Foto Produk');
     }
 
     public function test_gating_action_button_crm_sesuai_permission(): void
@@ -236,7 +237,8 @@ class FrontendRbacNavigationTest extends TestCase
         // Sidebar dropdown Pengaturan memiliki pengelompokan kategori yang jelas
         $response->assertSee('Akses &amp; Pengguna', false);
         $response->assertSee('Katalog &amp; Master Part', false);
-        $response->assertSee('Operasional &amp; Bisnis', false);
+        $response->assertSee('Kebijakan Bisnis');
+        $response->assertSee('Operasional &amp; Periferal', false);
         $response->assertSee('Sistem &amp; Keamanan', false);
     }
 
@@ -268,9 +270,16 @@ class FrontendRbacNavigationTest extends TestCase
             ->get(route('pengaturan'));
 
         $response->assertStatus(200);
-        // Slider horizontal mobile didukung pada Tier 1 card kategori dan Tier 2 contextual tabs
-        $response->assertSee('touch-pan-x');
-        $response->assertSee('scrollbar-none');
-        $response->assertSee('w-[140px]');
+        // Spotlight search pengaturan tersedia pada header
+        $response->assertSee('Cari pengaturan');
+
+        // Slider horizontal mobile didukung pada contextual tabs sub-modul (contoh: master_produk)
+        $masterProdukResponse = $this->actingAs($superAdmin)
+            ->withSession(['active_cabang_id' => $this->cabang->id])
+            ->get(route('pengaturan', ['tab' => 'master_produk']));
+
+        $masterProdukResponse->assertStatus(200);
+        $masterProdukResponse->assertSee('touch-pan-x');
+        $masterProdukResponse->assertSee('scrollbar-none');
     }
 }

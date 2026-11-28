@@ -944,9 +944,9 @@ class PosKasir extends Component
 
     public function getTotalDiskonDppProperty(): float
     {
-        // Subtotal sudah bersih setelah potongan kemasan, jadi DPP tidak boleh
-        // mengurangkannya dua kali.
-        return max(0.0, $this->getTotalDiskonProperty() - $this->getPotonganKemasanProperty());
+        // Subtotal sudah bersih setelah potongan kemasan dan diskon tier member,
+        // jadi DPP tidak boleh mengurangkan keduanya dua kali.
+        return max(0.0, $this->getTotalDiskonProperty() - $this->getPotonganKemasanProperty() - $this->getDiskonTierTotalProperty());
     }
 
     public function getHematTotalProperty(): float

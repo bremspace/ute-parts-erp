@@ -326,6 +326,7 @@ class TransactionActivityLogTest extends TestCase
         // Pindah ke tab 'audit'
         $component->set('activeTab', 'audit');
         $component->assertStatus(200);
-        $component->assertSee('Audit Trail');
+        $component->assertSee('Pencarian audit:');
+        $component->assertSee('Buka Semua Rincian');
     }
 }

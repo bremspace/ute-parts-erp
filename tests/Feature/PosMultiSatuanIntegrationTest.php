@@ -110,11 +110,16 @@ class PosMultiSatuanIntegrationTest extends TestCase
         $cart = $component->get('cart');
         $this->assertNotEmpty($cart);
 
-        $boxItem = collect($cart)->firstWhere('satuan', 'box');
+        $boxItem = collect($cart)->firstWhere('box_faktor', 10);
         $this->assertNotNull($boxItem);
-        $this->assertSame(90000.0, (float) $boxItem['harga']);
-        $this->assertSame(10.0, (float) $boxItem['konversi']);
-        $this->assertSame(1, $boxItem['qty']);
+        $this->assertSame('pcs', $boxItem['satuan']);
+        $this->assertSame(90000.0, (float) $boxItem['box_harga']);
+        $this->assertSame(9000.0, (float) $boxItem['harga']);
+        $this->assertSame(1.0, (float) $boxItem['konversi']);
+        $this->assertSame(10, $boxItem['qty']);
+        $this->assertSame(1, $boxItem['qty_satuan']);
+        $this->assertSame(90000.0, (float) $boxItem['subtotal']);
+        $this->assertSame('1 box', $boxItem['breakdown']);
     }
 
     public function test_ubah_satuan_di_keranjang_menyesuaikan_harga_konversi_dan_stok(): void
@@ -134,15 +139,19 @@ class PosMultiSatuanIntegrationTest extends TestCase
         $this->assertSame('pcs', $cart[$itemKey]['satuan']);
         $this->assertSame(10000.0, (float) $cart[$itemKey]['harga']);
 
-        // Ganti ke Box
+        // Ganti ke Box -> keranjang tetap menyimpan qty dalam base unit pcs dengan agregasi kemasan box_faktor=10
         $component->call('ubahSatuanItem', $itemKey, 'box');
 
         $cartAfter = $component->get('cart');
         $newItemKey = $this->produk->id.'-0-box';
         $this->assertArrayHasKey($newItemKey, $cartAfter);
-        $this->assertSame('box', $cartAfter[$newItemKey]['satuan']);
-        $this->assertSame(90000.0, (float) $cartAfter[$newItemKey]['harga']);
-        $this->assertSame(10.0, (float) $cartAfter[$newItemKey]['konversi']);
+        $this->assertSame('pcs', $cartAfter[$newItemKey]['satuan']);
+        $this->assertSame(10, (int) $cartAfter[$newItemKey]['box_faktor']);
+        $this->assertSame(90000.0, (float) $cartAfter[$newItemKey]['box_harga']);
+        $this->assertSame(9000.0, (float) $cartAfter[$newItemKey]['harga']);
+        $this->assertSame(1.0, (float) $cartAfter[$newItemKey]['konversi']);
+        $this->assertSame(10, (int) $cartAfter[$newItemKey]['qty']);
+        $this->assertSame(90000.0, (float) $cartAfter[$newItemKey]['subtotal']);
     }
 
     public function test_transaksi_multi_satuan_memotong_stok_dasar_dan_catat_jurnal_akuntansi(): void
@@ -161,13 +170,14 @@ class PosMultiSatuanIntegrationTest extends TestCase
         $this->assertSame(1, Transaksi::count());
         $transaksi = Transaksi::first();
 
-        // Cek TransaksiItem tersimpan dengan satuan dan konversi
+        // Cek TransaksiItem tersimpan dalam unit dasar pcs (10 pcs * Rp 9.000 = Rp 90.000)
         $item = TransaksiItem::where('transaksi_id', $transaksi->id)->first();
         $this->assertNotNull($item);
-        $this->assertSame('box', $item->satuan);
-        $this->assertSame(10.0, (float) $item->konversi);
-        $this->assertSame(1, $item->jumlah);
-        $this->assertSame(90000.0, (float) $item->harga_satuan);
+        $this->assertSame('pcs', $item->satuan);
+        $this->assertSame(1.0, (float) $item->konversi);
+        $this->assertSame(10, $item->jumlah);
+        $this->assertSame(9000.0, (float) $item->harga_satuan);
+        $this->assertSame(90000.0, (float) $item->subtotal);
 
         // Cek sisa stok di gudang (25 - 10 = 15 pcs)
         $stokTersisa = StokItem::where('gudang_id', $this->gudang->id)
