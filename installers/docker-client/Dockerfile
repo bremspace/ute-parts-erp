@@ -31,6 +31,10 @@ WORKDIR /var/www/html
 # --- Kode aplikasi (tanpa folder installers/ agar .env.client tidak ikut) ----
 COPY artisan composer.json composer.lock package.json package-lock.json vite.config.js version.json ./
 COPY app bootstrap config database lang public resources routes storage ./
+# Composer autoload memuat app/Helpers/functions.php saat package:discover.
+# Salin salinan kanonik dari installer agar build tidak gagal bila file itu
+# tidak ikut ter-copy dari context (zip download / filter Docker).
+COPY installers/docker-client/helpers/functions.php ./app/Helpers/functions.php
 COPY --from=assets /app/public/build ./public/build
 
 # --- Template env & helper installer (aman, tanpa secret) --------------------

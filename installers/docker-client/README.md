@@ -201,6 +201,7 @@ docker compose exec app php artisan sync:flush --batch
 | Perubahan `.env.client` tidak efek | `docker compose up -d --force-recreate app` (entrypoint membuang cache via checksum env). |
 | `The MAC is invalid` setelah restore snapshot | Samakan `APP_KEY` di `storage/.env` dengan APP_KEY sumber, lalu `docker compose exec app php artisan optimize:clear && docker compose exec app php artisan optimize`, hapus cookie browser, login ulang. |
 | Queue/scheduler tidak jalan | `docker compose exec app tail -f storage/logs/queue-worker.log` dan `storage/logs/scheduler.log`. Pastikan `QUEUE_CONNECTION=database`. |
+| Build gagal: `app/Helpers/functions.php` tidak ditemukan | Installer menyalin salinan kanonik helper dari `installers/docker-client/helpers/functions.php`. Pastikan Anda mendownload source versi terbaru lalu build ulang. |
 
 ---
 
