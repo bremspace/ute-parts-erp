@@ -45,12 +45,13 @@ class DatabaseManagement extends Component
      */
     public function updatedUploadedBackupFile(): void
     {
+        $maxKb = (int) config('livewire.temporary_file_upload.max_kb', 2048000);
         $this->validate([
-            'uploadedBackupFile' => 'required|file|max:512000', // max 500MB
+            'uploadedBackupFile' => 'required|file|max:'.$maxKb,
         ], [
             'uploadedBackupFile.required' => 'Pilih berkas backup terlebih dahulu.',
             'uploadedBackupFile.file' => 'Berkas backup tidak valid.',
-            'uploadedBackupFile.max' => 'Ukuran berkas melebihi batas 500 MB.',
+            'uploadedBackupFile.max' => 'Ukuran berkas melebihi batas '.round($maxKb / 1024).' MB.',
         ]);
 
         $ext = strtolower($this->uploadedBackupFile->getClientOriginalExtension());

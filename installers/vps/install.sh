@@ -146,8 +146,10 @@ PHP_FPM_BIN="/usr/sbin/php-fpm${PHP_VERSION}"
 PHP_FPM_SERVICE="php${PHP_VERSION}-fpm"
 PHP_SOCKET="/run/php/php${PHP_VERSION}-fpm.sock"
 
-install -d -m 0755 /etc/php/${PHP_VERSION}/fpm/conf.d
+install -d -m 0755 /etc/php/${PHP_VERSION}/fpm/conf.d /etc/php/${PHP_VERSION}/cli/conf.d
 cp "${CFG_DIR}/php-opcache.ini" /etc/php/${PHP_VERSION}/fpm/conf.d/99-ute-opcache.ini
+cp "${CFG_DIR}/php-uploads.ini.tpl" /etc/php/${PHP_VERSION}/fpm/conf.d/99-ute-uploads.ini
+cp "${CFG_DIR}/php-uploads.ini.tpl" /etc/php/${PHP_VERSION}/cli/conf.d/99-ute-uploads.ini
 
 render "${CFG_DIR}/php-fpm-www.conf.tpl" /etc/php/${PHP_VERSION}/fpm/pool.d/www.conf \
     PHP_SOCKET "$PHP_SOCKET" \
@@ -191,7 +193,7 @@ curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup -o /tmp/mariadb_rep
 chmod +x /tmp/mariadb_repo_setup
 /tmp/mariadb_repo_setup --mariadb-server-version="mariadb-11.4" --skip-maxscale >/dev/null 2>&1
 apt-get update -qq
-apt_install mariadb-server
+apt_install mariadb-server mariadb-client
 
 render "${CFG_DIR}/mariadb-tuning.cnf.tpl" /etc/mysql/mariadb.conf.d/99-ute-tuning.cnf \
     BUFFER_POOL "${BUFFER_MB}M"
@@ -255,6 +257,7 @@ composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 "$PHP_BIN" artisan migrate --force
 "$PHP_BIN" artisan db:seed --force --no-interaction || warn "Seeder dilewati/gagal (bisa normal bila data sudah ada)."
 "$PHP_BIN" artisan storage:link >/dev/null 2>&1 || true
+install -d -m 0770 -o www-data -g www-data "${APP_DIR}/storage/app/backups"
 chown -R www-data:www-data storage bootstrap/cache public/build
 
 # ---------------------------------------------------------------- Nginx + TLS

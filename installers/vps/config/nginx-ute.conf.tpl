@@ -40,7 +40,8 @@ server {
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-    client_max_body_size 30m;
+    client_max_body_size 2100m;
+    client_body_timeout 1800;
     charset utf-8;
 
     gzip on;
@@ -56,7 +57,7 @@ server {
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:{{PHP_SOCKET}};
-        fastcgi_read_timeout 300;
+        fastcgi_read_timeout 1800;
         fastcgi_buffers 16 16k;
         fastcgi_buffer_size 32k;
     }
@@ -85,7 +86,8 @@ server {
     root {{APP_DIR}}/public;
     index index.php;
 
-    client_max_body_size 30m;
+    client_max_body_size 2100m;
+    client_body_timeout 1800;
     charset utf-8;
 
     add_header X-Content-Type-Options "nosniff" always;
@@ -105,7 +107,7 @@ server {
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:{{PHP_SOCKET}};
-        fastcgi_read_timeout 300;
+        fastcgi_read_timeout 1800;
         fastcgi_buffers 16 16k;
         fastcgi_buffer_size 32k;
     }
@@ -135,7 +137,8 @@ server {
     ssl_session_timeout 1d;
     ssl_session_tickets off;
 
-    client_max_body_size 30m;
+    client_max_body_size 2100m;
+    client_body_timeout 1800;
     charset utf-8;
 
     location / {
@@ -145,7 +148,7 @@ server {
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:{{PHP_SOCKET}};
-        fastcgi_read_timeout 300;
+        fastcgi_read_timeout 1800;
         fastcgi_buffers 16 16k;
         fastcgi_buffer_size 32k;
     }

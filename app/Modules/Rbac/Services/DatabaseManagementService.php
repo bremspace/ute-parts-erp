@@ -958,7 +958,8 @@ class DatabaseManagementService
 
     protected function dumpMysql(array $conn, string $targetGz): void
     {
-        $mysqldump = (new ExecutableFinder)->find('mysqldump') ?? 'mysqldump';
+        $finder = new ExecutableFinder;
+        $mysqldump = $finder->find('mysqldump') ?? $finder->find('mariadb-dump') ?? 'mysqldump';
         $tmpSql = substr($targetGz, 0, -3);
 
         $args = [
@@ -1027,7 +1028,8 @@ class DatabaseManagementService
 
     protected function executeRestoreMysql(array $conn, string $sqlPath): void
     {
-        $mysql = (new ExecutableFinder)->find('mysql') ?? 'mysql';
+        $finder = new ExecutableFinder;
+        $mysql = $finder->find('mysql') ?? $finder->find('mariadb') ?? 'mysql';
 
         // Full wipe tables sebelum restore untuk memastikan tidak ada residu tabel/data asing
         try {
