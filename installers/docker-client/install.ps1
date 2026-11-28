@@ -1,8 +1,8 @@
-param()
+﻿param()
 $ErrorActionPreference = "Stop"
 
 # =============================================================================
-# UTE PARTS ERP — Docker Installer khusus NODE CLIENT (Windows)
+# UTE PARTS ERP - Docker Installer khusus NODE CLIENT (Windows)
 # =============================================================================
 # Peran : primary_store (default) atau cloud_storefront
 # TIDAK menjalankan seeder apa pun. Data awal ditarik dari cloud via sync:bootstrap.
@@ -82,7 +82,7 @@ function Show-Summary {
 
 try {
     Write-Host "============================================================" -ForegroundColor Cyan
-    Write-Host "  UTE PARTS ERP — Docker Installer CLIENT NODE (Windows)" -ForegroundColor Cyan
+    Write-Host "  UTE PARTS ERP - Docker Installer CLIENT NODE (Windows)" -ForegroundColor Cyan
     Write-Host "============================================================" -ForegroundColor Cyan
     Write-Host ""
 
@@ -129,9 +129,10 @@ try {
         Write-Host " WIZARD KONFIGURASI NODE" -ForegroundColor Cyan
         Write-Host "------------------------------------------------------------" -ForegroundColor Cyan
         Write-Host "Pilih peran node:"
-        Write-Host "  [1] client  (primary_store)     — DEFAULT. Toko lokal, data dari cloud."
-        Write-Host "  [2] cloud   (cloud_storefront)  — Sumber data kanonik di uteparts.id."
-        $roleInput = Ask-Default "Peran (1/2, default 1)" "1"
+        Write-Host "  [1] client  (primary_store)     - DEFAULT. Toko lokal, data dari cloud."
+        Write-Host "  [2] cloud   (cloud_storefront)  - Sumber data kanonik di uteparts.id."
+        $rolePrompt = "Peran (1/2, default 1)"
+        $roleInput = Ask-Default $rolePrompt "1"
         if ($roleInput -eq "1" -or $roleInput -ieq "client") { $Role = "client" }
         elseif ($roleInput -eq "2" -or $roleInput -ieq "cloud") { $Role = "cloud" }
         else { throw "Peran tidak valid." }
@@ -183,7 +184,7 @@ try {
         $clientMode = if ($Role -eq "cloud") { "false" } else { "true" }
         $adminName = "Admin $Role"
         $lines = @(
-            "# Dibuat oleh installers/docker-client/install.ps1 — JANGAN commit file ini."
+            "# Dibuat oleh installers/docker-client/install.ps1 - JANGAN commit file ini."
             'APP_NAME="' + (Esc-Env $appName) + '"'
             'APP_ENV=production'
             'APP_KEY='
@@ -257,8 +258,8 @@ try {
     # --------------------------- aksi -----------------------------------------
     Write-Host ""
     Write-Host "Pilih aksi:" -ForegroundColor Yellow
-    Write-Host "  [1] Fresh install — hapus container & volume lama (database kosong)"
-    Write-Host "  [2] Update / Start — rebuild image, data database tetap"
+    Write-Host "  [1] Fresh install - hapus container & volume lama (database kosong)"
+    Write-Host "  [2] Update / Start - rebuild image, data database tetap"
     $action = Ask-Default "Pilihan (1/2, default 2)" "2"
     if ($action -eq "1") {
         Write-Host "[PERINGATAN] Database lokal (volume mysql) akan dihapus. Data ditarik ulang via sync:bootstrap." -ForegroundColor Yellow
@@ -304,7 +305,7 @@ try {
     Write-Host "Akses LAN : http://$lanIp/" -ForegroundColor Green
     Write-Host "Login awal: $AdminEmail / (password di .env.client)" -ForegroundColor Green
     Write-Host ""
-    Write-Host "LANGKAH PENTING — tarik data dari cloud:" -ForegroundColor Yellow
+    Write-Host "LANGKAH PENTING - tarik data dari cloud:" -ForegroundColor Yellow
     Write-Host "  cd `"$InstallerDir`""
     Write-Host "  docker compose exec app php artisan sync:bootstrap"
     Write-Host "  docker compose exec -e ADMIN_FORCE=true app php /usr/local/bin/bootstrap-client-admin.php"
