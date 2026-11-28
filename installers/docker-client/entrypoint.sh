@@ -42,8 +42,8 @@ if ! grep -q '^APP_KEY=.\+' .env; then
 fi
 
 # PENTING: env_file dari compose bisa mengirim APP_KEY kosong. Laravel Dotenv
- bersifat immutable, jadi nilai process env menang atas .env. Ekspor kunci
- final ke environment sebelum config:cache dan Apache dijalankan.
+# bersifat immutable, jadi nilai process env menang atas .env. Ekspor kunci
+# final ke environment sebelum config:cache dan Apache dijalankan.
 APP_KEY_VALUE="$(sed -n 's/^APP_KEY=//p' .env | head -n 1)"
 export APP_KEY="$APP_KEY_VALUE"
 
