@@ -85,6 +85,20 @@ else
     echo "[WARN] ADMIN_EMAIL/ADMIN_PASSWORD belum diisi; admin lokal tidak dibuat."
 fi
 
+# Bootstrap awal dari cloud: sekali saja, saat belum ada penanda seed.
+# Tidak dijalankan kalau kredensial sync belum lengkap, supaya container tetap hidup.
+if [ ! -f storage/.synced_from_cloud ] \
+   && [ "${SYNC_ENABLED:-false}" = "true" ] \
+   && [ -n "${SYNC_REMOTE_URL:-}" ] \
+   && [ -n "${SYNC_API_SECRET:-}" ]; then
+    echo "[INFO] Bootstrap awal dari cloud (sync:bootstrap --force)..."
+    if php artisan sync:bootstrap --force; then
+        echo "[INFO] Bootstrap awal selesai."
+    else
+        echo "[WARN] Bootstrap awal gagal. Jalankan nanti: php artisan sync:bootstrap --force"
+    fi
+fi
+
 php artisan storage:link || true
 
 # ------------------------------------------------------------------------------
