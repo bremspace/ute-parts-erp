@@ -70,6 +70,8 @@ fi
 # 3. Migrasi struktur, lalu SATU admin lokal. TANPA seeder.
 # ------------------------------------------------------------------------------
 php artisan migrate --force
+# Self-healing: kondisi client lama bisa punya migrasi "ran" tanpa tabel sync.
+php artisan sync:ensure-tables
 
 if [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
     php /usr/local/bin/bootstrap-client-admin.php
