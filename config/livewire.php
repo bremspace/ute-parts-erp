@@ -130,7 +130,8 @@ return [
 
     'temporary_file_upload' => [
         'disk' => env('LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK'), // Example: 'local', 's3'             | Default: 'default'
-        'rules' => ['file', 'max:512000'],                   // Mendukung restore file backup/snapshot hingga 500MB (default bawaan hanya 12MB)
+        'max_kb' => (int) env('LIVEWIRE_UPLOAD_MAX_KB', 2048000), // 2GB untuk restore backup/snapshot
+        'rules' => ['file', 'max:'.(int) env('LIVEWIRE_UPLOAD_MAX_KB', 2048000)],
         'directory' => null,                                  // Example: 'tmp'                     | Default: 'livewire-tmp'
         'middleware' => null,                                 // Example: 'throttle:5,1'            | Default: 'throttle:60,1'
         'preview_mimes' => [                                  // Supported file types for temporary pre-signed file URLs...
@@ -138,7 +139,7 @@ return [
             'mov', 'avi', 'wmv', 'mp3', 'm4a',
             'jpg', 'jpeg', 'mpga', 'webp', 'wma',
         ],
-        'max_upload_time' => 30, // Max duration (in minutes) before an upload is invalidated...
+        'max_upload_time' => (int) env('LIVEWIRE_UPLOAD_MAX_MINUTES', 120), // Max duration (in minutes) before an upload is invalidated...
         'cleanup' => true, // Should cleanup temporary uploads older than 24 hrs...
     ],
 
@@ -274,7 +275,7 @@ return [
     */
 
     'payload' => [
-        'max_size' => 50 * 1024 * 1024,   // 50MB - maximum request payload size in bytes
+        'max_size' => (int) env('LIVEWIRE_PAYLOAD_MAX_SIZE', 2200 * 1024 * 1024), // ~2,2GB - maximum request payload size in bytes
         'max_nesting_depth' => 10,   // Maximum depth of dot-notation property paths
         'max_calls' => 50,           // Maximum method calls per request
         'max_components' => 200,     // Maximum components per batch request

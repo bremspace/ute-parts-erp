@@ -30,7 +30,8 @@ server {
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
 
-    client_max_body_size 30m;
+    client_max_body_size 2100m;
+    client_body_timeout 1800;
 
     location / {
         proxy_pass http://127.0.0.1:2785;
@@ -68,7 +69,8 @@ server {
     listen 80 default_server;
     server_name _;
 
-    client_max_body_size 30m;
+    client_max_body_size 2100m;
+    client_body_timeout 1800;
 
     location / {
         proxy_pass http://127.0.0.1:2785;
@@ -113,7 +115,8 @@ server {
     ssl_session_timeout 1d;
     ssl_session_tickets off;
 
-    client_max_body_size 30m;
+    client_max_body_size 2100m;
+    client_body_timeout 1800;
 
     location / {
         proxy_pass http://127.0.0.1:2785;

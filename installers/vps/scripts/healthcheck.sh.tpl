@@ -19,6 +19,28 @@ check_service() {
     fi
 }
 
+check_binary() {
+    if command -v "$1" >/dev/null 2>&1; then
+        printf '[ OK ] binary %s\n' "$1"
+    else
+        printf '[FAIL] binary %s tidak ditemukan\n' "$1"
+        FAIL=1
+    fi
+}
+
+check_binary_any() {
+    local found=no c
+    for c in "$@"; do
+        if command -v "$c" >/dev/null 2>&1; then found="$c"; break; fi
+    done
+    if [[ "$found" != "no" ]]; then
+        printf '[ OK ] binary %s tersedia\n' "$found"
+    else
+        printf '[FAIL] tidak ada binary: %s\n' "$*"
+        FAIL=1
+    fi
+}
+
 check_http() {
     local url="$1" code
     code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url" || true)"
@@ -42,6 +64,8 @@ check_service cron
 
 log ""
 log "=== Aplikasi ==="
+check_binary_any mysqldump mariadb-dump
+check_binary_any mysql mariadb
 cd "$APP_DIR"
 if "$PHP_BIN" artisan about --only=environment >/dev/null 2>&1; then
     printf '[ OK ] artisan about\n'

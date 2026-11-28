@@ -141,7 +141,7 @@
         </x-prism.glass-card>
 
         <!-- 2. Card Upload Restore dari PC Lokal -->
-        <x-prism.glass-card class="p-5" title="Pulihkan dari Berkas Luar" subtitle="Upload file .sql.gz, .sql, atau .zip snapshot clone dari laptop Anda (hingga 500MB)">
+        <x-prism.glass-card class="p-5" title="Pulihkan dari Berkas Luar" subtitle="Upload file .sql.gz, .sql, atau .zip snapshot clone dari laptop Anda (hingga 2GB)">
             <div class="space-y-3"
                  x-data="{ isUploading: false, progress: 0 }"
                  x-on:livewire-upload-start="isUploading = true; progress = 0"
@@ -157,7 +157,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                         </svg>
                         <span class="text-xs font-bold text-white block">Pilih Berkas Backup (.sql.gz / .zip Snapshot)</span>
-                        <span class="text-[10px] text-ink-400">Mendukung arsip database & snapshot ZIP hingga 500 MB</span>
+                        <span class="text-[10px] text-ink-400">Mendukung arsip database & snapshot ZIP hingga 2 GB</span>
                     </label>
                 </div>
 
