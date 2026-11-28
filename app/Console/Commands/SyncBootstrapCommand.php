@@ -6,13 +6,17 @@ use App\Modules\Sync\Services\HybridSyncProcessorService;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class SyncBootstrapCommand extends Command
 {
     protected $signature = 'sync:bootstrap
         {--table= : Hanya bootstrap satu tabel}
-        {--limit=200 : Jumlah baris per halaman}';
+        {--limit=200 : Jumlah baris per halaman}
+        {--force : Paksa seed penuh (transaksi + snapshot stok) walau data lokal sudah ada}';
 
     protected $description = 'Tarik data canonical dari cloud ke client (primary_store) sekali saat awal';
 
@@ -50,6 +54,22 @@ class SyncBootstrapCommand extends Command
 
         $tables = collect($tablesResponse->json('data.tables', []));
         $onlyTable = $this->option('table');
+        $force = (bool) $this->option('force');
+        $isFresh = ! Schema::hasTable('produk') || DB::table('produk')->count() === 0;
+        $fullSeed = $force || $isFresh;
+
+        if ($fullSeed && $onlyTable === null) {
+            $seedTables = $tables->whereIn('table', ['transaksi', 'stok_items'])->pluck('table')->all();
+            if (! in_array('transaksi', $seedTables, true) || ! in_array('stok_items', $seedTables, true)) {
+                $this->warn('Cloud belum menyediakan seed transaksi/stok. Deploy kode sync terbaru ke cloud agar seed penuh bekerja.');
+            }
+        }
+
+        if (! $fullSeed && $onlyTable === null) {
+            $this->info('Data lokal sudah ada — bootstrap hanya master data. Gunakan --force untuk seed penuh.');
+            $tables = $tables->whereNotIn('table', ['transaksi', 'stok_items']);
+        }
+
         if ($onlyTable) {
             $tables = $tables->where('table', $onlyTable);
         }
@@ -84,6 +104,19 @@ class SyncBootstrapCommand extends Command
                 }
 
                 foreach ($events as $event) {
+                    // Cloud lama bisa mengirim sync_uuid kosong pada master lawas.
+                    // Beri UUID deterministik agar event tetap idempotent saat di-seed.
+                    if (! is_array($event) || empty($event['sync_uuid'])) {
+                        if (! is_array($event)) {
+                            continue;
+                        }
+                        $event['sync_uuid'] = 'seed-'.substr(
+                            sha1($table.'|'.json_encode($event['payload'] ?? [])),
+                            0,
+                            31
+                        );
+                    }
+
                     $result = $processor->process($event);
                     if ($result['success']) {
                         $tableProcessed++;
@@ -102,6 +135,10 @@ class SyncBootstrapCommand extends Command
         Cache::put('hybrid_sync:remote_reachable', true, now()->addMinutes(5));
         $this->info("Bootstrap selesai: {$total} record tersinkron dari cloud.");
 
+        if ($fullSeed && $onlyTable === null) {
+            File::put(storage_path('.synced_from_cloud'), now()->toIso8601String());
+        }
+
         return Command::SUCCESS;
     }
 
@@ -111,6 +148,8 @@ class SyncBootstrapCommand extends Command
     private function signedGet(string $url, array $query, string $nodeId, string $secret): ?Response
     {
         $timestamp = (string) time();
+        // Cloud menyortir parameter query sebelum HMAC (lihat SyncPullCommand).
+        ksort($query);
         $queryString = http_build_query($query);
         $signature = hash_hmac('sha256', $timestamp.'.'.$queryString, $secret);
 

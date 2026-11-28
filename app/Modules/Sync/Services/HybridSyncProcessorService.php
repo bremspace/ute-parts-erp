@@ -100,25 +100,26 @@ class HybridSyncProcessorService
 
         $payloadHash = hash('sha256', (string) json_encode($payload));
 
+        $inboxAttributes = [
+            'source_node' => $sourceNode,
+            'event_type' => $eventType,
+            'payload_hash' => $payloadHash,
+            'status' => 'processing',
+            'error_message' => null,
+            'processed_at' => now(),
+        ];
+
         if ($existing) {
-            $existing->update([
-                'source_node' => $sourceNode,
-                'event_type' => $eventType,
-                'payload_hash' => $payloadHash,
-                'status' => 'processing',
-                'error_message' => null,
-                'processed_at' => now(),
-            ]);
+            $existing->update($inboxAttributes);
             $inbox = $existing;
         } else {
-            $inbox = HybridSyncInbox::create([
-                'sync_uuid' => $syncUuid,
-                'source_node' => $sourceNode,
-                'event_type' => $eventType,
-                'payload_hash' => $payloadHash,
-                'status' => 'processing',
-                'processed_at' => now(),
-            ]);
+            // UUID deterministik dari seed bisa tabraka bila dua baris cloud punya
+            // payload identik. firstOrCreate mencegah duplicate-key di inbox.
+            $inbox = HybridSyncInbox::firstOrCreate(
+                ['sync_uuid' => $syncUuid],
+                $inboxAttributes
+            );
+            $inbox->update($inboxAttributes);
         }
 
         $nodeRole = config('sync.node_role');
@@ -178,6 +179,7 @@ class HybridSyncProcessorService
             'transaksi.pos' => $this->upsertSyncedPosTransaction($payload, false),
             'transaksi.void' => $this->handleTransaksiVoid($payload),
             'stok.mutasi' => $this->handleStokMutasi($payload),
+            'stok.snapshot' => $this->handleStokSnapshot($payload),
             'servis.update' => $this->handleServisUpdate($payload),
             'jurnal.upsert' => $this->handleJurnalUpsert($payload),
             'payroll.upsert' => $this->handlePayrollUpsert($payload),
@@ -192,9 +194,10 @@ class HybridSyncProcessorService
     {
         match ($eventType) {
             'order.online_paid' => $this->handleOrderOnlinePaid($payload),
-            'transaksi.pos_cloud' => $this->upsertSyncedPosTransaction($payload, true),
+            'transaksi.pos_cloud' => $this->upsertSyncedPosTransaction($payload, empty($payload['seed_mode'])),
             'transaksi.void' => $this->handleTransaksiVoid($payload),
             'stok.mutasi' => $this->handleStokMutasi($payload),
+            'stok.snapshot' => $this->handleStokSnapshot($payload),
             'servis.update' => $this->handleServisUpdate($payload),
             'jurnal.upsert' => $this->handleJurnalUpsert($payload),
             'payroll.upsert' => $this->handlePayrollUpsert($payload),
@@ -1192,6 +1195,40 @@ class HybridSyncProcessorService
                 'label' => $payload['label'] ?? 'barcode_1',
                 'urutan' => (int) ($payload['urutan'] ?? 1),
                 'is_utama' => (bool) ($payload['is_utama'] ?? false),
+            ]
+        );
+    }
+
+    /**
+     * Seed stok absolut dari cloud. Tidak inkremental — angka cloud yang menang.
+     * Dipakai hanya saat bootstrap/seed awal, bukan sync harian.
+     */
+    protected function handleStokSnapshot(array $payload): void
+    {
+        if (! class_exists(StokItem::class)) {
+            return;
+        }
+
+        $produkId = $this->resolveProdukId($payload);
+        $skuVariantId = $this->resolveSkuVariantId($payload, $produkId);
+        $cabangId = isset($payload['cabang_id']) ? (int) $payload['cabang_id'] : null;
+        $gudangId = $this->resolveGudangId($payload, $cabangId);
+        if (! $gudangId && class_exists(Gudang::class)) {
+            $gudangId = Gudang::getDefault($cabangId)?->id;
+        }
+
+        if (! $produkId || ! $gudangId) {
+            throw new \RuntimeException("Produk atau Gudang untuk stok.snapshot tidak ditemukan.");
+        }
+
+        StokItem::updateOrCreate(
+            [
+                'gudang_id' => $gudangId,
+                'produk_id' => $produkId,
+                'sku_variant_id' => $skuVariantId,
+            ],
+            [
+                'jumlah' => max(0, (int) ($payload['jumlah'] ?? 0)),
             ]
         );
     }

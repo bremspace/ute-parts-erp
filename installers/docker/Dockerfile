@@ -20,7 +20,7 @@ WORKDIR /var/www/html
 
 COPY . .
 COPY --from=assets /app/public/build ./public/build
-COPY Installer*docker/.env.docker .env
+COPY installers/docker/.env.docker .env
 
 # Pastikan .env bisa ditulis oleh proses app (www-data) dari UI Pengaturan
 RUN chown www-data:www-data .env && chmod 664 .env
@@ -60,7 +60,7 @@ PHPINI
 # Apache timeout for long-running restore
 RUN printf '\nTimeout 3600\n' >> /etc/apache2/apache2.conf
 
-COPY Installer*docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY installers/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80
