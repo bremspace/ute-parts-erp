@@ -187,7 +187,6 @@ try {
             "# Dibuat oleh installers/docker-client/install.ps1 - JANGAN commit file ini."
             'APP_NAME="' + (Esc-Env $appName) + '"'
             'APP_ENV=production'
-            'APP_KEY='
             'APP_DEBUG=false'
             'APP_URL=http://localhost'
             ''

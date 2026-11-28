@@ -164,7 +164,6 @@ write_env() {
     w '# Dibuat oleh installers/docker-client/install.sh - JANGAN commit file ini.'
     w "APP_NAME=\"$(esc "$app_name")\""
     w 'APP_ENV=production'
-    w 'APP_KEY='
     w 'APP_DEBUG=false'
     w 'APP_URL=http://localhost'
     w ''
