@@ -199,6 +199,7 @@ docker compose exec app php artisan sync:flush --batch
 | `Database not ready` | MySQL belum selesai init. Tunggu atau cek `docker compose logs mysql`; jangan hapus volume `client_mysql` kecuali ingin data kosong. |
 | Port 80 bentrok | Hentikan service yang memakai port 80 atau ubah mapping di `docker-compose.yml` (mis. `8080:80`), lalu sesuaikan `APP_URL`. |
 | Perubahan `.env.client` tidak efek | `docker compose up -d --force-recreate app` (entrypoint membuang cache via checksum env). |
+| Log masih `hybrid_sync_outbox doesn't exist` setelah pull terbaru | Image masih lama. Jalankan `docker compose build --no-cache` lalu `docker compose up -d --force-recreate`. |
 | `The MAC is invalid` setelah restore snapshot | Samakan `APP_KEY` di `storage/.env` dengan APP_KEY sumber, lalu `docker compose exec app php artisan optimize:clear && docker compose exec app php artisan optimize`, hapus cookie browser, login ulang. |
 | Queue/scheduler tidak jalan | `docker compose exec app tail -f storage/logs/queue-worker.log` dan `storage/logs/scheduler.log`. Pastikan `QUEUE_CONNECTION=database`. |
 | Build gagal: `app/Helpers/functions.php` tidak ditemukan | Installer menyalin salinan kanonik helper dari `installers/docker-client/helpers/functions.php`. Pastikan Anda mendownload source versi terbaru lalu build ulang. |
