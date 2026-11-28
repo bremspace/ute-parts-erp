@@ -29,8 +29,19 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 # --- Kode aplikasi (tanpa folder installers/ agar .env.client tidak ikut) ----
+# PENTING: COPY <dir> ./ menyalin ISI folder, bukan foldernya. Setiap direktori
+# harus punya destination sendiri agar struktur /var/www/html/app, /bootstrap,
+# /config, /routes, dll. tetap benar saat artisan dijalankan composer.
 COPY artisan composer.json composer.lock package.json package-lock.json vite.config.js version.json ./
-COPY app bootstrap config database lang public resources routes storage ./
+COPY app ./app
+COPY bootstrap ./bootstrap
+COPY config ./config
+COPY database ./database
+COPY lang ./lang
+COPY public ./public
+COPY resources ./resources
+COPY routes ./routes
+COPY storage ./storage
 # Composer autoload memuat app/Helpers/functions.php saat package:discover.
 # Salin salinan kanonik dari installer agar build tidak gagal bila file itu
 # tidak ikut ter-copy dari context (zip download / filter Docker).
