@@ -663,6 +663,7 @@
                                 <a href="/app/pengaturan?tab=integrasi&amp;sub=duitku" class="{{ $subLinkClass }} {{ request('sub') === 'duitku' ? $subLinkActive : $subLinkIdle }}">Payment Gateway Duitku</a>
                                 <a href="/app/pengaturan?tab=integrasi&amp;sub=biteship" class="{{ $subLinkClass }} {{ request('sub') === 'biteship' ? $subLinkActive : $subLinkIdle }}">Logistik Biteship</a>
                                 <a href="/app/pengaturan?tab=integrasi&amp;sub=hybrid" class="{{ $subLinkClass }} {{ request('sub') === 'hybrid' ? $subLinkActive : $subLinkIdle }}">Hybrid Sync (Lokal &amp; Cloud)</a>
+                                <a href="{{ route('sync.dashboard') }}" class="{{ $subLinkClass }} {{ request()->routeIs('sync.dashboard') ? $subLinkActive : $subLinkIdle }}">Status Sinkronisasi</a>
                             </div>
                         </div>
 

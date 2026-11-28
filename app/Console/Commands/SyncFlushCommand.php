@@ -33,8 +33,8 @@ class SyncFlushCommand extends Command
             return Command::SUCCESS;
         }
 
-        if (config('sync.node_role') !== 'primary_store' || empty(config('sync.remote_url'))) {
-            $this->info('Node ini tidak memiliki target remote push (hanya node primary_store dengan SYNC_REMOTE_URL yang melakukan push).');
+        if (empty(config('sync.remote_url'))) {
+            $this->info('SYNC_REMOTE_URL belum dikonfigurasi — tidak ada target push.');
 
             return Command::SUCCESS;
         }

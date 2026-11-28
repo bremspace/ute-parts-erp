@@ -2,11 +2,16 @@
 
 namespace App\Modules\Sync;
 
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Sync\Observers\BackofficeModelSyncObserver;
 use App\Modules\Sync\Observers\BrandSyncObserver;
@@ -36,6 +41,7 @@ use App\Modules\Wms\Models\ProdukSatuanKonversi;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokLog;
+use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
 
 class SyncObserverBootstrap
@@ -74,6 +80,15 @@ class SyncObserverBootstrap
                 OrderOnlinePaidSyncObserver::class,
                 TransaksiCloudPosSyncObserver::class,
             ],
+            // Bidirectional backoffice generik
+            // Catatan: Gudang/Rak sengaja tidak dipasang observer generik karena
+            // dibuat otomatis oleh migrasi/setup dan memicu event saat install awal.
+            Cabang::class => [BackofficeModelSyncObserver::class],
+            Supplier::class => [BackofficeModelSyncObserver::class],
+            Karyawan::class => [BackofficeModelSyncObserver::class],
+            AkunCOA::class => [BackofficeModelSyncObserver::class],
+            JenisServis::class => [BackofficeModelSyncObserver::class],
+            TierMembership::class => [BackofficeModelSyncObserver::class],
         ];
 
         foreach ($observers as $model => $modelObservers) {

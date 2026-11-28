@@ -54,6 +54,8 @@ class SyncStatusControllerTest extends TestCase
             'sync.remote_url' => 'https://vps.bremspace.id',
         ]);
 
+        DB::table('hybrid_sync_outbox')->delete();
+
         DB::table('hybrid_sync_outbox')->insert([
             'sync_uuid' => (string) Str::uuid(),
             'event_type' => 'transaksi.pos',

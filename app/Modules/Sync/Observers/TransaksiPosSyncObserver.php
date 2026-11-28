@@ -15,10 +15,6 @@ class TransaksiPosSyncObserver
 
     public function created(Transaksi $transaksi): void
     {
-        if (config('sync.node_role') !== 'primary_store') {
-            return;
-        }
-
         $sumber = strtolower((string) ($transaksi->sumber ?? 'pos'));
         $status = strtolower((string) $transaksi->status);
 
@@ -41,10 +37,6 @@ class TransaksiPosSyncObserver
 
     public function updated(Transaksi $transaksi): void
     {
-        if (config('sync.node_role') !== 'primary_store') {
-            return;
-        }
-
         $sumber = strtolower((string) ($transaksi->sumber ?? 'pos'));
         if (in_array($sumber, self::EXCLUDED_SUMBER, true) || str_starts_with((string) $transaksi->no_transaksi, 'VPS-')) {
             return;

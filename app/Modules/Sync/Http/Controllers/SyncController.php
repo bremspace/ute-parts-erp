@@ -5,6 +5,7 @@ namespace App\Modules\Sync\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Sync\Models\HybridSyncOutbox;
 use App\Modules\Sync\Services\HybridSyncProcessorService;
+use App\Modules\Sync\Services\SyncBootstrapService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -159,6 +160,44 @@ class SyncController extends Controller
         return response()->json([
             'success' => true,
             'message' => count($uuids).' item outbox berhasil di-ACK.',
+        ]);
+    }
+
+    /**
+     * GET /api/internal/sync/bootstrap
+     * Ekspor data canonical cloud untuk bootstrap client lokal.
+     */
+    public function bootstrap(Request $request, SyncBootstrapService $bootstrap): JsonResponse
+    {
+        if (config('sync.node_role') !== 'cloud_storefront') {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'message' => 'Bootstrap hanya bisa diambil dari node cloud_storefront.',
+            ], 403);
+        }
+
+        $table = (string) $request->query('table', '');
+        $limit = max(1, min(500, (int) $request->query('limit', 200)));
+        $offset = max(0, (int) $request->query('offset', 0));
+
+        if ($table === '') {
+            return response()->json([
+                'success' => true,
+                'data' => ['tables' => $bootstrap->tables()],
+                'message' => 'Daftar tabel bootstrap berhasil dimuat.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'table' => $table,
+                'offset' => $offset,
+                'limit' => $limit,
+                'events' => $bootstrap->export($table, $limit, $offset),
+            ],
+            'message' => 'Data bootstrap berhasil diambil.',
         ]);
     }
 

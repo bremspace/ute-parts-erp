@@ -1,0 +1,49 @@
+# =============================================================================
+# UTE PARTS ERP — Compose khusus NODE CLIENT
+# =============================================================================
+# Jalankan dari folder ini. Konfigurasi (termasuk secret) dibaca dari
+# .env.client yang dibuat wizard — file itu TIDAK ikut ke dalam image Docker.
+# =============================================================================
+name: ute-parts-client
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: installers/docker-client/Dockerfile
+    image: ute-parts-client:latest
+    container_name: UTE_PARTS_CLIENT
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    env_file:
+      - .env.client
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - client_storage:/var/www/html/storage
+      - client_bootstrap:/var/www/html/bootstrap/cache
+
+  mysql:
+    image: mysql:8.0
+    container_name: ute-parts-client-db
+    command: --max-allowed-packet=268435456 --innodb-buffer-pool-size=256M --net-read-timeout=3600 --net-write-timeout=3600
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ute_parts_client
+      MYSQL_USER: ute_client
+      MYSQL_PASSWORD: ute_client_secret
+      MYSQL_ROOT_PASSWORD: root_secret
+    volumes:
+      - client_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_secret"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  client_storage:
+  client_bootstrap:
+  client_mysql:

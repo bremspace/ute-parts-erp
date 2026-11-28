@@ -33,12 +33,6 @@ class SyncPullCommand extends Command
             return Command::SUCCESS;
         }
 
-        if (config('sync.node_role') !== 'primary_store') {
-            $this->warn('Command sync:pull hanya dijalankan pada node primary_store (toko lokal).');
-
-            return Command::SUCCESS;
-        }
-
         $remoteUrl = config('sync.remote_url');
         if (empty($remoteUrl)) {
             $this->error('SYNC_REMOTE_URL belum dikonfigurasi di file environment.');

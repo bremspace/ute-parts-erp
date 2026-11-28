@@ -716,6 +716,11 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
     // Dashboard (DASH-01 widget per role)
     Route::get('/dashboard', DashboardIndex::class)->name('dashboard');
 
+    // [Hybrid Sync] Dashboard indikator sinkronisasi (client & cloud)
+    Route::get('/sync', \App\Modules\Sync\Livewire\SyncDashboard::class)
+        ->middleware('permission:pengaturan.manage|pos.view')
+        ->name('sync.dashboard');
+
     // [Hybrid Sync] Status & Manual Trigger Real-Time
     Route::get('/sync/status', [SyncStatusController::class, 'status'])
         ->middleware('permission:pos.view|pos.view-own|servis.view|pengaturan.manage')

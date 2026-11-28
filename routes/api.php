@@ -306,6 +306,8 @@ Route::prefix('internal/sync')->middleware(['throttle:300,1'])->group(function (
         ->middleware('verify.sync');
     Route::post('/ack', [SyncController::class, 'ack'])
         ->middleware('verify.sync');
+    Route::get('/bootstrap', [SyncController::class, 'bootstrap'])
+        ->middleware('verify.sync');
     Route::get('/health', [SyncController::class, 'health'])
         ->middleware('verify.sync');
 });
