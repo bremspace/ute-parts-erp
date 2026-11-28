@@ -619,7 +619,7 @@ if ($isInstalled -and (Test-Path $envFile)) {
     $queueErrLog = Join-Path $projectRoot 'storage\logs\queue-error.log'
     $queuePidFile = Join-Path $projectRoot 'storage\framework\queue.pid'
     try {
-        $qProc = Start-Process -FilePath $phpExe -ArgumentList "`"$artisanPath`"", "queue:work", "--sleep=3", "--tries=3" -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueErrLog -PassThru -ErrorAction SilentlyContinue
+        $qProc = Start-Process -FilePath $phpExe -ArgumentList "`"$artisanPath`"", "queue:work", "--queue=default,sync", "--sleep=3", "--tries=3" -WindowStyle Hidden -RedirectStandardOutput $queueLog -RedirectStandardError $queueErrLog -PassThru -ErrorAction SilentlyContinue
         if ($qProc) {
             $queuePid = $qProc.Id
             Set-Content -Path $queuePidFile -Value $qProc.Id -Encoding ASCII

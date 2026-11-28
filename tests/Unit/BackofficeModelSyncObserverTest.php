@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\RekonsiliasiBank;
 use App\Modules\Akunting\Models\RekonsiliasiBankItem;
 use App\Modules\Akunting\Services\JurnalService;
@@ -413,5 +414,40 @@ class BackofficeModelSyncObserverTest extends TestCase
         $konfigEvents = HybridSyncOutbox::where('event_type', 'konfigurasi.upsert')->get();
         $this->assertCount(1, $konfigEvents);
         $this->assertSame('ppn_percent', $konfigEvents->first()->payload['kunci'] ?? null);
+    }
+
+    public function test_jurnal_header_observer_enqueues_all_backoffice_sources_and_skips_pos(): void
+    {
+        foreach (['stok_awal', 'transfer', 'import', 'komisi', 'pembayaran', 'servis-bayar', 'beli', 'channel'] as $idx => $sumber) {
+            JurnalHeader::create([
+                'no_jurnal' => 'JRN-TEST-'.$idx,
+                'tanggal' => now()->toDateString(),
+                'cabang_id' => $this->cabang->id,
+                'cabang_key' => $this->cabang->id,
+                'sumber' => $sumber,
+                'deskripsi' => 'Test '.$sumber,
+                'total_debit' => 10000,
+                'total_kredit' => 10000,
+                'jumlah_baris' => 2,
+                'user_id' => $this->user->id,
+            ]);
+        }
+
+        JurnalHeader::create([
+            'no_jurnal' => 'JRN-POS-SKIP',
+            'tanggal' => now()->toDateString(),
+            'cabang_id' => $this->cabang->id,
+            'cabang_key' => $this->cabang->id,
+            'sumber' => 'pos',
+            'deskripsi' => 'POS skip',
+            'total_debit' => 10000,
+            'total_kredit' => 10000,
+            'jumlah_baris' => 2,
+            'user_id' => $this->user->id,
+        ]);
+
+        $jurnalEvents = HybridSyncOutbox::where('event_type', 'jurnal.upsert')->get();
+        $this->assertCount(8, $jurnalEvents);
+        $this->assertFalse($jurnalEvents->contains(fn ($row) => ($row->payload['no_jurnal'] ?? null) === 'JRN-POS-SKIP'));
     }
 }

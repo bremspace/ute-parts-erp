@@ -123,7 +123,7 @@ fi
 
 if [ "$QUEUE_RUNNING" = "0" ] && [ -f ".env" ]; then
     echo "ℹ [INFO] Menyalakan Background Queue Worker..."
-    nohup "$PHP_BIN" artisan queue:work --sleep=3 --tries=3 > storage/logs/queue.log 2>&1 &
+    nohup "$PHP_BIN" artisan queue:work --queue=default,sync --sleep=3 --tries=3 > storage/logs/queue.log 2>&1 &
     QUEUE_PID=$!
     echo "$QUEUE_PID" > storage/framework/queue.pid
     echo "✔ [OK] Queue Worker aktif (PID: $QUEUE_PID)"
