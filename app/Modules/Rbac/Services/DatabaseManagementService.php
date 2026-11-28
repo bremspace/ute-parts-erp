@@ -140,6 +140,9 @@ class DatabaseManagementService
      */
     public function backup(string $destination = 'local', int $keepDays = 7, ?string $cloudDisk = null, bool $fullSnapshot = false): array
     {
+        @set_time_limit(1800);
+        @ini_set('memory_limit', '512M');
+
         $connName = config('database.default');
         $conn = config("database.connections.{$connName}");
         $driver = $conn['driver'] ?? 'mysql';
@@ -1206,8 +1209,11 @@ class DatabaseManagementService
             throw new RuntimeException("Gagal membuat arsip snapshot: {$targetZip}");
         }
 
-        // 1. Masukkan database dump
+        // 1. Masukkan database dump (sudah terkompresi gzip, gunakan CM_STORE agar hemat CPU/RAM)
         $zip->addFile($sqlGzPath, 'database.sql.gz');
+        if (defined('ZipArchive::CM_STORE')) {
+            $zip->setCompressionName('database.sql.gz', ZipArchive::CM_STORE);
+        }
 
         // 2. Buat arsip storage/app/public
         $publicStorageDir = storage_path('app/public');
@@ -1217,9 +1223,15 @@ class DatabaseManagementService
             $proc = Process::fromShellCommandline(
                 escapeshellarg($tar).' -czf '.escapeshellarg($tarPath).' -C '.escapeshellarg($publicStorageDir).' .'
             );
+            $proc->setTimeout(1800);
             $proc->run();
             if ($proc->isSuccessful() && File::exists($tarPath)) {
                 $zip->addFile($tarPath, 'storage_public.tar.gz');
+                if (defined('ZipArchive::CM_STORE')) {
+                    $zip->setCompressionName('storage_public.tar.gz', ZipArchive::CM_STORE);
+                }
+            } else {
+                Log::warning('Gagal mengarsipkan storage/app/public untuk snapshot: '.$proc->getErrorOutput());
             }
         }
 
@@ -1235,8 +1247,12 @@ class DatabaseManagementService
         ];
         $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
-        $zip->close();
+        $closed = $zip->close();
         @unlink($tarPath);
+
+        if (! $closed) {
+            throw new RuntimeException("Gagal menyelesaikan penulisan arsip snapshot: {$targetZip}");
+        }
     }
 
     protected function formatSize(int $bytes): string

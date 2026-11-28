@@ -6,9 +6,11 @@ use App\Models\User;
 use App\Modules\Hr\Services\UserHrSyncService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Rbac\Services\DatabaseManagementService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class RbacController extends Controller
 {
@@ -121,5 +123,28 @@ class RbacController extends Controller
             'cabang' => session('cabang_id') ? Cabang::find(session('cabang_id')) : null,
             'cabang_id' => session('cabang_id'),
         ], 'Data izin berhasil diambil');
+    }
+
+    /**
+     * Stream unduhan berkas backup/snapshot langsung lewat HTTP agar tidak membebani memori Livewire.
+     */
+    public function downloadDatabaseBackup(string $filename, DatabaseManagementService $dbService): BinaryFileResponse
+    {
+        $user = auth()->user();
+        if (! $user || (! $user->hasRole('super-admin') && ! $user->hasRole('owner'))) {
+            abort(403, 'Akses ditolak: Hanya Super Admin dan Owner yang dapat mengunduh backup database.');
+        }
+
+        $safeName = basename($filename);
+        if (! preg_match('/^(backup|snapshot)-[A-Za-z0-9._-]+\.(sql|sql\.gz|zip)$/', $safeName)) {
+            abort(400, 'Nama berkas backup tidak valid.');
+        }
+
+        $path = $dbService->getBackupDirectory().DIRECTORY_SEPARATOR.$safeName;
+        if (! is_file($path)) {
+            abort(404, 'Berkas backup tidak ditemukan di server.');
+        }
+
+        return response()->download($path, $safeName);
     }
 }

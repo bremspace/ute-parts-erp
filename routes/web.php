@@ -41,6 +41,7 @@ use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Livewire\ReturPenjualanIndex;
 use App\Modules\Pos\Livewire\RiwayatTransaksiIndex;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Controllers\RbacController;
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
 use App\Modules\Rbac\Livewire\SessionManagementPage;
 use App\Modules\Rbac\Livewire\SettingsRbac;
@@ -962,6 +963,10 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
         ->name('pengaturan.web-konsumen.tab')
         ->whereIn('tab', ['hero', 'branding', 'banner', 'stok', 'panduan', 'review', 'faq', 'kontak', 'pembayaran', 'preview'])
         ->middleware('permission:pengaturan.manage');
+
+    Route::get('/pengaturan/database/download/{filename}', [RbacController::class, 'downloadDatabaseBackup'])
+        ->name('pengaturan.database.download')
+        ->middleware('permission:pengaturan.manage|user.view');
 
     Route::get('/pengaturan/{tab}', SettingsRbac::class)
         ->name('pengaturan.tab')

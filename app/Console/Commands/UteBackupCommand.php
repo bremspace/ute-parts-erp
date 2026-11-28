@@ -258,6 +258,9 @@ class UteBackupCommand extends Command
         }
 
         $zip->addFile($sqlGzPath, 'database.sql.gz');
+        if (defined('ZipArchive::CM_STORE')) {
+            $zip->setCompressionName('database.sql.gz', ZipArchive::CM_STORE);
+        }
 
         $publicStorageDir = storage_path('app/public');
         $tarPath = storage_path('app/temp_media_'.uniqid().'.tar.gz');
@@ -266,9 +269,13 @@ class UteBackupCommand extends Command
             $proc = Process::fromShellCommandline(
                 escapeshellarg($tar).' -czf '.escapeshellarg($tarPath).' -C '.escapeshellarg($publicStorageDir).' .'
             );
+            $proc->setTimeout(1800);
             $proc->run();
             if ($proc->isSuccessful() && File::exists($tarPath)) {
                 $zip->addFile($tarPath, 'storage_public.tar.gz');
+                if (defined('ZipArchive::CM_STORE')) {
+                    $zip->setCompressionName('storage_public.tar.gz', ZipArchive::CM_STORE);
+                }
             }
         }
 
@@ -283,8 +290,12 @@ class UteBackupCommand extends Command
         ];
         $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
-        $zip->close();
+        $closed = $zip->close();
         @unlink($tarPath);
+
+        if (! $closed) {
+            throw new RuntimeException("Gagal menyelesaikan penulisan arsip snapshot: {$targetZip}");
+        }
     }
 
     /** Gagal: pesan Indonesia ke konsol + notifikasi queue (tidak pernah sinkron). */

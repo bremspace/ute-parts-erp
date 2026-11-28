@@ -94,7 +94,7 @@
                         <select wire:model.live="backupDestination"
                             class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-primary focus:ring-0">
                             <option value="local" class="bg-gray-900 text-white">Simpan di Server Lokal (Direktori Backups)</option>
-                            <option value="download" class="bg-gray-900 text-white">Langsung Download ke Laptop/PC Saat Ini (.sql.gz)</option>
+                            <option value="download" class="bg-gray-900 text-white">Langsung Download ke Laptop/PC Saat Ini (.sql.gz / .zip)</option>
                             <option value="cloud" class="bg-gray-900 text-white">Kirim ke Cloud Storage (S3 / Google Drive via adapter)</option>
                         </select>
                     </div>
@@ -227,13 +227,13 @@
                             <td class="py-3 text-center">
                                 <div class="inline-flex items-center gap-1.5">
                                     <!-- Download ke Perangkat Klien -->
-                                    <button type="button" wire:click="downloadBackup('{{ $b['filename'] }}')"
-                                        class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition-[background-color,color] duration-140 active:scale-95 cursor-pointer"
+                                    <a href="{{ route('pengaturan.database.download', ['filename' => $b['filename']]) }}"
+                                        class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition-[background-color,color] duration-140 active:scale-95 cursor-pointer inline-flex items-center justify-center"
                                         title="Download ke Laptop/PC ini">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                         </svg>
-                                    </button>
+                                    </a>
 
                                     <!-- Restore Server -->
                                     <button type="button" wire:click="openRestoreModal('{{ $b['filename'] }}')"

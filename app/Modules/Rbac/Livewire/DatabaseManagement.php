@@ -8,7 +8,6 @@ use App\Modules\Rbac\Services\DatabaseManagementService;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Livewire\WithFileUploads;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 /**
@@ -434,7 +433,9 @@ class DatabaseManagement extends Component
             ]);
 
             if ($this->backupDestination === 'download') {
-                return response()->download($res['path'], $res['filename']);
+                // Stream via route HTTP terpisah agar file besar (Full Snapshot .zip) tidak di-base64 oleh Livewire
+                $url = route('pengaturan.database.download', ['filename' => $res['filename']]);
+                $this->js('window.location.assign('.json_encode($url).')');
             }
         } catch (Throwable $e) {
             $this->dispatch('alert', [
@@ -468,18 +469,20 @@ class DatabaseManagement extends Component
     /**
      * Unduh file backup yang sudah ada ke perangkat lokal klien.
      */
-    public function downloadBackup(string $filename, DatabaseManagementService $dbService): ?BinaryFileResponse
+    public function downloadBackup(string $filename, DatabaseManagementService $dbService): void
     {
         $this->authorizeAccess();
 
-        $path = $dbService->getBackupDirectory().DIRECTORY_SEPARATOR.basename($filename);
+        $safeName = basename($filename);
+        $path = $dbService->getBackupDirectory().DIRECTORY_SEPARATOR.$safeName;
         if (! file_exists($path)) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Berkas backup tidak ditemukan di server.']);
 
-            return null;
+            return;
         }
 
-        return response()->download($path, basename($filename));
+        $url = route('pengaturan.database.download', ['filename' => $safeName]);
+        $this->js('window.location.assign('.json_encode($url).')');
     }
 
     /**

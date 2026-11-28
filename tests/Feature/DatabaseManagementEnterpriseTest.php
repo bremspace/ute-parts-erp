@@ -317,4 +317,44 @@ class DatabaseManagementEnterpriseTest extends TestCase
         $this->artisan('ute:db-health-check')
             ->assertSuccessful();
     }
+
+    public function test_full_snapshot_clone_download_dan_otorisasi_route(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        $component = Livewire::test(DatabaseManagement::class)
+            ->set('backupDestination', 'download')
+            ->set('isFullSnapshot', true)
+            ->call('buatBackup')
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'success' && str_contains($payload['message'], 'Full snapshot clone');
+            });
+
+        $service = app(DatabaseManagementService::class);
+        $backups = $service->listBackups();
+        $snapshot = collect($backups)->first(fn ($b) => str_starts_with($b['filename'], 'snapshot-') && str_ends_with($b['filename'], '.zip'));
+
+        $this->assertNotNull($snapshot);
+        $this->assertFileExists($snapshot['path']);
+
+        try {
+            // Super admin bisa download langsung via HTTP streaming route
+            $this->get(route('pengaturan.database.download', ['filename' => $snapshot['filename']]))
+                ->assertOk()
+                ->assertHeader('content-disposition');
+
+            // Nama file tidak valid ditolak
+            $this->get(route('pengaturan.database.download', ['filename' => 'evil.env']))
+                ->assertStatus(400);
+
+            // Kasir dilarang download
+            $this->actingAs($this->kasir)
+                ->get(route('pengaturan.database.download', ['filename' => $snapshot['filename']]))
+                ->assertForbidden();
+        } finally {
+            $service->deleteBackup($snapshot['filename']);
+        }
+    }
 }
