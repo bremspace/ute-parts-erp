@@ -5,14 +5,18 @@ namespace App\Modules\Sync;
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\AsetTetap;
+use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\KasMatching;
 use App\Modules\Akunting\Models\PeriodeAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Models\RekonsiliasiBank;
+use App\Modules\Akunting\Models\RekonsiliasiBankItem;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Crm\Models\KampanyeBroadcast;
 use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\PelangganKodeAktivasi;
 use App\Modules\Crm\Models\PelangganPoinLog;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Hr\Models\AbsensiLog;
@@ -128,7 +132,7 @@ final class BackofficeSyncRegistry
             ],
             'supplier' => [
                 'model' => Supplier::class,
-                'unique' => [['kode_lama']],
+                'unique' => [['kode_lama'], ['nama']],
             ],
             'purchase_order' => [
                 'model' => PurchaseOrder::class,
@@ -254,6 +258,7 @@ final class BackofficeSyncRegistry
             ],
             'shift' => [
                 'model' => Shift::class,
+                'unique' => [['cabang_id', 'nama']],
             ],
             'shift_jadwal' => [
                 'model' => ShiftJadwal::class,
@@ -290,6 +295,7 @@ final class BackofficeSyncRegistry
             ],
             'bagi_hasil_periode' => [
                 'model' => BagiHasilPeriode::class,
+                'unique' => [['cabang_id', 'periode']],
             ],
             'bagi_hasil_rules' => [
                 'model' => BagiHasilRule::class,
@@ -305,6 +311,7 @@ final class BackofficeSyncRegistry
             ],
             'aset_tetap' => [
                 'model' => AsetTetap::class,
+                'unique' => [['cabang_id', 'nama', 'tanggal_perolehan']],
             ],
             'piutang' => [
                 'model' => Piutang::class,
@@ -323,10 +330,22 @@ final class BackofficeSyncRegistry
             'kas_matching' => [
                 'model' => KasMatching::class,
             ],
+            'rekonsiliasi_bank' => [
+                'model' => RekonsiliasiBank::class,
+                'unique' => [['cabang_id', 'akun_coa_id', 'periode_dari', 'periode_sampai', 'nama_file']],
+            ],
+            'rekonsiliasi_bank_item' => [
+                'model' => RekonsiliasiBankItem::class,
+                'cabang_relation' => 'rekonsiliasi.cabang_id',
+            ],
 
             // CRM & Reseller
             'tier_memberships' => [
                 'model' => TierMembership::class,
+                'unique' => [['kode']],
+            ],
+            'pelanggan_kode_aktivasi' => [
+                'model' => PelangganKodeAktivasi::class,
                 'unique' => [['kode']],
             ],
             'leads' => [
@@ -340,10 +359,12 @@ final class BackofficeSyncRegistry
             ],
             'komisi_skema' => [
                 'model' => KomisiSkema::class,
+                'unique' => [['cabang_id', 'nama', 'aktor_tipe', 'trigger_tipe']],
                 'poly_fks' => ['aktor_id' => 'aktor_tipe'],
             ],
             'skema_komisi' => [
                 'model' => SkemaKomisi::class,
+                'unique' => [['nama', 'kategori']],
             ],
             'skema_komisi_reseller' => [
                 'model' => SkemaKomisiReseller::class,
@@ -358,6 +379,7 @@ final class BackofficeSyncRegistry
             // Omnichannel Config & Workflow
             'channels' => [
                 'model' => Channel::class,
+                'unique' => [['platform', 'nama']],
             ],
             'channel_product_mapping' => [
                 'model' => ChannelProductMapping::class,
@@ -366,6 +388,7 @@ final class BackofficeSyncRegistry
             ],
             'approval_rules' => [
                 'model' => ApprovalRule::class,
+                'unique' => [['cabang_id', 'entity_type', 'approver_role', 'level']],
             ],
             'approval_requests' => [
                 'model' => ApprovalRequest::class,
@@ -378,7 +401,7 @@ final class BackofficeSyncRegistry
     /**
      * Peta nama kolom FK standar -> model target & kunci natural untuk resolusi lintas node.
      *
-     * @return array<string, array{model: class-string<Model>, natural: list<string>, fallback_user?: bool}>
+     * @return array<string, array{model: class-string<Model>, natural: list<string>, fallback_user?: bool, skip_raw_id_fallback?: bool}>
      */
     public static function foreignKeyDefinitions(): array
     {
@@ -413,6 +436,8 @@ final class BackofficeSyncRegistry
             'akun_coa_id' => ['model' => AkunCOA::class, 'natural' => ['kode']],
             'akun_id' => ['model' => AkunCOA::class, 'natural' => ['kode']],
             'jurnal_id' => ['model' => JurnalHeader::class, 'natural' => ['no_jurnal']],
+            'jurnal_akuntansi_id' => ['model' => JurnalAkuntansi::class, 'natural' => [], 'skip_raw_id_fallback' => true],
+            'rekonsiliasi_bank_id' => ['model' => RekonsiliasiBank::class, 'natural' => []],
             'skema_komisi_id' => ['model' => SkemaKomisi::class, 'natural' => []],
             'komisi_skema_id' => ['model' => KomisiSkema::class, 'natural' => []],
             'lead_id' => ['model' => Lead::class, 'natural' => []],
@@ -429,6 +454,14 @@ final class BackofficeSyncRegistry
             'user_penerima_id' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
             'approved_by' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
             'approved_by_id' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
+            'approved_by_user_id' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
+            'reversed_by_user_id' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
+            'dibuat_oleh' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
+            'dibayar_oleh' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
+            'komplain_gratis_proposed_by' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
+            'komplain_gratis_approved_by' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
+            'goodwill_proposed_by' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
+            'goodwill_approved_by' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
             'requested_by' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
             'actioned_by' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],
             'assigned_to' => ['model' => User::class, 'natural' => ['email'], 'fallback_user' => true],

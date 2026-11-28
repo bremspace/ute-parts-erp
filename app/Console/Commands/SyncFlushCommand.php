@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Modules\Sync\Jobs\BatchPushHybridSyncJob;
 use App\Modules\Sync\Jobs\PushHybridSyncJob;
 use App\Modules\Sync\Models\HybridSyncOutbox;
+use App\Modules\Sync\Providers\SyncServiceProvider;
 use Illuminate\Console\Command;
 
 class SyncFlushCommand extends Command
@@ -24,6 +25,8 @@ class SyncFlushCommand extends Command
      */
     public function handle(): int
     {
+        SyncServiceProvider::refreshRuntimeConfigIfChanged();
+
         if (! config('sync.enabled')) {
             $this->warn('Hybrid sync sedang dinonaktifkan (SYNC_ENABLED=false).');
 
@@ -44,6 +47,7 @@ class SyncFlushCommand extends Command
         $items = HybridSyncOutbox::whereIn('status', ['pending', 'failed'])
             ->where('attempts', '<', 10)
             ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc')
             ->get();
 
         if ($items->isEmpty()) {

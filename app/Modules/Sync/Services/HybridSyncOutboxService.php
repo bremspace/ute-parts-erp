@@ -47,6 +47,7 @@ class HybridSyncOutboxService
         return HybridSyncOutbox::whereIn('status', ['pending', 'failed'])
             ->where('attempts', '<', 10)
             ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc')
             ->limit($limit)
             ->get();
     }

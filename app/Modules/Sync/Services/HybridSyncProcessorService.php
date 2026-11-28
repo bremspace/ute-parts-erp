@@ -4,18 +4,22 @@ namespace App\Modules\Sync\Services;
 
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Hr\Models\Karyawan;
+use App\Modules\Hr\Models\PayrollKomisiDetail;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
+use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Sync\BackofficeSyncRegistry;
@@ -31,6 +35,7 @@ use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
+use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Scopes\CabangScope;
@@ -39,6 +44,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Casts\AsCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -54,9 +60,9 @@ class HybridSyncProcessorService
     private static array $syncUuidColumnCache = [];
 
     /**
-     * Cache daftar kolom dan nullability per tabel untuk generic upsert.
+     * Cache daftar kolom, nullability, dan tipe kolom per tabel untuk generic upsert.
      *
-     * @var array<string, array{columns: list<string>, nullable: array<string, bool>}>
+     * @var array<string, array{columns: list<string>, nullable: array<string, bool>, types: array<string, string>}>
      */
     private static array $tableSchemaCache = [];
 
@@ -210,6 +216,7 @@ class HybridSyncProcessorService
             'harga_tier.upsert' => $this->handleHargaTierUpsert($payload),
             'produk_satuan_konversi.upsert' => $this->handleProdukSatuanKonversiUpsert($payload),
             'produk_barcode.sync' => $this->handleProdukBarcodeSync($payload),
+            'konfigurasi.upsert' => $this->handleKonfigurasiUpsert($payload),
             default => $this->handleGenericBackofficeEvent($eventType, $payload),
         };
     }
@@ -570,6 +577,16 @@ class HybridSyncProcessorService
             'kualitas_sync_uuid',
             [['nama' => $payload['kualitas_nama'] ?? null]]
         );
+        $supplierId = $this->resolveForeignId(
+            Supplier::class,
+            $payload,
+            'supplier_id',
+            'supplier_sync_uuid',
+            [
+                ['kode_lama' => $payload['supplier_kode_lama'] ?? null],
+                ['nama' => $payload['supplier_nama'] ?? null],
+            ]
+        );
 
         if (! $produk) {
             $produk = new Produk;
@@ -608,7 +625,9 @@ class HybridSyncProcessorService
             'is_active' => (bool) ($payload['is_active'] ?? $produk->is_active ?? true),
             'brand_id' => $brandId ?? $produk->brand_id,
             'kualitas_id' => $kualitasId ?? $produk->kualitas_id,
-            'supplier_id' => $payload['supplier_id'] ?? $produk->supplier_id,
+            'supplier_id' => array_key_exists('supplier_id', $payload)
+                ? ($supplierId ?? ($payload['supplier_id'] === null ? null : $produk->supplier_id))
+                : $produk->supplier_id,
             'harga_fleksibel' => (bool) ($payload['harga_fleksibel'] ?? $produk->harga_fleksibel ?? false),
             'sn' => (bool) ($payload['sn'] ?? $produk->sn ?? false),
             'abc_class' => $payload['abc_class'] ?? $produk->abc_class ?? 'B',
@@ -657,6 +676,12 @@ class HybridSyncProcessorService
             ]
         );
 
+        if (! empty($payload['deleted'])) {
+            $pelanggan?->delete();
+
+            return;
+        }
+
         if ($pelanggan && ! $this->isIncomingNewer($payload['updated_at'] ?? null, $pelanggan->updated_at)) {
             return;
         }
@@ -668,6 +693,16 @@ class HybridSyncProcessorService
             null,
             [['kode' => $payload['tier_membership_kode'] ?? null]]
         );
+        $approvedById = $this->resolveForeignId(
+            User::class,
+            $payload,
+            'approved_by',
+            null,
+            [['email' => $payload['approved_by_email'] ?? null]]
+        );
+        if ($approvedById && ! User::query()->whereKey($approvedById)->exists()) {
+            $approvedById = null;
+        }
 
         if (! $pelanggan) {
             $pelanggan = new Pelanggan;
@@ -700,7 +735,7 @@ class HybridSyncProcessorService
             'status' => $payload['status'] ?? $pelanggan->status ?? 'aktif',
             'catatan_approval' => $payload['catatan_approval'] ?? $pelanggan->catatan_approval,
             'approved_at' => ! empty($payload['approved_at']) ? Carbon::parse((string) $payload['approved_at']) : $pelanggan->approved_at,
-            'approved_by' => $payload['approved_by'] ?? $pelanggan->approved_by,
+            'approved_by' => $approvedById ?? $pelanggan->approved_by,
         ]);
 
         if ($this->tableHasSyncUuid(Pelanggan::class) && ! empty($payload['sync_uuid'])) {
@@ -724,6 +759,12 @@ class HybridSyncProcessorService
                 ['nama' => $payload['nama'] ?? null],
             ]
         );
+
+        if (! empty($payload['deleted'])) {
+            $kategori?->delete();
+
+            return;
+        }
 
         if ($kategori && ! $this->isIncomingNewer($payload['updated_at'] ?? null, $kategori->updated_at)) {
             return;
@@ -771,6 +812,12 @@ class HybridSyncProcessorService
             ['nama' => $payload['nama'] ?? null],
         ]);
 
+        if (! empty($payload['deleted'])) {
+            $brand?->delete();
+
+            return;
+        }
+
         if ($brand && ! $this->isIncomingNewer($payload['updated_at'] ?? null, $brand->updated_at)) {
             return;
         }
@@ -805,6 +852,12 @@ class HybridSyncProcessorService
         $kualitas = $this->resolveTargetModel(KualitasProduk::class, $payload, [
             ['nama' => $payload['nama'] ?? null],
         ]);
+
+        if (! empty($payload['deleted'])) {
+            $kualitas?->delete();
+
+            return;
+        }
 
         if ($kualitas && ! $this->isIncomingNewer($payload['updated_at'] ?? null, $kualitas->updated_at)) {
             return;
@@ -851,6 +904,12 @@ class HybridSyncProcessorService
             ['nama' => $payload['nama'] ?? null],
         ]);
 
+        if (! empty($payload['deleted'])) {
+            $satuan?->delete();
+
+            return;
+        }
+
         if ($satuan && ! $this->isIncomingNewer($payload['updated_at'] ?? null, $satuan->updated_at)) {
             return;
         }
@@ -888,6 +947,12 @@ class HybridSyncProcessorService
                 'model' => $payload['model'] ?? null,
             ],
         ]);
+
+        if (! empty($payload['deleted'])) {
+            $tipeHp?->delete();
+
+            return;
+        }
 
         if ($tipeHp && ! $this->isIncomingNewer($payload['updated_at'] ?? null, $tipeHp->updated_at)) {
             return;
@@ -927,6 +992,12 @@ class HybridSyncProcessorService
             ['sku' => $payload['sku'] ?? null],
             ['barcode' => $payload['barcode'] ?? null],
         ]);
+
+        if (! empty($payload['deleted'])) {
+            $variant?->delete();
+
+            return;
+        }
 
         if ($variant && ! $this->isIncomingNewer($payload['updated_at'] ?? null, $variant->updated_at)) {
             return;
@@ -1736,6 +1807,12 @@ class HybridSyncProcessorService
             ['no_tiket' => $payload['no_tiket'] ?? null],
         ]);
 
+        if (! empty($payload['deleted'])) {
+            $tiket?->delete();
+
+            return;
+        }
+
         if ($tiket && ! $this->isIncomingNewer($payload['updated_at'] ?? null, $tiket->updated_at)) {
             return;
         }
@@ -1903,6 +1980,25 @@ class HybridSyncProcessorService
             $userId = null;
         }
 
+        $referensiTipe = $payload['referensi_tipe'] ?? null;
+        $referensiId = $payload['referensi_id'] ?? null;
+        if (is_string($referensiTipe) && $referensiTipe !== '' && class_exists($referensiTipe) && is_subclass_of($referensiTipe, Model::class)) {
+            $natMatchers = [];
+            foreach (is_array($payload['referensi_natural'] ?? null) ? $payload['referensi_natural'] : [] as $k => $v) {
+                if ($v !== null && $v !== '') {
+                    $natMatchers[] = [$k => $v];
+                }
+            }
+            $referensiId = $this->resolveForeignId(
+                $referensiTipe,
+                $payload,
+                'referensi_id',
+                'referensi_sync_uuid',
+                $natMatchers,
+                withTrashed: true
+            );
+        }
+
         app(JurnalService::class)->post(
             noJurnal: $noJurnal,
             tanggal: ! empty($payload['tanggal']) ? Carbon::parse((string) $payload['tanggal']) : now(),
@@ -1911,8 +2007,8 @@ class HybridSyncProcessorService
             deskripsi: $payload['deskripsi'] ?? null,
             cabangId: $cabangId,
             userId: $userId,
-            referensiTipe: $payload['referensi_tipe'] ?? null,
-            referensiId: $payload['referensi_id'] ?? null,
+            referensiTipe: $referensiTipe,
+            referensiId: $referensiId,
             idempotencyKey: $payload['idempotency_key'] ?? ("sync-jurnal-{$cabangKey}-{$noJurnal}"),
             statusApproval: (string) ($payload['status_approval'] ?? 'disetujui')
         );
@@ -1954,6 +2050,12 @@ class HybridSyncProcessorService
                 return true;
             },
         ]);
+
+        if (! empty($payload['deleted'])) {
+            $periodeRecord?->delete();
+
+            return;
+        }
 
         if (! $periodeRecord) {
             $periodeRecord = new PayrollPeriode;
@@ -2006,6 +2108,51 @@ class HybridSyncProcessorService
             ]);
             $slip->status = $slipData['status'] ?? $slip->status ?? 'approved';
             $slip->save();
+
+            if (is_array($slipData['komisi_details'] ?? null) && class_exists(PayrollKomisiDetail::class)) {
+                PayrollKomisiDetail::where('slip_id', $slip->id)->delete();
+
+                foreach ($slipData['komisi_details'] as $detail) {
+                    if (! is_array($detail)) {
+                        continue;
+                    }
+
+                    $komisiId = $this->resolveForeignId(
+                        Komisi::class,
+                        $detail,
+                        'komisi_id',
+                        'komisi_sync_uuid',
+                        [['idempotensi_key' => $detail['komisi_idempotensi_key'] ?? null]]
+                    );
+                    $tiketId = $this->resolveForeignId(
+                        TiketServis::class,
+                        $detail,
+                        'tiket_servis_id',
+                        'tiket_sync_uuid',
+                        [['no_tiket' => $detail['tiket_no_tiket'] ?? null]]
+                    );
+                    $teknisiId = $this->resolveForeignId(
+                        Karyawan::class,
+                        $detail,
+                        'teknisi_id',
+                        'teknisi_sync_uuid',
+                        [['nik' => $detail['teknisi_nik'] ?? null]]
+                    ) ?? $karyawanId;
+
+                    if (! $tiketId) {
+                        continue;
+                    }
+
+                    PayrollKomisiDetail::create([
+                        'slip_id' => $slip->id,
+                        'komisi_id' => $komisiId,
+                        'tiket_servis_id' => $tiketId,
+                        'teknisi_id' => $teknisiId,
+                        'jenis' => (string) ($detail['jenis'] ?? 'servis'),
+                        'nominal' => (float) ($detail['nominal'] ?? 0),
+                    ]);
+                }
+            }
         }
     }
 
@@ -2267,6 +2414,12 @@ class HybridSyncProcessorService
                 if (json_last_error() === JSON_ERROR_NONE) {
                     $val = $decoded;
                 }
+            } else {
+                $val = $this->normalizeGenericColumnValue(
+                    val: $val,
+                    typeName: $schema['types'][$col] ?? '',
+                    isNullable: (bool) ($schema['nullable'][$col] ?? true)
+                );
             }
 
             $attributes[$col] = $val;
@@ -2279,6 +2432,40 @@ class HybridSyncProcessorService
         $target = $existing ?? $modelInstance;
         $target->forceFill($attributes);
         $target->saveQuietly();
+    }
+
+    /**
+     * Normalisasi format tanggal/datetime ISO-8601 & string kosong agar lolos MySQL 8 strict mode
+     * meski model terkait belum mendeklarasikan Eloquent date/datetime cast pada kolom tersebut.
+     */
+    private function normalizeGenericColumnValue(mixed $val, string $typeName, bool $isNullable): mixed
+    {
+        if ($val === '' && $isNullable && preg_match('/date|time|int|dec|num|float|double/', $typeName)) {
+            return null;
+        }
+
+        if (! is_string($val) || $val === '') {
+            return $val;
+        }
+
+        $lowerType = strtolower($typeName);
+        if ($lowerType === 'date') {
+            try {
+                return Carbon::parse($val)->setTimezone((string) config('app.timezone', 'Asia/Jakarta'))->format('Y-m-d');
+            } catch (\Throwable) {
+                return $val;
+            }
+        }
+
+        if (str_contains($lowerType, 'datetime') || str_contains($lowerType, 'timestamp')) {
+            try {
+                return Carbon::parse($val)->setTimezone((string) config('app.timezone', 'Asia/Jakarta'))->format('Y-m-d H:i:s');
+            } catch (\Throwable) {
+                return $val;
+            }
+        }
+
+        return $val;
     }
 
     /**
@@ -2334,11 +2521,18 @@ class HybridSyncProcessorService
                 targetClass: $fkDef['model'],
                 naturalCols: $fkDef['natural'] ?? [],
                 fallbackUser: (bool) ($fkDef['fallback_user'] ?? false),
+                skipRawIdFallback: (bool) ($fkDef['skip_raw_id_fallback'] ?? false),
                 ref: is_array($refs[$col] ?? null) ? $refs[$col] : null,
                 rawId: $payload[$col],
                 isNullable: (bool) ($schema['nullable'][$col] ?? true),
                 throwOnMissingRequired: $throwOnMissingRequired
             );
+
+            if ($col === 'jurnal_akuntansi_id' && $payload[$col] === null && ! empty($payload['no_jurnal_matched'])) {
+                $payload[$col] = JurnalAkuntansi::query()
+                    ->where('no_jurnal', (string) $payload['no_jurnal_matched'])
+                    ->value('id');
+            }
         }
 
         foreach ($polyFks as $col => $polySpec) {
@@ -2364,6 +2558,7 @@ class HybridSyncProcessorService
                 targetClass: $targetClass,
                 naturalCols: BackofficeSyncRegistry::naturalKeysForModel($targetClass),
                 fallbackUser: false,
+                skipRawIdFallback: false,
                 ref: $ref,
                 rawId: $payload[$col],
                 isNullable: (bool) ($schema['nullable'][$col] ?? true),
@@ -2385,6 +2580,7 @@ class HybridSyncProcessorService
         string $targetClass,
         array $naturalCols,
         bool $fallbackUser,
+        bool $skipRawIdFallback,
         ?array $ref,
         mixed $rawId,
         bool $isNullable,
@@ -2432,7 +2628,7 @@ class HybridSyncProcessorService
         }
 
         // Jangan ikat ke numeric ID mentah bila ref punya sync_uuid namun baris belum ada di node ini (anti PK kolisi).
-        if (! $hasSyncUuid || $refUuid === null) {
+        if (! $skipRawIdFallback && (! $hasSyncUuid || $refUuid === null)) {
             $candidateId = (int) $rawId;
             if ($candidateId > 0) {
                 $found = $baseQuery()->where('id', $candidateId)->first();
@@ -2481,22 +2677,59 @@ class HybridSyncProcessorService
     }
 
     /**
-     * @return array{columns: list<string>, nullable: array<string, bool>}
+     * Sinkronisasi kunci konfigurasi bisnis ter-allowlist (pajak, loyalitas, reseller, payment MP).
+     */
+    protected function handleKonfigurasiUpsert(array $payload): void
+    {
+        $kunci = trim((string) ($payload['kunci'] ?? ''));
+        if ($kunci === '' || ! KonfigurasiService::isSyncAllowedKey($kunci)) {
+            return;
+        }
+
+        $now = now();
+        $nilai = array_key_exists('nilai', $payload) ? (string) $payload['nilai'] : '';
+        $existing = DB::table('konfigurasi')->where('kunci', $kunci)->first();
+
+        if ($existing) {
+            DB::table('konfigurasi')->where('kunci', $kunci)->update([
+                'nilai' => $nilai,
+                'deskripsi' => $payload['deskripsi'] ?? $existing->deskripsi,
+                'updated_at' => $now,
+            ]);
+        } else {
+            DB::table('konfigurasi')->insert([
+                'kunci' => $kunci,
+                'nilai' => $nilai,
+                'deskripsi' => $payload['deskripsi'] ?? null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        app(KonfigurasiService::class)->flushMemoryCache();
+        Cache::forget('crm-konfigurasi:'.$kunci);
+    }
+
+    /**
+     * @return array{columns: list<string>, nullable: array<string, bool>, types: array<string, string>}
      */
     protected function getTableSchemaInfo(string $table): array
     {
         if (! array_key_exists($table, self::$tableSchemaCache)) {
             $columns = [];
             $nullable = [];
+            $types = [];
             if (Schema::hasTable($table)) {
                 foreach (Schema::getColumns($table) as $col) {
                     $columns[] = $col['name'];
                     $nullable[$col['name']] = $col['nullable'];
+                    $types[$col['name']] = strtolower($col['type_name']);
                 }
             }
             self::$tableSchemaCache[$table] = [
                 'columns' => $columns,
                 'nullable' => $nullable,
+                'types' => $types,
             ];
         }
 

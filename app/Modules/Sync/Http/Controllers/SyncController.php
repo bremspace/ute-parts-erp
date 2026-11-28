@@ -99,12 +99,13 @@ class SyncController extends Controller
      */
     public function pull(Request $request): JsonResponse
     {
-        $limit = (int) $request->query('limit', 50);
+        $limit = max(1, min(200, (int) $request->query('limit', 50)));
         $cabangId = $request->query('cabang_id');
         $nodeRole = config('sync.node_role');
 
         $query = HybridSyncOutbox::where('status', 'pending')
             ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc')
             ->limit($limit);
 
         if ($cabangId) {

@@ -3,6 +3,7 @@
 namespace App\Modules\Sync\Jobs;
 
 use App\Modules\Sync\Models\HybridSyncOutbox;
+use App\Modules\Sync\Providers\SyncServiceProvider;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -29,6 +30,8 @@ class PushHybridSyncJob implements ShouldQueue
 
     public function handle(): void
     {
+        SyncServiceProvider::refreshRuntimeConfigIfChanged();
+
         try {
             $outbox = HybridSyncOutbox::find($this->outboxId);
             if (! $outbox || $outbox->status === 'synced') {

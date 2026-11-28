@@ -4,6 +4,7 @@ namespace App\Modules\Akunting\Services;
 
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Pos\Models\Transaksi;
 use Illuminate\Support\Facades\DB;
 
@@ -428,6 +429,7 @@ class PajakService
             ['kunci' => $kunci],
             ['nilai' => $val, 'deskripsi' => null, 'created_at' => now(), 'updated_at' => now()]
         );
+        KonfigurasiService::dispatchSyncIfAllowed($kunci, $val);
     }
 
     /**
@@ -440,6 +442,7 @@ class PajakService
             ['kunci' => $kunci],
             ['nilai' => (string) $val, 'deskripsi' => null, 'created_at' => now(), 'updated_at' => now()]
         );
+        KonfigurasiService::dispatchSyncIfAllowed($kunci, (string) $val);
     }
 
     /**
@@ -452,5 +455,6 @@ class PajakService
             ['kunci' => $kunci],
             ['nilai' => (string) $val, 'deskripsi' => null, 'created_at' => now(), 'updated_at' => now()]
         );
+        KonfigurasiService::dispatchSyncIfAllowed($kunci, (string) $val);
     }
 }

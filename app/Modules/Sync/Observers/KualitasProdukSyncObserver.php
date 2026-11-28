@@ -19,6 +19,16 @@ class KualitasProdukSyncObserver
         $this->enqueueSync($kualitas);
     }
 
+    public function deleted(KualitasProduk $kualitas): void
+    {
+        $this->enqueueDeletedSnapshot(
+            $kualitas,
+            'kualitas_produk.upsert',
+            ['nama' => $kualitas->nama],
+            logLabel: 'KualitasProdukSyncObserver:delete'
+        );
+    }
+
     private function enqueueSync(KualitasProduk $kualitas): void
     {
         $this->enqueueModelEvent(

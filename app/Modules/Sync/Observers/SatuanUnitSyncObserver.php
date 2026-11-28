@@ -19,6 +19,19 @@ class SatuanUnitSyncObserver
         $this->enqueueSync($satuan);
     }
 
+    public function deleted(SatuanUnit $satuan): void
+    {
+        $this->enqueueDeletedSnapshot(
+            $satuan,
+            'satuan_unit.upsert',
+            [
+                'kode' => $satuan->kode,
+                'nama' => $satuan->nama,
+            ],
+            logLabel: 'SatuanUnitSyncObserver:delete'
+        );
+    }
+
     private function enqueueSync(SatuanUnit $satuan): void
     {
         $this->enqueueModelEvent(

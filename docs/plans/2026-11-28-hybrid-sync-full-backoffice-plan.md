@@ -62,6 +62,16 @@
 
 ---
 
+## Part D: Audit Hardening (Pass 2 — 28 November 2026)
+
+- [x] **T-09** — Sinkronisasi signature HMAC query GET (`SyncPullCommand` `ksort()` param sebelum `http_build_query` agar cocok dgn normalisasi Symfony `VerifySyncSignature`) + guard `--all` saat batch gagal/ACK gagal + clamp limit `/pull` + tie-break `orderBy('created_at')->orderBy('id')` pada seluruh outbox reader.
+- [x] **T-10** — Reload live konfigurasi runtime (`SyncServiceProvider::markRuntimeConfigUpdated()` & `refreshRuntimeConfigIfChanged()` dipanggil dari `VerifySyncSignature`, `PushHybridSyncJob`, `BatchPushHybridSyncJob`, `SyncFlushCommand`, `SyncPullCommand`, `SyncStatusController`, dipicu oleh `SettingsRbac::simpanIntegrasi()`) agar `queue:work` langsung mengikuti perubahan `sync_api_secret`/URL tanpa restart worker.
+- [x] **T-11** — Perbaiki race condition hard-delete & create+delete dalam satu transaksi DB: `BackofficeModelSyncObserver::deleting()` menangkap snapshot `_refs` sebelum cascade FK terhapus; `SyncsModelEvents::enqueueModelEvent()` melewati `$model->refresh()` pada `.delete` dan melewatkan upsert bila `$model->exists === false` / `ModelNotFoundException` pasca-commit.
+- [x] **T-12** — Lengkapi observer `.delete` & FK cross-node yang terlewat: tambah `deleted()` + delete handler (`Brand`, `KategoriProduk`, `KualitasProduk`, `SatuanUnit`, `TipeHp`, `SkuVariant`, `Pelanggan`, `TiketServis`, `PayrollPeriode`, dan `Produk::forceDelete()`), remap `Produk::supplier_id`, `Pelanggan::approved_by`, `JurnalHeader::referensi_id`, serta anak `PayrollKomisiDetail` pada `payroll.upsert`.
+- [x] **T-13** — Perluasan cakupan & keamanan tipe DB: tambah `rekonsiliasi_bank`, `rekonsiliasi_bank_item`, `pelanggan_kode_aktivasi` (`2026_11_28_000002_add_sync_uuid_to_additional_backoffice_tables.php`), natural matchers pada master non-unique (`supplier` nama, `shift`, `bagi_hasil_periode`, `aset_tetap`, `skema_komisi`, `komisi_skema`, `channels`, `approval_rules`), sinkronisasi `konfigurasi.upsert` ter-allowlist (`KonfigurasiService`, `PajakService`), serta normalisasi kolom `date`/`datetime`/`timestamp` untuk MySQL 8 strict mode.
+
+---
+
 ## Cakupan Model yang Dikecualikan Secara Sengaja
 - `HybridSyncInbox`, `HybridSyncOutbox` (infrastruktur sync sendiri)
 - `AuditLog`, `AktivitasLog`, `PosOfflineSyncLog`, `ImportLog`, `SidImportMap` (log/jejak lokal per node)

@@ -7,12 +7,18 @@ use App\Modules\Sync\Services\HybridSyncOutboxService;
 use App\Modules\Sync\Services\HybridSyncProcessorService;
 use App\Modules\Sync\SyncObserverBootstrap;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Throwable;
 
 class SyncServiceProvider extends ServiceProvider
 {
+    public const CONFIG_VERSION_CACHE_KEY = 'hybrid_sync:config_version';
+
+    private static ?string $appliedConfigVersion = null;
+
     /**
      * Register any application services.
      */
@@ -34,9 +40,58 @@ class SyncServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->applyDatabaseConfig();
+        self::applyDatabaseConfig();
+        try {
+            $version = Cache::get(self::CONFIG_VERSION_CACHE_KEY);
+            self::$appliedConfigVersion = is_string($version) ? $version : null;
+        } catch (Throwable) {
+            self::$appliedConfigVersion = null;
+        }
 
         SyncObserverBootstrap::register();
+    }
+
+    /**
+     * Tandai perubahan konfigurasi runtime Hybrid Sync agar queue:work / worker lain
+     * otomatis memuat ulang konfigurasi terbaru tanpa restart proses.
+     */
+    public static function markRuntimeConfigUpdated(): void
+    {
+        $version = (string) Str::uuid();
+        self::$appliedConfigVersion = null;
+
+        try {
+            Cache::forever(self::CONFIG_VERSION_CACHE_KEY, $version);
+        } catch (Throwable) {
+            // Cache backend mungkin belum siap saat CLI setup awal.
+        }
+    }
+
+    /**
+     * Muat ulang config('sync.*') dari DB hanya jika versi konfigurasi di cache berubah
+     * sejak terakhir diterapkan pada worker proses ini.
+     */
+    public static function refreshRuntimeConfigIfChanged(): void
+    {
+        try {
+            $version = Cache::get(self::CONFIG_VERSION_CACHE_KEY);
+        } catch (Throwable) {
+            return;
+        }
+
+        if (! is_string($version) || $version === '' || $version === self::$appliedConfigVersion) {
+            return;
+        }
+
+        try {
+            app(KonfigurasiService::class)->flushMemoryCache();
+            Cache::forget('crm-konfigurasi:hybrid_sync_config');
+        } catch (Throwable) {
+            // Abaikan bila cache belum siap.
+        }
+
+        self::applyDatabaseConfig();
+        self::$appliedConfigVersion = $version;
     }
 
     /**
@@ -44,7 +99,7 @@ class SyncServiceProvider extends ServiceProvider
      * sumber runtime. Tanpa ini, UI hanya menyimpan `hybrid_sync_config` tetapi
      * observer/processor tetap membaca `config('sync.*')` dari .env.
      */
-    protected function applyDatabaseConfig(): void
+    protected static function applyDatabaseConfig(): void
     {
         try {
             $saved = app(KonfigurasiService::class)->get('hybrid_sync_config');

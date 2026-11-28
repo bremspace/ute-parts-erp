@@ -21,7 +21,22 @@ class ProdukSyncObserver
 
     public function deleted(Produk $produk): void
     {
-        $this->enqueueSync($produk, forceDeleted: ! $produk->exists);
+        if (! $produk->exists) {
+            $this->enqueueDeletedSnapshot(
+                $produk,
+                'produk.upsert',
+                [
+                    'slug' => $produk->slug,
+                    'barcode' => $produk->barcode,
+                    'force_deleted' => true,
+                ],
+                logLabel: 'ProdukSyncObserver:forceDelete'
+            );
+
+            return;
+        }
+
+        $this->enqueueSync($produk);
     }
 
     public function restored(Produk $produk): void
@@ -29,14 +44,14 @@ class ProdukSyncObserver
         $this->enqueueSync($produk);
     }
 
-    private function enqueueSync(Produk $produk, bool $forceDeleted = false): void
+    private function enqueueSync(Produk $produk): void
     {
         $this->enqueueModelEvent(
             $produk,
             'produk.upsert',
-            function (Produk $model) use ($forceDeleted): array {
+            function (Produk $model): array {
                 $syncUuid = $this->ensureSyncUuid($model);
-                $model->loadMissing(['brand', 'kualitas', 'kategoriRelasi']);
+                $model->loadMissing(['brand', 'kualitas', 'kategoriRelasi', 'supplier']);
 
                 return [
                     'id' => $model->id,
@@ -71,6 +86,9 @@ class ProdukSyncObserver
                     'kualitas_sync_uuid' => $model->kualitas?->getAttribute('sync_uuid'),
                     'kualitas_nama' => $model->kualitas?->getAttribute('nama'),
                     'supplier_id' => $model->supplier_id,
+                    'supplier_sync_uuid' => $model->supplier?->getAttribute('sync_uuid'),
+                    'supplier_kode_lama' => $model->supplier?->getAttribute('kode_lama'),
+                    'supplier_nama' => $model->supplier?->getAttribute('nama'),
                     'harga_fleksibel' => (bool) ($model->getAttribute('harga_fleksibel') ?? false),
                     'sn' => (bool) ($model->getAttribute('sn') ?? false),
                     'abc_class' => $model->abc_class,
@@ -80,7 +98,7 @@ class ProdukSyncObserver
                     'is_ondemand' => (bool) ($model->is_ondemand ?? false),
                     'kena_pajak' => (bool) ($model->kena_pajak ?? false),
                     'deleted_at' => $this->formatIso8601($model->getAttribute('deleted_at')),
-                    'force_deleted' => $forceDeleted,
+                    'force_deleted' => false,
                 ];
             },
             cabangId: null,

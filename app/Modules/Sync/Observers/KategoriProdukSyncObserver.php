@@ -19,6 +19,19 @@ class KategoriProdukSyncObserver
         $this->enqueueSync($kategori);
     }
 
+    public function deleted(KategoriProduk $kategori): void
+    {
+        $this->enqueueDeletedSnapshot(
+            $kategori,
+            'kategori_produk.upsert',
+            [
+                'slug' => $kategori->slug,
+                'nama' => $kategori->nama,
+            ],
+            logLabel: 'KategoriProdukSyncObserver:delete'
+        );
+    }
+
     private function enqueueSync(KategoriProduk $kategori): void
     {
         $this->enqueueModelEvent(

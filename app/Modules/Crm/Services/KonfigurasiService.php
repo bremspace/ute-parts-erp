@@ -4,6 +4,9 @@ namespace App\Modules\Crm\Services;
 
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Reseller\Models\KomisiSkema;
+use App\Modules\Sync\Services\HybridSyncOutboxService;
+use App\Modules\Sync\Services\SyncExecutionGuard;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -14,6 +17,67 @@ use Illuminate\Support\Facades\DB;
  */
 class KonfigurasiService
 {
+    /**
+     * Prefiks kunci konfigurasi bisnis yang aman & perlu disinkronkan dua arah.
+     * Kredensial gateway / DB / hybrid_sync_config Sengaja TIDAK masuk daftar ini.
+     *
+     * @var list<string>
+     */
+    public const SYNCABLE_KEY_PREFIXES = [
+        'pajak_',
+        'ppn_',
+        'poin_',
+        'diskon_',
+        'reseller_',
+        'agen_',
+        'mitra_',
+        'harga_partai_',
+        'margin_guard_',
+        'payment_gateway_fee_',
+        'komisi_agen_',
+        'payment_mp_',
+    ];
+
+    public static function isSyncAllowedKey(string $kunci): bool
+    {
+        foreach (self::SYNCABLE_KEY_PREFIXES as $prefix) {
+            if (str_starts_with($kunci, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function dispatchSyncIfAllowed(string $kunci, string $rawNilai, ?string $deskripsi = null): void
+    {
+        if (! self::isSyncAllowedKey($kunci) || SyncExecutionGuard::isSuppressed() || ! config('sync.enabled')) {
+            return;
+        }
+
+        try {
+            $stub = new class extends Model
+            {
+                protected $table = 'konfigurasi';
+            };
+            $rowId = DB::table('konfigurasi')->where('kunci', $kunci)->value('id');
+            $stub->forceFill(['id' => (int) ($rowId ?? 0)]);
+
+            app(HybridSyncOutboxService::class)->enqueue(
+                'konfigurasi.upsert',
+                $stub,
+                [
+                    'kunci' => $kunci,
+                    'nilai' => $rawNilai,
+                    'deskripsi' => $deskripsi,
+                    'updated_at' => now()->toIso8601String(),
+                ]
+            );
+        } catch (\Throwable) {
+            // Tabel outbox / migrasi mungkin belum ada saat instalasi awal.
+        }
+    }
+
     /**
      * [B-15d] TTL cache konfigurasi. Nilai konfigurasi jarang berubah (di-set dari
      * halaman Pengaturan / API CRM), jadi 5 menit aman; setiap `set()` wajib
@@ -88,16 +152,18 @@ class KonfigurasiService
         $existing = DB::table('konfigurasi')->where('kunci', $kunci)->first();
         $now = now();
 
+        $encoded = is_scalar($nilai) ? (string) $nilai : (string) json_encode($nilai);
+
         if ($existing) {
             DB::table('konfigurasi')->where('kunci', $kunci)->update([
-                'nilai' => is_scalar($nilai) ? (string) $nilai : json_encode($nilai),
+                'nilai' => $encoded,
                 'deskripsi' => $deskripsi,
                 'updated_at' => $now,
             ]);
         } else {
             DB::table('konfigurasi')->insert([
                 'kunci' => $kunci,
-                'nilai' => is_scalar($nilai) ? (string) $nilai : json_encode($nilai),
+                'nilai' => $encoded,
                 'deskripsi' => $deskripsi,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -107,6 +173,8 @@ class KonfigurasiService
         // [B-15d] Invalidasi cache WAJIB di titik tulis (satu-satunya jalur tulis).
         unset($this->requestMemo[$kunci]);
         Cache::forget(self::CACHE_PREFIX.$kunci);
+
+        self::dispatchSyncIfAllowed($kunci, $encoded, $deskripsi);
     }
 
     public function flushMemoryCache(): void

@@ -8,6 +8,7 @@ use App\Modules\Sync\Services\HybridSyncOutboxService;
 use App\Modules\Sync\Services\SyncExecutionGuard;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -106,20 +107,32 @@ trait SyncsModelEvents
         string $eventType,
         callable $payloadBuilder,
         ?int $cabangId = null,
-        string $logLabel = 'Model'
+        string $logLabel = 'Model',
+        bool $refreshBeforeBuild = true
     ): void {
         if (SyncExecutionGuard::isSuppressed() || ! config('sync.enabled')) {
             return;
         }
 
-        $action = function () use ($model, $eventType, $payloadBuilder, $cabangId, $logLabel): void {
+        $action = function () use ($model, $eventType, $payloadBuilder, $cabangId, $logLabel, $refreshBeforeBuild): void {
             if (SyncExecutionGuard::isSuppressed() || ! config('sync.enabled')) {
                 return;
             }
 
             try {
-                if ($model->exists) {
-                    $model->refresh();
+                if ($refreshBeforeBuild) {
+                    if (! $model->exists) {
+                        // Record telah dihapus dalam transaksi yang sama sebelum commit.
+                        return;
+                    }
+
+                    try {
+                        $model->refresh();
+                    } catch (ModelNotFoundException) {
+                        // Record telah dihapus dalam transaksi yang sama sebelum commit;
+                        // skip upsert agar tidak menumbuhkan data hantu atau log gagal.
+                        return;
+                    }
                 }
 
                 $payload = $payloadBuilder($model);
@@ -143,6 +156,41 @@ trait SyncsModelEvents
         } else {
             $action();
         }
+    }
+
+    /**
+     * Enqueue snapshot penghapusan model sebelum commit agar cascade-delete
+     * atau hard-delete tetap dapat disinkronkan secara idempotent lintas node.
+     *
+     * @param  array<string, mixed>  $extraPayload
+     */
+    protected function enqueueDeletedSnapshot(
+        Model $model,
+        string $eventType,
+        array $extraPayload = [],
+        ?int $cabangId = null,
+        string $logLabel = 'Model:delete'
+    ): void {
+        if (SyncExecutionGuard::isSuppressed() || ! config('sync.enabled')) {
+            return;
+        }
+
+        $payload = array_merge([
+            'id' => $model->getKey(),
+            'sync_uuid' => $model->getAttribute('sync_uuid'),
+            'deleted' => true,
+            'deleted_at' => now()->toIso8601String(),
+            'updated_at' => now()->toIso8601String(),
+        ], $extraPayload);
+
+        $this->enqueueModelEvent(
+            $model,
+            $eventType,
+            static fn (): array => $payload,
+            cabangId: $cabangId,
+            logLabel: $logLabel,
+            refreshBeforeBuild: false
+        );
     }
 
     /**

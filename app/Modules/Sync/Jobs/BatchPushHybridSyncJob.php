@@ -3,6 +3,7 @@
 namespace App\Modules\Sync\Jobs;
 
 use App\Modules\Sync\Models\HybridSyncOutbox;
+use App\Modules\Sync\Providers\SyncServiceProvider;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -32,6 +33,8 @@ class BatchPushHybridSyncJob implements ShouldQueue
 
     public function handle(): void
     {
+        SyncServiceProvider::refreshRuntimeConfigIfChanged();
+
         if (empty($this->outboxIds)) {
             return;
         }
@@ -43,6 +46,7 @@ class BatchPushHybridSyncJob implements ShouldQueue
         $items = HybridSyncOutbox::whereIn('id', $this->outboxIds)
             ->where('status', '!=', 'synced')
             ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc')
             ->get();
 
         if ($items->isEmpty()) {

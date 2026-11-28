@@ -19,6 +19,19 @@ class SkuVariantSyncObserver
         $this->enqueueSync($variant);
     }
 
+    public function deleted(SkuVariant $variant): void
+    {
+        $this->enqueueDeletedSnapshot(
+            $variant,
+            'sku_variant.upsert',
+            [
+                'sku' => $variant->sku,
+                'barcode' => $variant->getAttribute('barcode'),
+            ],
+            logLabel: 'SkuVariantSyncObserver:delete'
+        );
+    }
+
     private function enqueueSync(SkuVariant $variant): void
     {
         $this->enqueueModelEvent(

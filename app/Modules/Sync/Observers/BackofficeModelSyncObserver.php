@@ -4,6 +4,7 @@ namespace App\Modules\Sync\Observers;
 
 use App\Modules\Sync\BackofficeSyncRegistry;
 use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
+use App\Modules\Sync\Services\SyncExecutionGuard;
 use App\Scopes\CabangScope;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Casts\AsCollection;
@@ -27,6 +28,19 @@ class BackofficeModelSyncObserver
         AsCollection::class,
     ];
 
+    /**
+     * Snapshot sementara sebelum model + cascade FK dihapus agar metadata `_refs`
+     * tetap akurat saat di-enqueue setelah commit.
+     *
+     * @var \WeakMap<Model, array{payload: array<string, mixed>, cabang_id: int|null}>
+     */
+    private \WeakMap $pendingDeleteSnapshots;
+
+    public function __construct()
+    {
+        $this->pendingDeleteSnapshots = new \WeakMap;
+    }
+
     public function created(Model $model): void
     {
         $this->enqueueGenericUpsert($model);
@@ -37,44 +51,63 @@ class BackofficeModelSyncObserver
         $this->enqueueGenericUpsert($model);
     }
 
+    public function deleting(Model $model): void
+    {
+        if (SyncExecutionGuard::isSuppressed() || ! config('sync.enabled')) {
+            return;
+        }
+
+        $this->pendingDeleteSnapshots[$model] = $this->buildDeleteSnapshot($model);
+    }
+
     public function deleted(Model $model): void
     {
         $table = $model->getTable();
-        $cabangId = $this->resolveCabangId($model);
+        $snapshot = $this->pendingDeleteSnapshots[$model] ?? $this->buildDeleteSnapshot($model);
+        unset($this->pendingDeleteSnapshots[$model]);
 
         $this->enqueueModelEvent(
             $model,
             "{$table}.delete",
-            function (Model $m): array {
-                $syncUuid = $this->ensureSyncUuid($m);
-                $def = BackofficeSyncRegistry::tables()[$m->getTable()] ?? [];
-
-                $payload = [
-                    'id' => $m->getKey(),
-                    'sync_uuid' => $syncUuid,
-                    'deleted_at' => now()->toIso8601String(),
-                ];
-
-                // Sertakan natural key bila ada agar delete tetap cocok bila sync_uuid belum pernah tersinkron.
-                foreach ($def['unique'] ?? [] as $cols) {
-                    foreach ($cols as $col) {
-                        $val = $m->getAttribute($col);
-                        if ($val !== null && $val !== '') {
-                            $payload[$col] = $val;
-                        }
-                    }
-                }
-
-                $refs = $this->buildForeignKeyRefs($m, $m->getAttributes());
-                if ($refs !== []) {
-                    $payload['_refs'] = $refs;
-                }
-
-                return $payload;
-            },
-            cabangId: $cabangId,
-            logLabel: "BackofficeSync({$table}:delete)"
+            static fn (): array => $snapshot['payload'],
+            cabangId: $snapshot['cabang_id'],
+            logLabel: "BackofficeSync({$table}:delete)",
+            refreshBeforeBuild: false
         );
+    }
+
+    /**
+     * @return array{payload: array<string, mixed>, cabang_id: int|null}
+     */
+    private function buildDeleteSnapshot(Model $model): array
+    {
+        $def = BackofficeSyncRegistry::tables()[$model->getTable()] ?? [];
+
+        $payload = [
+            'id' => $model->getKey(),
+            'sync_uuid' => $model->getAttribute('sync_uuid'),
+            'deleted_at' => now()->toIso8601String(),
+        ];
+
+        // Sertakan natural key bila ada agar delete tetap cocok bila sync_uuid belum pernah tersinkron.
+        foreach ($def['unique'] ?? [] as $cols) {
+            foreach ($cols as $col) {
+                $val = $model->getAttribute($col);
+                if ($val !== null && $val !== '') {
+                    $payload[$col] = $val;
+                }
+            }
+        }
+
+        $refs = $this->buildForeignKeyRefs($model, $model->getAttributes());
+        if ($refs !== []) {
+            $payload['_refs'] = $refs;
+        }
+
+        return [
+            'payload' => $payload,
+            'cabang_id' => $this->resolveCabangId($model),
+        ];
     }
 
     private function enqueueGenericUpsert(Model $model): void

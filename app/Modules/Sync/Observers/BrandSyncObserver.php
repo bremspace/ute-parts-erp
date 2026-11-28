@@ -19,6 +19,16 @@ class BrandSyncObserver
         $this->enqueueSync($brand);
     }
 
+    public function deleted(Brand $brand): void
+    {
+        $this->enqueueDeletedSnapshot(
+            $brand,
+            'brand.upsert',
+            ['nama' => $brand->nama],
+            logLabel: 'BrandSyncObserver:delete'
+        );
+    }
+
     private function enqueueSync(Brand $brand): void
     {
         $this->enqueueModelEvent(

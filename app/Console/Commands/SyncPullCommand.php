@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Modules\Sync\Providers\SyncServiceProvider;
 use App\Modules\Sync\Services\HybridSyncProcessorService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -24,6 +25,8 @@ class SyncPullCommand extends Command
      */
     public function handle(HybridSyncProcessorService $processor): int
     {
+        SyncServiceProvider::refreshRuntimeConfigIfChanged();
+
         if (! config('sync.enabled')) {
             $this->warn('Hybrid sync sedang dinonaktifkan (SYNC_ENABLED=false).');
 
@@ -59,6 +62,8 @@ class SyncPullCommand extends Command
             if (! empty($cabangId)) {
                 $queryParams['cabang_id'] = $cabangId;
             }
+            // Symfony Request::getQueryString() mengurutkan parameter secara alfabetis.
+            ksort($queryParams);
 
             $queryString = http_build_query($queryParams);
             $endpoint = rtrim($remoteUrl, '/').'/api/internal/sync/pull?'.$queryString;
@@ -113,19 +118,26 @@ class SyncPullCommand extends Command
                 $totalFailed += $batchFailed;
 
                 // Kirim ACK ke VPS untuk item yang berhasil diproses agar tidak ditarik ulang
+                $ackOk = true;
                 if (! empty($processedUuids)) {
                     $ackPayload = json_encode(['sync_uuids' => $processedUuids]);
                     $ackTs = time();
                     $ackSig = hash_hmac('sha256', $ackTs.'.'.$ackPayload, $apiSecret);
-                    Http::timeout(10)->withHeaders([
+                    $ackResponse = Http::timeout(10)->withHeaders([
                         'X-Sync-Node' => config('sync.node_id'),
                         'X-Sync-Signature' => $ackSig,
                         'X-Sync-Timestamp' => (string) $ackTs,
                         'Content-Type' => 'application/json',
                     ])->withBody($ackPayload, 'application/json')->post(rtrim($remoteUrl, '/').'/api/internal/sync/ack');
+
+                    if ($ackResponse->failed()) {
+                        $ackOk = false;
+                        $this->warn('Gagal mengirim ACK batch (HTTP '.$ackResponse->status().') — menghentikan iterasi pull agar tidak berulang.');
+                    }
                 }
 
-                if (! $pullAll || $count < $limit) {
+                // Hindari loop --all tanpa akhir bila batch penuh gagal semua atau ACK gagal.
+                if (! $pullAll || $count < $limit || $batchProcessed === 0 || ! $ackOk) {
                     break;
                 }
             } catch (\Throwable $e) {

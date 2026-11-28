@@ -19,6 +19,19 @@ class TipeHpSyncObserver
         $this->enqueueSync($tipeHp);
     }
 
+    public function deleted(TipeHp $tipeHp): void
+    {
+        $this->enqueueDeletedSnapshot(
+            $tipeHp,
+            'tipe_hp.upsert',
+            [
+                'merk' => $tipeHp->merk,
+                'model' => $tipeHp->model,
+            ],
+            logLabel: 'TipeHpSyncObserver:delete'
+        );
+    }
+
     private function enqueueSync(TipeHp $tipeHp): void
     {
         $this->enqueueModelEvent(

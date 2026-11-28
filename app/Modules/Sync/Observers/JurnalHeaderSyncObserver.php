@@ -4,7 +4,9 @@ namespace App\Modules\Sync\Observers;
 
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Sync\BackofficeSyncRegistry;
 use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
+use App\Scopes\CabangScope;
 use Illuminate\Database\Eloquent\Model;
 
 class JurnalHeaderSyncObserver
@@ -70,6 +72,7 @@ class JurnalHeaderSyncObserver
             function (JurnalHeader $model): array {
                 $syncUuid = $this->ensureSyncUuid($model);
                 $model->loadMissing(['lines.akun', 'user']);
+                [$refUuid, $refNatural] = $this->resolveReferensiMetadata($model);
 
                 return [
                     'id' => $model->id,
@@ -85,6 +88,8 @@ class JurnalHeaderSyncObserver
                     'jumlah_baris' => (int) $model->jumlah_baris,
                     'referensi_tipe' => $model->referensi_tipe,
                     'referensi_id' => $model->referensi_id,
+                    'referensi_sync_uuid' => $refUuid,
+                    'referensi_natural' => $refNatural,
                     'idempotency_key' => $model->idempotency_key,
                     'user_id' => $model->user_id,
                     'user_email' => $model->user?->getAttribute('email'),
@@ -111,5 +116,43 @@ class JurnalHeaderSyncObserver
             cabangId: $header->cabang_id,
             logLabel: 'JurnalHeaderSyncObserver'
         );
+    }
+
+    /**
+     * @return array{0: string|null, 1: array<string, mixed>}
+     */
+    private function resolveReferensiMetadata(JurnalHeader $header): array
+    {
+        $refType = $header->referensi_tipe;
+        $refId = $header->referensi_id;
+
+        if (! is_string($refType) || $refType === '' || empty($refId)) {
+            return [null, []];
+        }
+
+        if (! class_exists($refType) || ! is_subclass_of($refType, Model::class)) {
+            return [null, []];
+        }
+
+        $query = method_exists($refType, 'withTrashed') ? $refType::withTrashed() : $refType::query();
+        if (class_exists(CabangScope::class)) {
+            $query->withoutGlobalScope(CabangScope::class);
+        }
+
+        $refModel = $query->find($refId);
+        if (! $refModel instanceof Model) {
+            return [null, []];
+        }
+
+        $refUuid = $this->ensureSyncUuid($refModel);
+        $natural = [];
+        foreach (BackofficeSyncRegistry::naturalKeysForModel($refType) as $col) {
+            $val = $refModel->getAttribute($col);
+            if ($val !== null && $val !== '') {
+                $natural[$col] = $val;
+            }
+        }
+
+        return [$refUuid, $natural];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sync\Middleware;
 
+use App\Modules\Sync\Providers\SyncServiceProvider;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -19,6 +20,8 @@ class VerifySyncSignature
      */
     public function handle(Request $request, Closure $next): Response
     {
+        SyncServiceProvider::refreshRuntimeConfigIfChanged();
+
         $isHealth = $request->is('api/internal/sync/health');
 
         // Health endpoint tetap mengizinkan pengecekan status meski sync.enabled = false

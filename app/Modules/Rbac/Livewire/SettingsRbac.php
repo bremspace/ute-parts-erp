@@ -23,6 +23,7 @@ use App\Modules\Rbac\Services\DatabaseManagementService;
 use App\Modules\Rbac\Services\NetworkManagementService;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\JenisServis;
+use App\Modules\Sync\Providers\SyncServiceProvider;
 use App\Modules\Wms\Exports\AtributProdukExport;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
@@ -1921,6 +1922,8 @@ class SettingsRbac extends Component
         if ($effectiveSecret !== '') {
             config(['sync.api_secret' => $effectiveSecret]);
         }
+
+        SyncServiceProvider::markRuntimeConfigUpdated();
 
         $this->integrasiForm['sync_api_secret'] = '';
         $this->syncSecretConfigured = $effectiveSecret !== '';

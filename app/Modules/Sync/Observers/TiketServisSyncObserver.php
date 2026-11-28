@@ -19,6 +19,17 @@ class TiketServisSyncObserver
         $this->enqueueSync($tiket);
     }
 
+    public function deleted(TiketServis $tiket): void
+    {
+        $this->enqueueDeletedSnapshot(
+            $tiket,
+            'servis.update',
+            ['no_tiket' => $tiket->no_tiket],
+            cabangId: $tiket->cabang_id,
+            logLabel: 'TiketServisSyncObserver:delete'
+        );
+    }
+
     private function enqueueSync(TiketServis $tiket): void
     {
         $this->enqueueModelEvent(

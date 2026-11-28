@@ -7,17 +7,29 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\AsetTetap;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\JurnalHeader;
+use App\Modules\Akunting\Models\RekonsiliasiBank;
+use App\Modules\Akunting\Models\RekonsiliasiBankItem;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\PelangganKodeAktivasi;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Hr\Models\Karyawan;
+use App\Modules\Hr\Models\PayrollKomisiDetail;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Sync\Jobs\PushHybridSyncJob;
 use App\Modules\Sync\Models\HybridSyncOutbox;
+use App\Modules\Sync\Providers\SyncServiceProvider;
+use App\Modules\Sync\Services\HybridSyncOutboxService;
 use App\Modules\Sync\Services\HybridSyncProcessorService;
 use App\Modules\Sync\SyncObserverBootstrap;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
@@ -27,6 +39,9 @@ use App\Modules\Wms\Models\StokOpname;
 use App\Modules\Wms\Models\Supplier;
 use App\Services\BranchContextManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -456,5 +471,384 @@ class BidirectionalBackofficeSyncTest extends TestCase
         // Payroll tetap ada dari seed / sync
         $this->assertSame($karyawan->nik, Karyawan::where('nik', 'NIK-CLOUD-01')->value('nik'));
         $this->assertDatabaseHas('payroll_periode', ['id' => $payroll->id, 'status' => 'selesai']);
+    }
+
+    public function test_pull_command_cabang_filter_sorts_query_params_and_breaks_failed_all_loop(): void
+    {
+        config([
+            'sync.enabled' => true,
+            'sync.node_role' => 'primary_store',
+            'sync.node_id' => 'STORE-01',
+            'sync.remote_url' => 'https://cloud.bremspace.test',
+            'sync.api_secret' => 'pull-sort-secret-456',
+        ]);
+
+        // Test Request signature dengan param terurut alfabetis (cabang_id lalu limit)
+        $sortedQuery = 'cabang_id='.$this->cabang->id.'&limit=10';
+        $ts = (string) time();
+        $sig = hash_hmac('sha256', $ts.'.'.$sortedQuery, 'pull-sort-secret-456');
+
+        // Simulasikan node cloud melayani GET pull?limit=10&cabang_id=X dengan VerifySyncSignature asli
+        config(['sync.node_role' => 'cloud_storefront']);
+        $httpRes = $this->withHeaders([
+            'X-Sync-Node' => 'STORE-01',
+            'X-Sync-Timestamp' => $ts,
+            'X-Sync-Signature' => $sig,
+        ])->getJson('/api/internal/sync/pull?limit=10&cabang_id='.$this->cabang->id);
+        $httpRes->assertStatus(200);
+
+        // Sekarang uji SyncPullCommand: wajib mengirim & menandatangani cabang_id=...&limit=...
+        config(['sync.node_role' => 'primary_store']);
+        Http::fake([
+            'https://cloud.bremspace.test/api/internal/sync/pull*' => Http::response([
+                'success' => true,
+                'data' => [
+                    // 2 event gagal sengaja dengan count == limit=2 untuk menguji anti infinite loop pada --all
+                    ['sync_uuid' => (string) Str::uuid(), 'event_type' => 'order.online_paid', 'payload' => []],
+                    ['sync_uuid' => (string) Str::uuid(), 'event_type' => 'order.online_paid', 'payload' => []],
+                ],
+            ], 200),
+        ]);
+
+        $this->artisan('sync:pull --limit=2 --cabang_id='.$this->cabang->id.' --all')
+            ->expectsOutputToContain('Sinkronisasi pull selesai: 0 diproses, 2 gagal.')
+            ->assertExitCode(0);
+
+        Http::assertSentCount(1);
+        Http::assertSent(function ($request) {
+            $tsHdr = $request->header('X-Sync-Timestamp')[0] ?? '';
+            $sigHdr = $request->header('X-Sync-Signature')[0] ?? '';
+            $expectedQs = 'cabang_id='.$this->cabang->id.'&limit=2';
+
+            return str_contains($request->url(), '?'.$expectedQs)
+                && hash_equals(hash_hmac('sha256', $tsHdr.'.'.$expectedQs, 'pull-sort-secret-456'), $sigHdr);
+        });
+    }
+
+    public function test_same_second_outbox_ordering_and_live_config_reload_without_worker_restart(): void
+    {
+        HybridSyncOutbox::query()->delete();
+
+        $sameTs = now()->startOfSecond();
+        $first = HybridSyncOutbox::create([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'supplier.upsert',
+            'entity_type' => Supplier::class,
+            'entity_id' => 10,
+            'cabang_id' => $this->cabang->id,
+            'payload' => ['nama' => 'First'],
+            'status' => 'pending',
+            'created_at' => $sameTs,
+            'updated_at' => $sameTs,
+        ]);
+        $second = HybridSyncOutbox::create([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'purchase_order.upsert',
+            'entity_type' => PurchaseOrder::class,
+            'entity_id' => 20,
+            'cabang_id' => $this->cabang->id,
+            'payload' => ['no_po' => 'PO-2'],
+            'status' => 'pending',
+            'created_at' => $sameTs,
+            'updated_at' => $sameTs,
+        ]);
+        // Pastikan urutan berdasarkan ID naik meskipun timestamp identik
+        $pendingIds = app(HybridSyncOutboxService::class)->getPendingItems(10)->pluck('id')->all();
+        $this->assertSame([$first->id, $second->id], $pendingIds);
+
+        // Simulasikan perubahan secret dari Settings UI saat queue worker masih hidup
+        config([
+            'sync.enabled' => true,
+            'sync.node_role' => 'primary_store',
+            'sync.remote_url' => 'https://cloud.bremspace.test',
+            'sync.api_secret' => 'old-boot-secret',
+        ]);
+        $newSecret = 'rotated-secret-after-boot-789';
+        app(KonfigurasiService::class)->set('hybrid_sync_config', [
+            'enabled' => true,
+            'node_role' => 'primary_store',
+            'node_id' => 'STORE-01',
+            'remote_url' => 'https://cloud.bremspace.test',
+            'api_secret' => Crypt::encryptString($newSecret),
+            'pull_interval_seconds' => 30,
+        ]);
+        SyncServiceProvider::markRuntimeConfigUpdated();
+
+        Http::fake([
+            'https://cloud.bremspace.test/api/internal/sync/push' => Http::response(['success' => true], 200),
+        ]);
+
+        (new PushHybridSyncJob($first->id))->handle();
+
+        Http::assertSent(function ($request) use ($newSecret) {
+            $tsHdr = $request->header('X-Sync-Timestamp')[0] ?? '';
+            $sigHdr = $request->header('X-Sync-Signature')[0] ?? '';
+
+            return hash_equals(hash_hmac('sha256', $tsHdr.'.'.$request->body(), $newSecret), $sigHdr);
+        });
+    }
+
+    public function test_processor_remaps_supplier_approver_jurnal_referensi_payroll_komisi_master_deletes_and_mysql_dates(): void
+    {
+        config(['sync.node_role' => 'primary_store']);
+        $processor = app(HybridSyncProcessorService::class);
+
+        // 1. Produk -> Supplier remap (ID lokal beda dari 8888)
+        $localSupplier = Supplier::create([
+            'nama' => 'Supplier Lokal Remap',
+            'kode_lama' => 'SUP-REMAP-01',
+            'status_aktif' => true,
+        ]);
+        $resProduk = $processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'produk.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => [
+                'sync_uuid' => (string) Str::uuid(),
+                'nama' => 'IC Power Remap',
+                'slug' => 'ic-power-remap',
+                'supplier_id' => 8888,
+                'supplier_kode_lama' => 'SUP-REMAP-01',
+                'supplier_nama' => 'Supplier Lokal Remap',
+                'harga_beli' => 15000,
+                'harga_jual_retail' => 35000,
+                'is_active' => true,
+            ],
+        ]);
+        $this->assertTrue($resProduk['success'], $resProduk['message'] ?? '');
+        $this->assertSame($localSupplier->id, Produk::where('slug', 'ic-power-remap')->value('supplier_id'));
+
+        // 2. Pelanggan -> approved_by remap by email
+        $resPelanggan = $processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'pelanggan.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => [
+                'sync_uuid' => (string) Str::uuid(),
+                'nama' => 'Reseller Approved Remap',
+                'telepon' => '081277700011',
+                'approved_by' => 7777,
+                'approved_by_email' => $this->user->email,
+                'status' => 'aktif',
+            ],
+        ]);
+        $this->assertTrue($resPelanggan['success'], $resPelanggan['message'] ?? '');
+        $pelangganSynced = Pelanggan::where('nama', 'Reseller Approved Remap')->firstOrFail();
+        $this->assertSame($this->user->id, $pelangganSynced->approved_by);
+
+        // 3. JurnalHeader -> referensi_id remap + PayrollPeriode -> komisi_details
+        $tiket = TiketServis::create([
+            'cabang_id' => $this->cabang->id,
+            'no_tiket' => 'SRV-REMAP-901',
+            'nama_pelanggan' => 'Adi',
+            'telepon_pelanggan' => '081234567891',
+            'jenis_hp' => 'Xiaomi',
+            'keluhan' => 'LCD',
+            'status' => 'selesai',
+        ]);
+        $karyawan = Karyawan::create([
+            'nik' => 'NIK-KMS-01',
+            'nama' => 'Teknisi Komisi',
+            'cabang_id' => $this->cabang->id,
+            'jabatan' => 'Teknisi',
+            'tgl_masuk' => '2026-01-01',
+            'gaji_pokok' => 3000000,
+            'status_aktif' => true,
+        ]);
+        $komisi = Komisi::create([
+            'no_komisi' => 'KMS-REMAP-901',
+            'aktor_tipe' => 'karyawan',
+            'aktor_id' => $karyawan->id,
+            'tiket_servis_id' => $tiket->id,
+            'jumlah_transaksi' => 100000,
+            'nominal_komisi' => 25000,
+            'status' => 'pending',
+            'idempotensi_key' => 'kms-remap-901',
+        ]);
+
+        $resJurnal = $processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'jurnal.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => [
+                'sync_uuid' => (string) Str::uuid(),
+                'no_jurnal' => 'JRN-SRV-REMAP-1',
+                'cabang_id' => $this->cabang->id,
+                'cabang_key' => $this->cabang->id,
+                'tanggal' => now()->toIso8601String(),
+                'sumber' => 'servis',
+                'deskripsi' => 'Jurnal referensi servis',
+                'referensi_tipe' => TiketServis::class,
+                'referensi_id' => 99999,
+                'referensi_natural' => ['no_tiket' => 'SRV-REMAP-901'],
+                'user_email' => $this->user->email,
+                'lines' => [
+                    ['akun_kode' => '110-04', 'akun_nama' => 'Kas Toko', 'debit' => 100000, 'kredit' => 0],
+                    ['akun_kode' => '610-01', 'akun_nama' => 'Biaya Operasional', 'debit' => 0, 'kredit' => 100000],
+                ],
+            ],
+        ]);
+        $this->assertTrue($resJurnal['success'], $resJurnal['message'] ?? '');
+        $this->assertSame($tiket->id, JurnalHeader::where('no_jurnal', 'JRN-SRV-REMAP-1')->value('referensi_id'));
+
+        $resPayroll = $processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'payroll.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => [
+                'sync_uuid' => (string) Str::uuid(),
+                'cabang_id' => $this->cabang->id,
+                'periode' => '2026-12',
+                'tanggal_mulai' => '2026-12-01',
+                'tanggal_selesai' => '2026-12-31',
+                'status' => PayrollPeriode::STATUS_SELESAI,
+                'slips' => [[
+                    'karyawan_id' => 8888,
+                    'karyawan_nik' => 'NIK-KMS-01',
+                    'gaji_pokok' => 3000000,
+                    'total_komisi' => 25000,
+                    'total_gaji' => 3025000,
+                    'komisi_details' => [[
+                        'komisi_id' => 7777,
+                        'komisi_idempotensi_key' => 'kms-remap-901',
+                        'tiket_servis_id' => 6666,
+                        'tiket_no_tiket' => 'SRV-REMAP-901',
+                        'teknisi_id' => 8888,
+                        'teknisi_nik' => 'NIK-KMS-01',
+                        'jenis' => 'servis',
+                        'nominal' => 25000,
+                    ]],
+                ]],
+            ],
+        ]);
+        $this->assertTrue($resPayroll['success'], $resPayroll['message'] ?? '');
+        $komisiDetail = PayrollKomisiDetail::firstOrFail();
+        $this->assertSame($komisi->id, $komisiDetail->komisi_id);
+        $this->assertSame($tiket->id, $komisiDetail->tiket_servis_id);
+        $this->assertSame($karyawan->id, $komisiDetail->teknisi_id);
+
+        // 4. Master delete cascade (Brand & KategoriProduk) + MySQL ISO-8601 date/datetime normalization + PelangganKodeAktivasi + Konfigurasi allowlist
+        $brandToDelete = Brand::create(['nama' => 'Brand Remote Del', 'is_active' => true]);
+        $katToDelete = KategoriProduk::create(['nama' => 'Kat Remote Del', 'slug' => 'kat-remote-del', 'is_active' => true]);
+        $produkLinked = Produk::create([
+            'nama' => 'Produk Cascade Check',
+            'slug' => 'produk-cascade-check',
+            'kategori' => $katToDelete->nama,
+            'kategori_id' => $katToDelete->id,
+            'brand_id' => $brandToDelete->id,
+            'kondisi' => 'baru',
+            'satuan' => 'pcs',
+            'harga_beli' => 1000,
+            'harga_jual_retail' => 2000,
+            'is_active' => true,
+        ]);
+
+        $this->assertTrue($processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'brand.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => ['nama' => 'Brand Remote Del', 'deleted' => true],
+        ])['success']);
+        $this->assertTrue($processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'kategori_produk.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => ['slug' => 'kat-remote-del', 'deleted' => true],
+        ])['success']);
+
+        $produkLinked->refresh();
+        $this->assertSame(Brand::getDefault()->id, $produkLinked->brand_id);
+        $this->assertSame(KategoriProduk::getDefault()->id, $produkLinked->kategori_id);
+
+        // MySQL 8 strict-safe ISO-8601 datetime & date normalization pada generic upsert (PelangganKodeAktivasi & RekonsiliasiBank)
+        $rekonUuid = (string) Str::uuid();
+        $coaBank = AkunCOA::firstOrCreate(
+            ['kode' => '110-02'],
+            ['nama' => 'Bank BCA', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit', 'is_active' => true]
+        );
+        $this->assertTrue($processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'rekonsiliasi_bank.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => [
+                'sync_uuid' => $rekonUuid,
+                'cabang_id' => 9999,
+                'akun_coa_id' => 9999,
+                'nama_bank' => 'BCA',
+                'periode_dari' => '2026-11-01T00:00:00+07:00',
+                'periode_sampai' => '2026-11-30T00:00:00+07:00',
+                'nama_file' => 'rekon-sync.csv',
+                'format_file' => 'csv',
+                'status' => 'draft',
+                '_refs' => [
+                    'cabang_id' => ['id' => 9999, 'kode' => $this->cabang->kode],
+                    'akun_coa_id' => ['id' => 9999, 'kode' => $coaBank->kode],
+                ],
+            ],
+        ])['success']);
+
+        $this->assertTrue($processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'pelanggan_kode_aktivasi.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => [
+                'sync_uuid' => (string) Str::uuid(),
+                'pelanggan_id' => 9999,
+                'kode' => 'SYNC7788',
+                'kedaluwarsa_at' => '2026-12-05T15:30:00+07:00',
+                'dibuat_oleh' => 9999,
+                '_refs' => [
+                    'pelanggan_id' => ['id' => 9999, 'telepon' => $pelangganSynced->telepon],
+                    'dibuat_oleh' => ['id' => 9999, 'email' => $this->user->email],
+                ],
+            ],
+        ])['success']);
+
+        $rekonSaved = RekonsiliasiBank::where('sync_uuid', $rekonUuid)->firstOrFail();
+        $this->assertSame('2026-11-01', $rekonSaved->periode_dari->toDateString());
+        $this->assertSame('2026-11-30', $rekonSaved->periode_sampai->toDateString());
+
+        // Uji juga resolusi RekonsiliasiBankItem dengan no_jurnal_matched tanpa salah mengikat ID line node asal
+        $this->assertTrue($processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'rekonsiliasi_bank_item.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => [
+                'sync_uuid' => (string) Str::uuid(),
+                'rekonsiliasi_bank_id' => 9999,
+                'tanggal' => '2026-11-15T08:00:00+07:00',
+                'deskripsi' => 'Transfer masuk',
+                'tipe' => 'CR',
+                'nominal' => 100000,
+                'status' => 'matched',
+                'jurnal_akuntansi_id' => 9999,
+                'no_jurnal_matched' => 'JRN-SRV-REMAP-1',
+                '_refs' => [
+                    'rekonsiliasi_bank_id' => ['id' => 9999, 'sync_uuid' => $rekonUuid],
+                ],
+            ],
+        ])['success']);
+        $rekonItemSaved = RekonsiliasiBankItem::where('rekonsiliasi_bank_id', $rekonSaved->id)->firstOrFail();
+        $this->assertSame(JurnalAkuntansi::where('no_jurnal', 'JRN-SRV-REMAP-1')->value('id'), $rekonItemSaved->jurnal_akuntansi_id);
+
+        $akt = PelangganKodeAktivasi::where('kode', 'SYNC7788')->firstOrFail();
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', (string) $akt->getRawOriginal('kedaluwarsa_at'));
+
+        // Konfigurasi upsert: allowlisted key diterima, rahasia lokal ditolak
+        $this->assertTrue($processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'konfigurasi.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => ['kunci' => 'ppn_percent', 'nilai' => '12'],
+        ])['success']);
+        $this->assertSame('12', DB::table('konfigurasi')->where('kunci', 'ppn_percent')->value('nilai'));
+
+        $this->assertTrue($processor->process([
+            'sync_uuid' => (string) Str::uuid(),
+            'event_type' => 'konfigurasi.upsert',
+            'source_node' => 'CLOUD-VPS',
+            'payload' => ['kunci' => 'hybrid_sync_config', 'nilai' => 'hijack'],
+        ])['success']);
+        $this->assertNotSame('hijack', DB::table('konfigurasi')->where('kunci', 'hybrid_sync_config')->value('nilai'));
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sync\Observers;
 
+use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
 
@@ -17,6 +18,20 @@ class PelangganSyncObserver
     public function updated(Pelanggan $pelanggan): void
     {
         $this->enqueueSync($pelanggan);
+    }
+
+    public function deleted(Pelanggan $pelanggan): void
+    {
+        $this->enqueueDeletedSnapshot(
+            $pelanggan,
+            'pelanggan.upsert',
+            [
+                'telepon' => $pelanggan->telepon,
+                'username' => $pelanggan->username,
+                'email' => $pelanggan->email,
+            ],
+            logLabel: 'PelangganSyncObserver:delete'
+        );
     }
 
     private function enqueueSync(Pelanggan $pelanggan): void
@@ -54,6 +69,9 @@ class PelangganSyncObserver
                     'catatan_approval' => $model->catatan_approval,
                     'approved_at' => $this->formatIso8601($model->getAttribute('approved_at')),
                     'approved_by' => $model->approved_by,
+                    'approved_by_email' => ! empty($model->approved_by)
+                        ? User::query()->whereKey($model->approved_by)->value('email')
+                        : null,
                 ];
             },
             logLabel: 'PelangganSyncObserver'

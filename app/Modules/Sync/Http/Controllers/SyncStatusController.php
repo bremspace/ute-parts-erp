@@ -4,6 +4,7 @@ namespace App\Modules\Sync\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Sync\Models\HybridSyncOutbox;
+use App\Modules\Sync\Providers\SyncServiceProvider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -19,6 +20,8 @@ class SyncStatusController extends Controller
      */
     public function status(Request $request): JsonResponse
     {
+        SyncServiceProvider::refreshRuntimeConfigIfChanged();
+
         return response()->json([
             'success' => true,
             'data' => $this->buildStatusData(probeRemote: $request->boolean('probe')),
@@ -31,6 +34,8 @@ class SyncStatusController extends Controller
      */
     public function trigger(Request $request): JsonResponse
     {
+        SyncServiceProvider::refreshRuntimeConfigIfChanged();
+
         $enabled = (bool) config('sync.enabled', false);
         $role = (string) config('sync.node_role', 'standalone');
         $remoteUrl = rtrim((string) config('sync.remote_url', ''), '/');
