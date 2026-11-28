@@ -2,197 +2,21 @@
 
 namespace Database\Seeders;
 
+use App\Modules\Rbac\Services\RbacBootstrapService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
     use WithoutModelEvents;
 
+    /**
+     * Node cloud memakai seeder ini. Katalog aslinya ada di RbacBootstrapService
+     * agar SetupWizard node client Docker bisa memakai katalog yang sama tanpa
+     * menjalankan seeder.
+     */
     public function run(): void
     {
-        // Clear permission cache via Spatie registrar (not static method on model)
-        app()[PermissionRegistrar::class]->forgetCachedPermissions();
-
-        // [API: RBAC-01] Permissions per module
-        $permissions = [
-            // POS
-            'pos.create', 'pos.view', 'pos.view-own', 'pos.void',
-            // WMS
-            'wms.view', 'wms.create', 'wms.delete', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'wms.receive-po',
-            // SERVIS
-            // SERVIS — `servis.manage` = permission resmi master jenis servis
-            // (pengganti ekuivalen sementara `servis.update-status`).
-            // [P2-1/T-04] `servis.payment` terpisah dari `servis.update-status`:
-            // pelunasan servis (jurnal kas, subledger piutang) adalah tugas
-            // pembayaran — naik-turun status pengerjaan tidak berhak menagih.
-            'servis.view', 'servis.create', 'servis.update-status', 'servis.payment', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status', 'servis.manage',
-            // CRM
-            'crm.view', 'crm.create', 'crm.edit', 'crm.delete', 'crm.broadcast',
-            // TIER
-            'tier.manage',
-            // RESELLER
-            'reseller.view', 'reseller.manage',
-            // KOMISI
-            'komisi.view', 'komisi.approve',
-            // AKUNTING
-            'akunting.view', 'akunting.create', 'akunting.edit', 'akunting.approve',
-            // PIUTANG
-            'piutang.view', 'piutang.manage',
-            // UTANG
-            'utang.view', 'utang.manage',
-            // LAPORAN — [P2-9] `laporan.kustom` dihapus: PRD-Advanced F2-4 tidak
-            // mendefinisikan permission terpisah; PRD-Backend §3 matriks RBAC hanya
-            // mencantumkan `laporan.cabang` (admin-toko). Route builder /laporan
-            // tetap memakai `permission:laporan.cabang`.
-            'laporan.cabang', 'laporan.konsolidasi',
-            // USER
-            'user.view', 'user.create', 'user.edit', 'user.delete',
-            // CABANG
-            'cabang.view', 'cabang.manage',
-            // PENGATURAN
-            'pengaturan.manage',
-            // OMNICHANNEL
-            'omnichannel.view', 'omnichannel.manage',
-            // WORKFLOW (F1-1)
-            'approve-workflow',
-            // AUDIT TRAIL (F1-4)
-            'lihat-audit-log',
-            // KEAMANAN & SESI (F3-4)
-            'kelola-sesi',
-            // HARGA FLEKSIBEL
-            'atur-harga-fleksibel',
-            // [F3-1] Field-level security permissions — baru untuk menghide harga_beli/margin dari role kasir/staff
-            'lihat.harga_beli',
-            'lihat.margin',
-            // [F3-8] HR & Payroll permissions — pakai di givePermissionTo role kelola-hr
-            'kelola-hr',
-            // [PRD §4.3] RBAC payroll: permission khusus `kelola-payroll` (super-admin + finance saja)
-            'kelola-payroll',
-            // [BH] RBAC bagi hasil jasa teknisi non-gaji (super-admin + finance)
-            'kelola-bagi-hasil',
-            'payroll.view',
-            'payroll.create',
-            'payroll.approve',
-            // [F3-8b] HR Absensi & KPI — karyawan boleh lihat absensi/KPI sendiri
-            'hr.lihat-sendiri',
-        ];
-
-        foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission]);
-        }
-
-        // Roles (idempoten — pakai findOrCreate agar bisa di-seed ulang)
-        $superAdmin = Role::findOrCreate('super-admin');
-        $superAdmin->givePermissionTo(Permission::all());
-
-        $owner = Role::findOrCreate('owner');
-        $owner->givePermissionTo(Permission::all());
-
-        $adminToko = Role::findOrCreate('admin-toko');
-        $adminToko->givePermissionTo([
-            'pos.create', 'pos.view', 'pos.view-own', 'pos.void',
-            'wms.view', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'wms.receive-po',
-            'servis.view', 'servis.create', 'servis.update-status', 'servis.payment', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status',
-            // admin-toko = bagian terkait servis → boleh kelola master jenis servis
-            'servis.manage',
-            'crm.view',
-            'laporan.cabang',
-            'approve-workflow',
-            'lihat-audit-log', // [F1-4] admin melihat riwayat audit cabangnya
-            'kelola-sesi', // [F3-4] admin mengelola sesi perangkat
-            // [F3-1] Field-level security: admin bisa lihat harga_beli/margin
-            'lihat.harga_beli',
-            'lihat.margin',
-        ]);
-
-        $kasir = Role::findOrCreate('kasir');
-        $kasir->givePermissionTo([
-            'pos.create', 'pos.view-own', 'wms.view',
-            // [P2-1/T-04] Pelunasan servis adalah tugas meja kasir (POS pelunasan
-            // servis dulu tanpa gate sama sekali).
-            'servis.payment',
-            // [B-14] Keputusan owner atas B-06 tertunda: kasir (meja kasir /
-            // loket terima unit) perlu membuka tiket servis — termasuk kunci
-            // gadget saat unit diserahkan / diambil. READ-ONLY: `servis.create` &
-            // `servis.update-status` TIDAK diberikan (tetap admin-toko/teknisi),
-            // dan aksi mutasi di Livewire ServisBoard diguard server-side.
-            'servis.view',
-        ]);
-
-        $teknisi = Role::findOrCreate('teknisi');
-        $teknisi->givePermissionTo([
-            // [B-14] `servis.create` ditambahkan utk teknisi karena guard
-            // server-side di `ServisBoard::simpanTerima()` kini sama dgn API
-            // `POST /api/servis` (`permission:servis.create`). Sebelum ini teknisi
-            // sudah bisa menerima unit lewat papan kanban (route hanya
-            // `servis.view`) — jadi ini KONSISTENSI, bukan perluasan akses.
-            // [P2-1/T-04] `servis.payment` diberikan sementara untuk
-            // KOMPATIBILITAS (teknisi dulu bayar lewat `servis.update-status`);
-            // owner dapat mencabut agar pembayaran murni tugas kasir/admin.
-            'servis.view', 'servis.create', 'servis.update-status', 'servis.payment', 'servis.input-sparepart',
-        ]);
-
-        $staffGudang = Role::findOrCreate('staff-gudang');
-        $staffGudang->givePermissionTo([
-            'wms.view', 'wms.create', 'wms.transfer', 'wms.opname', 'wms.receive-po',
-        ]);
-
-        $finance = Role::findOrCreate('finance');
-        $finance->givePermissionTo([
-            'akunting.view', 'akunting.create', 'akunting.edit', 'akunting.approve',
-            'piutang.view', 'piutang.manage',
-            'utang.view', 'utang.manage',
-            'komisi.approve',
-            'laporan.cabang', 'laporan.konsolidasi',
-            'approve-workflow',
-            'wms.receive-po',
-            'lihat-audit-log', // [F1-4] finance melihat riwayat audit
-            // [F3-1] Field-level security: finance bisa lihat harga_beli/margin
-            'lihat.harga_beli',
-            'lihat.margin',
-        ]);
-
-        $marketing = Role::findOrCreate('marketing');
-        $marketing->givePermissionTo([
-            'crm.view', 'crm.create', 'crm.edit', 'crm.delete', 'crm.broadcast',
-            'tier.manage',
-            'reseller.view',
-            // [B-14] B-06 tertunda: marketing perlu melihat status perbaikan +
-            // kunci gadget untuk menjawab pertanyaan pelanggan.
-            // READ-ONLY — tanpa `servis.create` / `servis.update-status`.
-            'servis.view',
-        ]);
-
-        // [B-14] Yang TIDAK diberi `servis.view` (minimum privilege):
-        // - `finance`    → fokusnya akunting/piutang/pajak; kunci gadget,
-        //                  data unit pelanggan tidak perlu untuk tugasnya.
-        // - `staff-gudang` → fokusnya stok/opname/transfer, bukan alur servis.
-        // Halaman & API servis tetap 403 untuk keduanya (middleware servis.view).
-
-        // [F3-8] HR & Payroll permissions
-        $hr = Role::findOrCreate('kelola-hr');
-        $hr->givePermissionTo([
-            'kelola-hr', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri',
-        ]);
-        // [PRD §4.3] `kelola-payroll` hanya super-admin + finance (payroll management);
-        // admin-toko TIDAK lagi dapat payroll.view (hanya kelola-hr + hr.lihat-sendiri)
-        $superAdmin->givePermissionTo(['kelola-hr', 'kelola-payroll', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
-        $finance->givePermissionTo(['kelola-hr', 'kelola-payroll', 'kelola-bagi-hasil', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
-        $adminToko->givePermissionTo(['kelola-hr', 'hr.lihat-sendiri']);
-
-        // [F3-8b] Karyawan (kasir/teknisi/marketing/staff/karyawan) lihat absensi & KPI sendiri
-        $karyawan = Role::findOrCreate('karyawan');
-        $karyawan->givePermissionTo('hr.lihat-sendiri');
-
-        foreach ([$kasir, $teknisi, $marketing, $staffGudang, $karyawan] as $roleKaryawan) {
-            $roleKaryawan->givePermissionTo('hr.lihat-sendiri');
-        }
-
-        // Refresh cache after all roles/permissions created
-        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+        app(RbacBootstrapService::class)->bootstrap();
     }
 }
