@@ -80,6 +80,43 @@ class SyncBootstrapCommand extends Command
             return Command::SUCCESS;
         }
 
+        $progressFile = storage_path('framework/sync-bootstrap-progress.json');
+        $startedAt = microtime(true);
+        $startedIso = now()->toIso8601String();
+        $overallTotal = (int) $tables->sum('count');
+        $overallProcessed = 0;
+        $tablesDone = 0;
+        $tablesTotal = $tables->count();
+
+        $writeProgress = function (string $status, string $table, int $tableDone, int $tableCount, string $message = '')
+            use ($progressFile, $startedAt, $startedIso, &$overallProcessed, $overallTotal, &$tablesDone, $tablesTotal): void {
+                $elapsed = max(0.001, microtime(true) - $startedAt);
+                $remaining = max(0, $overallTotal - $overallProcessed);
+                $rate = $overallProcessed / $elapsed;
+                $eta = $rate > 0 ? (int) round($remaining / $rate) : null;
+                $percent = $overallTotal > 0 ? min(100, round($overallProcessed / $overallTotal * 100, 1)) : 0;
+
+                File::put($progressFile, json_encode([
+                    'status' => $status,
+                    'started_at' => $startedIso,
+                    'updated_at' => now()->toIso8601String(),
+                    'finished_at' => $status === 'running' ? null : now()->toIso8601String(),
+                    'current_table' => $table,
+                    'table_processed' => $tableDone,
+                    'table_total' => $tableCount,
+                    'tables_done' => $tablesDone,
+                    'tables_total' => $tablesTotal,
+                    'overall_processed' => $overallProcessed,
+                    'overall_total' => $overallTotal,
+                    'percent' => $percent,
+                    'elapsed_seconds' => (int) round($elapsed),
+                    'eta_seconds' => $eta,
+                    'message' => $message,
+                ], JSON_UNESCAPED_SLASHES));
+            };
+
+        $writeProgress('running', '', 0, 0, 'Menyiapkan tarik data dari cloud');
+
         $total = 0;
         foreach ($tables as $info) {
             $table = (string) $info['table'];
@@ -95,6 +132,7 @@ class SyncBootstrapCommand extends Command
                 $response = $this->signedGet($remoteUrl.'/api/internal/sync/bootstrap?'.$queryString, $query, $nodeId, $secret);
                 if ($response === null || ! $response->successful()) {
                     $this->error("Gagal mengambil {$table} offset {$offset}.");
+                    $writeProgress('failed', $table, $tableProcessed, $count, "Gagal mengambil {$table} offset {$offset}");
                     break;
                 }
 
@@ -126,12 +164,17 @@ class SyncBootstrapCommand extends Command
                     }
                 }
 
+                $overallProcessed += count($events);
                 $offset += count($events);
+                $writeProgress('running', $table, $tableProcessed, $count, "Memproses {$table}");
             } while ($offset < $count);
 
+            $tablesDone++;
             $this->info("  {$table}: {$tableProcessed} baris tersinkron.");
+            $writeProgress('running', $table, $tableProcessed, $count, "Selesai {$table}");
         }
 
+        $writeProgress('done', '', $overallProcessed, $overallTotal, 'Tarik data dari cloud selesai');
         Cache::put('hybrid_sync:remote_reachable', true, now()->addMinutes(5));
         $this->info("Bootstrap selesai: {$total} record tersinkron dari cloud.");
 

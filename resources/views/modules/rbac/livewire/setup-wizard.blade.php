@@ -46,6 +46,103 @@
         </div>
     </div>
 
+    <!-- Penjelasan peran & progres tarik data awal -->
+    <div class="glass-panel p-4 sm:p-5 rounded-2xl border border-up-primary/25 bg-up-primary/[0.04] space-y-3">
+        <div class="flex items-start gap-2.5">
+            <span class="text-base">🏪</span>
+            <div class="min-w-0 space-y-1.5">
+                <p class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white">
+                    Mesin ini disiapkan sebagai <span class="text-up-primary">CLIENT toko fisik (primary_store)</span>
+                </p>
+                <p class="text-[11px] sm:text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
+                    Installer <strong>TIDAK menjalankan seeder</strong>. Yang dibuat lokal hanya struktur database dan
+                    <strong>satu akun admin</strong>. Master data, riwayat transaksi, dan stok ditarik otomatis dari cloud.
+                </p>
+                <p class="text-[11px] sm:text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
+                    <strong class="text-ink-700 dark:text-ink-200">Wajib diisi sebelum tarik data:</strong>
+                    Remote URL cloud, Shared Secret Key (sama persis dengan cloud), dan Node ID — semuanya ada di menu
+                    <span class="font-mono text-up-primary">Pengaturan → Integrasi</span>. Wizard ini mengisi identitas toko,
+                    domain, akun staf, dan aktivasi.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div x-data="{
+            p: null,
+            timer: null,
+            init() { this.load(); this.timer = setInterval(() => this.load(), 3000); },
+            async load() {
+                try {
+                    const r = await fetch('/app/sync/status');
+                    const j = await r.json();
+                    this.p = j && j.data ? j.data.bootstrap : null;
+                    if (this.p && this.p.status !== 'running' && this.timer) {
+                        clearInterval(this.timer);
+                        this.timer = null;
+                    }
+                } catch (e) {}
+            },
+            fmt(s) {
+                if (s === null || s === undefined) return 'menghitung…';
+                if (s < 60) return s + ' detik';
+                return Math.round(s / 60) + ' menit';
+            }
+         }"
+         x-init="init()"
+         class="glass-panel p-4 sm:p-5 rounded-2xl border border-ink-200/60 dark:border-white/10">
+        <template x-if="p && p.status === 'running'">
+            <div class="space-y-2.5">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white">Sedang menarik data dari cloud…</p>
+                        <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5" x-text="p.message"></p>
+                    </div>
+                    <span class="text-sm font-black text-up-primary tabular-nums" x-text="p.percent + '%'"></span>
+                </div>
+                <div class="w-full h-2.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+                    <div class="h-full rounded-full bg-gradient-to-r from-up-primary to-up-mint transition-all duration-500"
+                         :style="'width: ' + p.percent + '%'"></div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                    <div class="p-2 rounded-lg bg-black/[0.03] dark:bg-white/[0.03]">
+                        <div class="text-ink-500">Tabel</div>
+                        <div class="font-semibold text-ink-800 dark:text-ink-100 truncate" x-text="p.current_table || '-'"></div>
+                    </div>
+                    <div class="p-2 rounded-lg bg-black/[0.03] dark:bg-white/[0.03]">
+                        <div class="text-ink-500">Baris</div>
+                        <div class="font-semibold text-ink-800 dark:text-ink-100 tabular-nums"
+                             x-text="(p.overall_processed || 0).toLocaleString('id-ID') + ' / ' + (p.overall_total || 0).toLocaleString('id-ID')"></div>
+                    </div>
+                    <div class="p-2 rounded-lg bg-black/[0.03] dark:bg-white/[0.03]">
+                        <div class="text-ink-500">Estimasi sisa</div>
+                        <div class="font-semibold text-ink-800 dark:text-ink-100" x-text="fmt(p.eta_seconds)"></div>
+                    </div>
+                    <div class="p-2 rounded-lg bg-black/[0.03] dark:bg-white/[0.03]">
+                        <div class="text-ink-500">Tabel selesai</div>
+                        <div class="font-semibold text-ink-800 dark:text-ink-100 tabular-nums"
+                             x-text="(p.tables_done || 0) + ' / ' + (p.tables_total || 0)"></div>
+                    </div>
+                </div>
+                <p class="text-[11px] text-ink-500 dark:text-ink-400">
+                    Halaman tetap bisa dibuka saat proses berjalan. Jangan tutup/matikan container.
+                </p>
+            </div>
+        </template>
+        <template x-if="p && p.status === 'done'">
+            <div class="flex items-center gap-2 text-xs text-up-mint">
+                <span>✓</span>
+                <span>Tarik data awal dari cloud selesai. Silakan lanjutkan wizard.</span>
+            </div>
+        </template>
+        <template x-if="p && p.status === 'failed'">
+            <div class="flex items-center gap-2 text-xs text-up-red">
+                <span>✕</span>
+                <span x-text="p.message || 'Tarik data gagal.'"></span>
+            </div>
+        </template>
+    </div>
+
     @if($errorMessage)
         <div class="p-3.5 sm:p-4 rounded-xl bg-up-red/10 border border-up-red/30 text-up-red text-xs sm:text-sm flex items-start gap-2.5 sm:gap-3">
             <svg class="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
