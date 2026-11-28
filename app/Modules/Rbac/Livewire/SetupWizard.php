@@ -11,6 +11,7 @@ use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Models\QrisCabang;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AppUpdateService;
+use App\Modules\Rbac\Services\RbacBootstrapService;
 use App\Modules\Wms\Exports\ImportProdukTemplateExport;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Gudang;
@@ -716,6 +717,10 @@ class SetupWizard extends Component
 
         try {
             DB::transaction(function () {
+                // Client Docker sengaja tanpa seeder. Pastikan katalog role/permission
+                // tersedia sebelum User::role()/syncRoles() dipakai di wizard ini.
+                app(RbacBootstrapService::class)->bootstrap();
+
                 $cabangId = session('cabang_id');
                 $cabang = $cabangId ? Cabang::find($cabangId) : Cabang::first();
                 if (! $cabang) {

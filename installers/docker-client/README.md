@@ -202,6 +202,7 @@ docker compose exec app php artisan sync:flush --batch
 | Log masih `hybrid_sync_outbox doesn't exist` setelah pull terbaru | Image masih lama. Jalankan `docker compose build --no-cache` lalu `docker compose up -d --force-recreate`. |
 | Migrasi gagal `1050 Table 'hybrid_sync_outbox' already exists` | Tabel sudah ada tapi baris migrasi lama hilang. Perbaikan idempoten sudah masuk di `2026_11_17_000001`; pull terbaru lalu rebuild image. |
 | Semua URL 500 dengan log `No application encryption key` | `APP_KEY=` dari `env_file` mengosongkan kunci Laravel. Perbaikan terbaru mengekspor `APP_KEY` dari `storage/.env` di entrypoint; pull terbaru lalu rebuild image. |
+| Wizard gagal: `There is no role named 'super-admin' for guard 'web'` | Role belum ada karena client Docker sengaja tanpa seeder. Perbaikan terbaru membuat katalog role/permission di wizard; pull terbaru lalu rebuild image. |
 | `The MAC is invalid` setelah restore snapshot | Samakan `APP_KEY` di `storage/.env` dengan APP_KEY sumber, lalu `docker compose exec app php artisan optimize:clear && docker compose exec app php artisan optimize`, hapus cookie browser, login ulang. |
 | Queue/scheduler tidak jalan | `docker compose exec app tail -f storage/logs/queue-worker.log` dan `storage/logs/scheduler.log`. Pastikan `QUEUE_CONNECTION=database`. |
 | Build gagal: `app/Helpers/functions.php` tidak ditemukan | Installer menyalin salinan kanonik helper dari `installers/docker-client/helpers/functions.php`. Pastikan Anda mendownload source versi terbaru lalu build ulang. |
