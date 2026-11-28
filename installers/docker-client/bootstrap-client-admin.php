@@ -78,12 +78,17 @@ try {
     // Role berasal dari data kanonik cloud. Sebelum sync:bootstrap role ini
     // memang belum ada - itu normal dan TIDAK dijadikan alasan untuk seeder.
     try {
+        // Fresh client belum punya super-admin (role dibuat wizard/setup).
+        // Role 'owner' sudah tersedia dari migrasi dan cukup untuk membuka wizard.
         $role = Role::where('name', 'super-admin')
             ->where('guard_name', 'web')
-            ->first();
+            ->first()
+            ?? Role::where('name', 'owner')
+                ->where('guard_name', 'web')
+                ->first();
 
         if ($role === null) {
-            client_admin_log('Role super-admin belum ada. Jalankan sync:bootstrap dari cloud, lalu restart container.');
+            client_admin_log('Role super-admin/owner belum ada. Jalankan sync:bootstrap dari cloud, lalu restart container.');
         } elseif (! $user->hasRole($role)) {
             $user->assignRole($role);
             client_admin_log('Role super-admin diberikan.');

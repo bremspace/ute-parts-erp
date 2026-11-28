@@ -304,9 +304,10 @@ try {
     Write-Host "Akses LAN : http://$lanIp/" -ForegroundColor Green
     Write-Host "Login awal: $AdminEmail / (password di .env.client)" -ForegroundColor Green
     Write-Host ""
-    Write-Host "LANGKAH PENTING - tarik data dari cloud:" -ForegroundColor Yellow
+    Write-Host "Data awal dari cloud ditarik otomatis saat container pertama kali start." -ForegroundColor Yellow
+    Write-Host "Jika bootstrap gagal/stale, jalankan ulang:" -ForegroundColor Yellow
     Write-Host "  cd `"$InstallerDir`""
-    Write-Host "  docker compose exec app php artisan sync:bootstrap"
+    Write-Host "  docker compose exec app php artisan sync:bootstrap --force"
     Write-Host "  docker compose exec -e ADMIN_FORCE=true app php /usr/local/bin/bootstrap-client-admin.php"
     Write-Host "Cek status sync: http://localhost/app/sync/status?probe=1"
     Write-Host "============================================================" -ForegroundColor Green

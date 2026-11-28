@@ -41,7 +41,7 @@ File ini dibaca Compose lewat `env_file` dan **sengaja tidak disalin ke image**
 | `SYNC_REMOTE_URL` | `https://uteparts.id` | kosong (pasif receiver) |
 | `SYNC_NODE_ID` | `STORE-01` (bisa diganti) | `CLOUD-01` |
 | Database | DB lokal sendiri (volume `client_mysql`) | DB cloud yang menjadi sumber kanonik |
-| Data awal | Ditarik via `sync:bootstrap` | Harus diisi dari sumber kanonik/restore (bukan seeder installer ini) |
+| Data awal | Auto `sync:bootstrap --force` sekali saat first boot | Harus diisi dari sumber kanonik/restore (bukan seeder installer ini) |
 | Push/pull otomatis | Ya, scheduler `sync:flush` + `sync:pull` (jika remote terisi) | Pasif menerima request sync |
 
 `SYNC_CLIENT_MODE` adalah **penanda installer** (dipakai `entrypoint.sh` untuk
@@ -125,11 +125,16 @@ Node client harus sudah memiliki `SYNC_ENABLED=true`,
 `SYNC_NODE_ROLE=primary_store`, `SYNC_REMOTE_URL=https://uteparts.id`, dan
 `SYNC_API_SECRET` yang sama dengan cloud.
 
+Entry point menjalankan bootstrap ini **otomatis sekali** saat first boot,
+sebelum admin lokal dibuat, lalu menulis penanda `storage/.synced_from_cloud`.
+
+Kalau perlu ulang manual:
+
 ```bash
 cd installers/docker-client
 
-# Tarik seluruh tabel kanonik dari cloud (sekali saat awal)
-docker compose exec app php artisan sync:bootstrap
+# Tarik master + transaksi + snapshot stok dari cloud
+docker compose exec app php artisan sync:bootstrap --force
 
 # Opsional: satu tabel saja / ubah ukuran halaman
 docker compose exec app php artisan sync:bootstrap --table=produk --limit=200

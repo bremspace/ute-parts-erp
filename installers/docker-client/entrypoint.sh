@@ -79,13 +79,9 @@ php artisan migrate --force
 # Self-healing: kondisi client lama bisa punya migrasi "ran" tanpa tabel sync.
 php artisan sync:ensure-tables
 
-if [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
-    php /usr/local/bin/bootstrap-client-admin.php
-else
-    echo "[WARN] ADMIN_EMAIL/ADMIN_PASSWORD belum diisi; admin lokal tidak dibuat."
-fi
-
 # Bootstrap awal dari cloud: sekali saja, saat belum ada penanda seed.
+# Dijalankan SEBELUM admin dibuat agar cabang & data master sudah ada saat
+# admin lokal diberi role/cabang default.
 # Tidak dijalankan kalau kredensial sync belum lengkap, supaya container tetap hidup.
 if [ ! -f storage/.synced_from_cloud ] \
    && [ "${SYNC_ENABLED:-false}" = "true" ] \
@@ -97,6 +93,12 @@ if [ ! -f storage/.synced_from_cloud ] \
     else
         echo "[WARN] Bootstrap awal gagal. Jalankan nanti: php artisan sync:bootstrap --force"
     fi
+fi
+
+if [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
+    php /usr/local/bin/bootstrap-client-admin.php
+else
+    echo "[WARN] ADMIN_EMAIL/ADMIN_PASSWORD belum diisi; admin lokal tidak dibuat."
 fi
 
 php artisan storage:link || true
