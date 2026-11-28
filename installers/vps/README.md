@@ -212,6 +212,8 @@ installer vps new/
 
 - Installer **tidak** menghapus database yang sudah ada; ia hanya membuat database/user jika belum ada.
 - `.env` lama akan ditimpa, tetapi installer menyimpan kredensial baru di `/root/ute-install-credentials.txt`.
+- Upload backup/restore via UI sudah diizinkan sampai **2 GB** (Nginx `2100m`, PHP `post_max_size=2100M`, Livewire `2048000` KB).
+- Backup UI disimpan di `storage/app/backups` dan sudah dimiliki `www-data`. Tool `mysqldump`/`mariadb-dump` dan `mysql`/`mariadb` ikut terpasang.
 - `opcache.validate_timestamps=0` — setiap deploy harus lewat `ute-deploy` agar cache diperbarui.
 - Jangan expose port `2785` langsung ke internet. Pakai reverse proxy HTTPS.
 - Untuk OpenWA dengan banyak sesi, pertimbangkan engine `baileys` agar lebih ringan.
@@ -223,6 +225,8 @@ installer vps new/
 | Gejala | Cek |
 |---|---|
 | Login sukses tapi 419 Page Expired | `SESSION_SECURE_COOKIE=false` di `.env`, lalu `ute-deploy` + hapus cookie browser. Ini terjadi kalau akses lewat IP/HTTP karena cookie Secure tidak tersimpan. |
+| Backup database gagal | `ute-healthcheck` → cek binary `mysqldump`/`mariadb-dump`. Pastikan `storage/app/backups` writable `www-data`. |
+| Upload restore gagal / terpotong | Cek `client_max_body_size 2100m`, PHP `post_max_size=2100M`, dan `LIVEWIRE_UPLOAD_MAX_KB=2048000`. |
 | Nginx 502 | `systemctl status php*-fpm`, `ute-healthcheck` |
 | Queue tidak jalan | `supervisorctl status`, `supervisorctl restart ute:*` |
 | WA timeout | pastikan URL dari ERP bisa di-curl dari **server ERP** |
