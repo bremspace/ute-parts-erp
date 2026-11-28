@@ -25,6 +25,7 @@ class EnsureSetupCompleted
         // Jalur pengecualian untuk mencegah redirection loop
         if (
             $request->is('app/setup-wizard*') ||
+            $request->is('app/sync/status*') ||
             $request->is('livewire*') ||
             $request->is('logout') ||
             $request->is('app/logout')

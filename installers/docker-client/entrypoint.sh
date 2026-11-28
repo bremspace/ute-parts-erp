@@ -79,22 +79,8 @@ php artisan migrate --force
 # Self-healing: kondisi client lama bisa punya migrasi "ran" tanpa tabel sync.
 php artisan sync:ensure-tables
 
-# Bootstrap awal dari cloud: sekali saja, saat belum ada penanda seed.
-# Dijalankan SEBELUM admin dibuat agar cabang & data master sudah ada saat
-# admin lokal diberi role/cabang default.
-# Tidak dijalankan kalau kredensial sync belum lengkap, supaya container tetap hidup.
-if [ ! -f storage/.synced_from_cloud ] \
-   && [ "${SYNC_ENABLED:-false}" = "true" ] \
-   && [ -n "${SYNC_REMOTE_URL:-}" ] \
-   && [ -n "${SYNC_API_SECRET:-}" ]; then
-    echo "[INFO] Bootstrap awal dari cloud (sync:bootstrap --force)..."
-    if php artisan sync:bootstrap --force; then
-        echo "[INFO] Bootstrap awal selesai."
-    else
-        echo "[WARN] Bootstrap awal gagal. Jalankan nanti: php artisan sync:bootstrap --force"
-    fi
-fi
-
+# Admin dibuat lebih awal supaya user bisa login. Role/cabang mungkin belum ada
+# sebelum bootstrap selesai — script diulang otomatis di akhir bootstrap.
 if [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
     php /usr/local/bin/bootstrap-client-admin.php
 else
@@ -133,5 +119,25 @@ php artisan view:cache || true
 # ------------------------------------------------------------------------------
 su -s /bin/sh www-data -c "cd /var/www/html && php artisan queue:work --queue=default,sync --sleep=3 --tries=3" > /var/www/html/storage/logs/queue-worker.log 2>&1 &
 su -s /bin/sh www-data -c "cd /var/www/html && php artisan schedule:work" > /var/www/html/storage/logs/scheduler.log 2>&1 &
+
+# ------------------------------------------------------------------------------
+# 6. Bootstrap awal dari cloud di BACKGROUND.
+#    Web/Apache harus langsung hidup supaya halaman setup bisa menampilkan
+#    progres. Progres ditulis command ke storage/framework/sync-bootstrap-progress.json.
+# ------------------------------------------------------------------------------
+if [ ! -f storage/.synced_from_cloud ] \
+   && [ "${SYNC_ENABLED:-false}" = "true" ] \
+   && [ -n "${SYNC_REMOTE_URL:-}" ] \
+   && [ -n "${SYNC_API_SECRET:-}" ]; then
+    echo "[INFO] Bootstrap awal dari cloud berjalan di background (lihat progres di UI)."
+    (
+        php artisan sync:bootstrap --force >> /var/www/html/storage/logs/bootstrap-client.log 2>&1
+        rc=$?
+        if [ "$rc" -eq 0 ] && [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
+            ADMIN_FORCE=true php /usr/local/bin/bootstrap-client-admin.php >> /var/www/html/storage/logs/bootstrap-client.log 2>&1
+        fi
+        echo "[INFO] Bootstrap worker selesai (exit=$rc)" >> /var/www/html/storage/logs/bootstrap-client.log
+    ) &
+fi
 
 exec "$@"

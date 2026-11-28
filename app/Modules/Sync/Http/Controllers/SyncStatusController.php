@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 class SyncStatusController extends Controller
@@ -99,6 +100,13 @@ class SyncStatusController extends Controller
         $lastSyncedAt = HybridSyncOutbox::where('status', 'synced')
             ->max('synced_at');
 
+        $bootstrapProgress = null;
+        $progressPath = storage_path('framework/sync-bootstrap-progress.json');
+        if (File::exists($progressPath)) {
+            $decoded = json_decode((string) File::get($progressPath), true);
+            $bootstrapProgress = is_array($decoded) ? $decoded : null;
+        }
+
         $remoteReachable = null;
         if ($enabled && $remoteUrl !== '') {
             if ($probeRemote || ! Cache::has(self::REACHABLE_CACHE_KEY)) {
@@ -118,6 +126,7 @@ class SyncStatusController extends Controller
             'failed_count' => $failed,
             'synced_count' => $synced,
             'last_synced_at' => $lastSyncedAt,
+            'bootstrap' => $bootstrapProgress,
             'remote_configured' => $remoteUrl !== '',
             'remote_reachable' => $remoteReachable,
             'cloud_host' => $remoteHost,
