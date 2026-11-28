@@ -1,8 +1,8 @@
 # =============================================================================
-# UTE PARTS ERP — Compose khusus NODE CLIENT
+# UTE PARTS ERP - Compose khusus NODE CLIENT
 # =============================================================================
 # Jalankan dari folder ini. Konfigurasi (termasuk secret) dibaca dari
-# .env.client yang dibuat wizard — file itu TIDAK ikut ke dalam image Docker.
+# .env.client yang dibuat wizard - file itu TIDAK ikut ke dalam image Docker.
 # =============================================================================
 name: ute-parts-client
 

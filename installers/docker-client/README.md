@@ -1,10 +1,10 @@
-# UTE PARTS ERP — Docker Installer khusus CLIENT
+# UTE PARTS ERP - Docker Installer khusus CLIENT
 
 Installer Docker untuk **node client toko** yang berdiri sendiri (offline-first) dan
 menarik data awalnya dari cloud **uteparts.id** melalui sinkronisasi.
 Folder ini **tidak mengubah** installer lama di `installers/docker/`.
 
-> **Aturan utama: tidak ada `php artisan db:seed` — titik.**
+> **Aturan utama: tidak ada `php artisan db:seed` - titik.**
 > Installernya hanya menjalankan `migrate`, membuat **satu** akun admin lokal
 > dari `ADMIN_EMAIL` / `ADMIN_PASSWORD`, lalu menyiapkan cache, queue worker dan
 > scheduler. Master data (produk, kategori, cabang, pelanggan, dll.) datang dari
@@ -21,7 +21,7 @@ Folder ini **tidak mengubah** installer lama di `installers/docker/`.
 | `install.ps1` | Wizard + build + jalankan container (Windows / PowerShell) |
 | `Dockerfile` | Image Apache + PHP 8.4 + aset Vite + Compose Stack |
 | `docker-compose.yml` | Service `app` (port `80:80`) + `mysql:8.0`, 3 named volume |
-| `entrypoint.sh` | Migrate → admin lokal (tanpa seeder) → cache → worker & scheduler |
+| `entrypoint.sh` | Migrate -> admin lokal (tanpa seeder) -> cache -> worker & scheduler |
 | `bootstrap-client-admin.php` | Pembuat akun admin lokal yang idempoten (dipanggil entrypoint) |
 | `.env.client.example` | Template env **di dalam image** (tanpa rahasia) |
 | `.gitignore` | Mencegah `.env.client` ikut ter-commit |
@@ -54,14 +54,14 @@ setiap client. Tanpa itu, request bootstrap/sync ditolak HTTP 401.
 
 ## 3. Wizard (yang ditanyakan installer)
 
-1. **Peran** — `client` (default, `1`) atau `cloud` (`2`).
-2. **URL cloud** — default `https://uteparts.id` untuk client; boleh kosong untuk cloud.
-3. **Node ID** — default `STORE-01` (client) / `CLOUD-01` (cloud).
-4. **API secret** — disembunyikan saat diketik; bila kosong akan di-generate
+1. **Peran** - `client` (default, `1`) atau `cloud` (`2`).
+2. **URL cloud** - default `https://uteparts.id` untuk client; boleh kosong untuk cloud.
+3. **Node ID** - default `STORE-01` (client) / `CLOUD-01` (cloud).
+4. **API secret** - disembunyikan saat diketik; bila kosong akan di-generate
    otomatis (32 byte hex). Salin nilainya ke node lawan bicara.
-5. **Email & password admin lokal** — hanya untuk **login awal**, bukan data master.
+5. **Email & password admin lokal** - hanya untuk **login awal**, bukan data master.
    Password disembunyikan saat diketik dan di-hash (`Hash::make`) sebelum disimpan.
-6. **Cabang opsional** — kode cabang (default `CBG-01`, ketik `-` untuk tanpa cabang)
+6. **Cabang opsional** - kode cabang (default `CBG-01`, ketik `-` untuk tanpa cabang)
    dan nama cabang.
 
 Sebelum build, installer menampilkan **ringkasan konfigurasi** (secret & password
@@ -91,8 +91,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 
 Pilih aksi:
 
-- **[1] Fresh install** — container & volume dihapus, database lokal kosong.
-- **[2] Update / Start** — image dibangun ulang, data database tetap.
+- **[1] Fresh install** - container & volume dihapus, database lokal kosong.
+- **[2] Update / Start** - image dibangun ulang, data database tetap.
 
 Akses: `http://localhost` atau `http://IP-LAN` (port host `80`).
 
@@ -103,10 +103,10 @@ Akses: `http://localhost` atau `http://IP-LAN` (port host `80`).
 `entrypoint.sh` melakukan, secara berurutan:
 
 1. Menyiapkan `.env` persisten di `storage/.env` (symlink) dan menghasilkan
-   `APP_KEY` sekali saja — tidak berubah saat image di-build ulang.
+   `APP_KEY` sekali saja - tidak berubah saat image di-build ulang.
 2. Menunggu MySQL siap (maks. ~120 detik).
 3. `php artisan migrate --force`.
-4. `php /usr/local/bin/bootstrap-client-admin.php` → **maksimal satu user admin**
+4. `php /usr/local/bin/bootstrap-client-admin.php` -> **maksimal satu user admin**
    dari `ADMIN_EMAIL`/`ADMIN_PASSWORD`, dibuat hanya bila belum ada.
    Role `super-admin` dan cabang default **hanya dipasang bila sudah tersedia**
    di DB lokal; tidak dibuat oleh installer.

@@ -1,6 +1,6 @@
 #!/bin/sh
 # ==============================================================================
-# UTE PARTS ERP — Entry point NODE CLIENT (primary_store)
+# UTE PARTS ERP - Entry point NODE CLIENT (primary_store)
 # ==============================================================================
 # ATURAN INSTALLER INI:
 #   - TIDAK PERNAH menjalankan seeder apa pun (client MAUPUN cloud).
@@ -45,9 +45,9 @@ mkdir -p storage/framework/cache/data storage/framework/sessions storage/framewo
 chown -R www-data:www-data storage bootstrap/cache
 
 if [ "${SYNC_CLIENT_MODE:-false}" = "true" ]; then
-    echo "[INFO] SYNC_CLIENT_MODE=true → node CLIENT. Seeder dinonaktifkan permanen."
+    echo "[INFO] SYNC_CLIENT_MODE=true -> node CLIENT. Seeder dinonaktifkan permanen."
 else
-    echo "[INFO] SYNC_CLIENT_MODE=false → node CLOUD. Installer ini juga TIDAK menjalankan seeder."
+    echo "[INFO] SYNC_CLIENT_MODE=false -> node CLOUD. Installer ini juga TIDAK menjalankan seeder."
 fi
 
 # ------------------------------------------------------------------------------
@@ -80,7 +80,7 @@ fi
 php artisan storage:link || true
 
 # ------------------------------------------------------------------------------
-# 4. Cache. Bila env_file .env.client berubah, checksum berubah → cache lama
+# 4. Cache. Bila env_file .env.client berubah, checksum berubah -> cache lama
 #    dibuang dulu supaya konfigurasi sync/DB tidak tersimpan versi lama.
 # ------------------------------------------------------------------------------
 ENV_SIGNATURE=$(printf '%s|' \
@@ -93,7 +93,7 @@ ENV_SIGNATURE=$(printf '%s|' \
 
 SIG_FILE=storage/.client-env.sha256
 if [ ! -f "$SIG_FILE" ] || [ "$(cat "$SIG_FILE")" != "$ENV_SIGNATURE" ]; then
-    echo "[INFO] Konfigurasi berubah — membersihkan cache lama..."
+    echo "[INFO] Konfigurasi berubah - membersihkan cache lama..."
     php artisan config:clear || true
     php artisan route:clear || true
     php artisan view:clear || true

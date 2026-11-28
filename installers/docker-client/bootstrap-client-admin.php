@@ -76,7 +76,7 @@ try {
     }
 
     // Role berasal dari data kanonik cloud. Sebelum sync:bootstrap role ini
-    // memang belum ada — itu normal dan TIDAK dijadikan alasan untuk seeder.
+    // memang belum ada - itu normal dan TIDAK dijadikan alasan untuk seeder.
     try {
         $role = Role::where('name', 'super-admin')
             ->where('guard_name', 'web')

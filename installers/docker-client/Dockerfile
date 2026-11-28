@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# UTE PARTS ERP — Docker image khusus NODE CLIENT (primary_store)
+# UTE PARTS ERP - Docker image khusus NODE CLIENT (primary_store)
 # =============================================================================
 # Build context = ROOT repository (lihat docker-compose.yml / install.sh).
 # Sengaja TIDAK pakai `COPY . .`: .env.client berisi rahasia wizard dan

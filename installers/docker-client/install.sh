@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UTE PARTS ERP — Docker Installer khusus NODE CLIENT (Linux / VPS)
+# UTE PARTS ERP - Docker Installer khusus NODE CLIENT (Linux / VPS)
 # ==============================================================================
 # Stack : Docker Compose (Apache + PHP 8.4) + MySQL 8.0
 # Peran : primary_store (default) atau cloud_storefront
@@ -15,7 +15,7 @@ ENV_FILE="$SCRIPT_DIR/.env.client"
 cd "$SCRIPT_DIR"
 
 echo "============================================================"
-echo "   UTE PARTS ERP — Docker Installer (CLIENT NODE)"
+echo "   UTE PARTS ERP - Docker Installer (CLIENT NODE)"
 echo "============================================================"
 echo ""
 
@@ -75,15 +75,15 @@ run_wizard() {
     echo ""
 
     echo "Pilih peran node:"
-    echo "  [1] client  (primary_store)     — DEFAULT. Toko lokal, DB sendiri,"
+    echo "  [1] client  (primary_store)     - DEFAULT. Toko lokal, DB sendiri,"
     echo "                                    data awal ditarik dari cloud."
-    echo "  [2] cloud   (cloud_storefront)  — Sumber data kanonik di uteparts.id."
+    echo "  [2] cloud   (cloud_storefront)  - Sumber data kanonik di uteparts.id."
     local role_input
     role_input="$(ask "Peran (1/2, default 1): " "1")"
     case "$role_input" in
         1|client|Client|CLIENT) ROLE="client" ;;
         2|cloud|Cloud|CLOUD) ROLE="cloud" ;;
-        *) echo "❌ Peran tidak valid."; exit 1 ;;
+        *) echo "[FAIL] Peran tidak valid."; exit 1 ;;
     esac
 
     echo ""
@@ -117,7 +117,7 @@ run_wizard() {
         ADMIN_PASSWORD="$(gen_secret | cut -c1-20)"
         echo "[INFO] Password admin dibuat otomatis (lihat ringkasan, tersimpan di .env.client)."
     elif [ "${#ADMIN_PASSWORD}" -lt 8 ]; then
-        echo "❌ Password admin minimal 8 karakter."
+        echo "[FAIL] Password admin minimal 8 karakter."
         exit 1
     fi
 
@@ -161,7 +161,7 @@ write_env() {
     w() { printf '%s\n' "$1" >> "$ENV_FILE"; }
     : > "$ENV_FILE"
 
-    w '# Dibuat oleh installers/docker-client/install.sh — JANGAN commit file ini.'
+    w '# Dibuat oleh installers/docker-client/install.sh - JANGAN commit file ini.'
     w "APP_NAME=\"$(esc "$app_name")\""
     w 'APP_ENV=production'
     w 'APP_KEY='
@@ -246,7 +246,7 @@ show_summary() {
 
 # --------------------------- prerequisites -----------------------------------
 if ! command -v docker >/dev/null 2>&1; then
-    echo "❌ Docker belum terinstall."
+    echo "[FAIL] Docker belum terinstall."
     echo "   curl -fsSL https://get.docker.com | sh"
     echo "   sudo usermod -aG docker \$USER"
     exit 1
@@ -258,12 +258,12 @@ if docker compose version >/dev/null 2>&1; then
 elif command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD="docker-compose"
 else
-    echo "❌ Docker Compose belum terinstall (apt-get install docker-compose-plugin)."
+    echo "[FAIL] Docker Compose belum terinstall (apt-get install docker-compose-plugin)."
     exit 1
 fi
 
-echo "✔ Docker    : $(docker --version)"
-echo "✔ Compose   : $($COMPOSE_CMD version)"
+echo "[OK] Docker    : $(docker --version)"
+echo "[OK] Compose   : $($COMPOSE_CMD version)"
 echo ""
 
 # --------------------------- config ------------------------------------------
@@ -293,13 +293,13 @@ fi
 # --------------------------- action ------------------------------------------
 echo ""
 echo "Pilih aksi:"
-echo "  [1] Fresh install — hapus container & volume lama (database kosong)"
-echo "  [2] Update / Start — rebuild image, data database tetap"
+echo "  [1] Fresh install - hapus container & volume lama (database kosong)"
+echo "  [2] Update / Start - rebuild image, data database tetap"
 ACTION="$(ask "Pilihan (1/2, default 2): " "2")"
 
 if [ "$ACTION" = "1" ]; then
     echo ""
-    echo "⚠ PERINGATAN: Fresh install akan MENGHAPUS database lokal (volume mysql)."
+    echo "[WARN] PERINGATAN: Fresh install akan MENGHAPUS database lokal (volume mysql)."
     echo "  Data toko harus ditarik ulang dari cloud via sync:bootstrap."
     CONFIRM="$(ask "Yakin? (y/N): " "N")"
     if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
@@ -310,7 +310,7 @@ if [ "$ACTION" = "1" ]; then
         exit 0
     fi
 elif [ "$ACTION" != "2" ]; then
-    echo "❌ Pilihan tidak valid."
+    echo "[FAIL] Pilihan tidak valid."
     exit 1
 fi
 
@@ -339,7 +339,7 @@ echo "Akses lokal        : http://localhost"
 echo "Akses LAN / VPS    : http://$SERVER_IP"
 echo "Login awal         : $ADMIN_EMAIL / (password di .env.client)"
 echo ""
-echo "LANGKAH PENTING — tarik data dari cloud:"
+echo "LANGKAH PENTING - tarik data dari cloud:"
 echo "  cd \"$SCRIPT_DIR\""
 echo "  docker compose exec app php artisan sync:bootstrap"
 echo "  docker compose exec -e ADMIN_FORCE=true app php /usr/local/bin/bootstrap-client-admin.php"
