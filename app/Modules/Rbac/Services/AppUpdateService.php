@@ -3,6 +3,7 @@
 namespace App\Modules\Rbac\Services;
 
 use Carbon\Carbon;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -171,6 +172,9 @@ class AppUpdateService
     public function getGitToken(): string
     {
         $token = (string) env('GITHUB_DEPLOY_TOKEN', env('GIT_TOKEN', ''));
+        if (empty($token) && app()->configurationIsCached()) {
+            $token = (string) config('services.github.deploy_token', '');
+        }
         if (! empty($token)) {
             return $token;
         }
@@ -222,18 +226,10 @@ class AppUpdateService
         [$owner, $repo] = $this->getRepoOwnerAndName();
         $currentCommit = $currentInfo['commit'];
 
-        $headers = [
-            'User-Agent' => 'Bremspace-ERP-Updater/1.0',
-            'Accept' => 'application/vnd.github+json',
-        ];
-        if (! empty($token)) {
-            $headers['Authorization'] = 'Bearer '.$token;
-        }
-
         // Jika commit lokal valid (bukan 'dev'), gunakan compare API
         if ($currentCommit !== 'dev' && preg_match('/^[0-9a-fA-F]{4,40}$/', $currentCommit)) {
             $compareUrl = "https://api.github.com/repos/{$owner}/{$repo}/compare/{$currentCommit}...{$branch}";
-            $response = Http::withHeaders($headers)->timeout(8)->get($compareUrl);
+            $response = $this->githubGet($compareUrl, $token);
 
             if ($response->successful()) {
                 $data = $response->json();
@@ -281,7 +277,7 @@ class AppUpdateService
 
         // Fallback: periksa commit HEAD branch terkini
         $branchUrl = "https://api.github.com/repos/{$owner}/{$repo}/commits/{$branch}";
-        $response = Http::withHeaders($headers)->timeout(8)->get($branchUrl);
+        $response = $this->githubGet($branchUrl, $token);
 
         if ($response->successful()) {
             $data = $response->json();
@@ -323,22 +319,57 @@ class AppUpdateService
     }
 
     /**
+     * Request GET ke GitHub API; ulangi tanpa token bila token ditolak (401/403) pada repo publik.
+     */
+    protected function githubGet(string $url, string $token = ''): Response
+    {
+        $baseHeaders = [
+            'User-Agent' => 'Bremspace-ERP-Updater/1.0',
+            'Accept' => 'application/vnd.github+json',
+        ];
+
+        $headers = $baseHeaders;
+        if (! empty($token)) {
+            $headers['Authorization'] = 'Bearer '.$token;
+        }
+
+        $response = Http::withHeaders($headers)->timeout(8)->get($url);
+
+        if (! empty($token) && in_array($response->status(), [401, 403], true)) {
+            $response = Http::withHeaders($baseHeaders)->timeout(8)->get($url);
+        }
+
+        return $response;
+    }
+
+    /**
      * Cek update via Git CLI (fallback lokal).
      */
     protected function checkUpdatesViaGitCli(array $currentInfo, string $branch, string $token = ''): array
     {
         $this->selfHealGitLockFiles();
 
+        // Jika .git atau .git/FETCH_HEAD tidak dapat ditulisi user web,
+        // langsung gunakan git ls-remote (read-only) agar tidak gagal Permission denied.
+        if (! $this->isGitWritable()) {
+            return $this->checkUpdatesViaGitLsRemote($currentInfo, $branch, $token);
+        }
+
         // 1. Jalankan git fetch
         $fetchArgs = ['fetch', 'origin', $branch];
-        if (! empty($token)) {
-            $authHeader = 'AUTHORIZATION: bearer '.$token;
-            $fetchRes = $this->runGit(['-c', "http.extraheader={$authHeader}", 'fetch', 'origin', $branch]);
-        } else {
+        $fetchRes = ! empty($token)
+            ? $this->runGit(['-c', 'http.extraheader=AUTHORIZATION: bearer '.$token, ...$fetchArgs])
+            : $this->runGit($fetchArgs);
+
+        if ($fetchRes['status'] !== 0 && ! empty($token) && $this->isGitAuthError($fetchRes['output'])) {
             $fetchRes = $this->runGit($fetchArgs);
         }
 
         if ($fetchRes['status'] !== 0) {
+            if ($this->isGitPermissionError($fetchRes['output'])) {
+                return $this->checkUpdatesViaGitLsRemote($currentInfo, $branch, $token);
+            }
+
             $cleanOutput = preg_replace('/fatal:\s*/i', '', $fetchRes['output']);
 
             return [
@@ -398,6 +429,86 @@ class AppUpdateService
     }
 
     /**
+     * Cek pembaruan secara read-only via git ls-remote (tidak menulis ke .git/FETCH_HEAD).
+     */
+    protected function checkUpdatesViaGitLsRemote(array $currentInfo, string $branch, string $token = ''): array
+    {
+        $lsArgs = ['ls-remote', '--heads', 'origin', $branch];
+        $res = ! empty($token)
+            ? $this->runGit(['-c', 'http.extraheader=AUTHORIZATION: bearer '.$token, ...$lsArgs])
+            : $this->runGit($lsArgs);
+
+        if ($res['status'] !== 0 && ! empty($token) && $this->isGitAuthError($res['output'])) {
+            $res = $this->runGit($lsArgs);
+        }
+
+        if ($res['status'] !== 0) {
+            $cleanOutput = preg_replace('/fatal:\s*/i', '', $res['output']);
+
+            return [
+                'has_update' => false,
+                'status' => 'error',
+                'message' => 'Gagal terhubung ke server pembaruan: '.trim($cleanOutput),
+                'current' => $currentInfo,
+                'changelog' => [],
+                'commits_behind' => 0,
+            ];
+        }
+
+        $remoteSha = '';
+        foreach (explode("\n", trim($res['output'])) as $line) {
+            if (preg_match('/^([0-9a-fA-F]{40})\s+refs\/heads\/'.preg_quote($branch, '/').'$/', trim($line), $m)) {
+                $remoteSha = strtolower($m[1]);
+                break;
+            }
+        }
+
+        $localRes = $this->runGit(['rev-parse', 'HEAD']);
+        $localSha = ($localRes['status'] === 0) ? strtolower(trim($localRes['output'])) : '';
+
+        if ($remoteSha !== '' && $localSha !== '' && $remoteSha === $localSha) {
+            return [
+                'has_update' => false,
+                'status' => 'up_to_date',
+                'message' => 'Aplikasi sudah menggunakan versi terbaru.',
+                'current' => $currentInfo,
+                'changelog' => [],
+                'commits_behind' => 0,
+            ];
+        }
+
+        if ($remoteSha !== '') {
+            $shortSha = substr($remoteSha, 0, 7);
+
+            return [
+                'has_update' => true,
+                'status' => 'update_available',
+                'message' => 'Pembaruan versi terbaru tersedia di server rilis.',
+                'current' => $currentInfo,
+                'latest_hash' => $shortSha,
+                'commits_behind' => 1,
+                'changelog' => [
+                    [
+                        'hash' => $shortSha,
+                        'subject' => "Pembaruan terbaru tersedia di branch {$branch}",
+                        'author' => 'Server Rilis',
+                        'date' => 'Terbaru',
+                    ],
+                ],
+            ];
+        }
+
+        return [
+            'has_update' => false,
+            'status' => 'error',
+            'message' => "Branch '{$branch}' tidak ditemukan di server pembaruan.",
+            'current' => $currentInfo,
+            'changelog' => [],
+            'commits_behind' => 0,
+        ];
+    }
+
+    /**
      * Pasang pembaruan terbaru dari server rilis (git pull, composer, migrate, clear cache).
      */
     public function applyUpdate(): array
@@ -418,16 +529,25 @@ class AppUpdateService
         // 1. Sinkronisasi Berkas Aplikasi
         $hasGit = File::isDirectory($this->getBasePath().'/.git');
         if ($hasGit) {
+            $basePullArgs = ['pull', '--no-rebase', 'origin', $branch];
             $pullArgs = ! empty($token)
-                ? ['-c', "http.extraheader=AUTHORIZATION: bearer {$token}", 'pull', '--no-rebase', 'origin', $branch]
-                : ['pull', '--no-rebase', 'origin', $branch];
+                ? ['-c', "http.extraheader=AUTHORIZATION: bearer {$token}", ...$basePullArgs]
+                : $basePullArgs;
 
             $pullRes = $this->runGit($pullArgs);
+            if ($pullRes['status'] !== 0 && ! empty($token) && $this->isGitAuthError($pullRes['output'])) {
+                $pullRes = $this->runGit($basePullArgs);
+            }
+
             $logs[] = '[1/4] Sinkronisasi Berkas Aplikasi: '.($pullRes['status'] === 0 ? 'Sukses' : 'Gagal ('.$pullRes['output'].')');
             if ($pullRes['status'] !== 0) {
+                $errorMessage = $this->isGitPermissionError($pullRes['output'])
+                    ? $this->formatGitPermissionErrorMessage($branch)
+                    : 'Gagal mengunduh pembaruan dari server: '.$pullRes['output'];
+
                 return [
                     'success' => false,
-                    'message' => 'Gagal mengunduh pembaruan dari server: '.$pullRes['output'],
+                    'message' => $errorMessage,
                     'logs' => $logs,
                 ];
             }
@@ -664,12 +784,13 @@ class AppUpdateService
     }
 
     /**
-     * Bersihkan lock files git yang tertinggal jika proses sebelumnya terputus.
+     * Bersihkan lock files git yang tertinggal jika proses sebelumnya terputus,
+     * serta FETCH_HEAD yang tidak writable ketika folder .git dapat ditulisi user web.
      */
     protected function selfHealGitLockFiles(): void
     {
-        $base = $this->getBasePath();
-        $lockFile = $base.'/.git/index.lock';
+        $gitDir = $this->getBasePath().'/.git';
+        $lockFile = $gitDir.'/index.lock';
 
         if (File::exists($lockFile)) {
             $age = time() - File::lastModified($lockFile);
@@ -678,6 +799,64 @@ class AppUpdateService
                 Log::warning("AppUpdateService: Menghapus index.lock kadaluarsa ({$age}s)");
             }
         }
+
+        // Jika FETCH_HEAD dibuat user lain (misal root) tapi .git writable oleh user web,
+        // hapus file lama agar git fetch/pull bisa membuat ulang dengan izin yang benar.
+        $fetchHead = $gitDir.'/FETCH_HEAD';
+        if (File::exists($fetchHead) && ! is_writable($fetchHead) && is_writable($gitDir)) {
+            @File::delete($fetchHead);
+            Log::warning('AppUpdateService: Menghapus .git/FETCH_HEAD yang tidak dapat ditulisi user web');
+        }
+    }
+
+    /**
+     * Cek apakah direktori .git dan .git/FETCH_HEAD dapat ditulisi oleh proses PHP saat ini.
+     */
+    protected function isGitWritable(): bool
+    {
+        $gitDir = $this->getBasePath().'/.git';
+        if (! File::isDirectory($gitDir) || ! is_writable($gitDir)) {
+            return false;
+        }
+
+        $fetchHead = $gitDir.'/FETCH_HEAD';
+        if (File::exists($fetchHead) && ! is_writable($fetchHead)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function isGitPermissionError(string $output): bool
+    {
+        return (bool) preg_match('/permission denied|unable to create file|cannot open .*FETCH_HEAD|insufficient permission/i', $output);
+    }
+
+    protected function isGitAuthError(string $output): bool
+    {
+        return (bool) preg_match('/authentication failed|invalid username or token|returned error:\s*40[13]|could not read Username/i', $output);
+    }
+
+    protected function getProcessUser(): string
+    {
+        if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+            $info = @posix_getpwuid(posix_geteuid());
+            if (! empty($info['name'])) {
+                return (string) $info['name'];
+            }
+        }
+
+        return get_current_user() ?: 'www-data';
+    }
+
+    protected function formatGitPermissionErrorMessage(string $branch): string
+    {
+        $user = $this->getProcessUser();
+        $basePath = $this->getBasePath();
+
+        return "Izin tulis direktori Git/aplikasi ditolak untuk user \"{$user}\". "
+            ."Jalankan di terminal server: sudo chown -R {$user}:{$user} {$basePath} "
+            ."(atau perbarui manual via CLI: git pull origin {$branch}).";
     }
 
     /**

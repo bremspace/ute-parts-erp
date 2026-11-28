@@ -163,4 +163,152 @@ class AppUpdateServiceTest extends TestCase
 
         @unlink($tempEnv);
     }
+
+    public function test_check_for_updates_retries_github_api_without_token_on_401(): void
+    {
+        Http::fake([
+            'https://api.github.com/repos/*/compare/*' => Http::sequence()
+                ->push(['message' => 'Bad credentials'], 401)
+                ->push([
+                    'status' => 'identical',
+                    'ahead_by' => 0,
+                    'behind_by' => 0,
+                    'total_commits' => 0,
+                    'commits' => [],
+                ], 200),
+        ]);
+
+        $service = app(AppUpdateService::class);
+        $res = $service->checkForUpdates();
+
+        $this->assertFalse($res['has_update']);
+        $this->assertSame('up_to_date', $res['status']);
+    }
+
+    public function test_check_for_updates_falls_back_to_ls_remote_when_git_fetch_head_permission_denied(): void
+    {
+        Http::fake([
+            'https://api.github.com/*' => Http::response(['message' => 'Not Found'], 404),
+        ]);
+
+        $sha = 'abcdef1234567890abcdef1234567890abcdef12';
+        $service = new class($sha) extends AppUpdateService
+        {
+            public bool $fetchCalled = false;
+
+            public function __construct(private string $sha) {}
+
+            protected function isGitWritable(): bool
+            {
+                return false;
+            }
+
+            protected function runGit(array $arguments): array
+            {
+                $cmd = implode(' ', $arguments);
+                if (str_contains($cmd, 'fetch')) {
+                    $this->fetchCalled = true;
+
+                    return ['status' => 1, 'output' => "error:cannot open '.git/FETCH_HEAD': Permission denied"];
+                }
+                if (str_contains($cmd, 'ls-remote')) {
+                    return ['status' => 0, 'output' => "{$this->sha}\trefs/heads/main"];
+                }
+                if (str_contains($cmd, 'rev-parse --short HEAD')) {
+                    return ['status' => 0, 'output' => '1111111'];
+                }
+                if (str_contains($cmd, 'rev-parse HEAD')) {
+                    return ['status' => 0, 'output' => '1111111222222222222222222222222222222222'];
+                }
+                if (str_contains($cmd, 'rev-parse --abbrev-ref HEAD')) {
+                    return ['status' => 0, 'output' => 'main'];
+                }
+                if (str_contains($cmd, 'remote get-url origin')) {
+                    return ['status' => 0, 'output' => 'https://github.com/bremspace/ute-parts-erp.git'];
+                }
+
+                return ['status' => 0, 'output' => ''];
+            }
+        };
+
+        $res = $service->checkForUpdates();
+
+        $this->assertFalse($service->fetchCalled);
+        $this->assertTrue($res['has_update']);
+        $this->assertSame('update_available', $res['status']);
+        $this->assertSame('abcdef1', $res['latest_hash']);
+    }
+
+    public function test_check_for_updates_falls_back_to_ls_remote_up_to_date_when_fetch_returns_permission_denied(): void
+    {
+        Http::fake([
+            'https://api.github.com/*' => Http::response(['message' => 'API error'], 500),
+        ]);
+
+        $sha = 'abcdef1234567890abcdef1234567890abcdef12';
+        $service = new class($sha) extends AppUpdateService
+        {
+            public function __construct(private string $sha) {}
+
+            protected function isGitWritable(): bool
+            {
+                return true;
+            }
+
+            protected function runGit(array $arguments): array
+            {
+                $cmd = implode(' ', $arguments);
+                if (str_contains($cmd, 'fetch')) {
+                    return ['status' => 128, 'output' => "error:cannot open '.git/FETCH_HEAD': Permission denied"];
+                }
+                if (str_contains($cmd, 'ls-remote')) {
+                    return ['status' => 0, 'output' => "{$this->sha}\trefs/heads/main"];
+                }
+                if (str_contains($cmd, 'rev-parse --short HEAD')) {
+                    return ['status' => 0, 'output' => 'abcdef1'];
+                }
+                if (str_contains($cmd, 'rev-parse HEAD')) {
+                    return ['status' => 0, 'output' => $this->sha];
+                }
+                if (str_contains($cmd, 'rev-parse --abbrev-ref HEAD')) {
+                    return ['status' => 0, 'output' => 'main'];
+                }
+                if (str_contains($cmd, 'remote get-url origin')) {
+                    return ['status' => 0, 'output' => 'https://github.com/bremspace/ute-parts-erp.git'];
+                }
+
+                return ['status' => 0, 'output' => ''];
+            }
+        };
+
+        $res = $service->checkForUpdates();
+
+        $this->assertFalse($res['has_update']);
+        $this->assertSame('up_to_date', $res['status']);
+    }
+
+    public function test_apply_update_returns_actionable_message_on_git_permission_denied(): void
+    {
+        $service = new class extends AppUpdateService
+        {
+            protected function runGit(array $arguments): array
+            {
+                $cmd = implode(' ', $arguments);
+                if (str_contains($cmd, 'pull')) {
+                    return ['status' => 1, 'output' => "error:cannot open '.git/FETCH_HEAD': Permission denied"];
+                }
+                if (str_contains($cmd, 'rev-parse --abbrev-ref HEAD')) {
+                    return ['status' => 0, 'output' => 'main'];
+                }
+
+                return ['status' => 0, 'output' => 'dev'];
+            }
+        };
+
+        $res = $service->applyUpdate();
+
+        $this->assertFalse($res['success']);
+        $this->assertStringContainsString('sudo chown -R', $res['message']);
+        $this->assertStringContainsString('git pull origin main', $res['message']);
+    }
 }

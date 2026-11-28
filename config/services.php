@@ -68,4 +68,8 @@ return [
         'timeout' => (int) env('WA_OPENWA_TIMEOUT', 20),
     ],
 
+    'github' => [
+        'deploy_token' => env('GITHUB_DEPLOY_TOKEN', env('GIT_TOKEN')),
+    ],
+
 ];

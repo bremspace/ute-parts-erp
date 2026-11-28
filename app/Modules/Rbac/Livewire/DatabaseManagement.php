@@ -5,6 +5,7 @@ namespace App\Modules\Rbac\Livewire;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AppUpdateService;
 use App\Modules\Rbac\Services\DatabaseManagementService;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -322,6 +323,9 @@ class DatabaseManagement extends Component
     {
         $this->authorizeSuperAdminOnly();
         $updateService->updateEnv(['GITHUB_DEPLOY_TOKEN' => trim($this->gitDeployToken)]);
+        if (app()->configurationIsCached()) {
+            Artisan::call('config:clear');
+        }
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => 'Token autentikasi repositori berhasil disimpan ke .env!',
