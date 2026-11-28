@@ -6,6 +6,8 @@ use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Sync\Services\HybridSyncOutboxService;
 use App\Modules\Sync\Services\HybridSyncProcessorService;
 use App\Modules\Sync\SyncObserverBootstrap;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
 
@@ -86,6 +88,14 @@ class SyncServiceProvider extends ServiceProvider
                     // push sync gagal diam-diam tanpa pesan yang jelas.
                     if (($key === 'api_secret' || $key === 'remote_url') && $value === '') {
                         continue;
+                    }
+
+                    if ($key === 'api_secret') {
+                        try {
+                            $value = Crypt::decryptString($value);
+                        } catch (DecryptException) {
+                            // Legacy plaintext tetap didukung sampai disimpan ulang via UI.
+                        }
                     }
                 } else {
                     // Array/objek tidak punya padanan di config('sync.*').

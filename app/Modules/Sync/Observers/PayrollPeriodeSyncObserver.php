@@ -39,10 +39,6 @@ class PayrollPeriodeSyncObserver
 
     private function enqueueSync(PayrollPeriode $periode): void
     {
-        if (config('sync.node_role') !== 'primary_store') {
-            return;
-        }
-
         $this->enqueueModelEvent(
             $periode,
             'payroll.upsert',

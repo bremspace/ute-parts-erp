@@ -4672,9 +4672,44 @@
                                     <p class="text-[10px] text-ink-400 mt-1">Alamat server cloud VPS tujuan pengiriman outbox.</p>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Shared Secret Key (HMAC-SHA256) *</label>
-                                    <input type="password" wire:model="integrasiForm.sync_api_secret" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Kunci rahasia bersama" />
-                                    <p class="text-[10px] text-ink-400 mt-1">Wajib sama persis antara server lokal dan cloud VPS.</p>
+                                    <div class="flex items-center justify-between gap-2 mb-1.5">
+                                        <label class="block text-xs font-semibold text-ink-300">Shared Secret Key (HMAC-SHA256) *</label>
+                                        @if($syncSecretConfigured)
+                                            <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-up-mint/15 text-up-mint border border-up-mint/25">
+                                                ● Tersimpan Terenkripsi
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div
+                                        class="relative"
+                                        x-data
+                                        @sync-secret-generated.window="
+                                            if (navigator.clipboard && window.isSecureContext && $event.detail && $event.detail.secret) {
+                                                navigator.clipboard.writeText($event.detail.secret).catch(() => {});
+                                            }
+                                        "
+                                    >
+                                        <input
+                                            type="password"
+                                            wire:model="integrasiForm.sync_api_secret"
+                                            autocomplete="new-password"
+                                            autocapitalize="off"
+                                            autocorrect="off"
+                                            spellcheck="false"
+                                            class="w-full px-3 py-2.5 pr-24 rounded-xl glass-input text-xs font-medium font-mono"
+                                            placeholder="{{ $syncSecretConfigured ? 'Kosongkan jika tidak ingin mengganti secret tersimpan' : 'Masukkan atau klik Generate kunci rahasia' }}"
+                                        />
+                                        <button
+                                            type="button"
+                                            wire:click="generateSyncSecret"
+                                            wire:loading.attr="disabled"
+                                            class="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-lg bg-up-primary/20 text-up-primary text-[10px] font-bold hover:bg-up-primary/30 transition cursor-pointer disabled:opacity-50"
+                                        >
+                                            <span wire:loading.remove wire:target="generateSyncSecret">Generate</span>
+                                            <span wire:loading wire:target="generateSyncSecret">...</span>
+                                        </button>
+                                    </div>
+                                    <p class="text-[10px] text-ink-400 mt-1">Wajib sama persis antara server lokal dan cloud VPS. Disimpan terenkripsi di database.</p>
                                 </div>
                             </div>
 

@@ -3,6 +3,7 @@
 namespace App\Modules\Sync\Observers;
 
 use App\Modules\Akunting\Models\JurnalHeader;
+use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
 use Illuminate\Database\Eloquent\Model;
 
@@ -10,18 +11,28 @@ class JurnalHeaderSyncObserver
 {
     use SyncsModelEvents;
 
-    private const STANDALONE_SUMBER = [
+    private const BACKOFFICE_SUMBER = [
         'manual',
         'payroll',
         'payroll-bayar',
         'asset',
         'depresiasi',
         'disposal',
+        'tutup_buku',
+        'bagi_hasil',
+        'kas',
+        'grn',
+        'servis',
+        'retur',
+        'pembelian',
+        'opname',
+        'transfer:out',
+        'transfer:in',
     ];
 
     public function created(JurnalHeader $header): void
     {
-        if (! in_array($header->sumber, self::STANDALONE_SUMBER, true)) {
+        if (! $this->shouldSyncJurnal($header)) {
             return;
         }
 
@@ -30,7 +41,7 @@ class JurnalHeaderSyncObserver
 
     public function updated(JurnalHeader $header): void
     {
-        if (! in_array($header->sumber, self::STANDALONE_SUMBER, true)) {
+        if (! $this->shouldSyncJurnal($header)) {
             return;
         }
 
@@ -41,12 +52,18 @@ class JurnalHeaderSyncObserver
         $this->enqueueSync($header);
     }
 
-    private function enqueueSync(JurnalHeader $header): void
+    private function shouldSyncJurnal(JurnalHeader $header): bool
     {
-        if (config('sync.node_role') !== 'primary_store') {
-            return;
+        if (in_array($header->sumber, self::BACKOFFICE_SUMBER, true)) {
+            return true;
         }
 
+        // Sinkronkan jurnal reversal non-POS (reversal POS sudah ditangani transaksi.void).
+        return $header->sumber === 'reversal' && $header->referensi_tipe !== Transaksi::class;
+    }
+
+    private function enqueueSync(JurnalHeader $header): void
+    {
         $this->enqueueModelEvent(
             $header,
             'jurnal.upsert',

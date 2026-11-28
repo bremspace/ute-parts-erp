@@ -8,6 +8,7 @@ use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Sync\Observers\BackofficeModelSyncObserver;
 use App\Modules\Sync\Observers\BrandSyncObserver;
 use App\Modules\Sync\Observers\HargaTierSyncObserver;
 use App\Modules\Sync\Observers\JurnalHeaderSyncObserver;
@@ -81,6 +82,12 @@ class SyncObserverBootstrap
             }
             foreach ($modelObservers as $observer) {
                 $model::observe($observer);
+            }
+        }
+
+        foreach (BackofficeSyncRegistry::models() as $backofficeModel) {
+            if (class_exists($backofficeModel)) {
+                $backofficeModel::observe(BackofficeModelSyncObserver::class);
             }
         }
     }

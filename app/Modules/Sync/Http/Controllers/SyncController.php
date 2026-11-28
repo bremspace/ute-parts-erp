@@ -113,25 +113,10 @@ class SyncController extends Controller
             });
         }
 
-        // Jika node adalah cloud_storefront, yang ditarik oleh toko adalah pesanan online, master data, dan transaksi cloud pos
+        // Node cloud_storefront mengekspos seluruh antrean backoffice & order online
+        // untuk ditarik oleh primary_store (kecuali event transaksi.pos milik toko).
         if ($nodeRole === 'cloud_storefront') {
-            $allowedEvents = [
-                'order.online_paid',
-                'produk.upsert',
-                'sku_variant.upsert',
-                'pelanggan.upsert',
-                'kategori_produk.upsert',
-                'brand.upsert',
-                'kualitas_produk.upsert',
-                'satuan_unit.upsert',
-                'tipe_hp.upsert',
-                'harga_tier.upsert',
-                'produk_satuan_konversi.upsert',
-                'produk_barcode.sync',
-                'transaksi.pos_cloud',
-                'transaksi.void',
-            ];
-            $query->whereIn('event_type', $allowedEvents);
+            $query->where('event_type', '!=', 'transaksi.pos');
         }
 
         $items = $query->get()->map(function ($item) {

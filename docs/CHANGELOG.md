@@ -3,6 +3,19 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-11-28 — Hybrid Sync Bidireksional Penuh Backoffice & Enkripsi Shared Secret
+
+- **Enkripsi & Masking `sync_api_secret` (`SettingsRbac`, `SyncServiceProvider`, UI Integrasi)**:
+  - Menyimpan `hybrid_sync_config.api_secret` terenkripsi via `Crypt::encryptString()`, menjaga kompatibilitas mundur terhadap plaintext legacy (auto-upgrade saat disimpan ulang), serta mendekripsi di `SyncServiceProvider::applyDatabaseConfig()`.
+  - State publik Livewire `integrasiForm.sync_api_secret` tidak lagi mengirim rahasia ke browser setelah disimpan; diganti indikator `$syncSecretConfigured` (`● Tersimpan Terenkripsi`) + helper `resolveSyncSecret()`, tombol **Generate** (`generateSyncSecret()`, 64 karakter acak) + salin clipboard otomatis.
+- **Sinkronisasi Bidireksional Seluruh Modul Backoffice**:
+  - `BackofficeSyncRegistry` & migrasi `2026_11_28_000001_add_sync_uuid_to_backoffice_tables.php`: menambahkan kolom unik `sync_uuid` pada 61 tabel backoffice (WMS PO/GRN/Transfer/Opname/Return/CycleCount/SN, Servis, HR/Absensi/KPI/BagiHasil, Akunting COA/Aset/Piutang/Utang/Periode/KasMatching, CRM/Reseller, Omnichannel, Workflow Approval, Cabang).
+  - `BackofficeModelSyncObserver` & `SyncObserverBootstrap`: observer generik bidireksional yang mendekode kolom JSON/array cast, menyaring kolom sensitif (`webhook_secret`, `kredensial`, dll.), serta menyertakan peta `_refs` (`sync_uuid` + natural keys) untuk remapping FK lintas node.
+  - `TiketServisSyncObserver`, `PayrollPeriodeSyncObserver`, `JurnalHeaderSyncObserver`: hapus blokir `node_role` satu arah; perluas cakupan jurnal backoffice (`grn`, `servis`, `retur`, `tutup_buku`, `bagi_hasil`, `kas`, `opname`, `transfer`, `pembelian`, reversal non-POS) sambil tetap mencegah duplikasi jurnal `pos`.
+  - `StokLogSyncObserver`, `SyncController::pull()`, & `HybridSyncProcessorService`: buka pull endpoint cloud untuk seluruh antrean backoffice (`!= 'transaksi.pos'`), tambah handler `'stok.mutasi'` di `processForPrimaryStore()`, lindungi transaksi `marketplace`/`pos_cloud`/`VPS-*` dari double-deduction stok, serta tangani `{table}.upsert` / `{table}.delete` dengan bypass `CabangScope` dan `saveQuietly()`.
+  - `EnsureCabangSelected::ensureDefaultWarehouseAndShelf()`: bungkus dalam `SyncExecutionGuard::runWithoutSync()` agar self-healing read middleware tidak memicu noise outbox saat GET request.
+- **Pengujian**: Menambahkan `SyncApiSecretEncryptionTest`, `BackofficeModelSyncObserverTest`, dan `BidirectionalBackofficeSyncTest`.
+
 ## 2026-11-27 — Optimasi Performa Menyeluruh, Panduan OpenWA & Pembaruan README
 
 - **Optimasi Performa Aplikasi (`AppServiceProvider`, `SettingsRbac`, `WMS`, `Layout`)**:

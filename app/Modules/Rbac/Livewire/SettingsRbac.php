@@ -340,6 +340,9 @@ class SettingsRbac extends Component
     /** Indikator aman untuk frontend bahwa token WA sudah tersimpan (tanpa mengirim rahasia). */
     public bool $waTokenConfigured = false;
 
+    /** Indikator aman untuk frontend bahwa Shared Secret Hybrid Sync sudah tersimpan. */
+    public bool $syncSecretConfigured = false;
+
     /** OpenWA management state */
     public ?string $openwaHealth = null;
 
@@ -1348,16 +1351,18 @@ class SettingsRbac extends Component
             $this->integrasiForm['sync_node_role'] = (string) ($savedSync['node_role'] ?? config('sync.node_role', 'primary_store'));
             $this->integrasiForm['sync_node_id'] = (string) ($savedSync['node_id'] ?? config('sync.node_id', 'STORE-01'));
             $this->integrasiForm['sync_remote_url'] = (string) ($savedSync['remote_url'] ?? config('sync.remote_url', ''));
-            $this->integrasiForm['sync_api_secret'] = (string) ($savedSync['api_secret'] ?? config('sync.api_secret', ''));
             $this->integrasiForm['sync_pull_interval_seconds'] = (int) ($savedSync['pull_interval_seconds'] ?? config('sync.pull_interval_seconds', 30));
         } else {
             $this->integrasiForm['sync_enabled'] = (bool) config('sync.enabled', false);
             $this->integrasiForm['sync_node_role'] = (string) config('sync.node_role', 'primary_store');
             $this->integrasiForm['sync_node_id'] = (string) config('sync.node_id', 'STORE-01');
             $this->integrasiForm['sync_remote_url'] = (string) config('sync.remote_url', '');
-            $this->integrasiForm['sync_api_secret'] = (string) config('sync.api_secret', '');
             $this->integrasiForm['sync_pull_interval_seconds'] = (int) config('sync.pull_interval_seconds', 30);
         }
+
+        // Jangan pernah kirim sync_api_secret asli ke state publik Livewire.
+        $this->integrasiForm['sync_api_secret'] = '';
+        $this->syncSecretConfigured = $this->resolveSyncSecret() !== '';
 
         // Template WA (global) + status pengiriman terbaru.
         $waTemplate = app(WaTemplateService::class);
@@ -1883,17 +1888,26 @@ class SettingsRbac extends Component
         $syncRole = (string) ($this->integrasiForm['sync_node_role'] ?? 'primary_store');
         $syncNodeId = (string) ($this->integrasiForm['sync_node_id'] ?? 'STORE-01');
         $syncRemoteUrl = trim((string) ($this->integrasiForm['sync_remote_url'] ?? ''));
-        $syncSecret = trim((string) ($this->integrasiForm['sync_api_secret'] ?? ''));
         $syncPullInterval = max(5, (int) ($this->integrasiForm['sync_pull_interval_seconds'] ?? 30));
+
+        $rawSyncInput = trim((string) ($this->integrasiForm['sync_api_secret'] ?? ''));
+        $existingSync = $config->get('hybrid_sync_config');
+        $dbSecretPlain = $this->decryptStoredSyncSecret(is_array($existingSync) ? ($existingSync['api_secret'] ?? '') : '');
+
+        $secretToStore = ($rawSyncInput !== '' && $rawSyncInput !== '••••••••')
+            ? $rawSyncInput
+            : $dbSecretPlain;
 
         $config->set('hybrid_sync_config', [
             'enabled' => $syncEnabled,
             'node_role' => $syncRole,
             'node_id' => $syncNodeId,
             'remote_url' => $syncRemoteUrl,
-            'api_secret' => $syncSecret,
+            'api_secret' => $secretToStore !== '' ? Crypt::encryptString($secretToStore) : '',
             'pull_interval_seconds' => $syncPullInterval,
         ], 'Konfigurasi Asymmetric Hybrid Sync');
+
+        $effectiveSecret = $secretToStore !== '' ? $secretToStore : trim((string) config('sync.api_secret', ''));
 
         config([
             'sync.enabled' => $syncEnabled,
@@ -1904,9 +1918,12 @@ class SettingsRbac extends Component
         if ($syncRemoteUrl !== '') {
             config(['sync.remote_url' => $syncRemoteUrl]);
         }
-        if ($syncSecret !== '') {
-            config(['sync.api_secret' => $syncSecret]);
+        if ($effectiveSecret !== '') {
+            config(['sync.api_secret' => $effectiveSecret]);
         }
+
+        $this->integrasiForm['sync_api_secret'] = '';
+        $this->syncSecretConfigured = $effectiveSecret !== '';
         Cache::forget('hybrid_sync:remote_reachable');
         $this->refreshSyncStatus();
 
@@ -2445,6 +2462,56 @@ class SettingsRbac extends Component
         }
     }
 
+    private function decryptStoredSyncSecret(mixed $rawSecret): string
+    {
+        $raw = trim((string) ($rawSecret ?? ''));
+        if ($raw === '') {
+            return '';
+        }
+
+        try {
+            return trim(Crypt::decryptString($raw));
+        } catch (DecryptException) {
+            return $raw;
+        }
+    }
+
+    /**
+     * Resolve effective Hybrid Sync secret: form input -> DB encrypted config -> .env config.
+     */
+    private function resolveSyncSecret(): string
+    {
+        $input = trim((string) ($this->integrasiForm['sync_api_secret'] ?? ''));
+        if ($input !== '' && $input !== '••••••••') {
+            return $input;
+        }
+
+        $saved = app(KonfigurasiService::class)->get('hybrid_sync_config');
+        if (is_array($saved) && filled($saved['api_secret'] ?? null)) {
+            $decrypted = $this->decryptStoredSyncSecret($saved['api_secret']);
+            if ($decrypted !== '') {
+                return $decrypted;
+            }
+        }
+
+        return trim((string) config('sync.api_secret', ''));
+    }
+
+    public function generateSyncSecret(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin membuat secret sinkronisasi.')) {
+            return;
+        }
+
+        $newSecret = Str::random(64);
+        $this->integrasiForm['sync_api_secret'] = $newSecret;
+        $this->dispatch('sync-secret-generated', secret: $newSecret);
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Secret baru dibuat (64 karakter). Klik Simpan Pengaturan dan pastikan secret yang sama diisi di node pasangan.',
+        ]);
+    }
+
     public function testSyncConnection(): void
     {
         if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengecek sinkronisasi.')) {
@@ -2456,7 +2523,7 @@ class SettingsRbac extends Component
             role: (string) ($this->integrasiForm['sync_node_role'] ?? 'primary_store'),
             nodeId: trim((string) ($this->integrasiForm['sync_node_id'] ?? 'STORE-01')),
             remoteUrl: trim((string) ($this->integrasiForm['sync_remote_url'] ?? '')),
-            secret: trim((string) ($this->integrasiForm['sync_api_secret'] ?? '')),
+            secret: $this->resolveSyncSecret(),
             requireCredentials: true
         );
 

@@ -21,10 +21,6 @@ class TiketServisSyncObserver
 
     private function enqueueSync(TiketServis $tiket): void
     {
-        if (config('sync.node_role') !== 'primary_store') {
-            return;
-        }
-
         $this->enqueueModelEvent(
             $tiket,
             'servis.update',

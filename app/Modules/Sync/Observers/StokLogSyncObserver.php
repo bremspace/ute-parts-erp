@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sync\Observers;
 
+use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Sync\Observers\Concerns\SyncsModelEvents;
 use App\Modules\Wms\Models\StokLog;
 
@@ -11,8 +12,26 @@ class StokLogSyncObserver
 
     public function created(StokLog $stokLog): void
     {
-        if (config('sync.node_role') !== 'primary_store' || $stokLog->referensi_tipe === 'sync_inbox') {
+        if ($stokLog->referensi_tipe === 'sync_inbox') {
             return;
+        }
+
+        // Pada node cloud_storefront, mutasi stok dari order.online_paid maupun failover pos_cloud (VPS-*)
+        // sudah dipotong langsung saat primary_store memproses transaksi tersebut; cegah double-deduction.
+        if (config('sync.node_role') === 'cloud_storefront'
+            && $stokLog->referensi_tipe === Transaksi::class
+            && $stokLog->referensi_id
+        ) {
+            $trx = Transaksi::find($stokLog->referensi_id);
+            if ($trx) {
+                $sumber = strtolower((string) ($trx->sumber ?? ''));
+                if ($sumber === 'marketplace'
+                    || $sumber === 'pos_cloud'
+                    || str_starts_with((string) $trx->no_transaksi, 'VPS-')
+                ) {
+                    return;
+                }
+            }
         }
 
         $this->enqueueModelEvent(

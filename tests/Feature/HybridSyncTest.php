@@ -435,6 +435,7 @@ class HybridSyncTest extends TestCase
     public function test_sync_flush_command_dispatches_jobs(): void
     {
         Queue::fake();
+        HybridSyncOutbox::query()->delete();
         config(['sync.remote_url' => 'https://cloud.bremspace.test']);
 
         $item = HybridSyncOutbox::create([

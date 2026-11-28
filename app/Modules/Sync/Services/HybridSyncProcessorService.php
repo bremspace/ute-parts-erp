@@ -18,6 +18,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Sync\BackofficeSyncRegistry;
 use App\Modules\Sync\Models\HybridSyncInbox;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
@@ -32,8 +33,11 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\StokDeductionService;
+use App\Scopes\CabangScope;
 use App\Support\NomorTeleponIndonesia;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Casts\AsArrayObject;
+use Illuminate\Database\Eloquent\Casts\AsCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -48,6 +52,13 @@ class HybridSyncProcessorService
      * @var array<string, bool>
      */
     private static array $syncUuidColumnCache = [];
+
+    /**
+     * Cache daftar kolom dan nullability per tabel untuk generic upsert.
+     *
+     * @var array<string, array{columns: list<string>, nullable: array<string, bool>}>
+     */
+    private static array $tableSchemaCache = [];
 
     /**
      * Proses payload event sync masuk secara idempotent.
@@ -177,6 +188,7 @@ class HybridSyncProcessorService
             'order.online_paid' => $this->handleOrderOnlinePaid($payload),
             'transaksi.pos_cloud' => $this->upsertSyncedPosTransaction($payload, true),
             'transaksi.void' => $this->handleTransaksiVoid($payload),
+            'stok.mutasi' => $this->handleStokMutasi($payload),
             'servis.update' => $this->handleServisUpdate($payload),
             'jurnal.upsert' => $this->handleJurnalUpsert($payload),
             'payroll.upsert' => $this->handlePayrollUpsert($payload),
@@ -198,7 +210,7 @@ class HybridSyncProcessorService
             'harga_tier.upsert' => $this->handleHargaTierUpsert($payload),
             'produk_satuan_konversi.upsert' => $this->handleProdukSatuanKonversiUpsert($payload),
             'produk_barcode.sync' => $this->handleProdukBarcodeSync($payload),
-            default => Log::notice("[HybridSync] Abaikan event tidak dikenal: {$eventType}"),
+            default => $this->handleGenericBackofficeEvent($eventType, $payload),
         };
     }
 
@@ -245,9 +257,13 @@ class HybridSyncProcessorService
         array $naturalMatchers = [],
         bool $withTrashed = false
     ): ?Model {
-        $baseQuery = fn () => $withTrashed && method_exists($modelClass, 'withTrashed')
-            ? $modelClass::withTrashed()
-            : $modelClass::query();
+        $baseQuery = function () use ($modelClass, $withTrashed) {
+            $q = $withTrashed && method_exists($modelClass, 'withTrashed')
+                ? $modelClass::withTrashed()
+                : $modelClass::query();
+
+            return class_exists(CabangScope::class) ? $q->withoutGlobalScope(CabangScope::class) : $q;
+        };
 
         $hasSyncUuid = $this->tableHasSyncUuid($modelClass);
         $incomingUuid = ! empty($payload['sync_uuid']) ? (string) $payload['sync_uuid'] : null;
@@ -320,9 +336,13 @@ class HybridSyncProcessorService
         array $naturalMatchers = [],
         bool $withTrashed = false
     ): ?int {
-        $baseQuery = fn () => $withTrashed && method_exists($modelClass, 'withTrashed')
-            ? $modelClass::withTrashed()
-            : $modelClass::query();
+        $baseQuery = function () use ($modelClass, $withTrashed) {
+            $q = $withTrashed && method_exists($modelClass, 'withTrashed')
+                ? $modelClass::withTrashed()
+                : $modelClass::query();
+
+            return class_exists(CabangScope::class) ? $q->withoutGlobalScope(CabangScope::class) : $q;
+        };
 
         $hasSyncUuid = $this->tableHasSyncUuid($modelClass);
         if ($hasSyncUuid && $uuidKey !== null && ! empty($payload[$uuidKey])) {
@@ -2176,6 +2196,311 @@ class HybridSyncProcessorService
             Transaksi::class,
             $transaksi->id
         );
+    }
+
+    protected function handleGenericBackofficeEvent(string $eventType, array $payload): void
+    {
+        $parts = explode('.', $eventType, 2);
+        if (count($parts) !== 2) {
+            Log::notice("[HybridSync] Abaikan event tidak dikenal: {$eventType}");
+
+            return;
+        }
+
+        [$tableName, $action] = $parts;
+        $def = BackofficeSyncRegistry::tables()[$tableName] ?? null;
+        $modelClass = $def['model'] ?? null;
+
+        if ($modelClass === null || ! class_exists($modelClass)) {
+            Log::notice("[HybridSync] Abaikan event tidak dikenal: {$eventType}");
+
+            return;
+        }
+
+        if ($action === 'delete') {
+            $this->handleGenericDelete($tableName, $modelClass, $payload);
+
+            return;
+        }
+
+        if ($action === 'upsert') {
+            $this->handleGenericUpsert($tableName, $modelClass, $payload);
+
+            return;
+        }
+
+        Log::notice("[HybridSync] Aksi tidak dikenal pada {$eventType}");
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @param  array<string, mixed>  $payload
+     */
+    protected function handleGenericUpsert(string $tableName, string $modelClass, array $payload): void
+    {
+        $syncUuid = ! empty($payload['sync_uuid']) ? (string) $payload['sync_uuid'] : null;
+        $resolved = $this->resolveGenericForeignKeys($tableName, $payload);
+
+        $naturalMatchers = $this->resolveNaturalMatchersForTable($tableName, $resolved);
+        $existing = $this->resolveTargetModel($modelClass, $resolved, $naturalMatchers, withTrashed: true);
+
+        $schema = $this->getTableSchemaInfo($tableName);
+        if ($existing && in_array('updated_at', $schema['columns'], true)) {
+            if (! $this->isIncomingNewer($resolved['updated_at'] ?? null, $existing->getAttribute('updated_at'))) {
+                return;
+            }
+        }
+
+        $modelInstance = new $modelClass;
+        $pkCol = $modelInstance->getKeyName();
+        $excluded = array_flip(array_merge([$pkCol], ['_refs'], BackofficeSyncRegistry::SENSITIVE_COLUMNS));
+        $allowedCols = array_flip($schema['columns']);
+
+        $attributes = [];
+        foreach ($resolved as $col => $val) {
+            if (isset($excluded[$col]) || ! isset($allowedCols[$col])) {
+                continue;
+            }
+
+            if ($modelInstance->hasCast($col, ['array', 'json', 'object', 'collection', AsArrayObject::class, AsCollection::class]) && is_string($val)) {
+                $decoded = json_decode($val, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $val = $decoded;
+                }
+            }
+
+            $attributes[$col] = $val;
+        }
+
+        if ($syncUuid !== null && isset($allowedCols['sync_uuid'])) {
+            $attributes['sync_uuid'] = $syncUuid;
+        }
+
+        $target = $existing ?? $modelInstance;
+        $target->forceFill($attributes);
+        $target->saveQuietly();
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @param  array<string, mixed>  $payload
+     */
+    protected function handleGenericDelete(string $tableName, string $modelClass, array $payload): void
+    {
+        $resolved = $this->resolveGenericForeignKeys($tableName, $payload, throwOnMissingRequired: false);
+        $naturalMatchers = $this->resolveNaturalMatchersForTable($tableName, $resolved);
+        $existing = $this->resolveTargetModel($modelClass, $resolved, $naturalMatchers, withTrashed: true);
+
+        if (! $existing) {
+            return;
+        }
+
+        if (method_exists($existing, 'trashed')) {
+            if (! $existing->trashed()) {
+                $existing->deleteQuietly();
+            }
+
+            return;
+        }
+
+        $existing->deleteQuietly();
+    }
+
+    /**
+     * Remap ID FK di payload menggunakan metadata `_refs` lintas node.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function resolveGenericForeignKeys(string $tableName, array $payload, bool $throwOnMissingRequired = true): array
+    {
+        $def = BackofficeSyncRegistry::tables()[$tableName] ?? [];
+        $refs = is_array($payload['_refs'] ?? null) ? $payload['_refs'] : [];
+        $fkDefs = array_merge(BackofficeSyncRegistry::foreignKeyDefinitions(), $def['extra_fks'] ?? []);
+        $polyFks = $def['poly_fks'] ?? [];
+        $schema = $this->getTableSchemaInfo($tableName);
+
+        foreach ($fkDefs as $col => $fkDef) {
+            if (! in_array($col, $schema['columns'], true) || ! array_key_exists($col, $payload)) {
+                continue;
+            }
+            if ($payload[$col] === null || $payload[$col] === '') {
+                continue;
+            }
+
+            $payload[$col] = $this->resolveSingleGenericFk(
+                tableName: $tableName,
+                col: $col,
+                targetClass: $fkDef['model'],
+                naturalCols: $fkDef['natural'] ?? [],
+                fallbackUser: (bool) ($fkDef['fallback_user'] ?? false),
+                ref: is_array($refs[$col] ?? null) ? $refs[$col] : null,
+                rawId: $payload[$col],
+                isNullable: (bool) ($schema['nullable'][$col] ?? true),
+                throwOnMissingRequired: $throwOnMissingRequired
+            );
+        }
+
+        foreach ($polyFks as $col => $polySpec) {
+            if (! in_array($col, $schema['columns'], true) || ! array_key_exists($col, $payload)) {
+                continue;
+            }
+            if ($payload[$col] === null || $payload[$col] === '') {
+                continue;
+            }
+
+            $ref = is_array($refs[$col] ?? null) ? $refs[$col] : null;
+            $targetClass = is_string($ref['_model'] ?? null) && class_exists($ref['_model'])
+                ? $ref['_model']
+                : BackofficeSyncRegistry::resolvePolymorphicModelClass($polySpec, $payload);
+
+            if ($targetClass === null) {
+                continue;
+            }
+
+            $payload[$col] = $this->resolveSingleGenericFk(
+                tableName: $tableName,
+                col: $col,
+                targetClass: $targetClass,
+                naturalCols: BackofficeSyncRegistry::naturalKeysForModel($targetClass),
+                fallbackUser: false,
+                ref: $ref,
+                rawId: $payload[$col],
+                isNullable: (bool) ($schema['nullable'][$col] ?? true),
+                throwOnMissingRequired: $throwOnMissingRequired
+            );
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  class-string<Model>  $targetClass
+     * @param  list<string>  $naturalCols
+     * @param  array<string, mixed>|null  $ref
+     */
+    protected function resolveSingleGenericFk(
+        string $tableName,
+        string $col,
+        string $targetClass,
+        array $naturalCols,
+        bool $fallbackUser,
+        ?array $ref,
+        mixed $rawId,
+        bool $isNullable,
+        bool $throwOnMissingRequired
+    ): mixed {
+        $baseQuery = function () use ($targetClass) {
+            $q = method_exists($targetClass, 'withTrashed')
+                ? $targetClass::withTrashed()
+                : $targetClass::query();
+
+            return class_exists(CabangScope::class) ? $q->withoutGlobalScope(CabangScope::class) : $q;
+        };
+
+        $hasSyncUuid = $this->tableHasSyncUuid($targetClass);
+        $refUuid = is_array($ref) && ! empty($ref['sync_uuid']) ? (string) $ref['sync_uuid'] : null;
+
+        if ($hasSyncUuid && $refUuid !== null) {
+            $found = $baseQuery()->where('sync_uuid', $refUuid)->value('id');
+            if ($found) {
+                return (int) $found;
+            }
+        }
+
+        if (is_array($ref)) {
+            foreach ($naturalCols as $natCol) {
+                $val = $ref[$natCol] ?? null;
+                if ($val === null || $val === '') {
+                    continue;
+                }
+                $found = $baseQuery()->where($natCol, $val)->value('id');
+                if ($found) {
+                    return (int) $found;
+                }
+            }
+        }
+
+        if ($fallbackUser) {
+            if ($isNullable) {
+                return null;
+            }
+            $firstUserId = User::query()->value('id');
+            if ($firstUserId) {
+                return (int) $firstUserId;
+            }
+        }
+
+        // Jangan ikat ke numeric ID mentah bila ref punya sync_uuid namun baris belum ada di node ini (anti PK kolisi).
+        if (! $hasSyncUuid || $refUuid === null) {
+            $candidateId = (int) $rawId;
+            if ($candidateId > 0) {
+                $found = $baseQuery()->where('id', $candidateId)->first();
+                if ($found && (! $hasSyncUuid || empty($found->getAttribute('sync_uuid')))) {
+                    return (int) $found->getKey();
+                }
+            }
+        }
+
+        if ($isNullable) {
+            return null;
+        }
+
+        if ($throwOnMissingRequired) {
+            throw new \RuntimeException("Referensi relasi {$col} pada tabel {$tableName} belum tersedia di node tujuan.");
+        }
+
+        return $rawId;
+    }
+
+    /**
+     * @param  array<string, mixed>  $resolvedPayload
+     * @return list<array<string, mixed>>
+     */
+    protected function resolveNaturalMatchersForTable(string $tableName, array $resolvedPayload): array
+    {
+        $def = BackofficeSyncRegistry::tables()[$tableName] ?? [];
+        $matchers = [];
+
+        foreach ($def['unique'] ?? [] as $cols) {
+            $matcher = [];
+            foreach ($cols as $col) {
+                $val = $resolvedPayload[$col] ?? null;
+                if ($val === null || $val === '') {
+                    $matcher = [];
+                    break;
+                }
+                $matcher[$col] = $val;
+            }
+            if ($matcher !== []) {
+                $matchers[] = $matcher;
+            }
+        }
+
+        return $matchers;
+    }
+
+    /**
+     * @return array{columns: list<string>, nullable: array<string, bool>}
+     */
+    protected function getTableSchemaInfo(string $table): array
+    {
+        if (! array_key_exists($table, self::$tableSchemaCache)) {
+            $columns = [];
+            $nullable = [];
+            if (Schema::hasTable($table)) {
+                foreach (Schema::getColumns($table) as $col) {
+                    $columns[] = $col['name'];
+                    $nullable[$col['name']] = $col['nullable'];
+                }
+            }
+            self::$tableSchemaCache[$table] = [
+                'columns' => $columns,
+                'nullable' => $nullable,
+            ];
+        }
+
+        return self::$tableSchemaCache[$table];
     }
 
     /**
