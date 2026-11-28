@@ -78,7 +78,7 @@ class SyncStatusController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function buildStatusData(bool $probeRemote = false): array
+    public function buildStatusData(bool $probeRemote = false): array
     {
         $enabled = (bool) config('sync.enabled', false);
         $role = (string) config('sync.node_role', 'standalone');

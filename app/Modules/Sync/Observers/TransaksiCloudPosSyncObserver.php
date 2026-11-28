@@ -13,10 +13,6 @@ class TransaksiCloudPosSyncObserver
 
     public function created(Transaksi $transaksi): void
     {
-        if (config('sync.node_role') !== 'cloud_storefront') {
-            return;
-        }
-
         if (! $this->isCloudPosTransaction($transaksi)) {
             return;
         }
@@ -37,10 +33,6 @@ class TransaksiCloudPosSyncObserver
 
     public function updated(Transaksi $transaksi): void
     {
-        if (config('sync.node_role') !== 'cloud_storefront') {
-            return;
-        }
-
         if (! $this->isCloudPosTransaction($transaksi)) {
             return;
         }

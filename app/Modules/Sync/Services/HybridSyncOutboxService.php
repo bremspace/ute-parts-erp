@@ -30,9 +30,10 @@ class HybridSyncOutboxService
             'attempts' => 0,
         ]);
 
-        // Node cloud_storefront menunggu ditarik via sync:pull (primary_store di balik NAT),
-        // sehingga tidak perlu memenuhi tabel jobs dengan push job tanpa target.
-        if (config('sync.node_role') === 'primary_store' && ! empty(config('sync.remote_url'))) {
+        // Kedua peran boleh push bila remote_url tersedia. Jika gagal (misal cloud
+        // tidak bisa menjangkau primary_store di balik NAT), item tetap di outbox
+        // dan bisa ditarik via sync:pull dari sisi lokal.
+        if (! empty(config('sync.remote_url'))) {
             PushHybridSyncJob::dispatch($outbox->id);
         }
 

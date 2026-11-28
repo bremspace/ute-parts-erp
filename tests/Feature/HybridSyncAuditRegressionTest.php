@@ -21,6 +21,7 @@ use App\Modules\Sync\Models\HybridSyncInbox;
 use App\Modules\Sync\Models\HybridSyncOutbox;
 use App\Modules\Sync\Services\HybridSyncOutboxService;
 use App\Modules\Sync\Services\HybridSyncProcessorService;
+use App\Modules\Sync\Services\SyncExecutionGuard;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
@@ -505,17 +506,22 @@ class HybridSyncAuditRegressionTest extends TestCase
             ->assertStatus(403);
     }
 
-    public function test_cloud_storefront_never_pushes_outbox_and_stuck_processing_recovers(): void
+    public function test_cloud_storefront_can_push_when_remote_configured_and_stuck_processing_recovers(): void
     {
         Queue::fake();
-        config(['sync.node_role' => 'cloud_storefront']);
+        config([
+            'sync.node_role' => 'cloud_storefront',
+            'sync.remote_url' => 'https://primary-store.test',
+        ]);
 
-        $brand = Brand::create(['nama' => 'Brand Cloud Side', 'is_active' => true]);
+        $brand = SyncExecutionGuard::runWithoutSync(
+            fn () => Brand::create(['nama' => 'Brand Cloud Side', 'is_active' => true])
+        );
         app(HybridSyncOutboxService::class)->enqueue('brand.upsert', $brand, ['nama' => 'Brand Cloud Side']);
-        Queue::assertNotPushed(PushHybridSyncJob::class);
+        Queue::assertPushed(PushHybridSyncJob::class, 1);
 
         $this->artisan('sync:flush')
-            ->expectsOutputToContain('hanya node primary_store')
+            ->expectsOutputToContain('Ditemukan')
             ->assertExitCode(0);
 
         // Stuck processing recovery & attempts >= 10 exclusion on primary_store

@@ -438,6 +438,8 @@ class HybridSyncTest extends TestCase
         HybridSyncOutbox::query()->delete();
         config(['sync.remote_url' => 'https://cloud.bremspace.test']);
 
+        HybridSyncOutbox::query()->delete();
+
         $item = HybridSyncOutbox::create([
             'sync_uuid' => (string) Str::uuid(),
             'event_type' => 'produk.upsert',

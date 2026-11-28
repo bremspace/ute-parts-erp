@@ -1,0 +1,4 @@
+# Rahasia hasil wizard — JANGAN pernah di-commit.
+.env.client
+.env.client.bak.*
+install_error.log
