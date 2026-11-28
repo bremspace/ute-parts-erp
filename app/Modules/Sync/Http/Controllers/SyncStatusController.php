@@ -5,6 +5,7 @@ namespace App\Modules\Sync\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Sync\Models\HybridSyncOutbox;
 use App\Modules\Sync\Providers\SyncServiceProvider;
+use App\Modules\Sync\Services\SyncSchemaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -80,6 +81,8 @@ class SyncStatusController extends Controller
      */
     public function buildStatusData(bool $probeRemote = false): array
     {
+        app(SyncSchemaService::class)->ensureTables();
+
         $enabled = (bool) config('sync.enabled', false);
         $role = (string) config('sync.node_role', 'standalone');
         $nodeId = (string) config('sync.node_id', 'NODE-01');

@@ -19,6 +19,10 @@ class HybridSyncOutboxService
             return null;
         }
 
+        // Self-healing runtime: database node lama bisa punya migrasi "ran"
+        // tanpa tabel sync. Pastikan tersedia sebelum menulis event pertama.
+        app(SyncSchemaService::class)->ensureTables();
+
         $outbox = HybridSyncOutbox::create([
             'sync_uuid' => (string) Str::uuid(),
             'event_type' => $eventType,
